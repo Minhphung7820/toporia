@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Contracts\Export;
 
+use App\Domain\ValueObjects\Export\ExportResult;
+
 /**
  * Export Interface
  *

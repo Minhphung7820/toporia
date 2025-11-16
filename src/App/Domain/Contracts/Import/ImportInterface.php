@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Contracts\Import;
 
+use App\Domain\ValueObjects\Import\ImportResult;
+
 /**
  * Import Interface
  *

@@ -18,7 +18,11 @@ use App\Presentation\Http\Controllers\AuthController;
 use App\Presentation\Http\Controllers\ProductsController;
 use App\Presentation\Http\Controllers\FileUploadController;
 use App\Presentation\Http\Controllers\ExcelController;
-use App\Presentation\Http\Action\Product\CreateProductAction;
+use App\Presentation\Http\Actions\Product\CreateProductAction;
+use App\Presentation\Http\Actions\Product\UpdateProductAction;
+use App\Presentation\Http\Actions\Product\DeleteProductAction;
+use App\Presentation\Http\Actions\Product\ListProductsAction;
+use App\Presentation\Http\Actions\Product\GetProductAction;
 use App\Jobs\TestRabbitMQJob;
 use Toporia\Framework\Support\Accessors\Log;
 
@@ -26,18 +30,6 @@ use Toporia\Framework\Support\Accessors\Log;
 
 // Public routes
 $router->get('/', [HomeController::class, 'index']);
-$router->get('/test-rabbitmq', function (Request $request, Response $response) {
-    // Dispatch test job
-    dispatch(new TestRabbitMQJob('Test message from route!'));
-
-    return $response->json([
-        'message' => 'RabbitMQ job dispatched successfully!',
-        'queue' => 'default',
-        'check_dashboard' => 'http://localhost:15672',
-        'credentials' => 'guest / guest',
-        'note' => 'Make sure worker is running: php console queue:work'
-    ]);
-});
 $router->get('/login', [AuthController::class, 'showLoginForm']);
 $router->post('/login', [AuthController::class, 'login']);
 $router->get('/register', [AuthController::class, 'showRegisterForm']);
@@ -58,8 +50,23 @@ $router->get('/products/create', [ProductsController::class, 'create'], [Authent
 $router->post('/products', [ProductsController::class, 'store'], [Authenticate::class]);
 $router->get('/products/{id}', [ProductsController::class, 'show']);
 
-// API routes (ADR pattern)
-$router->post('/v2/products', [CreateProductAction::class, '__invoke']);
+// API routes - Product CRUD (ADR pattern with Clean Architecture)
+$router->group(['prefix' => 'api/v1/products'], function (Router $router) {
+    // List products (paginated)
+    $router->get('/', ListProductsAction::class);
+
+    // Get single product
+    $router->get('/{id}', GetProductAction::class);
+
+    // Create product
+    $router->post('/', CreateProductAction::class);
+
+    // Update product
+    $router->put('/{id}', UpdateProductAction::class);
+
+    // Delete product
+    $router->delete('/{id}', DeleteProductAction::class);
+});
 
 // Elasticsearch Search API
 $router->get('/api/products/search', function (Request $request, Response $response) {

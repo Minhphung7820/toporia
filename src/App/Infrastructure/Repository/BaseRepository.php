@@ -120,7 +120,7 @@ abstract class BaseRepository implements RepositoryInterface
      */
     protected function createQueryBuilder(): QueryBuilder
     {
-        return $this->connection->query()->from($this->getTableName());
+        return $this->connection->table($this->getTableName());
     }
 
     /**

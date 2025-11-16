@@ -6,6 +6,7 @@ namespace App\Presentation\Http\Controllers;
 
 use App\Domain\Entities\User;
 use App\Domain\Contracts\Repository\UserRepository;
+use App\Infrastructure\Auth\AuthenticatableAdapter;
 use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
 use Toporia\Framework\Auth\Contracts\HasApiTokensInterface;
 use Toporia\Framework\Http\Request;
@@ -316,9 +317,12 @@ final class AuthController extends BaseController
      */
     private function handleWebLogin(User $user): void
     {
+        // Adapt domain User to framework Authenticatable
+        $frameworkUser = new AuthenticatableAdapter($user);
+
         // Login via session guard
         $remember = (bool) ($this->request->input('remember') ?? false);
-        $this->auth->guard('web')->login($user, $remember);
+        $this->auth->guard('web')->login($frameworkUser, $remember);
 
         $this->response->redirect('/dashboard');
     }

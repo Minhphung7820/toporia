@@ -8,9 +8,9 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
-use App\Domain\Contracts\Repository\ProductRepository;
+use App\Domain\Contracts\Product\ProductRepositoryInterface;
 use App\Domain\Contracts\Repository\UserRepository;
-use App\Infrastructure\Repository\EloquentProductRepository;
+use App\Infrastructure\Persistence\Product\PdoProductRepository;
 use App\Infrastructure\Repository\Transaction\TransactionManager;
 use App\Infrastructure\Repository\UnitOfWork;
 use App\Infrastructure\Repository\InMemoryUserRepository;
@@ -52,16 +52,15 @@ class RepositoryServiceProvider extends ServiceProvider
         $container->singleton(UnitOfWork::class, function (ContainerInterface $c) {
             $uow = new UnitOfWork($c->get(TransactionManager::class));
             // Register repositories with Unit of Work
-            $uow->register($c->get(ProductRepository::class));
+            $uow->register($c->get(ProductRepositoryInterface::class));
             return $uow;
         });
 
-        // Bind ProductRepository to Eloquent implementation (database-backed)
-        // This uses BaseRepository for common functionality
-        $container->singleton(ProductRepository::class, function (ContainerInterface $c) {
-            return new EloquentProductRepository(
-                $c->get(ConnectionInterface::class),
-                $c->has(CacheInterface::class) ? $c->get(CacheInterface::class) : null
+        // Bind ProductRepositoryInterface to PDO implementation
+        // Clean Architecture: Domain interface → Infrastructure implementation
+        $container->singleton(ProductRepositoryInterface::class, function (ContainerInterface $c) {
+            return new PdoProductRepository(
+                $c->get(ConnectionInterface::class)
             );
         });
 
