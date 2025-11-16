@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Transformer;
 
-use App\Domain\Transformer\ResourceCollectionInterface;
-use App\Domain\Transformer\ResourceInterface;
+use App\Domain\Contracts\Transformer\ResourceCollectionInterface;
+use App\Domain\Contracts\Transformer\ResourceInterface;
 
 /**
  * Resource Collection Implementation

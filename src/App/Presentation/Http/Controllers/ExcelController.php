@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Presentation\Http\Controllers;
 
-use App\Domain\Product\ProductRepository;
+use App\Domain\Contracts\Repository\ProductRepository;
 use App\Infrastructure\Export\ExcelExporter;
 use App\Infrastructure\Import\ExcelImporter;
 use Toporia\Framework\Http\Request;
@@ -137,4 +137,3 @@ final class ExcelController extends BaseController
         }
     }
 }
-

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Macro;
 
-use App\Domain\Macro\MacroRegistryInterface;
+use Toporia\Framework\Macro\Contracts\MacroRegistryInterface;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**

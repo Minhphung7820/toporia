@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Providers;
 
-use App\Domain\User\UserRepository;
 use Toporia\Framework\Auth\AuthManager;
 use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
+use Toporia\Framework\Auth\Contracts\UserProviderInterface;
 use Toporia\Framework\Auth\Guards\{SessionGuard, TokenGuard};
-use Toporia\Framework\Auth\UserProvider\RepositoryUserProvider;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Http\Request;
@@ -70,15 +69,16 @@ class AuthServiceProvider extends ServiceProvider
     /**
      * Create a session guard instance.
      *
+     * Framework gets UserProviderInterface from container (registered by App).
+     *
      * @param ContainerInterface $container
      * @param string $name Guard name.
      * @return SessionGuard
      */
     protected function createSessionGuard(ContainerInterface $container, string $name): SessionGuard
     {
-        $userProvider = new RepositoryUserProvider(
-            $container->get(UserRepository::class)
-        );
+        // Get UserProviderInterface from container (App must register it)
+        $userProvider = $container->get(UserProviderInterface::class);
 
         return new SessionGuard($userProvider, $name);
     }
@@ -106,16 +106,16 @@ class AuthServiceProvider extends ServiceProvider
     /**
      * Create a token guard instance for API authentication.
      *
+     * Framework gets UserProviderInterface from container (registered by App).
+     *
      * @param ContainerInterface $container
      * @param string $name Guard name.
      * @return TokenGuard
      */
     protected function createTokenGuard(ContainerInterface $container, string $name): TokenGuard
     {
-        $userProvider = new RepositoryUserProvider(
-            $container->get(UserRepository::class)
-        );
-
+        // Get UserProviderInterface from container (App must register it)
+        $userProvider = $container->get(UserProviderInterface::class);
         $request = $container->get(Request::class);
 
         return new TokenGuard($userProvider, $request, $name);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Presentation\Http\Controllers;
 
-use App\Domain\Product\ProductRepository;
+use App\Domain\Contracts\Repository\ProductRepository;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
 

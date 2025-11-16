@@ -126,11 +126,11 @@ $app->registerProviders([
     ...FrameworkServiceProvider::providers(),
 
     // Application providers
-    \App\Providers\AppServiceProvider::class,
-    \App\Providers\RepositoryServiceProvider::class,
-    \App\Providers\EventServiceProvider::class,
-    \App\Providers\RouteServiceProvider::class,
-    \App\Providers\ScheduleServiceProvider::class,
+    \App\Infrastructure\Providers\AppServiceProvider::class,
+    \App\Infrastructure\Providers\RepositoryServiceProvider::class,
+    \App\Infrastructure\Providers\EventServiceProvider::class,
+    \App\Infrastructure\Providers\RouteServiceProvider::class,
+    \App\Infrastructure\Providers\ScheduleServiceProvider::class,
 ]);
 
 /*

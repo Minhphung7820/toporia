@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Services\Kafka;
 
-use App\Domain\Services\TopicServiceInterface;
-use App\Domain\Services\HealthCheckerInterface;
-use App\Domain\Services\ClusterFixerInterface;
+use App\Domain\Contracts\Services\TopicServiceInterface;
+use App\Domain\Contracts\Services\HealthCheckerInterface;
+use App\Domain\Contracts\Services\ClusterFixerInterface;
 use Toporia\Framework\Realtime\RealtimeManager;
 use Toporia\Framework\Support\Accessors\Log;
 

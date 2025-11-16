@@ -6,7 +6,7 @@ namespace App\Presentation\Http\Controllers;
 
 use App\Application\Product\CreateProduct\CreateProductCommand;
 use App\Application\Product\CreateProduct\CreateProductHandler;
-use App\Domain\Product\ProductRepository;
+use App\Domain\Contracts\Repository\ProductRepository;
 use App\Infrastructure\Persistence\Models\ProductModel;
 use Toporia\Framework\Http\Request;
 

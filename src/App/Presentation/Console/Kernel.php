@@ -37,15 +37,15 @@ final class Kernel
         return [
             // Test commands
             // Business logic consumers
-            \App\Console\Commands\OrderTrackingConsumerCommand::class,
+            \App\Application\Console\Commands\OrderTrackingConsumerCommand::class,
 
             // Kafka topic management
-            \App\Console\Commands\KafkaTopicManagerCommand::class,
+            \App\Application\Console\Commands\KafkaTopicManagerCommand::class,
 
             // Add your custom application commands here...
             // Example:
-            // \App\Console\Commands\SendNewsletterCommand::class,
-            // \App\Console\Commands\GenerateReportCommand::class,
+            // \App\Application\Console\Commands\SendNewsletterCommand::class,
+            // \App\Application\Console\Commands\GenerateReportCommand::class,
         ];
     }
 

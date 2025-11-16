@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository\Criteria;
 
-use App\Domain\Repository\Criteria\CriteriaInterface;
-use App\Domain\Repository\QueryBuilderInterface;
+use App\Domain\Contracts\Repository\Criteria\CriteriaInterface;
+use App\Domain\Contracts\Repository\QueryBuilderInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
 
 /**

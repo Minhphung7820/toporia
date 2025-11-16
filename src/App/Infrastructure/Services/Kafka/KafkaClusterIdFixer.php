@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Services\Kafka;
 
-use App\Domain\Services\ClusterFixerInterface;
+use App\Domain\Contracts\Services\ClusterFixerInterface;
 use Toporia\Framework\Support\Accessors\Log;
 
 /**

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Transformer;
 
-use App\Domain\Transformer\TransformerInterface;
+use App\Domain\Contracts\Transformer\TransformerInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**

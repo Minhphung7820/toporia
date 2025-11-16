@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Export;
 
-use App\Domain\Export\ExportInterface;
-use App\Domain\Export\ExportResult;
+use App\Domain\Contracts\Export\ExportInterface;
+use App\Domain\Contracts\Export\ExportResult;
 
 /**
  * Base Exporter Implementation

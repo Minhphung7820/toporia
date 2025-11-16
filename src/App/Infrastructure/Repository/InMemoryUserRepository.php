@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository;
 
-use App\Domain\User\User;
-use App\Domain\User\UserRepository;
+use App\Domain\Entities\User;
+use App\Domain\Contracts\Repository\UserRepository;
 
 /**
  * In-Memory User Repository - For testing and development.

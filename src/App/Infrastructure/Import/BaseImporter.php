@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Import;
 
-use App\Domain\Import\ImportInterface;
-use App\Domain\Import\ImportResult;
+use App\Domain\Contracts\Import\ImportInterface;
+use App\Domain\Contracts\Import\ImportResult;
 
 /**
  * Base Importer Implementation

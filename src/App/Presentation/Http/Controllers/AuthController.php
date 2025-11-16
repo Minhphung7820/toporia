@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Presentation\Http\Controllers;
 
-use App\Domain\User\User;
-use App\Domain\User\UserRepository;
+use App\Domain\Entities\User;
+use App\Domain\Contracts\Repository\UserRepository;
 use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
 use Toporia\Framework\Auth\Contracts\HasApiTokensInterface;
 use Toporia\Framework\Http\Request;

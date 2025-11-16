@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository;
 
-use App\Domain\Product\Product;
-use App\Domain\Product\ProductRepository as ProductRepositoryInterface;
-use App\Domain\Repository\RepositoryInterface;
+use App\Domain\Entities\Product;
+use App\Domain\Contracts\Repository\ProductRepository as ProductRepositoryInterface;
+use App\Domain\Contracts\Repository\RepositoryInterface;
 use App\Infrastructure\Persistence\Models\ProductModel;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Cache\Contracts\CacheInterface;

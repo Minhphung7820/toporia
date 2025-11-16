@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository;
 
-use App\Domain\Product\ProductRepository;
-use App\Domain\Product\Product;
+use App\Domain\Contracts\Repository\ProductRepository;
+use App\Domain\Entities\Product;
 
 final class InMemoryProductRepository implements ProductRepository
 {

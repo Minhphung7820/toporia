@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Export;
 
-use App\Domain\Export\ExportResult;
+use App\Domain\Contracts\Export\ExportResult;
 
 /**
  * Excel Exporter Implementation

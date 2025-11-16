@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Services\Kafka;
 
-use App\Domain\Services\HealthCheckerInterface;
+use App\Domain\Contracts\Services\HealthCheckerInterface;
 use Toporia\Framework\Realtime\RealtimeManager;
 use Toporia\Framework\Support\Accessors\Log;
 
@@ -122,5 +122,15 @@ final class KafkaHealthChecker implements HealthCheckerInterface
 
         // Default to true if not configured (assumes plaintext for development)
         return true;
+    }
+
+    /**
+     * Perform comprehensive health check.
+     *
+     * @return array<string, bool> Health check results
+     */
+    public function performHealthCheck(): array
+    {
+        return $this->getHealthStatus();
     }
 }

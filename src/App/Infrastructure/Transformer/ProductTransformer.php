@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Transformer;
 
-use App\Domain\Product\Product;
+use App\Domain\Entities\Product;
 use App\Infrastructure\Transformer\Resource;
 
 /**

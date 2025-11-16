@@ -7,7 +7,6 @@ namespace Toporia\Framework\Providers;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Console\{Application, CommandRegistry};
-use App\Presentation\Console\Kernel;
 
 /**
  * Console Service Provider
@@ -35,8 +34,13 @@ final class ConsoleServiceProvider extends ServiceProvider
     $this->registerFrameworkCommands($registry);
 
     // Bootstrap APPLICATION kernel (application layer)
-    $kernel = new Kernel();
-    $kernel->bootstrap($container->get(Application::class), $registry);
+    // App must register a callback or service to bootstrap its kernel
+    if ($container->has('console.kernel.bootstrap')) {
+      $bootstrap = $container->get('console.kernel.bootstrap');
+      if (is_callable($bootstrap)) {
+        $bootstrap($container->get(Application::class), $registry);
+      }
+    }
   }
 
   /**

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository;
 
-use App\Domain\Repository\RepositoryInterface;
-use App\Domain\Repository\Criteria\CriteriaInterface;
-use App\Domain\Repository\QueryBuilderInterface;
+use App\Domain\Contracts\Repository\RepositoryInterface;
+use App\Domain\Contracts\Repository\Criteria\CriteriaInterface;
+use App\Domain\Contracts\Repository\QueryBuilderInterface;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Cache\Contracts\CacheInterface;

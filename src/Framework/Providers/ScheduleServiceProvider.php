@@ -36,6 +36,6 @@ final class ScheduleServiceProvider extends ServiceProvider
     public function boot(ContainerInterface $container): void
     {
         // Scheduler is now ready with container injected
-        // Scheduled tasks are defined in App\Providers\ScheduleServiceProvider
+        // Scheduled tasks are defined in App\Infrastructure\Providers\ScheduleServiceProvider
     }
 }

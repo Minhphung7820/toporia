@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support;
 
-use App\Domain\Macro\MacroRegistryInterface;
+use Toporia\Framework\Macro\Contracts\MacroRegistryInterface;
+use Toporia\Framework\Macro\SimpleMacroRegistry;
 use Toporia\Framework\Container\Container;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
@@ -149,11 +150,14 @@ trait Macroable
     /**
      * Get macro registry instance.
      *
+     * Tries to get from container first (if App registered it).
+     * Falls back to simple in-memory registry if container is not available.
+     *
      * @return MacroRegistryInterface Macro registry
      */
     private static function getMacroRegistry(): MacroRegistryInterface
     {
-        // Try to get from container first (if available)
+        // Try to get from container first (if available and registered by App)
         try {
             if (Container::hasInstance()) {
                 $container = Container::getInstance();
@@ -162,15 +166,16 @@ trait Macroable
                 }
             }
         } catch (\Throwable $e) {
-            // Container not available, fallback to singleton
+            // Container not available, fallback to simple registry
         }
 
-        // Fallback to singleton instance
-        static $registry = null;
-        if ($registry === null) {
-            $registry = new \App\Infrastructure\Macro\MacroRegistry();
+        // Fallback: Use Framework's simple in-memory registry
+        // This works without App dependencies but doesn't have caching
+        static $fallbackRegistry = null;
+        if ($fallbackRegistry === null) {
+            $fallbackRegistry = new SimpleMacroRegistry();
         }
 
-        return $registry;
+        return $fallbackRegistry;
     }
 }

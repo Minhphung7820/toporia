@@ -1,8 +1,8 @@
 <?php
 namespace App\Application\Product\CreateProduct;
 
-use App\Domain\Product\Product;
-use App\Domain\Product\ProductRepository;
+use App\Domain\Entities\Product;
+use App\Domain\Contracts\Repository\ProductRepository;
 
 final class CreateProductHandler
 {
