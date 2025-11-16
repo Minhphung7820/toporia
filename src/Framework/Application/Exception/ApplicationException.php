@@ -13,7 +13,4 @@ use Exception;
  *
  * @package Toporia\Framework\Application\Exception
  */
-class ApplicationException extends Exception
-{
-}
-
+class ApplicationException extends Exception {}
