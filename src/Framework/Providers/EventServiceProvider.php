@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Providers;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Events\Dispatcher;
 use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
 use Toporia\Framework\Foundation\ServiceProvider;

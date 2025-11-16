@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Routing;
 
+use Toporia\Framework\Routing\Contracts\UrlGeneratorInterface;
+use Toporia\Framework\Routing\Contracts\RouteCollectionInterface;
 use Toporia\Framework\Http\Request;
 
 /**
@@ -185,8 +187,8 @@ final class UrlGenerator implements UrlGeneratorInterface
 
         // Rebuild URL without signature
         $urlWithoutSignature = ($parts['scheme'] ?? 'http') . '://' .
-                               ($parts['host'] ?? 'localhost') .
-                               ($parts['path'] ?? '/');
+            ($parts['host'] ?? 'localhost') .
+            ($parts['path'] ?? '/');
 
         if (!empty($query)) {
             $urlWithoutSignature .= '?' . http_build_query($query);

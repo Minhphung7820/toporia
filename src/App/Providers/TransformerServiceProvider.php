@@ -8,7 +8,7 @@ use App\Domain\Transformer\TransformerInterface;
 use App\Infrastructure\Transformer\ProductTransformer;
 use App\Infrastructure\Transformer\TransformerManager;
 use App\Infrastructure\Transformer\UserTransformer;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 
 /**

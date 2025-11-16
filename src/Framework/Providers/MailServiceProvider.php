@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Providers;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Mail\MailerInterface;
+use Toporia\Framework\Mail\Contracts\MailerInterface;
 use Toporia\Framework\Mail\MailManager;
-use Toporia\Framework\Mail\MailManagerInterface;
+use Toporia\Framework\Mail\Contracts\MailManagerInterface;
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**

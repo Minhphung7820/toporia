@@ -49,8 +49,7 @@ final class SseTransport implements TransportInterface
     public function __construct(
         private readonly array $config,
         private readonly RealtimeManagerInterface $manager
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}

@@ -6,7 +6,7 @@ namespace Toporia\Framework\Support;
 
 use App\Domain\Macro\MacroRegistryInterface;
 use Toporia\Framework\Container\Container;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Macroable Trait

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Validation;
 
+use Toporia\Framework\Validation\Contracts\ValidatorInterface;
+
 /**
  * Validator
  *
@@ -156,7 +158,7 @@ final class Validator implements ValidatorInterface
     {
         if (is_string($connection)) {
             // Connection name - will be resolved lazily
-            self::$connectionResolver = function() use ($connection) {
+            self::$connectionResolver = function () use ($connection) {
                 // Try to get DatabaseManager from container
                 if (function_exists('app') && app()->has('db.manager')) {
                     return app('db.manager')->connection($connection);
@@ -234,7 +236,7 @@ final class Validator implements ValidatorInterface
 
         throw new \RuntimeException(
             'Database connection not available. ' .
-            'Please call Validator::setConnection($db) or Validator::setConnectionResolver(fn() => app(\'db\')) first.'
+                'Please call Validator::setConnection($db) or Validator::setConnectionResolver(fn() => app(\'db\')) first.'
         );
     }
 

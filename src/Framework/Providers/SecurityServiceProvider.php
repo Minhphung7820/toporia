@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Providers;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Security\CsrfTokenManagerInterface;
+use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
 use Toporia\Framework\Security\SessionCsrfTokenManager;
-use Toporia\Framework\Security\ReplayAttackProtectionInterface;
+use Toporia\Framework\Security\Contracts\ReplayAttackProtectionInterface;
 use Toporia\Framework\Security\SessionReplayAttackProtection;
 use Toporia\Framework\Security\XssService;
-use Toporia\Framework\Auth\GateInterface;
-use Toporia\Framework\Auth\Gate;
-use Toporia\Framework\Auth\AuthInterface;
+use Toporia\Framework\Auth\Contracts\GateContract;
+use Toporia\Framework\Auth\Access\Gate;
+use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
 use Toporia\Framework\Http\CookieJar;
 
 /**
@@ -36,12 +36,12 @@ final class SecurityServiceProvider extends ServiceProvider
         $container->bind('csrf', fn($c) => $c->get(CsrfTokenManagerInterface::class));
 
         // Authorization Gate
-        $container->singleton(GateInterface::class, function ($c) {
+        $container->singleton(GateContract::class, function ($c) {
             $auth = $c->has('auth') ? $c->get('auth') : null;
             return new Gate($auth);
         });
 
-        $container->bind('gate', fn($c) => $c->get(GateInterface::class));
+        $container->bind('gate', fn($c) => $c->get(GateContract::class));
 
         // Cookie Jar
         $container->singleton(CookieJar::class, function () {

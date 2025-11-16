@@ -41,8 +41,7 @@ final class MemoryTransport implements TransportInterface
 
     public function __construct(
         private readonly RealtimeManager $manager
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}

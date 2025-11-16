@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Schema;
 
-use Toporia\Framework\Database\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 
 /**
  * Schema Builder for creating/modifying database tables.

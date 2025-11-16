@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Query;
 
-use Toporia\Framework\Database\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\QueryBuilderInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Query\RowCollection;
 
 /**
@@ -674,7 +675,7 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
-     * Execute the built SELECT and return a typed RowCollection.
+     * Execute the built SELECT and return rows.
      *
      * @return RowCollection<int, array<string,mixed>>
      */
@@ -693,7 +694,9 @@ class QueryBuilder implements QueryBuilderInterface
     public function first(): ?array
     {
         $this->limit(1);
-        return $this->get()->first() ?? null;
+        $collection = $this->get();
+        $first = $collection->first();
+        return is_array($first) ? $first : null;
     }
 
     /**
@@ -703,7 +706,9 @@ class QueryBuilder implements QueryBuilderInterface
      */
     public function collect(): RowCollection
     {
-        return $this->get();
+        /** @var RowCollection<int, array<string,mixed>> $result */
+        $result = $this->get();
+        return $result;
     }
 
     /**
@@ -713,7 +718,9 @@ class QueryBuilder implements QueryBuilderInterface
      */
     public function getArray(): array
     {
-        return $this->get()->all();
+        /** @var RowCollection<int, array<string,mixed>> $collection */
+        $collection = $this->get();
+        return $collection->toArray();
     }
 
     /**
@@ -1339,6 +1346,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         // Step 2: Get paginated items
         $offset = ($page - 1) * $perPage;
+        /** @var RowCollection<int, array<string,mixed>> $items */
         $items = $this->limit($perPage)->offset($offset)->get();
 
         // Step 3: Return Paginator value object

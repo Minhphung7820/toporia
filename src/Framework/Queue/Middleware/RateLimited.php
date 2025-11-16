@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Queue\Middleware;
 
 use Toporia\Framework\Queue\Contracts\JobInterface;
-use Toporia\Framework\RateLimit\RateLimiterInterface;
+use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
 use Toporia\Framework\Queue\Exceptions\RateLimitExceededException;
 
 /**

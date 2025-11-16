@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support;
 
+use Toporia\Framework\Support\Contracts\CollectionInterface;
+
 /**
  * Collection - Advanced immutable collection with functional operations.
  *

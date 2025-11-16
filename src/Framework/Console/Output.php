@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Console;
 
+use Toporia\Framework\Console\Contracts\OutputInterface;
 /**
  * Console Output
  *

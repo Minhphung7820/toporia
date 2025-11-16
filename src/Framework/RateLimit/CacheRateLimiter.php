@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\RateLimit;
 
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
  * Cache-based Rate Limiter

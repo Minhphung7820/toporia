@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Accessors;
 
 use Toporia\Framework\Foundation\ServiceAccessor;
-use Toporia\Framework\Auth\GateInterface;
+use Toporia\Framework\Auth\Contracts\GateContract;
 use Toporia\Framework\Auth\Authenticatable;
 
 /**
@@ -19,9 +19,9 @@ use Toporia\Framework\Auth\Authenticatable;
  * @method static void authorize(string $ability, mixed ...$arguments) Authorize or throw exception
  * @method static bool any(array $abilities, mixed ...$arguments) Check if any ability is allowed
  * @method static bool all(array $abilities, mixed ...$arguments) Check if all abilities are allowed
- * @method static GateInterface forUser(Authenticatable $user) Get gate for specific user
+ * @method static GateContract forUser(Authenticatable $user) Get gate for specific user
  *
- * @see GateInterface
+ * @see GateContract
  *
  * @example
  * // Define ability

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Notification\Jobs;
 
+use Toporia\Framework\Notification\Contracts\NotificationInterface;
+use Toporia\Framework\Notification\Contracts\NotifiableInterface;
 use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationInterface};
 

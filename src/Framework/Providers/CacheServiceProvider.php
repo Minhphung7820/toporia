@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Providers;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Toporia\Framework\Cache\CacheManager;
-use Toporia\Framework\Cache\CacheManagerInterface;
+use Toporia\Framework\Cache\Contracts\CacheManagerInterface;
 
 /**
  * Cache Service Provider

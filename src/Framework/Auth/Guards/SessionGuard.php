@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Toporia\Framework\Auth\Guards;
 
 use Toporia\Framework\Auth\Authenticatable;
-use Toporia\Framework\Auth\GuardInterface;
-use Toporia\Framework\Auth\UserProviderInterface;
+use Toporia\Framework\Auth\Contracts\GuardInterface;
+use Toporia\Framework\Auth\Contracts\UserProviderInterface;
 
 /**
  * Session Guard - Session-based authentication.

@@ -6,7 +6,7 @@ namespace Toporia\Framework\Providers;
 
 use Elastic\Elasticsearch\Client;
 use Elastic\Elasticsearch\ClientBuilder;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Search\Contracts\SearchClientInterface;
 use Toporia\Framework\Search\Contracts\SearchIndexerInterface;

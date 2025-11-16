@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Notification\Channels;
 
+use Toporia\Framework\Notification\Contracts\NotificationInterface;
+use Toporia\Framework\Notification\Contracts\NotifiableInterface;
+use Toporia\Framework\Notification\Contracts\ChannelInterface;
 use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface};
 use Toporia\Framework\Notification\Messages\SmsMessage;
 

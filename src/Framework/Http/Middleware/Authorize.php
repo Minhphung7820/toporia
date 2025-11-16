@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Http\Middleware;
 
+use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Auth\AuthorizationException;
-use Toporia\Framework\Auth\GateInterface;
+use Toporia\Framework\Auth\Contracts\GateContract;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
 
@@ -18,7 +19,7 @@ use Toporia\Framework\Http\Response;
 final class Authorize implements MiddlewareInterface
 {
     public function __construct(
-        private GateInterface $gate,
+        private GateContract $gate,
         private string $ability,
         private array $arguments = []
     ) {}
@@ -48,12 +49,12 @@ final class Authorize implements MiddlewareInterface
     /**
      * Create middleware for a specific ability
      *
-     * @param GateInterface $gate
+     * @param GateContract $gate
      * @param string $ability
      * @param mixed ...$arguments
      * @return self
      */
-    public static function can(GateInterface $gate, string $ability, mixed ...$arguments): self
+    public static function can(GateContract $gate, string $ability, mixed ...$arguments): self
     {
         return new self($gate, $ability, $arguments);
     }

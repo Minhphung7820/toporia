@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Accessors;
 
 use Toporia\Framework\Foundation\ServiceAccessor;
-use Toporia\Framework\Database\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\DatabaseManager;
 

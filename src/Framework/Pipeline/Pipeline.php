@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Pipeline;
 
 use Closure;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Pipeline\Contracts\PipelineInterface;
 
 /**

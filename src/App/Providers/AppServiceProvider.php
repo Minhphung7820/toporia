@@ -6,7 +6,7 @@ namespace App\Providers;
 
 use App\Domain\User\UserRepository;
 use App\Infrastructure\Persistence\InMemoryUserRepository;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 
 /**

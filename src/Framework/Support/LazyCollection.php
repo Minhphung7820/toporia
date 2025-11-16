@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support;
 
+use Toporia\Framework\Support\Contracts\CollectionInterface;
 use ArrayAccess;
 use Countable;
 use Generator;

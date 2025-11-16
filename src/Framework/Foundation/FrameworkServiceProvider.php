@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Foundation;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Framework Service Provider

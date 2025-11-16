@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Cache;
 
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 /**
  * Tagged Cache
  *

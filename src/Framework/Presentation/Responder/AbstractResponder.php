@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Presentation\Responder;
 
+use Toporia\Framework\Presentation\Contracts\ResponderInterface;
 use Toporia\Framework\Http\Response;
 
 /**

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http;
 
 use Toporia\Framework\Validation\Validator;
-use Toporia\Framework\Validation\ValidatorInterface;
+use Toporia\Framework\Validation\Contracts\ValidatorInterface;
 
 /**
  * Form Request

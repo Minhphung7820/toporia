@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support\Accessors;
 
-use Toporia\Framework\Routing\UrlGeneratorInterface;
+use Toporia\Framework\Routing\Contracts\UrlGeneratorInterface;
 
 /**
  * Static accessor for URL Generator (Laravel-compatible).

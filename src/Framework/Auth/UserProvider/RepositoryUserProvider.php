@@ -7,7 +7,7 @@ namespace Toporia\Framework\Auth\UserProvider;
 use App\Domain\User\User;
 use App\Domain\User\UserRepository;
 use Toporia\Framework\Auth\Authenticatable;
-use Toporia\Framework\Auth\UserProviderInterface;
+use Toporia\Framework\Auth\Contracts\UserProviderInterface;
 
 /**
  * Repository User Provider - Retrieves users via UserRepository.

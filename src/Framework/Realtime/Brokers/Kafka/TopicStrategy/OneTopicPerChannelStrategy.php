@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy;
 
+use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
 /**
  * One Topic Per Channel Strategy
  *

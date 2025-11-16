@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Security;
 
+use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
 /**
  * Session-based CSRF token manager
  *

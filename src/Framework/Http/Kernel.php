@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Http;
 
-use Toporia\Framework\Container\ContainerInterface;
-use Toporia\Framework\Routing\RouterInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Routing\Contracts\RouterInterface;
 
 /**
  * HTTP Kernel

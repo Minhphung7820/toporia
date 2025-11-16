@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM\Relations;
 
+use Toporia\Framework\Database\Contracts\RelationInterface;
 use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Database\ORM\ModelCollection;
 

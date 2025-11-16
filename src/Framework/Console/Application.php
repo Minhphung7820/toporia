@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Console;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Console\Contracts\InputInterface;
+use Toporia\Framework\Console\Contracts\OutputInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Console Application

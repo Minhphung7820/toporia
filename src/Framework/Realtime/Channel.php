@@ -39,8 +39,7 @@ final class Channel implements ChannelInterface
         private readonly string $name,
         private readonly ?TransportInterface $transport = null,
         private readonly mixed $authorizer = null
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}

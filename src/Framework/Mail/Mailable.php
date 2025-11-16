@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Mail;
 
+use Toporia\Framework\Mail\Contracts\MessageInterface;
 /**
  * Mailable Abstract Class
  *

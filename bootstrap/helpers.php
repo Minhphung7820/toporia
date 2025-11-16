@@ -750,3 +750,89 @@ if (!function_exists('chronos')) {
         return \Toporia\Framework\DateTime\Chronos::parse($time, $timezone);
     }
 }
+
+// ============================================================================
+// AUTHORIZATION HELPERS (Gate & Policy)
+// ============================================================================
+
+if (!function_exists('gate')) {
+    /**
+     * Get the gate instance.
+     *
+     * @return \Toporia\Framework\Auth\Contracts\GateContract
+     */
+    function gate(): \Toporia\Framework\Auth\Contracts\GateContract
+    {
+        return app(\Toporia\Framework\Auth\Contracts\GateContract::class);
+    }
+}
+
+if (!function_exists('can')) {
+    /**
+     * Determine if the current user has a given ability.
+     *
+     * @param string $ability Ability name
+     * @param mixed ...$arguments Arguments (typically resource instance)
+     * @return bool True if allowed
+     */
+    function can(string $ability, mixed ...$arguments): bool
+    {
+        return gate()->allows($ability, ...$arguments);
+    }
+}
+
+if (!function_exists('cannot')) {
+    /**
+     * Determine if the current user does not have a given ability.
+     *
+     * @param string $ability Ability name
+     * @param mixed ...$arguments Arguments
+     * @return bool True if denied
+     */
+    function cannot(string $ability, mixed ...$arguments): bool
+    {
+        return gate()->denies($ability, ...$arguments);
+    }
+}
+
+if (!function_exists('authorize')) {
+    /**
+     * Authorize an ability or throw exception.
+     *
+     * @param string $ability Ability name
+     * @param mixed ...$arguments Arguments
+     * @return \Toporia\Framework\Auth\Access\Response Authorization response
+     * @throws \Toporia\Framework\Auth\AuthorizationException If denied
+     */
+    function authorize(string $ability, mixed ...$arguments): \Toporia\Framework\Auth\Access\Response
+    {
+        return gate()->authorize($ability, ...$arguments);
+    }
+}
+
+if (!function_exists('deny')) {
+    /**
+     * Create a denied authorization response.
+     *
+     * @param string|null $message Denial reason
+     * @param mixed $code Error code
+     * @return \Toporia\Framework\Auth\Access\Response Denied response
+     */
+    function deny(?string $message = null, mixed $code = null): \Toporia\Framework\Auth\Access\Response
+    {
+        return \Toporia\Framework\Auth\Access\Response::deny($message, $code);
+    }
+}
+
+if (!function_exists('allow')) {
+    /**
+     * Create an allowed authorization response.
+     *
+     * @param string|null $message Success message
+     * @return \Toporia\Framework\Auth\Access\Response Allowed response
+     */
+    function allow(?string $message = null): \Toporia\Framework\Auth\Access\Response
+    {
+        return \Toporia\Framework\Auth\Access\Response::allow($message);
+    }
+}

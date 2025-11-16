@@ -43,8 +43,7 @@ final class WebSocketTransport implements TransportInterface
     public function __construct(
         private readonly array $config,
         private readonly RealtimeManagerInterface $manager
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}
@@ -103,7 +102,7 @@ final class WebSocketTransport implements TransportInterface
         if (!extension_loaded('swoole')) {
             throw new \RuntimeException(
                 'Swoole extension is required for WebSocket transport. ' .
-                'Install: pecl install swoole'
+                    'Install: pecl install swoole'
             );
         }
 

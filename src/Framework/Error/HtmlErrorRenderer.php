@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Error;
 
+use Toporia\Framework\Error\Contracts\ErrorRendererInterface;
 use Throwable;
 
 /**

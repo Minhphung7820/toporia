@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Http;
 
+use Toporia\Framework\Http\Contracts\ResponseInterface;
 /**
  * HTTP Response implementation.
  *

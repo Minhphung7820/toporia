@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Routing;
 
+use Toporia\Framework\Routing\Contracts\RouteInterface;
 /**
  * Route implementation with parameter extraction support.
  */

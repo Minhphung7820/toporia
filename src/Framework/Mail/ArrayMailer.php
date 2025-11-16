@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Mail;
 
+use Toporia\Framework\Mail\Contracts\MessageInterface;
+use Toporia\Framework\Mail\Contracts\MailerInterface;
 /**
  * Array Mailer
  *

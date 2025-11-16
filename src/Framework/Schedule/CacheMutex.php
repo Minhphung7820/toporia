@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Schedule;
 
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\Schedule\Contracts\MutexInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
  * Cache-based Mutex

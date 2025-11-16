@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Queue;
 
-use Toporia\Framework\Container\ContainerInterface;
-use Toporia\Framework\Database\Connection;
-use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface, QueueManagerInterface};
+use Toporia\Framework\Queue\Contracts\JobInterface;
+use Toporia\Framework\Queue\Contracts\QueueInterface;
+use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Queue Manager

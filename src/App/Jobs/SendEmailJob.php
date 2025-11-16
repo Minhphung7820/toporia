@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use Toporia\Framework\Queue\Job;
-use Toporia\Framework\Mail\MailerInterface;
+use Toporia\Framework\Mail\Contracts\MailerInterface;
 use Toporia\Framework\Mail\Message;
 
 /**

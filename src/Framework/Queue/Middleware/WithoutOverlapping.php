@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Queue\Middleware;
 
 use Toporia\Framework\Queue\Contracts\JobInterface;
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Toporia\Framework\Queue\Exceptions\JobAlreadyRunningException;
 
 /**

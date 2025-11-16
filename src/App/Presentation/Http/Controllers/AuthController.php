@@ -6,32 +6,39 @@ namespace App\Presentation\Http\Controllers;
 
 use App\Domain\User\User;
 use App\Domain\User\UserRepository;
-use Toporia\Framework\Auth\AuthManagerInterface;
-use Toporia\Framework\Auth\Guards\TokenGuard;
+use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
+use Toporia\Framework\Auth\Contracts\HasApiTokensInterface;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
 
 /**
  * Authentication Controller
  *
- * Handles user authentication for both web and API requests.
- * Supports session-based (web) and token-based (API) authentication.
+ * Handles user authentication with multiple strategies:
+ * - Web: Session-based authentication
+ * - API: Sanctum-style personal access tokens
  *
- * Following Clean Architecture and SOLID principles.
+ * Clean Architecture:
+ * - Presentation layer controller
+ * - Depends on domain repositories and framework services
+ *
+ * SOLID Principles:
+ * - Single Responsibility: User authentication only
+ * - Dependency Inversion: Depends on abstractions (interfaces)
  */
 final class AuthController extends BaseController
 {
     /**
-     * @param Request $request
-     * @param Response $response
+     * @param Request $request HTTP request
+     * @param Response $response HTTP response
      * @param AuthManagerInterface $auth Auth manager for multi-guard support
      * @param UserRepository $userRepository User repository for registration
      */
     public function __construct(
         Request $request,
         Response $response,
-        private AuthManagerInterface $auth,
-        private UserRepository $userRepository
+        private readonly AuthManagerInterface $auth,
+        private readonly UserRepository $userRepository
     ) {
         parent::__construct($request, $response);
     }
@@ -51,7 +58,8 @@ final class AuthController extends BaseController
     /**
      * Handle login request.
      *
-     * Supports both web (session) and API (token) authentication.
+     * Web: Returns session-based authentication
+     * API: Returns Sanctum personal access token
      *
      * @return void
      */
@@ -59,30 +67,27 @@ final class AuthController extends BaseController
     {
         // Validate input
         $credentials = $this->request->only(['email', 'password']);
-        $remember = (bool) ($this->request->input('remember') ?? false);
 
         if (empty($credentials['email']) || empty($credentials['password'])) {
             $this->handleLoginError('Email and password are required');
             return;
         }
 
-        // Determine guard based on request type
-        $guard = $this->request->expectsJson() ? 'api' : 'web';
+        // Find user
+        $user = $this->userRepository->findByEmail($credentials['email']);
 
-        // Add remember to credentials for session guard
-        $credentials['remember'] = $remember;
-
-        // Attempt authentication
-        if (!$this->auth->guard($guard)->attempt($credentials)) {
+        if ($user === null || !password_verify($credentials['password'], $user->password)) {
             $this->handleLoginError('Invalid credentials');
             return;
         }
 
-        // Success response based on guard type
-        if ($guard === 'api') {
-            $this->handleApiLoginSuccess();
+        // Determine authentication strategy
+        if ($this->request->expectsJson()) {
+            // API: Create Sanctum token
+            $this->handleApiLogin($user);
         } else {
-            $this->handleWebLoginSuccess();
+            // Web: Create session
+            $this->handleWebLogin($user);
         }
     }
 
@@ -130,14 +135,10 @@ final class AuthController extends BaseController
             $savedUser = $this->userRepository->save($user);
 
             // Auto-login after registration
-            $guard = $this->request->expectsJson() ? 'api' : 'web';
-            $this->auth->guard($guard)->login($savedUser);
-
-            // Success response
-            if ($guard === 'api') {
-                $this->handleApiLoginSuccess();
+            if ($this->request->expectsJson()) {
+                $this->handleApiLogin($savedUser);
             } else {
-                $this->response->redirect('/dashboard');
+                $this->handleWebLogin($savedUser);
             }
         } catch (\Throwable $e) {
             $this->handleRegistrationError(['error' => 'Registration failed: ' . $e->getMessage()]);
@@ -147,19 +148,28 @@ final class AuthController extends BaseController
     /**
      * Handle logout request.
      *
-     * Supports both web and API logout.
+     * Web: Destroy session
+     * API: Revoke current token
      *
      * @return void
      */
     public function logout(): void
     {
-        $guard = $this->request->expectsJson() ? 'api' : 'web';
+        if ($this->request->expectsJson()) {
+            // API: Revoke current token
+            $user = $this->auth->guard('sanctum')->user();
 
-        $this->auth->guard($guard)->logout();
+            if ($user instanceof HasApiTokensInterface) {
+                $currentToken = $user->currentAccessToken();
+                if ($currentToken !== null) {
+                    $currentToken->revoke();
+                }
+            }
 
-        if ($guard === 'api') {
             $this->response->json(['message' => 'Logged out successfully']);
         } else {
+            // Web: Destroy session
+            $this->auth->guard('web')->logout();
             $this->response->redirect('/login');
         }
     }
@@ -173,7 +183,7 @@ final class AuthController extends BaseController
      */
     public function me(): void
     {
-        $user = $this->auth->guard('api')->user();
+        $user = $this->auth->guard('sanctum')->user();
 
         if ($user === null) {
             $this->response->json(['error' => 'Unauthenticated'], 401);
@@ -191,6 +201,126 @@ final class AuthController extends BaseController
             'email' => $user->email,
             'created_at' => $user->createdAt?->format('Y-m-d H:i:s'),
         ]);
+    }
+
+    /**
+     * Revoke a specific token.
+     *
+     * API endpoint to revoke a user's token by ID.
+     *
+     * @param int $tokenId Token ID to revoke
+     * @return void
+     */
+    public function revokeToken(int $tokenId): void
+    {
+        $user = $this->auth->guard('sanctum')->user();
+
+        if ($user === null || !$user instanceof HasApiTokensInterface) {
+            $this->response->json(['error' => 'Unauthenticated'], 401);
+            return;
+        }
+
+        // Find token belonging to user
+        $tokens = $user->tokens();
+        $token = $tokens->first(fn($t) => $t->getId() === $tokenId);
+
+        if ($token === null) {
+            $this->response->json(['error' => 'Token not found'], 404);
+            return;
+        }
+
+        $token->revoke();
+
+        $this->response->json(['message' => 'Token revoked successfully']);
+    }
+
+    /**
+     * Get all tokens for the authenticated user.
+     *
+     * API endpoint to list user's tokens.
+     *
+     * @return void
+     */
+    public function tokens(): void
+    {
+        $user = $this->auth->guard('sanctum')->user();
+
+        if ($user === null || !$user instanceof HasApiTokensInterface) {
+            $this->response->json(['error' => 'Unauthenticated'], 401);
+            return;
+        }
+
+        $tokens = $user->tokens()->map(function ($token) {
+            return [
+                'id' => $token->getId(),
+                'name' => $token->getName(),
+                'abilities' => $token->getAbilities(),
+                'last_used_at' => $token->last_used_at ?? null,
+                'expires_at' => $token->expires_at ?? null,
+                'created_at' => $token->created_at ?? null,
+            ];
+        });
+
+        $this->response->json(['tokens' => $tokens->all()]);
+    }
+
+    /**
+     * Handle API login with Sanctum token creation.
+     *
+     * @param User $user Authenticated user
+     * @return void
+     */
+    private function handleApiLogin(User $user): void
+    {
+        if (!$user instanceof HasApiTokensInterface) {
+            $this->response->json(['error' => 'User does not support API tokens'], 500);
+            return;
+        }
+
+        // Get device name from request (optional)
+        $deviceName = $this->request->input('device_name') ?? 'api-client';
+
+        // Get token abilities from request (optional)
+        $abilities = $this->request->input('abilities') ?? ['*'];
+        if (is_string($abilities)) {
+            $abilities = explode(',', $abilities);
+        }
+
+        // Get expiration from request (optional)
+        $expiresAt = null;
+        if ($expiresIn = $this->request->input('expires_in')) {
+            $expiresAt = new \DateTime("+{$expiresIn} seconds");
+        }
+
+        // Create token
+        $newToken = $user->createToken($deviceName, $abilities, $expiresAt);
+
+        $this->response->json([
+            'token' => $newToken->getPlainTextToken(), // Only shown ONCE!
+            'token_type' => 'Bearer',
+            'abilities' => $abilities,
+            'expires_at' => $expiresAt?->format('Y-m-d H:i:s'),
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->name,
+            ],
+        ], 201);
+    }
+
+    /**
+     * Handle web login with session creation.
+     *
+     * @param User $user Authenticated user
+     * @return void
+     */
+    private function handleWebLogin(User $user): void
+    {
+        // Login via session guard
+        $remember = (bool) ($this->request->input('remember') ?? false);
+        $this->auth->guard('web')->login($user, $remember);
+
+        $this->response->redirect('/dashboard');
     }
 
     /**
@@ -245,56 +375,6 @@ final class AuthController extends BaseController
             // TODO: Implement flash session messages
             $this->response->redirect('/login');
         }
-    }
-
-    /**
-     * Handle API login success response.
-     *
-     * Returns JWT token for API authentication.
-     *
-     * @return void
-     */
-    private function handleApiLoginSuccess(): void
-    {
-        $guard = $this->auth->guard('api');
-
-        if (!$guard instanceof TokenGuard) {
-            $this->response->json(['error' => 'Invalid guard type'], 500);
-            return;
-        }
-
-        $user = $guard->user();
-
-        if ($user === null) {
-            $this->response->json(['error' => 'Authentication failed'], 500);
-            return;
-        }
-
-        // Generate JWT token
-        $token = $guard->generateToken($user);
-
-        $this->response->json([
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'expires_in' => 3600,
-            'user' => [
-                'id' => $user->getAuthIdentifier(),
-                'email' => $user instanceof User ? $user->email : null,
-                'name' => $user instanceof User ? $user->name : null,
-            ],
-        ]);
-    }
-
-    /**
-     * Handle web login success response.
-     *
-     * Redirects to dashboard.
-     *
-     * @return void
-     */
-    private function handleWebLoginSuccess(): void
-    {
-        $this->response->redirect('/dashboard');
     }
 
     /**

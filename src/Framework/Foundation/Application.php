@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Foundation;
 
+use Toporia\Framework\Foundation\Contracts\ServiceProviderInterface;
 use Toporia\Framework\Container\Container;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Application Bootstrap

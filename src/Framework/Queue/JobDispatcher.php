@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Queue;
 
-use Toporia\Framework\Container\ContainerInterface;
-use Toporia\Framework\Queue\Contracts\{Dispatcher, JobInterface, QueueInterface};
+use Toporia\Framework\Queue\Contracts\Dispatcher;
+use Toporia\Framework\Queue\Contracts\JobInterface;
+use Toporia\Framework\Queue\Contracts\QueueInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Job Dispatcher
@@ -36,8 +38,7 @@ final class JobDispatcher implements Dispatcher
     public function __construct(
         private readonly ContainerInterface $container,
         private readonly ?string $defaultQueue = 'default'
-    ) {
-    }
+    ) {}
 
     /**
      * Dispatch a job to its designated queue.

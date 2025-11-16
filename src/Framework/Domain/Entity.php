@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Domain;
 
+use Toporia\Framework\Domain\Contracts\EntityInterface;
 /**
  * Base Entity class for Domain-Driven Design.
  *

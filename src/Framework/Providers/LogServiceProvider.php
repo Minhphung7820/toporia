@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Providers;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Log\LogManager;
 use Toporia\Framework\Log\Contracts\LoggerInterface;

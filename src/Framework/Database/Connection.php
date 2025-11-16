@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database;
 
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Query\QueryBuilder;
 use PDO;
 use PDOException;
 use Toporia\Framework\Database\Exception\ConnectionException;
@@ -412,10 +414,10 @@ class Connection implements ConnectionInterface
      * $users = $connection->table('users')->where('active', true)->get();
      *
      * @param string $table Table name.
-     * @return Query\QueryBuilder
+     * @return QueryBuilder
      */
-    public function table(string $table): Query\QueryBuilder
+    public function table(string $table): QueryBuilder
     {
-        return (new Query\QueryBuilder($this))->table($table);
+        return (new QueryBuilder($this))->table($table);
     }
 }

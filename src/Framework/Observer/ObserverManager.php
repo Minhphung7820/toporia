@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Observer;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Observer\Contracts\ObserverInterface;
 use Toporia\Framework\Observer\Contracts\ObserverManagerInterface;
 
@@ -96,6 +96,7 @@ final class ObserverManager implements ObserverManagerInterface
 
         // Remove observer from all priorities
         foreach ($this->registry[$observableClass][$eventKey] as $priority => $observers) {
+            /** @var array<int, ObserverInterface|string> $observers */
             $this->registry[$observableClass][$eventKey][$priority] = array_filter(
                 $observers,
                 fn($obs) => $obs !== $observer && (is_string($obs) ? $obs !== (is_string($observer) ? $observer : get_class($observer)) : $obs !== $observer)
@@ -289,6 +290,7 @@ final class ObserverManager implements ObserverManagerInterface
         foreach ($this->registry as $observableClass => $events) {
             foreach ($events as $event => $priorities) {
                 foreach ($priorities as $priority => $observers) {
+                    /** @var array<int, ObserverInterface|string> $observers */
                     $stats['total_observers'] += count($observers);
                 }
             }
@@ -297,4 +299,3 @@ final class ObserverManager implements ObserverManagerInterface
         return $stats;
     }
 }
-

@@ -6,11 +6,11 @@ namespace Toporia\Framework\Providers;
 
 use App\Domain\User\UserRepository;
 use Toporia\Framework\Auth\AuthManager;
-use Toporia\Framework\Auth\AuthManagerInterface;
+use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
 use Toporia\Framework\Auth\Guards\SessionGuard;
 use Toporia\Framework\Auth\Guards\TokenGuard;
 use Toporia\Framework\Auth\UserProvider\RepositoryUserProvider;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Http\Request;
 

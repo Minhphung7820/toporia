@@ -7,7 +7,7 @@ namespace Toporia\Framework\Realtime\Brokers;
 use Toporia\Framework\Realtime\Contracts\{BrokerInterface, MessageInterface};
 use Toporia\Framework\Realtime\RealtimeManager;
 use Toporia\Framework\Realtime\Message;
-use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyInterface;
+use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
 use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyFactory;
 
 /**
@@ -677,59 +677,59 @@ final class KafkaBroker implements BrokerInterface
             // @ suppresses precision warnings from rdkafka (handled internally)
             $message = @$consumer->consume($timeoutMs);
 
-                $pollCount++;
+            $pollCount++;
 
-                if ($message === null) {
-                    continue; // Timeout, no message
-                }
+            if ($message === null) {
+                continue; // Timeout, no message
+            }
 
-                // Handle errors
-                switch ($message->err) {
-                    case RD_KAFKA_RESP_ERR_NO_ERROR:
-                        // Valid message
-                        $batch[] = $message;
+            // Handle errors
+            switch ($message->err) {
+                case RD_KAFKA_RESP_ERR_NO_ERROR:
+                    // Valid message
+                    $batch[] = $message;
 
-                        // Process batch when full
-                        if (count($batch) >= $batchSize) {
-                            $this->processBatch($batch);
-                            $batch = [];
-                        }
-                        break;
+                    // Process batch when full
+                    if (count($batch) >= $batchSize) {
+                        $this->processBatch($batch);
+                        $batch = [];
+                    }
+                    break;
 
-                    case RD_KAFKA_RESP_ERR__PARTITION_EOF:
-                    case RD_KAFKA_RESP_ERR__TIMED_OUT:
-                        // End of partition or timeout (normal, continue)
-                        break;
+                case RD_KAFKA_RESP_ERR__PARTITION_EOF:
+                case RD_KAFKA_RESP_ERR__TIMED_OUT:
+                    // End of partition or timeout (normal, continue)
+                    break;
 
-                    case RD_KAFKA_RESP_ERR_UNKNOWN_TOPIC_OR_PART:
-                        // Unknown topic or partition - wait for metadata refresh
-                        usleep(1000000); // 1 second delay
-                        break;
+                case RD_KAFKA_RESP_ERR_UNKNOWN_TOPIC_OR_PART:
+                    // Unknown topic or partition - wait for metadata refresh
+                    usleep(1000000); // 1 second delay
+                    break;
 
-                    default:
-                        // Error - only log critical errors
-                        if ($pollCount % 100 === 0) {
-                            error_log("Kafka consumer error: {$message->errstr()} (code: {$message->err})");
-                        }
-                        break;
-                }
+                default:
+                    // Error - only log critical errors
+                    if ($pollCount % 100 === 0) {
+                        error_log("Kafka consumer error: {$message->errstr()} (code: {$message->err})");
+                    }
+                    break;
+            }
 
-                // Process remaining batch periodically (every 10 messages or every 100ms)
-                // This ensures messages are processed even if batch not full
-                static $lastBatchFlushTime = 0;
-                $now = (int) (microtime(true) * 1000);
-                $shouldFlush = count($batch) > 0 && (
-                    $processed % 10 === 0 || // Every 10 messages
-                    ($now - $lastBatchFlushTime) >= 100 // Or every 100ms
-                );
+            // Process remaining batch periodically (every 10 messages or every 100ms)
+            // This ensures messages are processed even if batch not full
+            static $lastBatchFlushTime = 0;
+            $now = (int) (microtime(true) * 1000);
+            $shouldFlush = count($batch) > 0 && (
+                $processed % 10 === 0 || // Every 10 messages
+                ($now - $lastBatchFlushTime) >= 100 // Or every 100ms
+            );
 
-                if ($shouldFlush) {
-                    $this->processBatch($batch);
-                    $batch = [];
-                    $lastBatchFlushTime = $now;
-                }
+            if ($shouldFlush) {
+                $this->processBatch($batch);
+                $batch = [];
+                $lastBatchFlushTime = $now;
+            }
 
-                $processed++;
+            $processed++;
         }
 
         // Process remaining batch

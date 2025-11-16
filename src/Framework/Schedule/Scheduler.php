@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Schedule;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Schedule\Contracts\MutexInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Task Scheduler

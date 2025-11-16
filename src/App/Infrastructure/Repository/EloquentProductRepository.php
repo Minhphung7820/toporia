@@ -8,8 +8,8 @@ use App\Domain\Product\Product;
 use App\Domain\Product\ProductRepository as ProductRepositoryInterface;
 use App\Domain\Repository\RepositoryInterface;
 use App\Infrastructure\Persistence\Models\ProductModel;
-use Toporia\Framework\Database\ConnectionInterface;
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
  * Eloquent Product Repository

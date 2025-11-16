@@ -7,9 +7,9 @@ namespace App\Infrastructure\Repository;
 use App\Domain\Repository\RepositoryInterface;
 use App\Domain\Repository\Criteria\CriteriaInterface;
 use App\Domain\Repository\QueryBuilderInterface;
-use Toporia\Framework\Database\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Toporia\Framework\Support\Accessors\Log;
 
 /**

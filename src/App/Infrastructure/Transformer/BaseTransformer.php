@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Transformer;
 
 use App\Domain\Transformer\TransformerInterface;
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
  * Base Transformer Implementation

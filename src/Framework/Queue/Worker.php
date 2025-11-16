@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Queue;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Support\ColoredLogger;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
 use Toporia\Framework\Queue\Exceptions\{RateLimitExceededException, JobAlreadyRunningException};

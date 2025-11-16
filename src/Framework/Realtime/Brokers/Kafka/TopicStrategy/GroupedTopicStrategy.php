@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy;
 
+use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
+
 /**
  * Grouped Topic Strategy
  *
@@ -141,4 +143,3 @@ final class GroupedTopicStrategy implements TopicStrategyInterface
         return (bool) preg_match("/^{$regex}$/", $channel);
     }
 }
-

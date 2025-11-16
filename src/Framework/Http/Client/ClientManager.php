@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Http\Client;
 
+use Toporia\Framework\Http\Contracts\HttpResponseInterface;
+use Toporia\Framework\Http\Contracts\HttpClientInterface;
+use Toporia\Framework\Http\Contracts\ClientManagerInterface;
 use Toporia\Framework\Http\Client\Exceptions\HttpClientException;
 
 /**

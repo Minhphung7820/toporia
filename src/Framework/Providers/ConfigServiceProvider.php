@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Config\Repository;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\Application;
 use Toporia\Framework\Foundation\ServiceProvider;
 

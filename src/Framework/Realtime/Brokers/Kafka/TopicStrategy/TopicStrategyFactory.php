@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy;
 
+use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
+
 /**
  * Topic Strategy Factory
  *
@@ -34,7 +36,7 @@ final class TopicStrategyFactory
             'grouped' => self::createGroupedStrategy($config, $topicPrefix),
             default => throw new \InvalidArgumentException(
                 "Unknown topic strategy: {$strategyType}. " .
-                "Supported: 'one-per-channel', 'grouped'"
+                    "Supported: 'one-per-channel', 'grouped'"
             )
         };
     }
@@ -87,4 +89,3 @@ final class TopicStrategyFactory
         ];
     }
 }
-

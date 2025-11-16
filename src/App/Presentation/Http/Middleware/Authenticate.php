@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Presentation\Http\Middleware;
 
-use Toporia\Framework\Http\Middleware\MiddlewareInterface;
+use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
 

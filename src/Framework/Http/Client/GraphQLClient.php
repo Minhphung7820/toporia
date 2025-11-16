@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Http\Client;
 
+use Toporia\Framework\Http\Contracts\HttpResponseInterface;
 /**
  * GraphQL HTTP Client
  *

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repository\Transaction;
 
-use Toporia\Framework\Database\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Support\Accessors\Log;
 
 /**

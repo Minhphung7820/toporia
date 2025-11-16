@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Foundation;
 
 use RuntimeException;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Service Accessor - Facade Pattern for IoC Container Services

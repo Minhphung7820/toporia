@@ -83,8 +83,7 @@ final class SocketIOGateway implements TransportInterface
     public function __construct(
         private readonly array $config,
         private readonly RealtimeManagerInterface $manager
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}
@@ -146,7 +145,7 @@ final class SocketIOGateway implements TransportInterface
         if (!extension_loaded('swoole')) {
             throw new \RuntimeException(
                 'Swoole extension is required for Socket.IO gateway. ' .
-                'Install: pecl install swoole'
+                    'Install: pecl install swoole'
             );
         }
 

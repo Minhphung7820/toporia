@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Commands;
 
 use Toporia\Framework\Console\Command;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
 use Toporia\Framework\Queue\Worker;
 

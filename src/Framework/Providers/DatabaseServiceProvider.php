@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Providers;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Database\Connection;
-use Toporia\Framework\Database\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Foundation\ServiceProvider;

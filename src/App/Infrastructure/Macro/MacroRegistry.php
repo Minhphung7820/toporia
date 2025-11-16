@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Macro;
 
 use App\Domain\Macro\MacroRegistryInterface;
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
  * Macro Registry Implementation

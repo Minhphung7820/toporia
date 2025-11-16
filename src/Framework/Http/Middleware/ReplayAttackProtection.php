@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Http\Middleware;
 
+use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
-use Toporia\Framework\Security\ReplayAttackProtectionInterface;
+use Toporia\Framework\Security\Contracts\ReplayAttackProtectionInterface;
 
 /**
  * Replay Attack Protection Middleware

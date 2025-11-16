@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database;
 
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Schema\SchemaBuilder;
 
 /**

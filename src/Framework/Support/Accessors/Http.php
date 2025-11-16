@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Accessors;
 
 use Toporia\Framework\Foundation\ServiceAccessor;
-use Toporia\Framework\Http\Client\ClientManagerInterface;
-use Toporia\Framework\Http\Client\HttpClientInterface;
+use Toporia\Framework\Http\Contracts\ClientManagerInterface;
+use Toporia\Framework\Http\Contracts\HttpClientInterface;
 use Toporia\Framework\Http\Client\GraphQLClient;
-use Toporia\Framework\Http\Client\HttpResponseInterface;
+use Toporia\Framework\Http\Contracts\HttpResponseInterface;
 
 /**
  * HTTP Accessor

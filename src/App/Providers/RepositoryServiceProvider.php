@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Database\ConnectionInterface;
-use Toporia\Framework\Cache\CacheInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Cache\Contracts\CacheInterface;
 use App\Domain\Product\ProductRepository;
 use App\Domain\User\UserRepository;
 use App\Infrastructure\Repository\EloquentProductRepository;

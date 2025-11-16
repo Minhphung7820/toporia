@@ -6,7 +6,7 @@ namespace App\Providers;
 
 use App\Domain\Macro\MacroRegistryInterface;
 use App\Infrastructure\Macro\MacroRegistry;
-use Toporia\Framework\Container\ContainerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 
 /**

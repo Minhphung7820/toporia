@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM;
 
 use Toporia\Framework\Database\Query\QueryBuilder;
-use Toporia\Framework\Database\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 
 /**
  * Model Query Builder - Extends QueryBuilder with Model-aware functionality.

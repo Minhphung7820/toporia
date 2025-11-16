@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Commands;
 
 use Toporia\Framework\Console\Command;
-use Toporia\Framework\Cache\CacheManagerInterface;
+use Toporia\Framework\Cache\Contracts\CacheManagerInterface;
 
 /**
  * Cache Clear Command

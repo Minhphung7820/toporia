@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime;
 
-use Toporia\Framework\Container\ContainerInterface;
-use Toporia\Framework\Realtime\Contracts\{
-    BrokerInterface,
-    ChannelInterface,
-    ConnectionInterface,
-    MessageInterface,
-    RealtimeManagerInterface,
-    TransportInterface
-};
+use Toporia\Framework\Realtime\Contracts\BrokerInterface;
+use Toporia\Framework\Realtime\Contracts\ConnectionInterface;
+use Toporia\Framework\Realtime\Contracts\TransportInterface;
+use Toporia\Framework\Realtime\Contracts\ChannelInterface;
+use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
  * Realtime Manager
