@@ -27,7 +27,7 @@ use Toporia\Framework\Http\Response;
  *
  *     public function list(Response $response, array $products): void
  *     {
-     *         $this->json($response, resource_collection($products)->toArray());
+ *         $this->json($response, resource_collection($products)->toArray());
  *     }
  * }
  * ```
