@@ -45,6 +45,7 @@ use Toporia\Framework\Http\Response;
 abstract class BaseController
 {
     use ControllerHelpers;
+    use \Toporia\Framework\Support\Macroable;
 
     /**
      * Constructor with Request/Response injection.

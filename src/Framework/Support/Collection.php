@@ -21,6 +21,7 @@ namespace Toporia\Framework\Support;
  */
 class Collection implements CollectionInterface, \JsonSerializable
 {
+    use Macroable;
     /**
      * @param array<TKey, TValue> $items
      */

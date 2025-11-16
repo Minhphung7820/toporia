@@ -16,6 +16,7 @@ namespace Toporia\Framework\Http;
  */
 final class Request implements RequestInterface
 {
+    use \Toporia\Framework\Support\Macroable;
     /**
      * @var string HTTP method.
      */

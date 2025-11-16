@@ -22,6 +22,7 @@ use Toporia\Framework\Database\Query\RowCollection;
  */
 class QueryBuilder implements QueryBuilderInterface
 {
+    use \Toporia\Framework\Support\Macroable;
     /**
      * Target table name.
      *

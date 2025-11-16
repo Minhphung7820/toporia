@@ -14,6 +14,7 @@ namespace Toporia\Framework\Http;
  */
 final class Response implements ResponseInterface
 {
+    use \Toporia\Framework\Support\Macroable;
     /**
      * @var int HTTP status code.
      */
