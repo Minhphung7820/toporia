@@ -465,55 +465,31 @@ final class KafkaBroker implements BrokerInterface
         $key = $this->getMessageKey($channel);
         $payload = $message->toJson();
 
-        // Debug logging
-        error_log("Kafka publish: channel={$channel}, topic={$topicName}, partition={$partition}, key=" . ($key ?? 'null'));
-
-        // Set error handler to suppress precision warnings for large Kafka offsets/timestamps
-        $originalErrorHandler = set_error_handler(function ($errno, $errstr, $errfile, $errline) {
-            // Suppress precision loss warnings from Kafka library (handled internally)
-            if (str_contains($errstr, 'Implicit conversion') || str_contains($errstr, 'loses precision')) {
-                return true; // Suppress the error
-            }
-            return false; // Let other errors through
-        }, E_WARNING | E_NOTICE | E_DEPRECATED);
-
-        try {
-            // Publish to Kafka topic
-            if ($this->producer instanceof \RdKafka\Producer) {
-                // Using enqueue/rdkafka - optimized with batching and topic caching
-                $this->publishRdKafka($topicName, $partition, $key, $payload);
-            } elseif (class_exists(\Kafka\Producer::class)) {
-                // Using nmred/kafka-php - lazy initialization
-                if ($this->producer === null) {
-                    /** @var \Kafka\Producer $producer */
-                    $this->producer = new \Kafka\Producer();
-                }
-
+        // Publish to Kafka topic
+        if ($this->producer instanceof \RdKafka\Producer) {
+            // Using enqueue/rdkafka - optimized with batching and topic caching
+            $this->publishRdKafka($topicName, $partition, $key, $payload);
+        } elseif (class_exists(\Kafka\Producer::class)) {
+            // Using nmred/kafka-php - lazy initialization
+            if ($this->producer === null) {
                 /** @var \Kafka\Producer $producer */
-                $producer = $this->producer;
+                $this->producer = new \Kafka\Producer();
+            }
 
-                // Suppress precision warnings during send (Kafka library handles large values internally)
-                @$producer->send([
-                    [
-                        'topic' => $topicName,
-                        'value' => $payload,
-                        'partition' => $partition,
-                        'key' => $key,
-                    ]
-                ]);
-            } else {
-                throw new \RuntimeException('Kafka producer not initialized');
-            }
-        } catch (\TypeError $e) {
-            // Handle precision loss errors from Kafka library
-            if (!str_contains($e->getMessage(), 'Implicit conversion') && !str_contains($e->getMessage(), 'loses precision')) {
-                throw $e; // Re-throw other TypeErrors
-            }
-        } finally {
-            // Restore original error handler
-            if ($originalErrorHandler !== null) {
-                restore_error_handler();
-            }
+            /** @var \Kafka\Producer $producer */
+            $producer = $this->producer;
+
+            // Suppress precision warnings (Kafka library handles large values internally)
+            @$producer->send([
+                [
+                    'topic' => $topicName,
+                    'value' => $payload,
+                    'partition' => $partition,
+                    'key' => $key,
+                ]
+            ]);
+        } else {
+            throw new \RuntimeException('Kafka producer not initialized');
         }
     }
 
@@ -595,18 +571,10 @@ final class KafkaBroker implements BrokerInterface
             }
         }
 
-        // Flush producer (send all buffered messages)
-        // Use poll() to trigger delivery reports and flush
-        $producer->poll(0);
-
-        // Force flush if supported (rdkafka >= 1.0.0)
-        if (method_exists($producer, 'flush')) {
-            $producer->flush(1000); // 1 second timeout
-        } else {
-            // Fallback: poll multiple times to ensure flush
-            for ($i = 0; $i < 10; $i++) {
-                $producer->poll(0);
-            }
+        // Non-blocking flush: poll multiple times to trigger delivery
+        // This is much faster than blocking flush(1000)
+        for ($i = 0; $i < 5; $i++) {
+            $producer->poll(0); // 0 = non-blocking
         }
 
         // Clear buffer
@@ -624,9 +592,6 @@ final class KafkaBroker implements BrokerInterface
         }
 
         $topicName = $this->getTopicName($channel);
-
-        // Debug logging
-        error_log("Kafka subscribe: channel={$channel}, topic={$topicName}");
 
         // Store callback with channel mapping for later use
         if (!isset($this->subscriptions[$topicName])) {
@@ -663,9 +628,6 @@ final class KafkaBroker implements BrokerInterface
         $this->consuming = true;
         $topics = array_keys($this->subscriptions);
 
-        // Debug logging
-        error_log("Kafka consume: topics=" . implode(',', $topics) . ", subscriptions=" . json_encode(array_keys($this->subscriptions)));
-
         if ($this->consumer instanceof \RdKafka\KafkaConsumer) {
             // Using enqueue/rdkafka
             $this->consumeRdKafka($topics, $timeoutMs, $batchSize);
@@ -691,10 +653,8 @@ final class KafkaBroker implements BrokerInterface
         $consumer = $this->consumer;
 
         // Subscribe to topics
-        error_log("Kafka consumer subscribing to topics: " . implode(', ', $topics));
         try {
             $consumer->subscribe($topics);
-            error_log("Kafka consumer subscribed successfully");
 
             // Wait a bit for metadata to be refreshed after subscription
             // This helps avoid "Unknown topic or partition" errors
@@ -710,37 +670,16 @@ final class KafkaBroker implements BrokerInterface
 
         $processed = 0;
         $batch = [];
+        $pollCount = 0;
 
-        // Set error handler to suppress precision warnings for large Kafka offsets
-        $originalErrorHandler = set_error_handler(function ($errno, $errstr, $errfile, $errline) use (&$originalErrorHandler) {
-            // Suppress precision loss warnings for Kafka offsets (they're handled internally)
-            if (str_contains($errstr, 'Implicit conversion') || str_contains($errstr, 'loses precision')) {
-                return true; // Suppress the error
-            }
-            // Call original error handler for other errors
-            if ($originalErrorHandler) {
-                return $originalErrorHandler($errno, $errstr, $errfile, $errline);
-            }
-            return false;
-        }, E_WARNING | E_NOTICE);
+        while ($this->consuming) {
+            // Poll for messages (non-blocking with timeout)
+            // @ suppresses precision warnings from rdkafka (handled internally)
+            $message = @$consumer->consume($timeoutMs);
 
-        try {
-            $pollCount = 0;
-            while ($this->consuming) {
-                // Poll for messages (non-blocking with timeout)
-                $message = @$consumer->consume($timeoutMs);
-
-                // Log every 10 polls to show consumer is alive
                 $pollCount++;
-                if ($pollCount % 10 === 0) {
-                    error_log("Kafka consumer polling... (poll #{$pollCount})");
-                }
 
                 if ($message === null) {
-                    // Log timeout every 100 polls to show consumer is alive
-                    if ($pollCount % 100 === 0) {
-                        error_log("Kafka consumer: No messages (timeout), poll #{$pollCount}");
-                    }
                     continue; // Timeout, no message
                 }
 
@@ -748,8 +687,6 @@ final class KafkaBroker implements BrokerInterface
                 switch ($message->err) {
                     case RD_KAFKA_RESP_ERR_NO_ERROR:
                         // Valid message
-                        $topicName = @$message->topic_name ?? 'unknown';
-                        error_log("Kafka received message: topic={$topicName}, offset=" . (@$message->offset ?? 'unknown'));
                         $batch[] = $message;
 
                         // Process batch when full
@@ -760,25 +697,20 @@ final class KafkaBroker implements BrokerInterface
                         break;
 
                     case RD_KAFKA_RESP_ERR__PARTITION_EOF:
-                        // End of partition (normal)
-                        error_log("Kafka consumer: End of partition (EOF) - no more messages in partition");
-                        break;
-
                     case RD_KAFKA_RESP_ERR__TIMED_OUT:
-                        // Timeout (normal, continue)
-                        // Already logged above
+                        // End of partition or timeout (normal, continue)
                         break;
 
                     case RD_KAFKA_RESP_ERR_UNKNOWN_TOPIC_OR_PART:
-                        // Unknown topic or partition - usually means metadata needs refresh
-                        error_log("Kafka consumer error: Unknown topic or partition (code: {$message->err}). This usually resolves after metadata refresh.");
-                        // Wait a bit and let metadata refresh
+                        // Unknown topic or partition - wait for metadata refresh
                         usleep(1000000); // 1 second delay
                         break;
 
                     default:
-                        // Error
-                        error_log("Kafka consumer error: {$message->errstr()} (code: {$message->err})");
+                        // Error - only log critical errors
+                        if ($pollCount % 100 === 0) {
+                            error_log("Kafka consumer error: {$message->errstr()} (code: {$message->err})");
+                        }
                         break;
                 }
 
@@ -798,12 +730,6 @@ final class KafkaBroker implements BrokerInterface
                 }
 
                 $processed++;
-            }
-        } finally {
-            // Restore original error handler
-            if ($originalErrorHandler !== null) {
-                restore_error_handler();
-            }
         }
 
         // Process remaining batch
@@ -848,9 +774,6 @@ final class KafkaBroker implements BrokerInterface
         $consumerConfig->setOffsetReset('earliest'); // Always start from earliest for testing
         $consumerConfig->setMaxBytes(1024 * 1024); // 1MB
 
-        // Log consumer config for debugging
-        error_log("Kafka consumer config: groupId={$this->consumerGroup}, topics=" . implode(',', $topics) . ", offsetReset=earliest");
-
         // Verify config was set
         $actualBrokerList = $consumerConfig->getMetadataBrokerList();
         if (empty($actualBrokerList)) {
@@ -869,46 +792,25 @@ final class KafkaBroker implements BrokerInterface
         // Wrap in try-catch to provide better error messages
         try {
             $batch = [];
-            error_log("Kafka consumer (nmred/kafka-php) starting, subscribed topics: " . implode(', ', $topics));
-            error_log("Kafka consumer subscriptions: " . json_encode(array_keys($this->subscriptions)));
-            // Log subscriptions structure (callbacks can't be serialized, so just log structure)
-            $subscriptionsInfo = [];
-            foreach ($this->subscriptions as $topic => $subs) {
-                if (is_array($subs)) {
-                    $subscriptionsInfo[$topic] = array_keys($subs);
-                } else {
-                    $subscriptionsInfo[$topic] = is_callable($subs) ? 'callable' : gettype($subs);
-                }
-            }
-            error_log("Kafka consumer subscriptions structure: " . json_encode($subscriptionsInfo, JSON_PRETTY_PRINT));
-
             $messageCount = 0;
             $consumer->start(function ($topic, $partition, $message) use (&$batch, $batchSize, $topics, &$messageCount) {
                 $messageCount++;
-                error_log("Kafka consumer callback invoked #{$messageCount}: topic={$topic}, partition={$partition}");
                 if (!$this->consuming) {
-                    error_log("Kafka consumer: stopConsuming() called, returning false");
                     return false; // Stop consuming
                 }
 
                 try {
-                    error_log("Kafka consumer (nmred/kafka-php) received message: topic={$topic}, partition={$partition}");
-
                     // Check if we have subscription for this topic
                     $subscriptions = $this->subscriptions[$topic] ?? null;
                     if (!$subscriptions) {
-                        error_log("Kafka consumer: No subscription found for topic '{$topic}'. Available topics: " . implode(', ', array_keys($this->subscriptions)));
                         return true; // Continue but skip this message
                     }
 
                     // Decode message value
                     $payload = $message['value'] ?? '';
                     if (empty($payload)) {
-                        error_log("Kafka consumer: Empty payload for topic '{$topic}'");
                         return true;
                     }
-
-                    error_log("Kafka consumer: Processing message from topic '{$topic}', payload length: " . strlen($payload));
 
                     // Create message object
                     $msg = Message::fromJson($payload);
@@ -928,14 +830,11 @@ final class KafkaBroker implements BrokerInterface
                         $callback = $subscriptions[$channel] ?? null;
 
                         if ($callback) {
-                            error_log("Kafka consumer: Invoking callback for channel '{$channel}' on topic '{$topic}'");
                             $callback($msg);
                         } else {
                             // Fallback: try all callbacks (for backward compatibility)
-                            error_log("Kafka consumer: No callback for channel '{$channel}', trying all callbacks. Available channels: " . implode(', ', array_keys($subscriptions)));
-                            foreach ($subscriptions as $ch => $cb) {
+                            foreach ($subscriptions as $cb) {
                                 if (is_callable($cb)) {
-                                    error_log("Kafka consumer: Trying callback for channel '{$ch}'");
                                     $cb($msg);
                                     break; // Use first available callback
                                 }
@@ -943,17 +842,13 @@ final class KafkaBroker implements BrokerInterface
                         }
                     } elseif (is_callable($subscriptions)) {
                         // Old format: single callback
-                        error_log("Kafka consumer: Invoking single callback for topic '{$topic}'");
                         $subscriptions($msg);
-                    } else {
-                        error_log("Kafka consumer: Subscriptions is neither array nor callable. Type: " . gettype($subscriptions));
                     }
 
                     $batch[] = ['topic' => $topic, 'message' => $msg];
 
                     // Process batch when full
                     if (count($batch) >= $batchSize) {
-                        error_log("Kafka consumer: Batch full (" . count($batch) . " messages), resetting batch");
                         $batch = []; // Reset batch (messages already processed via callback)
                     }
                 } catch (\Throwable $e) {
@@ -992,7 +887,6 @@ final class KafkaBroker implements BrokerInterface
                 $key = @$message->key ?? null;
 
                 if (empty($topicName) || empty($payload)) {
-                    error_log("Invalid message: missing topic or payload");
                     continue;
                 }
 
