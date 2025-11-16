@@ -138,69 +138,49 @@ abstract class AbstractBatchKafkaConsumer extends AbstractKafkaConsumer implemen
         $lastFlushTime = (int) (microtime(true) * 1000); // milliseconds (cast to int to avoid precision loss)
         $interval = $this->getBatchReleaseInterval();
 
-        // Set error handler to suppress precision warnings for large Kafka offsets
-        $originalErrorHandler = set_error_handler(function ($errno, $errstr, $errfile, $errline) {
-            // Suppress precision loss warnings for Kafka offsets
-            if (str_contains($errstr, 'Implicit conversion') || str_contains($errstr, 'loses precision')) {
-                return true; // Suppress the error
-            }
-            return false; // Let other errors through
-        }, E_WARNING | E_NOTICE | E_DEPRECATED);
+        $topic = $this->getTopic();
+        $this->logKafkaEvent('SUBSCRIBE', "topic <options=bold>{$topic}</>");
 
-        try {
-            $topic = $this->getTopic();
-            $this->logKafkaEvent('SUBSCRIBE', "topic <options=bold>{$topic}</>");
+        // Subscribe to topic
+        $broker->subscribe($topic, function (MessageInterface $message) use (&$batch, &$lastFlushTime, $batchSize, $interval, $broker, $topic) {
+            // Log message metadata with highlighting
+            $event = $message->getEvent() ?? 'unknown';
+            $this->logKafkaEvent(
+                'MESSAGE',
+                "topic <fg=cyan>{$topic}</> • event <comment>{$event}</comment>"
+            );
 
-            // Subscribe to topic
-            $broker->subscribe($topic, function (MessageInterface $message) use (&$batch, &$lastFlushTime, $batchSize, $interval, $broker, $topic) {
-                // Log message metadata with highlighting
-                $event = $message->getEvent() ?? 'unknown';
+            $batch[] = [
+                'message' => $message,
+                'metadata' => [
+                    'topic' => $topic,
+                    'timestamp' => time(),
+                ],
+            ];
+
+            // Suppress precision warnings for large Kafka offsets (handled internally by rdkafka)
+            $now = @(int) (microtime(true) * 1000);
+
+            // Process batch if full or interval elapsed
+            if (count($batch) >= $batchSize || ($now - $lastFlushTime) >= $interval) {
                 $this->logKafkaEvent(
-                    'MESSAGE',
-                    "topic <fg=cyan>{$topic}</> • event <comment>{$event}</comment>"
+                    'BATCH',
+                    "Processing <info>" . count($batch) . "</info> message(s)"
                 );
-
-                $batch[] = [
-                    'message' => $message,
-                    'metadata' => [
-                        'topic' => $topic,
-                        'timestamp' => time(),
-                    ],
-                ];
-
-                $now = (int) (microtime(true) * 1000); // Cast to int to avoid precision loss
-
-                // Process batch if full or interval elapsed
-                if (count($batch) >= $batchSize || ($now - $lastFlushTime) >= $interval) {
-                    $this->logKafkaEvent(
-                        'BATCH',
-                        "Processing <info>" . count($batch) . "</info> message(s)"
-                    );
-                    $this->processBatch($batch);
-                    $batch = [];
-                    $lastFlushTime = $now;
-                }
-
-                // Check shouldQuit
-                if ($this->shouldQuit) {
-                    $broker->stopConsuming();
-                }
-            });
-
-            $this->logKafkaEvent('CONSUME', "listening on <fg=cyan>{$topic}</>");
-            // Start consuming (this will use the batch size from KafkaBroker)
-            $broker->consume($timeout, $batchSize);
-        } catch (\TypeError $e) {
-            // Handle precision loss errors for large Kafka offsets
-            if (!str_contains($e->getMessage(), 'Implicit conversion') && !str_contains($e->getMessage(), 'loses precision')) {
-                throw $e; // Re-throw other TypeErrors
+                $this->processBatch($batch);
+                $batch = [];
+                $lastFlushTime = $now;
             }
-        } finally {
-            // Restore original error handler
-            if ($originalErrorHandler !== null) {
-                restore_error_handler();
+
+            // Check shouldQuit
+            if ($this->shouldQuit) {
+                $broker->stopConsuming();
             }
-        }
+        });
+
+        $this->logKafkaEvent('CONSUME', "listening on <fg=cyan>{$topic}</>");
+        // Start consuming (this will use the batch size from KafkaBroker)
+        $broker->consume($timeout, $batchSize);
     }
 
     /**
