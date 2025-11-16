@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Import;
 
 use App\Domain\Contracts\Import\ImportInterface;
-use App\Domain\Contracts\Import\ImportResult;
+use App\Domain\ValueObjects\Import\ImportResult;
 
 /**
  * Base Importer Implementation

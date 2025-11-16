@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Jobs;
+namespace App\Application\Services\Jobs;
 
 use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Support\Accessors\Log;

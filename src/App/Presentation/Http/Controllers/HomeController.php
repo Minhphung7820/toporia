@@ -6,8 +6,8 @@ namespace App\Presentation\Http\Controllers;
 
 use App\Infrastructure\Persistence\Models\ProductModel;
 use App\Infrastructure\Persistence\Models\UserModel;
-use App\Application\Jobs\SendEmailJob;
-use App\Application\Jobs\TestProcess;
+use App\Application\Services\Jobs\SendEmailJob;
+use App\Application\Services\Jobs\TestProcess;
 use App\Infrastructure\Notifications\UserCreatedNotification;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;

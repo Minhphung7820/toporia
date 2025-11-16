@@ -4,15 +4,25 @@ declare(strict_types=1);
 
 namespace App\Domain\Entities;
 
-use Toporia\Framework\Auth\Authenticatable;
+use App\Domain\Contracts\Auth\AuthenticatableInterface;
 
 /**
  * User Entity - Domain model for users.
  *
- * Implements Authenticatable for authentication system integration.
+ * Pure domain entity with ZERO framework dependencies.
+ * Implements domain AuthenticatableInterface for authentication.
  * Immutable entity following Clean Architecture principles.
+ *
+ * Clean Architecture:
+ * - Domain layer (innermost circle)
+ * - No dependencies on outer layers (Framework, Infrastructure)
+ * - Infrastructure adapters bridge to Framework authentication
+ *
+ * SOLID Principles:
+ * - Single Responsibility: User business logic only
+ * - Immutability: All properties readonly, with* methods for changes
  */
-final class User implements Authenticatable
+final class User implements AuthenticatableInterface
 {
     /**
      * @param int|null $id User ID
@@ -44,14 +54,6 @@ final class User implements Authenticatable
     /**
      * {@inheritdoc}
      */
-    public function getAuthIdentifierName(): string
-    {
-        return 'id';
-    }
-
-    /**
-     * {@inheritdoc}
-     */
     public function getAuthPassword(): string
     {
         return $this->password;
@@ -67,23 +69,10 @@ final class User implements Authenticatable
 
     /**
      * {@inheritdoc}
-     */
-    public function setRememberToken(string $token): void
-    {
-        // Since User is immutable, this would need to be handled by the UserProvider
-        // when persisting. For in-memory use, we'd create a new instance.
-        throw new \BadMethodCallException(
-            'User entity is immutable. Update remember token via UserRepository.'
-        );
-    }
-
-    /**
-     * Create a new User with updated remember token.
      *
-     * @param string|null $token Remember token.
-     * @return self New User instance.
+     * Returns new immutable instance with updated token (Clean Architecture).
      */
-    public function withRememberToken(?string $token): self
+    public function setRememberToken(?string $token): self
     {
         return new self(
             $this->id,

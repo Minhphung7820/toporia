@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Console\Commands;
+namespace App\Presentation\Console\Commands;
 
 use App\Domain\Contracts\Services\TopicServiceInterface;
 use App\Domain\Contracts\Services\HealthCheckerInterface;

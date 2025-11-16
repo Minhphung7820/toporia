@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Contracts\Export;
+namespace App\Domain\ValueObjects\Export;
 
 /**
  * Export Result

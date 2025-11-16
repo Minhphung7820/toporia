@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
-use App\Application\Jobs\TestProcess;
+use App\Application\Services\Jobs\TestProcess;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Console\Scheduling\Scheduler;

@@ -2,33 +2,33 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Console\Commands;
+namespace App\Presentation\Console\Commands;
 
 use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerInterface;
-use Toporia\Framework\Console\Commands\RabbitMq\Base\AbstractBatchRabbitMqConsumer;
+use Toporia\Framework\Console\Commands\Redis\Base\AbstractBatchRedisConsumer;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 use Toporia\Framework\Support\Collection\Collection;
 use Toporia\Framework\Support\Accessors\Log;
 
 /**
- * RabbitMQ Event Consumer Command
+ * Redis Event Consumer Command
  *
- * Example consumer for processing events from RabbitMQ.
- * Demonstrates batch processing with RabbitMQ broker.
+ * Example consumer for processing events from Redis Pub/Sub.
+ * Demonstrates batch processing with Redis broker.
  *
  * Usage:
- *   php console rabbitmq:events:consume
- *   php console rabbitmq:events:consume --channels=user.1,user.2 --batch-size=50
- *   php console rabbitmq:events:consume --max-messages=1000
+ *   php console redis:events:consume
+ *   php console redis:events:consume --channels=user.1,user.2 --batch-size=50
+ *   php console redis:events:consume --max-messages=1000
  *
  * @package App\Application\Console\Commands
  */
-final class RabbitMqEventConsumerCommand extends AbstractBatchRabbitMqConsumer implements BatchingMessagesHandlerInterface
+final class RedisEventConsumerCommand extends AbstractBatchRedisConsumer implements BatchingMessagesHandlerInterface
 {
-    protected string $signature = 'rabbitmq:events:consume {--channels=*} {--batch-size=100} {--timeout=1000} {--max-messages=0}';
+    protected string $signature = 'redis:events:consume {--channels=*} {--batch-size=100} {--timeout=1000} {--max-messages=0}';
 
-    protected string $description = 'Consume events from RabbitMQ with batch processing';
+    protected string $description = 'Consume events from Redis Pub/Sub with batch processing';
 
     /**
      * @var array<string> Channels to subscribe
@@ -87,7 +87,7 @@ final class RabbitMqEventConsumerCommand extends AbstractBatchRabbitMqConsumer i
     {
         $count = $messages->count();
         $this->writeln(sprintf("----------- %s -----------", date('Y-m-d H:i:s')));
-        $this->writeln(sprintf("[RabbitMQEvents] Processing batch of %s event(s)", $count));
+        $this->writeln(sprintf("[RedisEvents] Processing batch of %s event(s)", $count));
 
         foreach ($messages as $item) {
             try {
@@ -96,7 +96,7 @@ final class RabbitMqEventConsumerCommand extends AbstractBatchRabbitMqConsumer i
                 $metadata = $item['metadata'] ?? [];
 
                 if (!$message) {
-                    $this->warn("[RabbitMQEvents] Skipping message: message is null");
+                    $this->warn("[RedisEvents] Skipping message: message is null");
                     continue;
                 }
 
@@ -124,7 +124,7 @@ final class RabbitMqEventConsumerCommand extends AbstractBatchRabbitMqConsumer i
             }
         }
 
-        $this->writeln(sprintf("[RabbitMQEvents] Batch processed: %s events, %s errors", $this->processed, $this->errors));
+        $this->writeln(sprintf("[RedisEvents] Batch processed: %s events, %s errors", $this->processed, $this->errors));
     }
 
     /**
@@ -139,7 +139,7 @@ final class RabbitMqEventConsumerCommand extends AbstractBatchRabbitMqConsumer i
     private function processEvent(string $channel, string $event, array $data, array $metadata): void
     {
         // Log to application log
-        Log::info("RabbitMQ event received", [
+        Log::info("Redis event received", [
             'channel' => $channel,
             'event' => $event,
             'data' => $data,

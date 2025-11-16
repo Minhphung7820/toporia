@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Pipes;
+namespace App\Infrastructure\Pipes;
 
 use Closure;
 use Toporia\Framework\Pipeline\Contracts\PipeInterface;

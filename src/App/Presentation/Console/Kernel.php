@@ -4,66 +4,51 @@ declare(strict_types=1);
 
 namespace App\Presentation\Console;
 
-use Toporia\Framework\Console\Application;
-use Toporia\Framework\Console\Command;
-use Toporia\Framework\Console\CommandRegistry;
-
 /**
  * Console Kernel
  *
- * APPLICATION-LEVEL command registration.
- * Framework commands are auto-registered in ConsoleServiceProvider.
+ * Registers all application console commands.
  *
- * Only register YOUR APPLICATION-SPECIFIC commands here.
+ * Clean Architecture:
+ * - Presentation layer (UI concerns)
+ * - Console Commands are UI entry points
+ * - Commands delegate to Application Services (use cases)
  *
- * This follows Clean Architecture:
- * - Framework layer manages framework commands
- * - Application layer manages application commands
+ * SOLID Principles:
+ * - Single Responsibility: Command registration only
+ * - Open/Closed: Add new commands by extending array
  */
 final class Kernel
 {
     /**
-     * Return APPLICATION-SPECIFIC command classes to be registered.
+     * Bootstrap console commands into application.
      *
-     * Framework commands (migrate, cache:clear, queue:work, etc.)
-     * are automatically registered by the framework.
+     * @param mixed $app Application instance
+     * @param mixed $registry Command registry
+     * @return void
+     */
+    public function bootstrap(mixed $app, mixed $registry): void
+    {
+        foreach ($this->commands() as $commandClass) {
+            $registry->register($commandClass);
+        }
+    }
+
+    /**
+     * Get all application console commands.
      *
-     * Only add YOUR CUSTOM application commands here.
-     *
-     * @return array<int, class-string<Command>>
+     * @return array<class-string> Command classes
      */
     public function commands(): array
     {
         return [
-            // Test commands
-            // Business logic consumers
-            \App\Application\Console\Commands\OrderTrackingConsumerCommand::class,
-
-            // Kafka topic management
-            \App\Application\Console\Commands\KafkaTopicManagerCommand::class,
-
             // Add your custom application commands here...
-            // Example:
-            // \App\Application\Console\Commands\SendNewsletterCommand::class,
-            // \App\Application\Console\Commands\GenerateReportCommand::class,
+            Commands\ExportExcelCommand::class,
+            Commands\ImportExcelCommand::class,
+            Commands\KafkaTopicManagerCommand::class,
+            Commands\RedisEventConsumerCommand::class,
+            Commands\RabbitMqEventConsumerCommand::class,
+            Commands\OrderTrackingConsumerCommand::class,
         ];
-    }
-
-    /**
-     * Bootstrap the console application by registering commands.
-     *
-     * @param Application $app Console application
-     * @param CommandRegistry $registry Command registry with framework commands
-     * @return void
-     */
-    public function bootstrap(Application $app, CommandRegistry $registry): void
-    {
-        // Register application-specific commands
-        $registry->registerMany($this->commands());
-
-        // Register all commands (framework + application) to console app
-        foreach ($registry->all() as $commandClass) {
-            $app->register($commandClass);
-        }
     }
 }

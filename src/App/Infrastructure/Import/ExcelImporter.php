@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Import;
 
-use App\Domain\Contracts\Import\ImportResult;
+use App\Domain\ValueObjects\Import\ImportResult;
 
 /**
  * Excel Importer Implementation

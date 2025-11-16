@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Console\Commands;
+namespace App\Presentation\Console\Commands;
 
 use Toporia\Framework\Console\Commands\Kafka\Base\AbstractBatchKafkaConsumer;
 use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerInterface;

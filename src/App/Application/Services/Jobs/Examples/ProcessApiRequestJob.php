@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Application\Jobs\Examples;
+namespace App\Application\Services\Jobs\Examples;
 
 use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Queue\Backoff\ExponentialBackoff;
