@@ -6,20 +6,35 @@ namespace App\Providers;
 
 use Toporia\Framework\Container\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
+use Toporia\Framework\Database\ConnectionInterface;
+use Toporia\Framework\Cache\CacheInterface;
 use App\Domain\Product\ProductRepository;
-use App\Infrastructure\Persistence\EloquentProductRepository;
-use App\Infrastructure\Persistence\InMemoryProductRepository;
+use App\Domain\User\UserRepository;
+use App\Infrastructure\Repository\EloquentProductRepository;
+use App\Infrastructure\Repository\Transaction\TransactionManager;
+use App\Infrastructure\Repository\UnitOfWork;
+use App\Infrastructure\Persistence\InMemoryUserRepository;
 
 /**
  * Repository Service Provider
  *
- * Bind repository interfaces to their implementations.
+ * Binds repository interfaces to their implementations.
  * This is where you configure which repository implementation to use.
  *
  * Clean Architecture:
- * - Binds Domain interfaces (ProductRepository) to Infrastructure implementations
+ * - Binds Domain interfaces (ProductRepository, UserRepository) to Infrastructure implementations
  * - This is the Dependency Inversion in action
  * - Domain layer doesn't know about Infrastructure
+ *
+ * SOLID Principles:
+ * - Dependency Inversion: High-level modules (Domain) depend on abstractions
+ * - Open/Closed: Can swap implementations without changing Domain code
+ * - Single Responsibility: Each repository handles one entity type
+ *
+ * Performance:
+ * - Repositories are singletons (shared instances)
+ * - Cache is injected for query result caching
+ * - Connection pooling for database operations
  */
 class RepositoryServiceProvider extends ServiceProvider
 {
@@ -28,16 +43,48 @@ class RepositoryServiceProvider extends ServiceProvider
      */
     public function register(ContainerInterface $container): void
     {
+        // Register Transaction Manager (singleton)
+        $container->singleton(TransactionManager::class, function (ContainerInterface $c) {
+            return new TransactionManager($c->get(ConnectionInterface::class));
+        });
+
+        // Register Unit of Work (singleton)
+        $container->singleton(UnitOfWork::class, function (ContainerInterface $c) {
+            $uow = new UnitOfWork($c->get(TransactionManager::class));
+            // Register repositories with Unit of Work
+            $uow->register($c->get(ProductRepository::class));
+            return $uow;
+        });
+
         // Bind ProductRepository to Eloquent implementation (database-backed)
-        // This uses ProductModel for actual database operations
-        $container->bind(ProductRepository::class, fn() => new EloquentProductRepository());
+        // This uses BaseRepository for common functionality
+        $container->singleton(ProductRepository::class, function (ContainerInterface $c) {
+            return new EloquentProductRepository(
+                $c->get(ConnectionInterface::class),
+                $c->has(CacheInterface::class) ? $c->get(CacheInterface::class) : null
+            );
+        });
 
-        // Alternative: Use in-memory implementation (for testing)
+        // Bind UserRepository to InMemory implementation (for now)
+        // TODO: Replace with EloquentUserRepository for production
+        $container->singleton(UserRepository::class, fn() => new InMemoryUserRepository());
+
+        // Alternative implementations (commented out):
+        //
+        // Use in-memory implementation (for testing)
         // $container->bind(ProductRepository::class, fn() => new InMemoryProductRepository());
-
-        // Alternative: Use PDO repository (custom SQL)
+        //
+        // Use PDO repository (custom SQL)
         // $container->bind(ProductRepository::class, function(ContainerInterface $c) {
         //     return new PdoProductRepository($c->get('db'));
+        // });
+        //
+        // Use Cached repository (decorator pattern)
+        // $container->bind(ProductRepository::class, function(ContainerInterface $c) {
+        //     $baseRepo = new EloquentProductRepository(
+        //         $c->get(ConnectionInterface::class)
+        //     );
+        //     return new CachedProductRepository($baseRepo, $c->get(CacheInterface::class));
         // });
     }
 }
