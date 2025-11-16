@@ -43,9 +43,9 @@ use Toporia\Framework\Support\Collection;
  */
 final class OrderTrackingConsumerCommand extends AbstractBatchKafkaConsumer implements BatchingMessagesHandlerInterface
 {
-    protected string $signature = 'order:tracking:consume {--batch-size=50} {--timeout=1000} {--max-messages=0} {--dlq-enabled}';
+    protected string $signature = 'order:tracking:consume {--batch-size=50} {--timeout=1000} {--max-messages=0} {--dlq-enabled} {--from-beginning}';
 
-    protected string $description = 'Consume order events from Kafka and process order tracking';
+    protected string $description = 'Consume order events from Kafka and process order tracking. Use --from-beginning to read all messages from the start.';
 
     /**
      * @var DeadLetterQueueHandler|null DLQ handler
@@ -75,6 +75,10 @@ final class OrderTrackingConsumerCommand extends AbstractBatchKafkaConsumer impl
      */
     protected function getOffset(): string
     {
+        // If --from-beginning is used, start from earliest
+        if ($this->hasOption('from-beginning') && $this->option('from-beginning')) {
+            return 'earliest';
+        }
         // Start from earliest to process all order events
         return config('kafka.offset_reset', 'earliest');
     }
@@ -116,12 +120,21 @@ final class OrderTrackingConsumerCommand extends AbstractBatchKafkaConsumer impl
             $topic = $this->getTopic();
             $batchSize = $this->getBatchSizeLimit();
             $interval = $this->getBatchReleaseInterval();
+            $offset = $this->getOffset();
 
             // Validate
             if (empty($topic)) {
                 $this->error('Topic is required. Override getTopic() method.');
                 return 1;
             }
+
+            // Log consumer start info
+            $this->info("Starting consumer for topic: {$topic}");
+            $this->info("Offset reset: {$offset}");
+            if ($offset === 'earliest') {
+                $this->warn("⚠️  Reading from earliest - will process ALL messages in topic!");
+            }
+            $this->newLine();
 
             if ($batchSize <= 0) {
                 $this->error('Batch size must be greater than 0.');
@@ -177,6 +190,7 @@ final class OrderTrackingConsumerCommand extends AbstractBatchKafkaConsumer impl
     public function handleMessages(Collection $messages): void
     {
         $count = $messages->count();
+        error_log("OrderTrackingConsumer: handleMessages called with {$count} message(s)");
         $this->newLine();
         $this->line(str_repeat('-', 70));
         $this->line(sprintf('[OrderTracking] Processing batch of %d event(s)', $count));
@@ -195,6 +209,7 @@ final class OrderTrackingConsumerCommand extends AbstractBatchKafkaConsumer impl
 
                 // Extract order data from message
                 $orderData = $this->extractOrderData($message);
+                error_log("OrderTrackingConsumer: Extracted order data: " . json_encode($orderData));
 
                 $this->renderOrderConsoleSummary($orderData);
 
@@ -343,7 +358,10 @@ final class OrderTrackingConsumerCommand extends AbstractBatchKafkaConsumer impl
         // - Send confirmation email
         // - Update inventory
         // - Generate analytics
-        Log::info("Order created: {$orderId}");
+        Log::info("Order created: {$orderId}", $orderData);
+        $userId = $orderData['user_id'] ?? 'N/A';
+        $total = $orderData['total'] ?? 'N/A';
+        error_log("OrderTrackingConsumer: Order created - {$orderId}, user={$userId}, total={$total}");
         $this->line(
             sprintf(
                 "    ✓ Created | #%s | user=%s | total=%s",

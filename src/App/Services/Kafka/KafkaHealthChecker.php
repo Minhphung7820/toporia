@@ -95,15 +95,18 @@ final class KafkaHealthChecker
         $consumerConfig = $brokerConfig['consumer_config'] ?? [];
         $producerConfig = $brokerConfig['producer_config'] ?? [];
 
-        $consumerProtocol = $consumerConfig['security.protocol'] ?? null;
-        $producerProtocol = $producerConfig['security.protocol'] ?? null;
+        $consumerProtocol = $consumerConfig['security.protocol'] ?? 'plaintext'; // Default to plaintext for development
+        $producerProtocol = $producerConfig['security.protocol'] ?? 'plaintext'; // Default to plaintext for development
 
-        // Both should be set and match (usually 'plaintext' for development)
+        // Both should match (usually 'plaintext' for development)
+        // If both are 'plaintext', it's OK (development mode)
+        // If both match and are not empty, it's OK (production mode)
         if ($consumerProtocol && $producerProtocol) {
-            return $consumerProtocol === $producerProtocol && $consumerProtocol === 'plaintext';
+            return $consumerProtocol === $producerProtocol;
         }
 
-        return false;
+        // Default to true if not configured (assumes plaintext for development)
+        return true;
     }
 
     /**

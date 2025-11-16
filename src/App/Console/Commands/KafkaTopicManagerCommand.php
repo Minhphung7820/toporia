@@ -45,7 +45,7 @@ final class KafkaTopicManagerCommand extends Command
 {
     protected string $signature = 'kafka:topics {action : Action to perform (create|list|describe|health-check|fix-cluster-id)} {--topic= : Topic name (for create/describe)} {--partitions= : Number of partitions (for create)} {--replication-factor=1 : Replication factor (for create)} {--from-config : Create topics from config/kafka.php} {--all : Create all topics from configuration}';
 
-    protected string $description = 'Manage Kafka topics: create, list, describe, health check, and fix issues';
+    protected string $description = 'Manage Kafka topics: create, list, describe, health check, and fix issues. Note: This command only manages topics. To consume messages, run: php console order:tracking:consume';
 
     private ?KafkaTopicService $topicService = null;
 
@@ -123,6 +123,9 @@ final class KafkaTopicManagerCommand extends Command
         }
 
         $this->info('✅ Kafka is healthy');
+        $this->newLine();
+        $this->warn('💡 Note: Topic creation only creates topics. To consume messages, run:');
+        $this->writeln('   php console order:tracking:consume');
         $this->newLine();
 
         // Create from config
