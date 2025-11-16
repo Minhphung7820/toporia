@@ -1,5 +1,8 @@
 <?php
-namespace App\Infrastructure\Persistence;
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\Repository;
 
 use App\Domain\Product\ProductRepository;
 use App\Domain\Product\Product;
@@ -9,7 +12,10 @@ final class InMemoryProductRepository implements ProductRepository
     private array $db = [];
     private int $id = 1;
 
-    public function nextId(): int { return $this->id; }
+    public function nextId(): int
+    {
+        return $this->id;
+    }
 
     public function store(Product $product): Product
     {

@@ -8,7 +8,7 @@ use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
 use App\Application\Product\CreateProduct\CreateProductCommand;
 use App\Application\Product\CreateProduct\CreateProductHandler;
-use App\Infrastructure\Persistence\InMemoryProductRepository;
+use App\Infrastructure\Repository\InMemoryProductRepository;
 
 final class CreateProductAction extends AbstractAction
 {

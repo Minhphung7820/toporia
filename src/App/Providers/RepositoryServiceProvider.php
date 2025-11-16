@@ -13,7 +13,7 @@ use App\Domain\User\UserRepository;
 use App\Infrastructure\Repository\EloquentProductRepository;
 use App\Infrastructure\Repository\Transaction\TransactionManager;
 use App\Infrastructure\Repository\UnitOfWork;
-use App\Infrastructure\Persistence\InMemoryUserRepository;
+use App\Infrastructure\Repository\InMemoryUserRepository;
 
 /**
  * Repository Service Provider
