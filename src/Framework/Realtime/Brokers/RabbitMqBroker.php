@@ -8,10 +8,8 @@ use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
-use Toporia\Framework\Realtime\Contracts\BrokerInterface;
-use Toporia\Framework\Realtime\Contracts\MessageInterface;
-use Toporia\Framework\Realtime\Message;
-use Toporia\Framework\Realtime\RealtimeManager;
+use Toporia\Framework\Realtime\Contracts\{BrokerInterface, MessageInterface};
+use Toporia\Framework\Realtime\{Message, RealtimeManager};
 
 /**
  * RabbitMQ Broker

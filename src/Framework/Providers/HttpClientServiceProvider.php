@@ -7,8 +7,7 @@ namespace Toporia\Framework\Providers;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Http\Client\ClientManager;
-use Toporia\Framework\Http\Contracts\ClientManagerInterface;
-use Toporia\Framework\Http\Contracts\HttpClientInterface;
+use Toporia\Framework\Http\Contracts\{ClientManagerInterface, HttpClientInterface};
 
 /**
  * HTTP Client Service Provider

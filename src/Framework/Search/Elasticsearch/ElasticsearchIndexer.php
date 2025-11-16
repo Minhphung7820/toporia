@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Search\Elasticsearch;
 
-use Toporia\Framework\Search\Contracts\SearchClientInterface;
-use Toporia\Framework\Search\Contracts\SearchIndexerInterface;
+use Toporia\Framework\Search\Contracts\{SearchClientInterface, SearchIndexerInterface};
 
 final class ElasticsearchIndexer implements SearchIndexerInterface
 {

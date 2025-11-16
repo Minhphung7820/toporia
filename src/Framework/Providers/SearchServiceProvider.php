@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Providers;
 
-use Elastic\Elasticsearch\Client;
-use Elastic\Elasticsearch\ClientBuilder;
+use Elastic\Elasticsearch\{Client, ClientBuilder};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Search\Contracts\SearchClientInterface;
-use Toporia\Framework\Search\Contracts\SearchIndexerInterface;
-use Toporia\Framework\Search\Elasticsearch\ElasticsearchClient;
-use Toporia\Framework\Search\Elasticsearch\ElasticsearchIndexer;
+use Toporia\Framework\Search\Contracts\{SearchClientInterface, SearchIndexerInterface};
+use Toporia\Framework\Search\Elasticsearch\{ElasticsearchClient, ElasticsearchIndexer};
 use Toporia\Framework\Search\SearchManager;
 
 final class SearchServiceProvider extends ServiceProvider

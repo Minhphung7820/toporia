@@ -6,8 +6,7 @@ namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Http\Request;
-use Toporia\Framework\Http\Response;
+use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\Routing\Router;
 use Toporia\Framework\Routing\Contracts\RouterInterface;
 

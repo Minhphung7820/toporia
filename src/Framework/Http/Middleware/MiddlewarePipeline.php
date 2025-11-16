@@ -6,8 +6,7 @@ namespace Toporia\Framework\Http\Middleware;
 
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
-use Toporia\Framework\Http\Request;
-use Toporia\Framework\Http\Response;
+use Toporia\Framework\Http\{Request, Response};
 
 /**
  * Middleware Pipeline - Builds and executes middleware chains.

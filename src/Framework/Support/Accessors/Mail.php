@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Accessors;
 
 use Toporia\Framework\Foundation\ServiceAccessor;
-use Toporia\Framework\Mail\Contracts\MailManagerInterface;
-use Toporia\Framework\Mail\Contracts\MailerInterface;
-use Toporia\Framework\Mail\Contracts\MessageInterface;
+use Toporia\Framework\Mail\Contracts\{MailManagerInterface, MailerInterface, MessageInterface};
 use Toporia\Framework\Mail\Mailable;
 
 /**

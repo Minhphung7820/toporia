@@ -6,14 +6,10 @@ namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
-use Toporia\Framework\Security\SessionCsrfTokenManager;
-use Toporia\Framework\Security\Contracts\ReplayAttackProtectionInterface;
-use Toporia\Framework\Security\SessionReplayAttackProtection;
-use Toporia\Framework\Security\XssService;
-use Toporia\Framework\Auth\Contracts\GateContract;
+use Toporia\Framework\Security\Contracts\{CsrfTokenManagerInterface, ReplayAttackProtectionInterface};
+use Toporia\Framework\Security\{SessionCsrfTokenManager, SessionReplayAttackProtection, XssService};
+use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, GateContract};
 use Toporia\Framework\Auth\Access\Gate;
-use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
 use Toporia\Framework\Http\CookieJar;
 
 /**

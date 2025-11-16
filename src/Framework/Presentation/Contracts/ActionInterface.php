@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Presentation\Contracts;
 
-use Toporia\Framework\Http\Request;
-use Toporia\Framework\Http\Response;
+use Toporia\Framework\Http\{Request, Response};
 
 /**
  * Action interface for ADR (Action-Domain-Responder) pattern.

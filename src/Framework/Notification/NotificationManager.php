@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Notification;
 
-use Toporia\Framework\Notification\Contracts\ChannelInterface;
-use Toporia\Framework\Notification\Contracts\NotificationInterface;
-use Toporia\Framework\Notification\Contracts\NotifiableInterface;
-use Toporia\Framework\Notification\Contracts\NotificationManagerInterface;
+use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface, NotificationManagerInterface};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Notification\Contracts\{
     ChannelInterface,

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM\Relations;
 
-use Toporia\Framework\Database\ORM\Model;
-use Toporia\Framework\Database\ORM\ModelCollection;
+use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 
 /**
  * Morph To Many Relationship

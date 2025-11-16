@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Search;
 
-use Toporia\Framework\Search\Contracts\SearchIndexerInterface;
-use Toporia\Framework\Search\Contracts\SearchableModelInterface;
+use Toporia\Framework\Search\Contracts\{SearchIndexerInterface, SearchableModelInterface};
 
 trait Searchable
 {

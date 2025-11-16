@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\Tokens;
 
-use Toporia\Framework\Auth\Contracts\NewAccessTokenInterface;
-use Toporia\Framework\Auth\Contracts\PersonalAccessTokenInterface;
+use Toporia\Framework\Auth\Contracts\{NewAccessTokenInterface, PersonalAccessTokenInterface};
 
 /**
  * New Access Token Value Object

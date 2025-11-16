@@ -7,8 +7,7 @@ namespace Toporia\Framework\Console\Commands;
 use Toporia\Framework\Console\Commands\Kafka\Base\AbstractBatchKafkaConsumer;
 use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerInterface;
 use Toporia\Framework\Console\Commands\Kafka\DeadLetterQueue\DeadLetterQueueHandler;
-use Toporia\Framework\Realtime\Contracts\MessageInterface;
-use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
+use Toporia\Framework\Realtime\Contracts\{MessageInterface, RealtimeManagerInterface};
 use Toporia\Framework\Support\Collection;
 
 /**

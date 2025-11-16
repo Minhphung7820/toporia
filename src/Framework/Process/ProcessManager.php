@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Process;
 
-use Toporia\Framework\Process\Contracts\ProcessInterface;
-use Toporia\Framework\Process\Contracts\ProcessManagerInterface;
+use Toporia\Framework\Process\Contracts\{ProcessInterface, ProcessManagerInterface};
 
 /**
  * Process Manager

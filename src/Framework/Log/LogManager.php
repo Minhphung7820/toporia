@@ -4,13 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Log;
 
-use Toporia\Framework\Log\Contracts\ChannelInterface;
-use Toporia\Framework\Log\Contracts\LoggerInterface;
-use Toporia\Framework\Log\Channels\DailyFileChannel;
-use Toporia\Framework\Log\Channels\FileChannel;
-use Toporia\Framework\Log\Channels\StackChannel;
-use Toporia\Framework\Log\Channels\StderrChannel;
-use Toporia\Framework\Log\Channels\SyslogChannel;
+use Toporia\Framework\Log\Contracts\{ChannelInterface, LoggerInterface};
+use Toporia\Framework\Log\Channels\{DailyFileChannel, FileChannel, StackChannel, StderrChannel, SyslogChannel};
 
 /**
  * Log Manager - Multi-channel logger factory

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth;
 
-use Toporia\Framework\Auth\Contracts\GuardInterface;
-use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
+use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, GuardInterface};
 /**
  * Auth Manager - Manages multiple authentication guards.
  *

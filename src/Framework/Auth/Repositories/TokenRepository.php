@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\Repositories;
 
-use Toporia\Framework\Auth\Contracts\NewAccessTokenInterface;
-use Toporia\Framework\Auth\Contracts\PersonalAccessTokenInterface;
-use Toporia\Framework\Auth\Contracts\TokenRepositoryInterface;
-use Toporia\Framework\Auth\Tokens\NewAccessToken;
-use Toporia\Framework\Auth\Tokens\PersonalAccessToken;
+use Toporia\Framework\Auth\Contracts\{NewAccessTokenInterface, PersonalAccessTokenInterface, TokenRepositoryInterface};
+use Toporia\Framework\Auth\Tokens\{NewAccessToken, PersonalAccessToken};
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Toporia\Framework\Database\Connection;
 use Toporia\Framework\Support\Collection;

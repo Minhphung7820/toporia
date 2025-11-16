@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Container;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
-use Toporia\Framework\Container\Exception\ContainerException;
-use Toporia\Framework\Container\Exception\NotFoundException;
+use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException};
 use ReflectionClass;
 use ReflectionException;
 use ReflectionFunction;

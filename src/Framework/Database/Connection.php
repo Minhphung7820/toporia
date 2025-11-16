@@ -8,8 +8,7 @@ use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use PDO;
 use PDOException;
-use Toporia\Framework\Database\Exception\ConnectionException;
-use Toporia\Framework\Database\Exception\QueryException;
+use Toporia\Framework\Database\Exception\{ConnectionException, QueryException};
 
 /**
  * Database connection implementation.

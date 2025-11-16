@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Log;
 
-use Toporia\Framework\Log\Contracts\ChannelInterface;
-use Toporia\Framework\Log\Contracts\LoggerInterface;
+use Toporia\Framework\Log\Contracts\{ChannelInterface, LoggerInterface};
 
 /**
  * Logger - PSR-3 compliant logger implementation

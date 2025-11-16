@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Auth\Guards;
 
 use Toporia\Framework\Auth\Authenticatable;
-use Toporia\Framework\Auth\Contracts\GuardInterface;
-use Toporia\Framework\Auth\Contracts\UserProviderInterface;
+use Toporia\Framework\Auth\Contracts\{GuardInterface, UserProviderInterface};
 use Toporia\Framework\Http\Request;
 
 /**

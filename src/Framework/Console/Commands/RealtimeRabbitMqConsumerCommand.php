@@ -7,8 +7,7 @@ namespace Toporia\Framework\Console\Commands;
 use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerInterface;
 use Toporia\Framework\Console\Commands\RabbitMq\Base\AbstractBatchRabbitMqConsumer;
 use Toporia\Framework\Realtime\Brokers\RabbitMqBroker;
-use Toporia\Framework\Realtime\Contracts\MessageInterface;
-use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
+use Toporia\Framework\Realtime\Contracts\{MessageInterface, RealtimeManagerInterface};
 use Toporia\Framework\Support\Collection;
 
 /**

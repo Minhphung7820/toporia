@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Query;
 
-use Toporia\Framework\Database\Contracts\QueryBuilderInterface;
-use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\{ConnectionInterface, QueryBuilderInterface};
 use Toporia\Framework\Database\Query\RowCollection;
 
 /**

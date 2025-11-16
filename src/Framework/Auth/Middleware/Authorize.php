@@ -7,8 +7,7 @@ namespace Toporia\Framework\Auth\Middleware;
 use Toporia\Framework\Auth\AuthorizationException;
 use Toporia\Framework\Auth\Contracts\GateContract;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
-use Toporia\Framework\Http\Request;
-use Toporia\Framework\Http\Response;
+use Toporia\Framework\Http\{Request, Response};
 
 /**
  * Authorize Middleware

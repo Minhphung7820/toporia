@@ -6,8 +6,7 @@ namespace Toporia\Framework\Console\Commands;
 
 use Toporia\Framework\Console\Commands\Base\AbstractBrokerConsumerCommand;
 use Toporia\Framework\Realtime\Brokers\RedisBroker;
-use Toporia\Framework\Realtime\Contracts\MessageInterface;
-use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
+use Toporia\Framework\Realtime\Contracts\{MessageInterface, RealtimeManagerInterface};
 
 /**
  * Realtime Redis Consumer Command

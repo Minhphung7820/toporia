@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM;
 
-use Toporia\Framework\Database\Contracts\ModelInterface;
-use Toporia\Framework\Database\Contracts\ConnectionInterface;
-use Toporia\Framework\Database\Query\QueryBuilder;
-use Toporia\Framework\Database\ORM\ModelCollection;
-use Toporia\Framework\Database\Query\RowCollection;
-use Toporia\Framework\Database\ORM\Relations;
+use Toporia\Framework\Database\Contracts\{ConnectionInterface, ModelInterface};
+use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
+use Toporia\Framework\Database\ORM\{ModelCollection, Relations};
 use Toporia\Framework\Observer\Traits\Observable;
 use Toporia\Framework\Observer\Contracts\ObservableInterface;
 

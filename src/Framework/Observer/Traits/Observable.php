@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Observer\Traits;
 
-use Toporia\Framework\Observer\Contracts\ObservableInterface;
-use Toporia\Framework\Observer\Contracts\ObserverInterface;
-use Toporia\Framework\Observer\Contracts\ObserverManagerInterface;
+use Toporia\Framework\Observer\Contracts\{ObservableInterface, ObserverInterface, ObserverManagerInterface};
 
 /**
  * Observable Trait

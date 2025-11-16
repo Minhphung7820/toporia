@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Accessors;
 
 use Toporia\Framework\Foundation\ServiceAccessor;
-use Toporia\Framework\Process\ProcessManager;
-use Toporia\Framework\Process\ProcessPool;
-use Toporia\Framework\Process\ForkProcess;
+use Toporia\Framework\Process\{ForkProcess, ProcessManager, ProcessPool};
 use Toporia\Framework\Process\Contracts\ProcessInterface;
 
 /**

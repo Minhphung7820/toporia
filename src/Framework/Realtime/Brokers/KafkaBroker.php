@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime\Brokers;
 
 use Toporia\Framework\Realtime\Contracts\{BrokerInterface, MessageInterface};
-use Toporia\Framework\Realtime\RealtimeManager;
-use Toporia\Framework\Realtime\Message;
+use Toporia\Framework\Realtime\{Message, RealtimeManager};
 use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
 use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyFactory;
 

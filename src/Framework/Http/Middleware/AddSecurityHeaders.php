@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Http\Middleware;
 
-use Toporia\Framework\Http\Request;
-use Toporia\Framework\Http\Response;
+use Toporia\Framework\Http\{Request, Response};
 
 /**
  * Add Security Headers Middleware

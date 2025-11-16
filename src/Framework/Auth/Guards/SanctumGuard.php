@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\Guards;
 
-use Toporia\Framework\Auth\Contracts\GuardInterface;
-use Toporia\Framework\Auth\Contracts\HasApiTokensInterface;
-use Toporia\Framework\Auth\Contracts\TokenRepositoryInterface;
-use Toporia\Framework\Auth\Contracts\UserProviderInterface;
+use Toporia\Framework\Auth\Contracts\{GuardInterface, HasApiTokensInterface, TokenRepositoryInterface, UserProviderInterface};
 use Toporia\Framework\Http\Request;
 
 /**

@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Observer;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
-use Toporia\Framework\Observer\Contracts\ObserverInterface;
-use Toporia\Framework\Observer\Contracts\ObserverManagerInterface;
+use Toporia\Framework\Observer\Contracts\{ObserverInterface, ObserverManagerInterface};
 
 /**
  * Observer Manager

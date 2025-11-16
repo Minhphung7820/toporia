@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Mail;
 
 use Toporia\Framework\Mail\Contracts\MailerInterface;
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+use PHPMailer\PHPMailer\{Exception, PHPMailer};
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**

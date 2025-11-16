@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Accessors;
 
 use Toporia\Framework\Foundation\ServiceAccessor;
-use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
-use Toporia\Framework\Auth\Contracts\GuardInterface;
+use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, GuardInterface};
 use Toporia\Framework\Auth\Authenticatable;
 
 /**

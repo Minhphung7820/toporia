@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Routing;
 
-use Toporia\Framework\Routing\Contracts\UrlGeneratorInterface;
-use Toporia\Framework\Routing\Contracts\RouteCollectionInterface;
+use Toporia\Framework\Routing\Contracts\{RouteCollectionInterface, UrlGeneratorInterface};
 use Toporia\Framework\Http\Request;
 
 /**

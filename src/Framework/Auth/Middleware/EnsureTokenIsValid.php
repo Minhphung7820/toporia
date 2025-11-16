@@ -6,8 +6,7 @@ namespace Toporia\Framework\Auth\Middleware;
 
 use Toporia\Framework\Auth\AuthManager;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
-use Toporia\Framework\Http\Request;
-use Toporia\Framework\Http\Response;
+use Toporia\Framework\Http\{Request, Response};
 
 /**
  * Ensure Token Is Valid Middleware

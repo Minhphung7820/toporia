@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Events;
 
-use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
-use Toporia\Framework\Events\Contracts\EventInterface;
+use Toporia\Framework\Events\Contracts\{EventDispatcherInterface, EventInterface};
 
 /**
  * Event Dispatcher implementation.

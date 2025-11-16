@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Search;
 
-use Toporia\Framework\Search\Contracts\SearchClientInterface;
-use Toporia\Framework\Search\Contracts\SearchIndexerInterface;
-use Toporia\Framework\Search\Contracts\SearchQueryBuilderInterface;
+use Toporia\Framework\Search\Contracts\{SearchClientInterface, SearchIndexerInterface, SearchQueryBuilderInterface};
 use Toporia\Framework\Search\Query\SearchQueryBuilder;
 
 final class SearchManager

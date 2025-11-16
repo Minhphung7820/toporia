@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Commands\Base;
 
 use Toporia\Framework\Console\Command;
-use Toporia\Framework\Realtime\Contracts\BrokerInterface;
-use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
+use Toporia\Framework\Realtime\Contracts\{BrokerInterface, RealtimeManagerInterface};
 
 /**
  * Abstract Broker Consumer Command

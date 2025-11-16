@@ -6,8 +6,7 @@ namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Process\ProcessManager;
-use Toporia\Framework\Process\ProcessPool;
+use Toporia\Framework\Process\{ProcessManager, ProcessPool};
 
 /**
  * Process Service Provider

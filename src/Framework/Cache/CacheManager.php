@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Cache;
 
-use Toporia\Framework\Cache\Contracts\CacheInterface;
-use Toporia\Framework\Cache\Contracts\CacheManagerInterface;
+use Toporia\Framework\Cache\Contracts\{CacheInterface, CacheManagerInterface};
 /**
  * Cache Manager
  *

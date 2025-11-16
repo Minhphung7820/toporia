@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Mail;
 
-use Toporia\Framework\Mail\Contracts\MailerInterface;
-use Toporia\Framework\Mail\Contracts\MailManagerInterface;
+use Toporia\Framework\Mail\Contracts\{MailManagerInterface, MailerInterface};
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\UserProvider;
 
-use App\Domain\User\User;
-use App\Domain\User\UserRepository;
+use App\Domain\User\{User, UserRepository};
 use Toporia\Framework\Auth\Authenticatable;
 use Toporia\Framework\Auth\Contracts\UserProviderInterface;
 

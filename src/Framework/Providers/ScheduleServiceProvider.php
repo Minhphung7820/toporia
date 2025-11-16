@@ -6,9 +6,8 @@ namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Schedule\Scheduler;
+use Toporia\Framework\Schedule\{CacheMutex, Scheduler};
 use Toporia\Framework\Schedule\Contracts\MutexInterface;
-use Toporia\Framework\Schedule\CacheMutex;
 
 /**
  * Schedule Service Provider

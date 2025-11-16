@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Queue;
 
-use Toporia\Framework\Queue\Contracts\Dispatcher;
-use Toporia\Framework\Queue\Contracts\JobInterface;
-use Toporia\Framework\Queue\Contracts\QueueInterface;
+use Toporia\Framework\Queue\Contracts\{Dispatcher, JobInterface, QueueInterface};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**

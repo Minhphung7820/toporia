@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Observer;
 
-use Toporia\Framework\Observer\Contracts\ObservableInterface;
-use Toporia\Framework\Observer\Contracts\ObserverInterface;
+use Toporia\Framework\Observer\Contracts\{ObservableInterface, ObserverInterface};
 
 /**
  * Abstract Observer

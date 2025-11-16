@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-use Toporia\Framework\Support\Collection;
-use Toporia\Framework\Support\Str;
-use Toporia\Framework\Support\Stringable;
+use Toporia\Framework\Support\{Collection, Str, Stringable};
 
 if (!function_exists('collect')) {
     /**

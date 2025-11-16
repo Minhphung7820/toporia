@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Container\Contracts;
 
-use Toporia\Framework\Container\Exception\ContainerException;
-use Toporia\Framework\Container\Exception\NotFoundException;
+use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException};
 
 /**
  * Dependency Injection Container interface.

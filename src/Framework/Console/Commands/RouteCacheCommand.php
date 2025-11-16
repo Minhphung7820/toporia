@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Commands;
 
 use Toporia\Framework\Console\Command;
-use Toporia\Framework\Routing\Router;
-use Toporia\Framework\Routing\RouteCache;
+use Toporia\Framework\Routing\{RouteCache, Router};
 
 /**
  * Cache compiled routes for performance.
