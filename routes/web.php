@@ -17,6 +17,7 @@ use App\Presentation\Http\Controllers\HomeController;
 use App\Presentation\Http\Controllers\AuthController;
 use App\Presentation\Http\Controllers\ProductsController;
 use App\Presentation\Http\Controllers\FileUploadController;
+use App\Presentation\Http\Controllers\ExcelController;
 use App\Presentation\Http\Action\Product\CreateProductAction;
 use App\Jobs\TestRabbitMQJob;
 use Toporia\Framework\Support\Accessors\Log;
@@ -142,6 +143,10 @@ $router->get('/api/products/search', function (Request $request, Response $respo
 // File Upload routes
 $router->get('/upload', [FileUploadController::class, 'showForm']);
 $router->post('/upload/local', [FileUploadController::class, 'uploadLocal']);
+
+// Excel Import/Export routes
+$router->post('/api/excel/import', [ExcelController::class, 'import']);
+$router->get('/api/excel/export', [ExcelController::class, 'export']);
 $router->post('/upload/s3', [FileUploadController::class, 'uploadToS3']);
 $router->get('/upload/list', [FileUploadController::class, 'listFiles']);
 $router->get('/upload/download/{filename}', [FileUploadController::class, 'download']);

@@ -19,6 +19,9 @@
     "ext-pdo_mysql": "Required for MySQL database support",
     "ext-pdo_pgsql": "Required for PostgreSQL database support",
     "ext-amqp": "Optional for RabbitMQ performance boost (php-amqplib pure PHP works well)",
+    "ext-zip": "Required for Excel import/export (openspout/phpspreadsheet)",
+    "openspout/openspout": "High-performance Excel library for streaming (recommended for large files)",
+    "phpoffice/phpspreadsheet": "Full-featured Excel library (slower for large files)",
     "enqueue/rdkafka": "High-performance Kafka client (requires ext-rdkafka)",
     "php-amqplib/php-amqplib": "Pure PHP AMQP client for RabbitMQ (already installed)",
     "nmred/kafka-php": "Pure PHP Kafka client (already installed, fallback if ext-rdkafka unavailable)"

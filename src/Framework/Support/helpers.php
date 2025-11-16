@@ -217,6 +217,93 @@ if (!function_exists('retry')) {
     }
 }
 
+if (!function_exists('resource')) {
+    /**
+     * Transform entity to resource using transformer.
+     *
+     * @param mixed $entity Entity to transform
+     * @param array<string, mixed> $context Optional context
+     * @return \App\Domain\Transformer\ResourceInterface Resource
+     */
+    function resource(mixed $entity, array $context = []): \App\Domain\Transformer\ResourceInterface
+    {
+        $container = \Toporia\Framework\Container\Container::getInstance();
+
+        // Get transformer manager
+        if ($container->has(\App\Infrastructure\Transformer\TransformerManager::class)) {
+            $manager = $container->get(\App\Infrastructure\Transformer\TransformerManager::class);
+            $transformer = $manager->getTransformer($entity);
+            return $transformer->transform($entity, $context);
+        }
+
+        // Fallback: Direct mapping
+        $entityClass = is_object($entity) ? get_class($entity) : null;
+        if ($entityClass === null) {
+            throw new \InvalidArgumentException('Entity must be an object');
+        }
+
+        $mapping = [
+            \App\Domain\Product\Product::class => \App\Infrastructure\Transformer\ProductTransformer::class,
+            \App\Domain\User\User::class => \App\Infrastructure\Transformer\UserTransformer::class,
+        ];
+
+        $transformerClass = $mapping[$entityClass] ?? null;
+        if ($transformerClass === null) {
+            throw new \RuntimeException("No transformer found for entity: {$entityClass}");
+        }
+
+        $transformer = $container->get($transformerClass);
+        return $transformer->transform($entity, $context);
+    }
+}
+
+if (!function_exists('resource_collection')) {
+    /**
+     * Transform collection of entities to resource collection.
+     *
+     * @param iterable $entities Collection of entities
+     * @param array<string, mixed> $context Optional context
+     * @param array<string, mixed> $meta Optional metadata
+     * @return \App\Domain\Transformer\ResourceCollectionInterface Resource collection
+     */
+    function resource_collection(iterable $entities, array $context = [], array $meta = []): \App\Domain\Transformer\ResourceCollectionInterface
+    {
+        $entitiesArray = is_array($entities) ? $entities : iterator_to_array($entities);
+
+        if (empty($entitiesArray)) {
+            return \App\Infrastructure\Transformer\ResourceCollection::make([], $meta);
+        }
+
+        $container = \Toporia\Framework\Container\Container::getInstance();
+        $firstEntity = reset($entitiesArray);
+
+        // Get transformer manager
+        if ($container->has(\App\Infrastructure\Transformer\TransformerManager::class)) {
+            $manager = $container->get(\App\Infrastructure\Transformer\TransformerManager::class);
+            $transformer = $manager->getTransformer($firstEntity);
+            $resources = $transformer->transformCollection($entitiesArray, $context);
+            return \App\Infrastructure\Transformer\ResourceCollection::make($resources, $meta);
+        }
+
+        // Fallback: Direct mapping
+        $entityClass = get_class($firstEntity);
+        $mapping = [
+            \App\Domain\Product\Product::class => \App\Infrastructure\Transformer\ProductTransformer::class,
+            \App\Domain\User\User::class => \App\Infrastructure\Transformer\UserTransformer::class,
+        ];
+
+        $transformerClass = $mapping[$entityClass] ?? null;
+        if ($transformerClass === null) {
+            throw new \RuntimeException("No transformer found for entity: {$entityClass}");
+        }
+
+        $transformer = $container->get($transformerClass);
+        $resources = $transformer->transformCollection($entitiesArray, $context);
+
+        return \App\Infrastructure\Transformer\ResourceCollection::make($resources, $meta);
+    }
+}
+
 if (!function_exists('transform')) {
     /**
      * Transform a value if it is not blank.
