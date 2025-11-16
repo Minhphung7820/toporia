@@ -45,8 +45,7 @@ final class TransactionManager
      */
     public function __construct(
         private readonly ConnectionInterface $connection
-    ) {
-    }
+    ) {}
 
     /**
      * Execute callback within a transaction.
@@ -201,4 +200,3 @@ final class TransactionManager
         return $this->nestingLevel;
     }
 }
-
