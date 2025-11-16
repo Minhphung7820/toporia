@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console;
 
 use Toporia\Framework\Console\Contracts\{InputInterface, OutputInterface};
+use Toporia\Framework\Console\Input;
+use Toporia\Framework\Console\Output;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
