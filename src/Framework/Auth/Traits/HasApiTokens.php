@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Auth\Traits;
 
 use Toporia\Framework\Auth\Contracts\{HasApiTokensInterface, NewAccessTokenInterface, PersonalAccessTokenInterface, TokenRepositoryInterface};
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Has API Tokens Trait

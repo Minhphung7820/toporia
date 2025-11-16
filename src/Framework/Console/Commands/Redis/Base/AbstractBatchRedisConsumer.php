@@ -7,7 +7,7 @@ namespace Toporia\Framework\Console\Commands\Redis\Base;
 use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerInterface;
 use Toporia\Framework\Realtime\Brokers\RedisBroker;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Abstract Batch Redis Consumer

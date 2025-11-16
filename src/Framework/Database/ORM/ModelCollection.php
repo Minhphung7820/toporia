@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM;
 
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Typed collection for Model instances.

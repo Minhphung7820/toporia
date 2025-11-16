@@ -8,7 +8,7 @@ use Toporia\Framework\Auth\Contracts\{NewAccessTokenInterface, PersonalAccessTok
 use Toporia\Framework\Auth\Tokens\{NewAccessToken, PersonalAccessToken};
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Toporia\Framework\Database\Connection;
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Token Repository

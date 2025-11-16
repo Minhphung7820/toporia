@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Schedule\Contracts;
+namespace Toporia\Framework\Console\Scheduling\Contracts;
 
 /**
  * Mutex Interface

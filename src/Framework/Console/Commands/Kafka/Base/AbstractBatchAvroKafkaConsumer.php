@@ -6,7 +6,7 @@ namespace Toporia\Framework\Console\Commands\Kafka\Base;
 
 use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerInterface;
 use Toporia\Framework\Realtime\Brokers\KafkaBroker;
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Abstract Batch Avro Kafka Consumer

@@ -8,7 +8,7 @@ use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerIn
 use Toporia\Framework\Console\Commands\RabbitMq\Base\AbstractBatchRabbitMqConsumer;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 use Toporia\Framework\Support\Accessors\Log;
 
 /**

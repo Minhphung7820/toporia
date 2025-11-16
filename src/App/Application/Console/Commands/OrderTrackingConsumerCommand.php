@@ -9,7 +9,7 @@ use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerIn
 use Toporia\Framework\Console\Commands\Kafka\DeadLetterQueue\DeadLetterQueueHandler;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 use Toporia\Framework\Support\Accessors\Log;
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Order Tracking Consumer Command

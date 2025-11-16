@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\Contracts;
 
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Token Repository Interface

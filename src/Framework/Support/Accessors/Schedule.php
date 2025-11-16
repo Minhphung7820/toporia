@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Accessors;
 
 use Toporia\Framework\Foundation\ServiceAccessor;
-use Toporia\Framework\Schedule\{ScheduledTask, Scheduler};
+use Toporia\Framework\Console\Scheduling\{ScheduledTask, Scheduler};
 use Toporia\Framework\Queue\Contracts\JobInterface;
 
 /**

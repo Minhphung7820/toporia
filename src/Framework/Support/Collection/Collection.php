@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Support;
+namespace Toporia\Framework\Support\Collection;
 
 use Toporia\Framework\Support\Contracts\CollectionInterface;
+use Toporia\Framework\Support\Macroable;
 
 /**
  * Collection - Advanced immutable collection with functional operations.
@@ -1665,9 +1666,9 @@ class Collection implements CollectionInterface, \JsonSerializable
         return new static($groups);
     }
 
-    public function toLazy(): LazyCollection
+    public function toLazy(): \Toporia\Framework\Support\Collection\LazyCollection
     {
-        return LazyCollection::make(function () {
+        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () {
             foreach ($this->items as $item) {
                 yield $item;
             }

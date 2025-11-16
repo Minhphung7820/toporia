@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Support;
+namespace Toporia\Framework\Support\Collection;
 
 use Toporia\Framework\Support\Contracts\CollectionInterface;
 use ArrayAccess;
@@ -108,7 +108,7 @@ class LazyCollection implements IteratorAggregate, Countable, CollectionInterfac
         if (is_callable($source) && !($source instanceof Traversable)) {
             return static function () use ($source): Generator {
                 $it = $source();
-                yield from LazyCollection::iterToGenerator($it);
+                yield from self::iterToGenerator($it);
             };
         }
 

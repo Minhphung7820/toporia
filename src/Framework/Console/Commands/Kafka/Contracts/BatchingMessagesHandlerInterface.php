@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Console\Commands\Kafka\Contracts;
 
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Batching Messages Handler Interface

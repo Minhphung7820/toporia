@@ -8,7 +8,7 @@ use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerIn
 use Toporia\Framework\Console\Commands\RabbitMq\Base\AbstractBatchRabbitMqConsumer;
 use Toporia\Framework\Realtime\Brokers\RabbitMqBroker;
 use Toporia\Framework\Realtime\Contracts\{MessageInterface, RealtimeManagerInterface};
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Realtime RabbitMQ Consumer Command

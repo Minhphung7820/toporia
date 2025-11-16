@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Schedule;
+namespace Toporia\Framework\Console\Scheduling;
 
-use Toporia\Framework\Schedule\Contracts\MutexInterface;
+use Toporia\Framework\Console\Scheduling\Contracts\MutexInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**

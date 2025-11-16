@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support\Pagination;
 
-use Toporia\Framework\Support\Collection;
+use Toporia\Framework\Support\Collection\Collection;
 
 /**
  * Paginator - Immutable value object representing a paginated result set.
