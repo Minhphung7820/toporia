@@ -13,6 +13,7 @@ use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
 use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
 use Toporia\Framework\Support\Accessors\Chronos;
+use Toporia\Framework\Support\Accessors\Log;
 use Toporia\Framework\Support\Accessors\Process;
 use Toporia\Framework\Support\Accessors\URL;
 
@@ -41,6 +42,7 @@ final class HomeController extends BaseController
      */
     public function index(Request $request)
     {
+        Log::info('HomeController@index', ['request' => $request->all()]);
         // Use default timezone from config (Asia/Ho_Chi_Minh, UTC+7)
         // dd(Chronos::now()->format('Y-m-d H:i:s'));
         // Process::run([

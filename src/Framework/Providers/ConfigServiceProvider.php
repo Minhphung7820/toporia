@@ -20,6 +20,12 @@ class ConfigServiceProvider extends ServiceProvider
      */
     public function register(ContainerInterface $container): void
     {
+        // If config is already loaded (by LoadConfiguration), use it
+        if ($container->has('config')) {
+            return;
+        }
+
+        // Otherwise, load it now (backward compatibility)
         $container->singleton(Repository::class, function (ContainerInterface $c) {
             /** @var Application $app */
             $app = $c->get(Application::class);
@@ -27,7 +33,10 @@ class ConfigServiceProvider extends ServiceProvider
             $config = new Repository();
 
             // Load all config files from config directory
-            $config->loadDirectory($app->path('config'));
+            $configPath = $app->path('config');
+            if (is_dir($configPath)) {
+                $config->loadDirectory($configPath);
+            }
 
             return $config;
         });

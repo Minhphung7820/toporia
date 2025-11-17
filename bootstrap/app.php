@@ -5,17 +5,49 @@ declare(strict_types=1);
 /**
  * Application Bootstrap Configuration
  *
- * This file creates and configures the application instance.
- * It registers all service providers needed by the framework and application.
+ * This file bootstraps the application following Clean Architecture principles.
+ * Each bootstrap step is handled by a dedicated class for maximum modularity.
+ *
+ * Bootstrap Order (Optimized):
+ * 1. Load Environment Variables    - Required for all configuration
+ * 2. Handle Exceptions              - Catch errors early
+ * 3. Create Application            - Core framework instance
+ * 4. Load Helper Functions         - Required for config files
+ * 5. Load Configuration            - Required for service providers
+ * 6. Register Facades              - Required for Route facade
+ * 7. Register Providers            - Framework and application services
+ * 8. Boot Providers                - Initialize services and load routes
  */
+
+/*
+|--------------------------------------------------------------------------
+| Load Environment Variables
+|--------------------------------------------------------------------------
+|
+| Load environment variables from .env file into $_ENV.
+| This MUST be done FIRST, before any other bootstrap steps.
+|
+*/
+
+\Toporia\Framework\Foundation\LoadEnvironmentVariables::bootstrap(dirname(__DIR__));
+
+/*
+|--------------------------------------------------------------------------
+| Handle Exceptions
+|--------------------------------------------------------------------------
+|
+| Register error and exception handler early to catch all errors.
+|
+*/
+
+\Toporia\Framework\Foundation\Bootstrap\HandleExceptions::bootstrap();
 
 /*
 |--------------------------------------------------------------------------
 | Create The Application
 |--------------------------------------------------------------------------
 |
-| The first thing we will do is create a new application instance which
-| serves as the central hub for the entire framework.
+| Create the application instance which serves as the central hub.
 |
 */
 
@@ -25,80 +57,11 @@ $app = new \Toporia\Framework\Foundation\Application(
 
 /*
 |--------------------------------------------------------------------------
-| Register Error Handler
+| Load Helper Functions
 |--------------------------------------------------------------------------
 |
-| Register beautiful error handler for debugging and production.
-| This must be done early to catch all errors.
-|
-*/
-
-$debug = ($_ENV['APP_DEBUG'] ?? 'true') === 'true';
-$errorHandler = new \Toporia\Framework\Error\ErrorHandler($debug);
-$errorHandler->register();
-
-/*
-|--------------------------------------------------------------------------
-| Load Environment Variables
-|--------------------------------------------------------------------------
-|
-| Load environment variables from .env file into $_ENV.
-| This must be done before loading helpers and providers.
-|
-*/
-
-// Load environment variables from .env file (if exists)
-// Also merge with existing environment variables (from Docker, system, etc.)
-$envFile = dirname(__DIR__) . '/.env';
-if (file_exists($envFile)) {
-    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) {
-            continue; // Skip comments
-        }
-        if (strpos($line, '=') !== false) {
-            [$key, $value] = explode('=', $line, 2);
-            $key = trim($key);
-            $value = trim($value);
-
-            // Remove quotes if present
-            if (preg_match('/^"(.*)"$/', $value, $matches)) {
-                $value = $matches[1];
-            } elseif (preg_match("/^'(.*)'$/", $value, $matches)) {
-                $value = $matches[1];
-            }
-
-            // Expand variables like ${VAR}
-            $value = preg_replace_callback('/\$\{([A-Z_]+)\}/', function ($m) {
-                return $_ENV[$m[1]] ?? '';
-            }, $value);
-
-            // Only set if not already set (Docker env vars take precedence)
-            if (!isset($_ENV[$key])) {
-                $_ENV[$key] = $value;
-                putenv("{$key}={$value}");
-            }
-        }
-    }
-}
-
-// Merge system environment variables into $_ENV (for Docker, etc.)
-// This ensures Docker environment variables are available
-foreach ($_SERVER as $key => $value) {
-    if (strpos($key, 'HTTP_') !== 0 && is_string($value)) {
-        if (!isset($_ENV[$key])) {
-            $_ENV[$key] = $value;
-        }
-    }
-}
-
-/*
-|--------------------------------------------------------------------------
-| Load Helper Functions Early
-|--------------------------------------------------------------------------
-|
-| Load helper functions before booting providers so they're available
-| in route files and other boot methods.
+| Load helper functions BEFORE loading configuration.
+| Config files use env() helper function.
 |
 */
 
@@ -106,55 +69,47 @@ require __DIR__ . '/helpers.php';
 
 /*
 |--------------------------------------------------------------------------
-| Set Container for Service Accessors
+| Load Configuration
 |--------------------------------------------------------------------------
 |
-| Set the container instance for the ServiceAccessor system.
-| This MUST be done before booting providers because RouteServiceProvider
-| loads routes which may use Route facade (ServiceAccessor).
-| This enables static-like access to services (e.g., Route::get()).
+| Load all configuration files from config directory into container.
 |
 */
 
-\Toporia\Framework\Foundation\ServiceAccessor::setContainer($app->getContainer());
+\Toporia\Framework\Foundation\LoadConfiguration::bootstrap($app);
+
+/*
+|--------------------------------------------------------------------------
+| Register Facades
+|--------------------------------------------------------------------------
+|
+| Set container for ServiceAccessor system (Route facade, etc.).
+|
+*/
+
+\Toporia\Framework\Foundation\Bootstrap\RegisterFacades::bootstrap($app);
 
 /*
 |--------------------------------------------------------------------------
 | Register Service Providers
 |--------------------------------------------------------------------------
 |
-| Register framework and application service providers.
-|
-| Clean Architecture:
-| - Framework providers are auto-registered by FrameworkServiceProvider
-| - Application only registers its own providers
+| Register all framework and application service providers.
 |
 */
 
-$app->registerProviders([
-    // Framework providers (auto-loaded from FrameworkServiceProvider)
-    ...\Toporia\Framework\Foundation\FrameworkServiceProvider::providers(),
-
-    // Application providers
-    \App\Infrastructure\Providers\AppServiceProvider::class,
-    \App\Infrastructure\Providers\RepositoryServiceProvider::class,
-    \App\Infrastructure\Providers\EventServiceProvider::class,
-    \App\Infrastructure\Providers\RouteServiceProvider::class,
-    \App\Infrastructure\Providers\ScheduleServiceProvider::class,
-]);
+\Toporia\Framework\Foundation\Bootstrap\RegisterProviders::bootstrap($app);
 
 /*
 |--------------------------------------------------------------------------
 | Boot Service Providers
 |--------------------------------------------------------------------------
 |
-| Boot all registered service providers. This is where event listeners
-| are registered and other post-registration setup occurs.
-| Routes are loaded here via RouteServiceProvider::boot().
+| Boot all registered service providers. Routes are loaded here.
 |
 */
 
-$app->boot();
+\Toporia\Framework\Foundation\Bootstrap\BootProviders::bootstrap($app);
 
 /*
 |--------------------------------------------------------------------------
