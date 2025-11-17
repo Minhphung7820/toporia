@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Mail\Contracts;
 
+use Toporia\Framework\Mail\Mailable;
+
 /**
  * Mailer Interface
  *
