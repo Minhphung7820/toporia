@@ -31,4 +31,3 @@ final class RegisterFacades
         ServiceAccessor::setContainer($app->getContainer());
     }
 }
-

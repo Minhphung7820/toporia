@@ -43,10 +43,11 @@ final class LoadConfiguration
         // Create config repository
         $config = new Repository();
 
-        // Load all config files from config directory
+        // Set config directory for lazy loading
+        // Config files will be loaded on first access (lazy loading)
         $configPath = $app->path('config');
         if (is_dir($configPath)) {
-            $config->loadDirectory($configPath);
+            $config->loadDirectory($configPath, eager: false); // Lazy load
         }
 
         // Register in container as singleton

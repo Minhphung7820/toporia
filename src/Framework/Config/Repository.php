@@ -17,6 +17,16 @@ class Repository
     private array $items = [];
 
     /**
+     * @var string|null Configuration directory path (for lazy loading)
+     */
+    private ?string $configPath = null;
+
+    /**
+     * @var array<string, bool> Track which config files have been loaded
+     */
+    private array $loaded = [];
+
+    /**
      * @param array<string, mixed> $items Initial configuration items
      */
     public function __construct(array $items = [])
@@ -27,12 +37,17 @@ class Repository
     /**
      * Get a configuration value using dot notation.
      *
+     * Supports lazy loading: if config file not loaded yet, load it on first access.
+     *
      * @param string $key Configuration key (e.g., 'app.name', 'database.default')
      * @param mixed $default Default value if not found
      * @return mixed
      */
     public function get(string $key, mixed $default = null): mixed
     {
+        // Lazy load config file if needed
+        $this->lazyLoadConfig($key);
+
         return data_get($this->items, $key, $default);
     }
 
@@ -51,11 +66,16 @@ class Repository
     /**
      * Check if a configuration key exists.
      *
+     * Supports lazy loading: if config file not loaded yet, load it on first access.
+     *
      * @param string $key Configuration key
      * @return bool
      */
     public function has(string $key): bool
     {
+        // Lazy load config file if needed
+        $this->lazyLoadConfig($key);
+
         return data_get($this->items, $key) !== null;
     }
 
@@ -86,6 +106,7 @@ class Repository
 
         if (is_array($config)) {
             $this->items[$name] = $config;
+            $this->loaded[$name] = true;
         }
     }
 
@@ -93,19 +114,56 @@ class Repository
      * Load all configuration files from a directory.
      *
      * @param string $directory Configuration directory path
+     * @param bool $eager If true, load all files immediately. If false, lazy load on access.
      * @return void
      */
-    public function loadDirectory(string $directory): void
+    public function loadDirectory(string $directory, bool $eager = false): void
     {
         if (!is_dir($directory)) {
             return;
         }
 
-        $files = glob($directory . '/*.php');
+        $this->configPath = $directory;
 
-        foreach ($files as $file) {
-            $name = basename($file, '.php');
-            $this->load($name, $file);
+        if ($eager) {
+            // Eager load all config files (current behavior)
+            $files = glob($directory . '/*.php');
+            foreach ($files as $file) {
+                $name = basename($file, '.php');
+                $this->load($name, $file);
+            }
+        }
+        // If lazy, files will be loaded on first access via lazyLoadConfig()
+    }
+
+    /**
+     * Lazy load a configuration file if not already loaded.
+     *
+     * Extracts the config file name from the key (e.g., 'app.name' -> 'app').
+     *
+     * @param string $key Configuration key
+     * @return void
+     */
+    private function lazyLoadConfig(string $key): void
+    {
+        if ($this->configPath === null) {
+            return; // No config directory set
+        }
+
+        // Extract config file name from key (first segment before dot)
+        $parts = explode('.', $key, 2);
+        $configName = $parts[0];
+
+        // Skip if already loaded
+        if (isset($this->loaded[$configName])) {
+            return;
+        }
+
+        // Load the config file
+        $configFile = $this->configPath . '/' . $configName . '.php';
+        if (file_exists($configFile)) {
+            $this->load($configName, $configFile);
+            $this->loaded[$configName] = true;
         }
     }
 }

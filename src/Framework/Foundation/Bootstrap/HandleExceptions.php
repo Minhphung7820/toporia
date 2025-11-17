@@ -31,4 +31,3 @@ final class HandleExceptions
         $errorHandler->register();
     }
 }
-
