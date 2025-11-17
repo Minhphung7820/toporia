@@ -9,8 +9,6 @@ declare(strict_types=1);
  * It registers all service providers needed by the framework and application.
  */
 
-use Toporia\Framework\Foundation\Application;
-
 /*
 |--------------------------------------------------------------------------
 | Create The Application
@@ -21,7 +19,7 @@ use Toporia\Framework\Foundation\Application;
 |
 */
 
-$app = new Application(
+$app = new \Toporia\Framework\Foundation\Application(
     basePath: dirname(__DIR__)
 );
 
@@ -133,11 +131,9 @@ require __DIR__ . '/helpers.php';
 |
 */
 
-use Toporia\Framework\Foundation\FrameworkServiceProvider;
-
 $app->registerProviders([
     // Framework providers (auto-loaded from FrameworkServiceProvider)
-    ...FrameworkServiceProvider::providers(),
+    ...\Toporia\Framework\Foundation\FrameworkServiceProvider::providers(),
 
     // Application providers
     \App\Infrastructure\Providers\AppServiceProvider::class,

@@ -21,6 +21,10 @@ services:
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
       - ELASTICSEARCH_HOST=elasticsearch:9200
+      # OPcache settings for development (auto-reload on file changes)
+      - OPCACHE_ENABLE=1
+      - OPCACHE_VALIDATE_TIMESTAMPS=1
+      - OPCACHE_REVALIDATE_FREQ=0
     depends_on:
       - mysql
       - redis

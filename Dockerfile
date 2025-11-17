@@ -45,13 +45,15 @@ RUN pecl install redis-6.0.2 && \
     pecl install rdkafka-6.0.3 && \
     docker-php-ext-enable redis rdkafka
 
-# Configure PHP for production
+# Configure OPcache (default: enabled with timestamp validation for development)
+# Can be overridden via environment variables in docker-compose.yml
 RUN { \
     echo 'opcache.enable=1'; \
     echo 'opcache.memory_consumption=256'; \
     echo 'opcache.interned_strings_buffer=16'; \
     echo 'opcache.max_accelerated_files=10000'; \
-    echo 'opcache.validate_timestamps=0'; \
+    echo 'opcache.validate_timestamps=1'; \
+    echo 'opcache.revalidate_freq=0'; \
     echo 'opcache.fast_shutdown=1'; \
     } > /usr/local/etc/php/conf.d/opcache.ini
 
@@ -83,6 +85,10 @@ RUN composer install \
 # Install enqueue/rdkafka specifically
 RUN composer require enqueue/rdkafka --no-interaction
 
+# Copy entrypoint script early (before copying all files)
+COPY docker/php/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Copy application code
 COPY . .
 
@@ -93,7 +99,6 @@ RUN composer dump-autoload --optimize --classmap-authoritative
 RUN mkdir -p /var/www/html/storage /var/www/html/bootstrap/cache \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-
 # Expose port 9000 for PHP-FPM
 EXPOSE 9000
 
@@ -101,5 +106,6 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
     CMD php -v || exit 1
 
-# Start PHP-FPM
+# Start PHP-FPM with entrypoint (entrypoint configures OPcache dynamically)
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["php-fpm"]
