@@ -122,7 +122,7 @@ class ModelQueryBuilder extends QueryBuilder
     /**
      * Filter models that have a related model matching the given constraints.
      *
-     * More efficient than Laravel's implementation:
+     * Optimized implementation:
      * - Uses EXISTS subquery instead of JOIN when possible (better performance)
      * - Supports callback for complex constraints
      *
@@ -267,7 +267,7 @@ class ModelQueryBuilder extends QueryBuilder
     /**
      * Add a subselect count of a relationship to the query.
      *
-     * More efficient than Laravel:
+     * Optimized implementation:
      * - Single query with subselect instead of separate query
      * - Automatically optimized by database engine
      *

@@ -7,7 +7,7 @@ namespace Toporia\Framework\Support;
 /**
  * Colored Console Logger
  *
- * Beautiful Laravel-style colored output for console commands.
+ * Beautiful colored output for console commands.
  *
  * Features:
  * - ANSI color support (info, success, warning, error)

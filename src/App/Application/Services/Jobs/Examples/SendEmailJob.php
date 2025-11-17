@@ -11,7 +11,7 @@ use Toporia\Framework\Queue\Middleware\RateLimited;
  * Example Job: Send Email
  *
  * Simple job with constant retry delay.
- * Demonstrates property-based configuration (Laravel-style).
+ * Demonstrates property-based configuration.
  *
  * @package App\Application\Jobs\Examples
  */

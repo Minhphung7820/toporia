@@ -21,10 +21,10 @@ use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
  * - Automatic retry mechanism
  * - Failed jobs tracking
  *
- * Laravel Compatibility:
- * - Same table schema as Laravel
- * - Same job serialization format
- * - Same retry/failed job logic
+ * Features:
+ * - Standard table schema
+ * - Job serialization format
+ * - Retry/failed job logic
  *
  * SOLID Principles:
  * - Single Responsibility: Only manages database queue
@@ -48,7 +48,7 @@ final class DatabaseQueue implements QueueInterface
         $this->connection->ensureConnected();
 
         // Use raw PDO for maximum performance - no QueryBuilder overhead
-        // Laravel does the same for hot path operations
+        // Direct PDO for maximum performance
         $sql = "INSERT INTO jobs (id, queue, payload, attempts, available_at, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)";
 
@@ -96,7 +96,7 @@ final class DatabaseQueue implements QueueInterface
         $currentTime = time();
 
         // BEGIN TRANSACTION to prevent race conditions
-        // Laravel uses database transactions + row locking for atomic pop operations
+        // Use database transactions + row locking for atomic pop operations
         $this->connection->beginTransaction();
 
         try {
@@ -109,7 +109,7 @@ final class DatabaseQueue implements QueueInterface
             // - MySQL/PostgreSQL: Row-level locking
             // - SQLite: Table-level locking (acceptable for small scale)
             //
-            // Laravel uses: SELECT ... FOR UPDATE SKIP LOCKED (PostgreSQL 9.5+)
+            // PostgreSQL 9.5+ supports: SELECT ... FOR UPDATE SKIP LOCKED
             // We use database-specific optimizations for maximum performance
             $record = $this->lockAndGetNextJob($queue, $currentTime);
 
@@ -137,7 +137,7 @@ final class DatabaseQueue implements QueueInterface
     }
 
     /**
-     * Lock and get the next available job (Laravel-style).
+     * Lock and get the next available job.
      *
      * Uses SELECT FOR UPDATE to lock the row and prevent race conditions.
      * Multiple workers will wait for the lock, ensuring each gets a unique job.

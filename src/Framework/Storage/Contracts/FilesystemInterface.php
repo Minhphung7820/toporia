@@ -8,7 +8,7 @@ namespace Toporia\Framework\Storage\Contracts;
  * Filesystem Interface
  *
  * Contract for file storage operations.
- * Laravel-compatible API for maximum portability.
+ * Standard filesystem API for maximum portability.
  *
  * SOLID Principles:
  * - Interface Segregation: Focused contract for file operations

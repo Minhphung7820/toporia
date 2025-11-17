@@ -615,7 +615,7 @@ if (!function_exists('view')) {
 
 if (!function_exists('dispatch')) {
     /**
-     * Dispatch a job to the queue (Laravel-style).
+     * Dispatch a job to the queue.
      *
      * **Auto-dispatch** when PendingDispatch is destroyed:
      * ```php

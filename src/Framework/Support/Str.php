@@ -7,7 +7,7 @@ namespace Toporia\Framework\Support;
 /**
  * Str - Advanced string manipulation utilities.
  *
- * Enhanced string operations with features beyond Laravel:
+ * Enhanced string operations with advanced features:
  * - Fluent string builder pattern
  * - Advanced parsing (markdown, templates, etc)
  * - Better Unicode support
@@ -556,7 +556,7 @@ class Str
     }
 
     // ========================================
-    // ADVANCED FEATURES (Beyond Laravel)
+    // ADVANCED FEATURES
     // ========================================
 
     /**

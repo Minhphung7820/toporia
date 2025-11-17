@@ -16,7 +16,7 @@ use ReflectionParameter;
 /**
  * Dependency Injection Container
  *
- * Professional DI container with Laravel-style features:
+ * Professional DI container with advanced features:
  * - Auto-wiring with reflection
  * - Singleton pattern support
  * - Contextual bindings
@@ -200,7 +200,7 @@ final class Container implements ContainerInterface
     }
 
     /**
-     * Alias for get() method (Laravel-style).
+     * Alias for get() method.
      *
      * @param string $id Service identifier
      * @return mixed

@@ -62,7 +62,7 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Blacklist of attributes that cannot be mass-assigned.
      *
-     * Behavior (Laravel-compatible):
+     * Behavior:
      * - Empty array (default): Allow all fields when $fillable is also empty (auto-fillable)
      * - ['field1', 'field2']: Block specific fields (blacklist approach)
      * - ['*']: Disable mass assignment entirely (require explicit $fillable)
@@ -211,7 +211,7 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Get the database connection for this model.
      *
-     * Resolution order (following Laravel pattern):
+     * Resolution order:
      * 1. Check if model specifies a connection name (static::$connection)
      * 2. If yes, resolve from DatabaseManager
      * 3. If no, use global default connection
@@ -725,7 +725,7 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Check whether a key can be mass-assigned.
      *
-     * Mass Assignment Rules (Laravel-compatible):
+     * Mass Assignment Rules:
      * 1. If $fillable is NOT empty: ONLY allow fields in $fillable (whitelist)
      * 2. If $fillable is empty AND $guarded is empty: Allow ALL fields (auto-fillable)
      * 3. If $fillable is empty BUT $guarded has values: Allow all EXCEPT $guarded (blacklist)
@@ -1510,7 +1510,7 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Static eager loading for query results.
      *
-     * Supports multiple formats (Laravel-compatible):
+     * Supports multiple formats:
      * 1. String: with('childrens')
      * 2. Array: with(['childrens', 'category'])
      * 3. Array with column selection: with(['childrens:id,title', 'category:id,name'])

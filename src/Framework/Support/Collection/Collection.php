@@ -10,7 +10,7 @@ use Toporia\Framework\Support\Macroable;
 /**
  * Collection - Advanced immutable collection with functional operations.
  *
- * Enhanced collection implementation with features beyond Laravel:
+ * Enhanced collection implementation with advanced features:
  * - Truly immutable by default (all operations return new instances)
  * - Advanced functional methods (window, sliding, transpose)
  * - Better performance with lazy evaluation
@@ -920,7 +920,7 @@ class Collection implements CollectionInterface, \JsonSerializable
     }
 
     // ========================================
-    // ADVANCED METHODS (Beyond Laravel)
+    // ADVANCED METHODS
     // ========================================
 
     /**

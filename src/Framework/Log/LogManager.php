@@ -11,7 +11,7 @@ use Toporia\Framework\Log\Channels\{DailyFileChannel, FileChannel, StackChannel,
  * Log Manager - Multi-channel logger factory
  *
  * Manages multiple named log channels with lazy loading.
- * Similar to Laravel's Log facade but with explicit configuration.
+ * Multi-channel logger with explicit configuration.
  *
  * Features:
  * - Multiple named channels

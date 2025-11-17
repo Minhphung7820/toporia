@@ -124,13 +124,13 @@ abstract class AbstractObserver implements ObserverInterface
     }
 
     // =========================================================================
-    // CONDITIONAL HELPER METHODS (Laravel-like API)
+    // CONDITIONAL HELPER METHODS
     // =========================================================================
 
     /**
      * Check if any field is dirty (changed).
      *
-     * Laravel-like API:
+     * API:
      * - $observer->isDirty() - check if any field changed
      * - $observer->isDirty('price') - check if specific field changed
      * - $observer->isDirty(['price', 'stock']) - check if any of these fields changed
@@ -178,7 +178,7 @@ abstract class AbstractObserver implements ObserverInterface
     /**
      * Get all dirty (changed) fields.
      *
-     * Laravel-like API: $observer->getDirty()
+     * API: $observer->getDirty()
      *
      * @param array<string, mixed> $data Event data
      * @return array<string, mixed> Dirty fields with new values
@@ -191,7 +191,7 @@ abstract class AbstractObserver implements ObserverInterface
     /**
      * Check if a field was changed (alias for isDirtyField).
      *
-     * Laravel-like API: $observer->wasChanged('price')
+     * API: $observer->wasChanged('price')
      *
      * @param string|null $field Field name (null = any field)
      * @param array<string, mixed> $data Event data
@@ -209,7 +209,7 @@ abstract class AbstractObserver implements ObserverInterface
     /**
      * Get the original value of a field (before change).
      *
-     * Laravel-like API: $observer->getOriginal('price')
+     * API: $observer->getOriginal('price')
      *
      * @param string|null $field Field name (null = all original values)
      * @param array<string, mixed> $data Event data
@@ -229,7 +229,7 @@ abstract class AbstractObserver implements ObserverInterface
     /**
      * Check if a field had a specific value before change.
      *
-     * Laravel-like API: $observer->was('price', 100)
+     * API: $observer->was('price', 100)
      *
      * @param string $field Field name
      * @param mixed $value Value to check
@@ -245,7 +245,7 @@ abstract class AbstractObserver implements ObserverInterface
     /**
      * Check if a field has a specific value now (after change).
      *
-     * Laravel-like API: $observer->is('price', 200)
+     * API: $observer->is('price', 200)
      *
      * @param string $field Field name
      * @param mixed $value Value to check
@@ -261,7 +261,7 @@ abstract class AbstractObserver implements ObserverInterface
     /**
      * Check if any of the specified fields are dirty.
      *
-     * Laravel-like API: $observer->isDirty(['price', 'stock'])
+     * API: $observer->isDirty(['price', 'stock'])
      *
      * @param array<string> $fields Field names to check
      * @param array<string, mixed> $data Event data
@@ -289,7 +289,7 @@ abstract class AbstractObserver implements ObserverInterface
     /**
      * Get the old value of a dirty field.
      *
-     * Laravel-like API: $observer->getOldValue('price')
+     * API: $observer->getOldValue('price')
      *
      * @param string $field Field name
      * @param array<string, mixed> $data Event data

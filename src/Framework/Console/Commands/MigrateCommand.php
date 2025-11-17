@@ -11,7 +11,7 @@ use Toporia\Framework\Database\Migration\Migrator;
 /**
  * Run database migrations.
  *
- * Laravel-like migration system with:
+ * Migration system with:
  * - Batch tracking (only run new migrations)
  * - Rollback support
  * - Beautiful colored output

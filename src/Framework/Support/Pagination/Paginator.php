@@ -175,7 +175,7 @@ class Paginator implements \JsonSerializable
     /**
      * Convert the paginator to an array.
      *
-     * This format is compatible with Laravel's pagination format.
+     * Standard pagination format.
      *
      * @return array<string, mixed>
      */

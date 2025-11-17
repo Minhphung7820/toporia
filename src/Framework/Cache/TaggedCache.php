@@ -9,7 +9,7 @@ use Toporia\Framework\Cache\Contracts\CacheInterface;
  * Tagged Cache
  *
  * Provides tag-based cache invalidation for grouped cache entries.
- * Laravel-compatible API for cache tagging.
+ * Tag-based cache invalidation API.
  *
  * Features:
  * - Group related cache entries with tags
@@ -155,7 +155,7 @@ final class TaggedCache implements CacheInterface
     }
 
     /**
-     * Laravel-style helper: Store cache entry (alias for set()).
+     * Store cache entry (alias for set()).
      */
     public function put(string $key, mixed $value, ?int $ttl = null): bool
     {
@@ -163,7 +163,7 @@ final class TaggedCache implements CacheInterface
     }
 
     /**
-     * Laravel-style helper: Delete cache entry (alias for delete()).
+     * Delete cache entry (alias for delete()).
      */
     public function forget(string $key): bool
     {
@@ -171,7 +171,7 @@ final class TaggedCache implements CacheInterface
     }
 
     /**
-     * Laravel-style helper: Flush all tagged entries (alias for clear()).
+     * Flush all tagged entries (alias for clear()).
      */
     public function flush(): bool
     {
@@ -179,7 +179,7 @@ final class TaggedCache implements CacheInterface
     }
 
     /**
-     * Laravel-style helper: Get and delete cache entry.
+     * Get and delete cache entry.
      */
     public function pull(string $key, mixed $default = null): mixed
     {
@@ -189,7 +189,7 @@ final class TaggedCache implements CacheInterface
     }
 
     /**
-     * Laravel-style helper: Store cache entry forever (no expiration).
+     * Store cache entry forever (no expiration).
      */
     public function forever(string $key, mixed $value): bool
     {

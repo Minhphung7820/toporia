@@ -10,7 +10,6 @@ use Toporia\Framework\Database\Connection;
  * Migration Repository
  *
  * Tracks executed migrations in database to prevent re-running.
- * Similar to Laravel's migration tracking system.
  *
  * Performance:
  * - Uses indexed queries for O(log N) lookup

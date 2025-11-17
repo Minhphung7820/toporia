@@ -211,7 +211,7 @@ final class Worker
             return $this->executeJob($job);
         }
 
-        // Build middleware pipeline (Laravel-style)
+        // Build middleware pipeline
         $pipeline = array_reduce(
             array_reverse($middleware),
             function ($next, $middleware) {

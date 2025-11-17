@@ -191,7 +191,7 @@ class QueryBuilder implements QueryBuilderInterface
      * Supports multiple syntaxes:
      * - where('col', '=', 10)         // Basic comparison
      * - where('col', 10)              // Operator defaults to '='
-     * - where(function($q) { ... })   // Nested closure (Laravel-style)
+     * - where(function($q) { ... })   // Nested closure
      *
      * Nested closures allow complex conditions:
      * ```php

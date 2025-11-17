@@ -36,10 +36,10 @@ use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
  * - Multiple queue support
  * - Graceful connection handling
  *
- * Laravel Compatibility:
- * - Same Redis structure as Laravel Horizon
- * - Same job serialization format
- * - Compatible with Laravel queue workers
+ * Features:
+ * - Standard Redis structure
+ * - Job serialization format
+ * - Compatible queue workers
  *
  * SOLID Principles:
  * - Single Responsibility: Only manages Redis queue

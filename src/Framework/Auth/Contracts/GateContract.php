@@ -9,7 +9,7 @@ use Toporia\Framework\Auth\Access\Response;
 /**
  * Gate Contract
  *
- * Professional authorization gate interface (Laravel-compatible).
+ * Professional authorization gate interface.
  *
  * Clean Architecture:
  * - Domain layer contract

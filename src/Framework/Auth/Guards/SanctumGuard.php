@@ -10,7 +10,7 @@ use Toporia\Framework\Http\Request;
 /**
  * Sanctum Guard
  *
- * Token-based authentication guard (Laravel Sanctum style).
+ * Token-based authentication guard.
  *
  * Authentication Flow:
  * 1. Extract token from Authorization header (Bearer token)

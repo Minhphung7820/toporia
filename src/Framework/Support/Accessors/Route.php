@@ -11,7 +11,7 @@ use Toporia\Framework\Routing\Contracts\RouterInterface;
 /**
  * Route Accessor (Facade)
  *
- * Static accessor for Router service providing Laravel-style route registration.
+ * Static accessor for Router service providing fluent route registration.
  * Enables static method calls for route definitions.
  *
  * Usage:

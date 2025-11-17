@@ -28,7 +28,7 @@ final class HomeController extends BaseController
     /**
      * Product listing with pagination.
      *
-     * Demo: Laravel-style job dispatching with fluent API.
+     * Demo: Job dispatching with fluent API.
      *
      * Performance:
      * - O(1) job dispatch (no blocking)

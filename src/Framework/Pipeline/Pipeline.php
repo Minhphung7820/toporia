@@ -11,7 +11,7 @@ use Toporia\Framework\Pipeline\Contracts\PipelineInterface;
 /**
  * General-purpose Pipeline for passing data through multiple stages.
  *
- * Laravel-compatible pipeline implementation for chainable operations.
+ * Pipeline implementation for chainable operations.
  * Perfect for filtering, transforming, validating data through multiple steps.
  *
  * Features:

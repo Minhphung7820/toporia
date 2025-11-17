@@ -216,25 +216,25 @@ class MorphToMany extends Relation
             "{$this->pivotTable}.{$this->relatedPivotKey}"
         );
 
-        // Add constraints for all types using closures (Laravel-style)
+        // Add constraints for all types using closures
         // WHERE (type='Post' AND id IN (?,...)) OR (type='Video' AND id IN (?,...))
         $pivotTable = $this->pivotTable;
         $morphType = $this->morphType;
         $foreignKey = $this->foreignKey;
 
-        $this->query->where(function($q) use ($types, $pivotTable, $morphType, $foreignKey) {
+        $this->query->where(function ($q) use ($types, $pivotTable, $morphType, $foreignKey) {
             $first = true;
             foreach ($types as $type => $ids) {
                 if ($first) {
-                    $q->where(function($subQ) use ($type, $ids, $pivotTable, $morphType, $foreignKey) {
+                    $q->where(function ($subQ) use ($type, $ids, $pivotTable, $morphType, $foreignKey) {
                         $subQ->where("{$pivotTable}.{$morphType}", $type)
-                             ->whereIn("{$pivotTable}.{$foreignKey}", $ids);
+                            ->whereIn("{$pivotTable}.{$foreignKey}", $ids);
                     });
                     $first = false;
                 } else {
-                    $q->orWhere(function($subQ) use ($type, $ids, $pivotTable, $morphType, $foreignKey) {
+                    $q->orWhere(function ($subQ) use ($type, $ids, $pivotTable, $morphType, $foreignKey) {
                         $subQ->where("{$pivotTable}.{$morphType}", $type)
-                             ->whereIn("{$pivotTable}.{$foreignKey}", $ids);
+                            ->whereIn("{$pivotTable}.{$foreignKey}", $ids);
                     });
                 }
             }

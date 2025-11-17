@@ -9,7 +9,7 @@ use Toporia\Framework\Validation\Contracts\ValidatorInterface;
 /**
  * Validator
  *
- * Powerful validation engine inspired by Laravel Validator.
+ * Powerful validation engine with comprehensive rule support.
  *
  * Features:
  * - 20+ built-in validation rules

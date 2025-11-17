@@ -11,7 +11,7 @@ use Toporia\Framework\Database\Migration\Migrator;
 /**
  * Rollback database migrations.
  *
- * Laravel-like rollback system with:
+ * Rollback system with:
  * - Batch-based rollback (undo last batch by default)
  * - Step-based rollback (--step=N to rollback N batches)
  * - Beautiful colored output

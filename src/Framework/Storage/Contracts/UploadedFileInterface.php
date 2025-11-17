@@ -8,7 +8,7 @@ namespace Toporia\Framework\Storage\Contracts;
  * Uploaded File Interface
  *
  * Contract for handling uploaded files from HTTP requests.
- * Laravel-compatible API.
+ * Standard uploaded file API.
  */
 interface UploadedFileInterface
 {

@@ -10,7 +10,7 @@ use Toporia\Framework\Storage\Contracts\FilesystemInterface;
  * Local Filesystem Driver
  *
  * High-performance local disk storage implementation.
- * Laravel-compatible with optimizations.
+ * Local filesystem implementation with optimizations.
  *
  * Performance Optimizations:
  * - Direct filesystem calls (no abstraction overhead)

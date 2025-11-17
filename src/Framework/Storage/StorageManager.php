@@ -9,7 +9,7 @@ use Toporia\Framework\Storage\Contracts\FilesystemInterface;
 /**
  * Storage Manager
  *
- * Multi-driver storage manager (like Laravel Storage facade).
+ * Multi-driver storage manager with fluent API.
  *
  * Supports:
  * - Local filesystem

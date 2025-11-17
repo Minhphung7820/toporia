@@ -257,7 +257,7 @@ if (!function_exists('storage')) {
 
 if (!function_exists('dd')) {
     /**
-     * Dump the given variables and end the script (Laravel-style).
+     * Dump the given variables and end the script.
      *
      * @param mixed ...$vars Variables to dump
      * @return never
@@ -276,7 +276,7 @@ if (!function_exists('dd')) {
 
 if (!function_exists('dump')) {
     /**
-     * Dump the given variable (Laravel-style).
+     * Dump the given variable.
      *
      * @param mixed $var Variable to dump
      * @return mixed Returns the dumped variable for chaining

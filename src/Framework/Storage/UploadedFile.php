@@ -9,7 +9,7 @@ use Toporia\Framework\Storage\Contracts\UploadedFileInterface;
 /**
  * Uploaded File Handler
  *
- * Handles HTTP file uploads with Laravel-compatible API.
+ * Handles HTTP file uploads with standard API.
  *
  * Performance:
  * - Stream-based for large files (memory efficient)

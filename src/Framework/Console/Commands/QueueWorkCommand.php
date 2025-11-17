@@ -14,7 +14,7 @@ use Toporia\Framework\Queue\Worker;
  *
  * Process jobs from the queue with graceful shutdown support.
  *
- * Multi-Queue Support (Laravel-style):
+ * Multi-Queue Support:
  * - Supports comma-separated queue names with priority order
  * - Processes queues in order: first queue has highest priority
  * - Example: --queue=emails,default,notifications

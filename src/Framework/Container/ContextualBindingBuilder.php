@@ -7,7 +7,7 @@ namespace Toporia\Framework\Container;
 /**
  * Contextual Binding Builder
  *
- * Fluent builder for contextual bindings (Laravel-style).
+ * Fluent builder for contextual bindings.
  *
  * Usage:
  * ```php

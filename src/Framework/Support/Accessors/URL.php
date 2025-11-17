@@ -7,7 +7,7 @@ namespace Toporia\Framework\Support\Accessors;
 use Toporia\Framework\Routing\Contracts\UrlGeneratorInterface;
 
 /**
- * Static accessor for URL Generator (Laravel-compatible).
+ * Static accessor for URL Generator.
  *
  * Provides static methods for convenient URL generation throughout the application.
  *

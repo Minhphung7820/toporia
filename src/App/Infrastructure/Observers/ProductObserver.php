@@ -91,7 +91,7 @@ final class ProductObserver extends AbstractObserver
 
         $productId = $observable->id ?? 'unknown';
 
-        // Example 1: Only handle if price changed (Laravel-like syntax)
+        // Example 1: Only handle if price changed
         if ($this->isDirty('price', $data)) {
             $oldPrice = $this->getOldValue('price', $data);
             $newPrice = $this->getNewValue('price', $data);

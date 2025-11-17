@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Web Routes
  *
  * Define your application routes here.
- * Using Laravel-style static Route facade.
+ * Using static Route facade.
  */
 
 use Toporia\Framework\Support\Accessors\Route;

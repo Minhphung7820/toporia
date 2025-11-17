@@ -10,7 +10,7 @@ use Toporia\Framework\Queue\Contracts\Dispatcher;
  * Pending Job Dispatch
  *
  * Provides fluent API for configuring job dispatch.
- * Inspired by Laravel's PendingDispatch.
+ * Provides fluent API for configuring job dispatch.
  *
  * Usage:
  * ```php
@@ -37,8 +37,7 @@ final class PendingDispatch
     public function __construct(
         private readonly object $job,
         private readonly Dispatcher $dispatcher
-    ) {
-    }
+    ) {}
 
     /**
      * Set the queue for the job.
@@ -111,7 +110,7 @@ final class PendingDispatch
     /**
      * Destructor - automatically dispatches job when object is destroyed.
      *
-     * Laravel-style implicit dispatch:
+     * Implicit dispatch:
      * ```php
      * dispatch(new SendEmailJob(...));  // Auto-dispatches, no ->dispatch() needed!
      * ```

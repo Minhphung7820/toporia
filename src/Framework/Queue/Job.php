@@ -266,7 +266,7 @@ abstract class Job implements JobInterface
     }
 
     /**
-     * Dispatch the job to the queue (Laravel-style static dispatch).
+     * Dispatch the job to the queue (static dispatch).
      *
      * Usage:
      * ```php

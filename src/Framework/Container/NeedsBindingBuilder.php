@@ -7,7 +7,7 @@ namespace Toporia\Framework\Container;
 /**
  * Needs Binding Builder
  *
- * Second part of contextual binding chain (Laravel-style).
+ * Second part of contextual binding chain.
  *
  * Usage:
  * ```php

@@ -2,7 +2,7 @@
 
 ## Tổng quan
 
-IoC (Inversion of Control) Container là trái tim của Toporia Framework, cung cấp Dependency Injection (DI) và Service Location pattern. Container được thiết kế theo phong cách Laravel với các tính năng nâng cao và tối ưu hóa hiệu suất.
+IoC (Inversion of Control) Container là trái tim của Toporia Framework, cung cấp Dependency Injection (DI) và Service Location pattern. Container được thiết kế với các tính năng nâng cao và tối ưu hóa hiệu suất.
 
 ## Kiến trúc
 
@@ -399,7 +399,7 @@ $container->instance('config', $configRepository);
 ```
 
 #### `make(string $id): mixed`
-Alias của `get()` (Laravel-style).
+Alias của `get()`.
 
 ```php
 $service = $container->make(Service::class);
@@ -715,7 +715,7 @@ $container->bind('param.name', fn() => $value);
 IoC Container của Toporia Framework cung cấp:
 
 - ✅ **Auto-wiring** mạnh mẽ với reflection caching
-- ✅ **Laravel-style API** quen thuộc và dễ sử dụng
+- ✅ **Fluent API** quen thuộc và dễ sử dụng
 - ✅ **Advanced features**: Contextual bindings, tagged services, extenders
 - ✅ **High performance**: Reflection caching, singleton optimization
 - ✅ **Clean Architecture**: Tuân thủ SOLID principles

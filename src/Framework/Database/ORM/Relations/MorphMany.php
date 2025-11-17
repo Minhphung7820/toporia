@@ -151,7 +151,7 @@ class MorphMany extends Relation
             $types[$type][] = $model->getAttribute($this->localKey);
         }
 
-        // Build nested WHERE with closures (clean Laravel-style)
+        // Build nested WHERE with closures
         // WHERE (type='Post' AND id IN (...)) OR (type='Video' AND id IN (...))
         $this->query->where(function($q) use ($types) {
             $first = true;

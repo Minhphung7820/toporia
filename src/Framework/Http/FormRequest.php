@@ -10,7 +10,7 @@ use Toporia\Framework\Validation\Contracts\ValidatorInterface;
 /**
  * Form Request
  *
- * Base class for form validation requests (Laravel-style).
+ * Base class for form validation requests.
  *
  * Features:
  * - Auto-validation before controller method

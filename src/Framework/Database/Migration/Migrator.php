@@ -10,7 +10,7 @@ use Toporia\Framework\Database\Schema\SchemaBuilder;
 /**
  * Migrator
  *
- * Orchestrates database migrations with Laravel-like functionality.
+ * Orchestrates database migrations with comprehensive functionality.
  *
  * Features:
  * - Batch tracking (only run new migrations)

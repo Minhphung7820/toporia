@@ -10,7 +10,7 @@ use Toporia\Framework\Hashing\Contracts\HasherInterface;
 /**
  * Hash Accessor (Facade)
  *
- * Static accessor for HashManager providing Laravel-style API.
+ * Static accessor for HashManager providing fluent API.
  * Enables static method calls for convenient hashing operations.
  *
  * Usage:

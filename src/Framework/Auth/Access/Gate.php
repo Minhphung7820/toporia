@@ -11,7 +11,7 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 /**
  * Authorization Gate
  *
- * Professional gate implementation with performance optimization and Laravel compatibility.
+ * Professional gate implementation with performance optimization.
  *
  * Clean Architecture:
  * - Framework layer implementation
