@@ -42,33 +42,3 @@ final class ContextualBindingBuilder
         return new NeedsBindingBuilder($this->container, $this->concrete, $abstract);
     }
 }
-
-/**
- * Needs Binding Builder
- *
- * Second part of contextual binding chain.
- */
-final class NeedsBindingBuilder
-{
-    /**
-     * @param Container $container Container instance
-     * @param string $concrete Concrete class
-     * @param string $abstract Abstract class/interface
-     */
-    public function __construct(
-        private Container $container,
-        private string $concrete,
-        private string $abstract
-    ) {}
-
-    /**
-     * Specify the implementation to use.
-     *
-     * @param callable|string $implementation Implementation class or factory
-     * @return void
-     */
-    public function give(callable|string $implementation): void
-    {
-        $this->container->addContextualBinding($this->concrete, $this->abstract, $implementation);
-    }
-}
