@@ -59,7 +59,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'repository',
-            'repository' => \App\Domain\User\UserRepository::class,
+            'repository' => \App\Domain\Contracts\Repository\UserRepository::class,
         ],
     ],
 

@@ -36,20 +36,21 @@ interface ContainerInterface
      * Bind a service factory to the container.
      *
      * @param string $id Service identifier.
-     * @param callable $factory Factory function that creates the service.
+     * @param callable|string|null $concrete Concrete implementation (null = auto-bind to $id).
+     * @param bool $shared Whether the service should be shared (singleton).
      * @return void
      */
-    public function bind(string $id, callable $factory): void;
+    public function bind(string $id, callable|string|null $concrete = null, bool $shared = false): void;
 
     /**
      * Bind a singleton service to the container.
      * The service will be created once and reused on subsequent calls.
      *
      * @param string $id Service identifier.
-     * @param callable $factory Factory function that creates the service.
+     * @param callable|string|null $concrete Concrete implementation (null = auto-bind to $id).
      * @return void
      */
-    public function singleton(string $id, callable $factory): void;
+    public function singleton(string $id, callable|string|null $concrete = null): void;
 
     /**
      * Register an existing instance as a singleton.
