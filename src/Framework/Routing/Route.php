@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Routing;
 
 use Toporia\Framework\Routing\Contracts\RouteInterface;
+
 /**
  * Route implementation with parameter extraction support.
  */
@@ -24,6 +25,11 @@ final class Route implements RouteInterface
      * @var string|null Route name.
      */
     private ?string $name = null;
+
+    /**
+     * @var array<string, string> Parameter constraints (regex patterns)
+     */
+    private array $constraints = [];
 
     /**
      * @param string|array $methods HTTP method(s).
@@ -130,6 +136,31 @@ final class Route implements RouteInterface
     }
 
     /**
+     * Add parameter constraints.
+     *
+     * Useful for SPA routes: Route::any('/{any}', ...)->where('any', '.*')
+     *
+     * @param string|array $parameter Parameter name or array of constraints
+     * @param string|null $pattern Regex pattern (if $parameter is string)
+     * @return self
+     */
+    public function where(string|array $parameter, ?string $pattern = null): self
+    {
+        if (is_array($parameter)) {
+            // Multiple constraints: where(['id' => '\d+', 'slug' => '[a-z-]+'])
+            $this->constraints = array_merge($this->constraints, $parameter);
+        } else {
+            // Single constraint: where('id', '\d+')
+            $this->constraints[$parameter] = $pattern ?? '[^/]+';
+        }
+
+        // Recompile route with new constraints
+        $this->compileRoute();
+
+        return $this;
+    }
+
+    /**
      * Compile the route pattern into a regex.
      */
     private function compileRoute(): void
@@ -138,8 +169,14 @@ final class Route implements RouteInterface
         if (preg_match_all('#\{([^/]+)\}#', $this->uri, $matches)) {
             $this->parameterNames = $matches[1];
 
-            // Convert {param} to named capture groups
-            $pattern = preg_replace('#\{([^/]+)\}#', '(?P<$1>[^/]+)', $this->uri);
+            // Build pattern with constraints
+            $pattern = $this->uri;
+            foreach ($this->parameterNames as $name) {
+                // Use custom constraint if provided, otherwise default to [^/]+
+                $constraint = $this->constraints[$name] ?? '[^/]+';
+                $pattern = str_replace('{' . $name . '}', '(?P<' . $name . '>' . $constraint . ')', $pattern);
+            }
+
             $this->compiledPattern = '#^' . $pattern . '$#';
         }
     }

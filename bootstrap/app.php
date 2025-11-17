@@ -108,6 +108,20 @@ require __DIR__ . '/helpers.php';
 
 /*
 |--------------------------------------------------------------------------
+| Set Container for Service Accessors
+|--------------------------------------------------------------------------
+|
+| Set the container instance for the ServiceAccessor system.
+| This MUST be done before booting providers because RouteServiceProvider
+| loads routes which may use Route facade (ServiceAccessor).
+| This enables static-like access to services (e.g., Route::get()).
+|
+*/
+
+\Toporia\Framework\Foundation\ServiceAccessor::setContainer($app->getContainer());
+
+/*
+|--------------------------------------------------------------------------
 | Register Service Providers
 |--------------------------------------------------------------------------
 |
@@ -140,22 +154,11 @@ $app->registerProviders([
 |
 | Boot all registered service providers. This is where event listeners
 | are registered and other post-registration setup occurs.
+| Routes are loaded here via RouteServiceProvider::boot().
 |
 */
 
 $app->boot();
-
-/*
-|--------------------------------------------------------------------------
-| Set Container for Service Accessors
-|--------------------------------------------------------------------------
-|
-| Set the container instance for the ServiceAccessor system.
-| This enables static-like access to services (e.g., Cache::get()).
-|
-*/
-
-\Toporia\Framework\Foundation\ServiceAccessor::setContainer($app->getContainer());
 
 /*
 |--------------------------------------------------------------------------

@@ -1,0 +1,71 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Toporia\Framework\Support\Accessors;
+
+use Toporia\Framework\Foundation\ServiceAccessor;
+use Toporia\Framework\Routing\Contracts\RouteInterface;
+use Toporia\Framework\Routing\Contracts\RouterInterface;
+
+/**
+ * Route Accessor (Facade)
+ *
+ * Static accessor for Router service providing Laravel-style route registration.
+ * Enables static method calls for route definitions.
+ *
+ * Usage:
+ * ```php
+ * use Toporia\Framework\Support\Accessors\Route;
+ *
+ * // Basic routes
+ * Route::get('/', [HomeController::class, 'index']);
+ * Route::post('/users', [UserController::class, 'store']);
+ *
+ * // Route groups
+ * Route::group(['prefix' => 'api', 'middleware' => 'auth'], function () {
+ *     Route::get('/users', [UserController::class, 'index']);
+ * });
+ *
+ * // SPA fallback route (catch-all)
+ * Route::any('/{any}', [SpaController::class, 'index'])->where('any', '.*');
+ * ```
+ *
+ * Performance:
+ * - O(1) instance resolution (cached after first call)
+ * - Zero overhead method forwarding
+ * - Direct delegation to Router instance
+ *
+ * Clean Architecture:
+ * - ServiceAccessor pattern for dependency injection
+ * - Static interface for route definitions
+ * - Router instance resolved from container
+ *
+ * @method static RouteInterface get(string $path, mixed $handler, array $middleware = [])
+ * @method static RouteInterface post(string $path, mixed $handler, array $middleware = [])
+ * @method static RouteInterface put(string $path, mixed $handler, array $middleware = [])
+ * @method static RouteInterface patch(string $path, mixed $handler, array $middleware = [])
+ * @method static RouteInterface delete(string $path, mixed $handler, array $middleware = [])
+ * @method static RouteInterface any(string $path, mixed $handler, array $middleware = [])
+ * @method static void group(array $attributes, callable $callback)
+ */
+final class Route extends ServiceAccessor
+{
+    /**
+     * {@inheritdoc}
+     */
+    protected static function getServiceName(): string
+    {
+        return 'router';
+    }
+
+    /**
+     * Get the router instance.
+     *
+     * @return RouterInterface
+     */
+    public static function getInstance(): RouterInterface
+    {
+        return parent::getInstance();
+    }
+}

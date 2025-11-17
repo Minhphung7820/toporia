@@ -6,10 +6,10 @@ declare(strict_types=1);
  * Web Routes
  *
  * Define your application routes here.
- * The $router variable is automatically injected by RouteServiceProvider.
+ * Using Laravel-style static Route facade.
  */
 
-use Toporia\Framework\Routing\Router;
+use Toporia\Framework\Support\Accessors\Route;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
 use App\Presentation\Http\Middleware\Authenticate;
@@ -23,53 +23,50 @@ use App\Presentation\Http\Actions\Product\UpdateProductAction;
 use App\Presentation\Http\Actions\Product\DeleteProductAction;
 use App\Presentation\Http\Actions\Product\ListProductsAction;
 use App\Presentation\Http\Actions\Product\GetProductAction;
-use App\Jobs\TestRabbitMQJob;
 use Toporia\Framework\Support\Accessors\Log;
 
-/** @var Router $router */
-
 // Public routes
-$router->get('/', [HomeController::class, 'index']);
-$router->get('/login', [AuthController::class, 'showLoginForm']);
-$router->post('/login', [AuthController::class, 'login']);
-$router->get('/register', [AuthController::class, 'showRegisterForm']);
-$router->post('/register', [AuthController::class, 'register']);
+Route::get('/', [HomeController::class, 'index']);
+Route::get('/login', [AuthController::class, 'showLoginForm']);
+Route::post('/login', [AuthController::class, 'login']);
+Route::get('/register', [AuthController::class, 'showRegisterForm']);
+Route::post('/register', [AuthController::class, 'register']);
 
 // Auth routes
-$router->post('/logout', [AuthController::class, 'logout']);
+Route::post('/logout', [AuthController::class, 'logout']);
 
 // API routes - Authentication
-$router->post('/api/login', [AuthController::class, 'login']);
-$router->post('/api/register', [AuthController::class, 'register']);
-$router->post('/api/logout', [AuthController::class, 'logout']);
-$router->get('/api/me', [AuthController::class, 'me'])->middleware(['auth:api']);
+Route::post('/api/login', [AuthController::class, 'login']);
+Route::post('/api/register', [AuthController::class, 'register']);
+Route::post('/api/logout', [AuthController::class, 'logout']);
+Route::get('/api/me', [AuthController::class, 'me'])->middleware(['auth:api']);
 
 // Protected routes (require authentication)
-$router->get('/dashboard', [HomeController::class, 'dashboard'], [Authenticate::class]);
-$router->get('/products/create', [ProductsController::class, 'create'], [Authenticate::class]);
-$router->post('/products', [ProductsController::class, 'store'], [Authenticate::class]);
-$router->get('/products/{id}', [ProductsController::class, 'show']);
+Route::get('/dashboard', [HomeController::class, 'dashboard'], [Authenticate::class]);
+Route::get('/products/create', [ProductsController::class, 'create'], [Authenticate::class]);
+Route::post('/products', [ProductsController::class, 'store'], [Authenticate::class]);
+Route::get('/products/{id}', [ProductsController::class, 'show']);
 
 // API routes - Product CRUD (ADR pattern with Clean Architecture)
-$router->group(['prefix' => 'api/v1/products'], function (Router $router) {
+Route::group(['prefix' => 'api/v1/products'], function () {
     // List products (paginated)
-    $router->get('/', ListProductsAction::class);
+    Route::get('/', ListProductsAction::class);
 
     // Get single product
-    $router->get('/{id}', GetProductAction::class);
+    Route::get('/{id}', GetProductAction::class);
 
     // Create product
-    $router->post('/', CreateProductAction::class);
+    Route::post('/', CreateProductAction::class);
 
     // Update product
-    $router->put('/{id}', UpdateProductAction::class);
+    Route::put('/{id}', UpdateProductAction::class);
 
     // Delete product
-    $router->delete('/{id}', DeleteProductAction::class);
+    Route::delete('/{id}', DeleteProductAction::class);
 });
 
 // Elasticsearch Search API
-$router->get('/api/products/search', function (Request $request, Response $response) {
+Route::get('/api/products/search', function (Request $request, Response $response) {
     $search = container('search');
     $query = $request->query('q', '');
     $page = (int) $request->query('page', 1);
@@ -148,19 +145,19 @@ $router->get('/api/products/search', function (Request $request, Response $respo
 });
 
 // File Upload routes
-$router->get('/upload', [FileUploadController::class, 'showForm']);
-$router->post('/upload/local', [FileUploadController::class, 'uploadLocal']);
+Route::get('/upload', [FileUploadController::class, 'showForm']);
+Route::post('/upload/local', [FileUploadController::class, 'uploadLocal']);
 
 // Excel Import/Export routes
-$router->post('/api/excel/import', [ExcelController::class, 'import']);
-$router->get('/api/excel/export', [ExcelController::class, 'export']);
-$router->post('/upload/s3', [FileUploadController::class, 'uploadToS3']);
-$router->get('/upload/list', [FileUploadController::class, 'listFiles']);
-$router->get('/upload/download/{filename}', [FileUploadController::class, 'download']);
-$router->delete('/upload/{filename}', [FileUploadController::class, 'delete']);
+Route::post('/api/excel/import', [ExcelController::class, 'import']);
+Route::get('/api/excel/export', [ExcelController::class, 'export']);
+Route::post('/upload/s3', [FileUploadController::class, 'uploadToS3']);
+Route::get('/upload/list', [FileUploadController::class, 'listFiles']);
+Route::get('/upload/download/{filename}', [FileUploadController::class, 'download']);
+Route::delete('/upload/{filename}', [FileUploadController::class, 'delete']);
 
 // Kafka Test routes
-$router->get('/test-kafka', function (Request $request, Response $response) {
+Route::get('/test-kafka', function (Request $request, Response $response) {
     $realtime = realtime();
     $channel = $request->query('channel', 'test.channel');
     $event = $request->query('event', 'test-event');
@@ -187,7 +184,7 @@ $router->get('/test-kafka', function (Request $request, Response $response) {
     ]);
 });
 
-$router->post('/test-kafka', function (Request $request, Response $response) {
+Route::post('/test-kafka', function (Request $request, Response $response) {
     $realtime = realtime();
     $data = $request->input(); // Get parsed JSON body
 
@@ -209,7 +206,7 @@ $router->post('/test-kafka', function (Request $request, Response $response) {
 });
 
 // Order Tracking Test Routes (Business Logic)
-$router->post('/api/orders', function (Request $request, Response $response) {
+Route::post('/api/orders', function (Request $request, Response $response) {
     $realtime = realtime();
     $data = $request->input();
 
@@ -246,7 +243,7 @@ $router->post('/api/orders', function (Request $request, Response $response) {
     ]);
 });
 
-$router->post('/api/orders/{orderId}/ship', function (Request $request, Response $response, string $orderId) {
+Route::post('/api/orders/{orderId}/ship', function (Request $request, Response $response, string $orderId) {
     $realtime = realtime();
     $data = $request->input();
 
@@ -279,7 +276,7 @@ $router->post('/api/orders/{orderId}/ship', function (Request $request, Response
     ]);
 });
 
-$router->post('/api/orders/{orderId}/deliver', function (Request $request, Response $response, string $orderId) {
+Route::post('/api/orders/{orderId}/deliver', function (Request $request, Response $response, string $orderId) {
     $realtime = realtime();
 
     // Simulate order delivery
@@ -308,7 +305,7 @@ $router->post('/api/orders/{orderId}/deliver', function (Request $request, Respo
     ]);
 });
 
-$router->get('/api/orders/test', function (Request $request, Response $response) {
+Route::get('/api/orders/test', function (Request $request, Response $response) {
     return $response->json([
         'message' => 'Order Tracking Test Endpoints',
         'endpoints' => [
@@ -347,7 +344,7 @@ $router->get('/api/orders/test', function (Request $request, Response $response)
 });
 
 // Quick test route - GET để dễ test producer
-$router->get('/api/orders/produce', function (Request $request, Response $response) {
+Route::get('/api/orders/produce', function (Request $request, Response $response) {
     $realtime = realtime();
     // Get parameters from query string
     $event = $request->query('event', 'order.created');
@@ -427,3 +424,8 @@ $router->get('/api/orders/produce', function (Request $request, Response $respon
         ], 500);
     }
 });
+
+// SPA Fallback Route - Catch all routes for Single Page Application
+// This should be the last route to allow all other routes to be matched first
+// Use Route::any() with where('any', '.*') to match any path including nested paths
+Route::any('/{any}', [HomeController::class, 'index'])->where('any', '.*');
