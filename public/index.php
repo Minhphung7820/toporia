@@ -38,18 +38,11 @@ $app = require __DIR__ . '/../bootstrap/app.php';
 
 /*
 |--------------------------------------------------------------------------
-| Load Helper Functions
-|--------------------------------------------------------------------------
-*/
-
-require __DIR__ . '/../bootstrap/helpers.php';
-
-/*
-|--------------------------------------------------------------------------
 | Run The Application
 |--------------------------------------------------------------------------
 |
 | Dispatch the HTTP request through the router.
+| Helper functions are already loaded in bootstrap/app.php
 |
 */
 
