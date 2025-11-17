@@ -62,6 +62,10 @@ final class ConsoleServiceProvider extends ServiceProvider
       \Toporia\Framework\Console\Commands\RouteClearCommand::class,
       \Toporia\Framework\Console\Commands\RouteListCommand::class,
 
+      // Config commands
+      \Toporia\Framework\Console\Commands\ConfigCacheCommand::class,
+      \Toporia\Framework\Console\Commands\ConfigClearCommand::class,
+
       // Cache commands
       \Toporia\Framework\Console\Commands\CacheClearCommand::class,
 

@@ -22,16 +22,23 @@ class Repository
     private ?string $configPath = null;
 
     /**
+     * @var string|null Compiled config cache path
+     */
+    private ?string $cachePath = null;
+
+    /**
      * @var array<string, bool> Track which config files have been loaded
      */
     private array $loaded = [];
 
     /**
      * @param array<string, mixed> $items Initial configuration items
+     * @param string|null $cachePath Compiled config cache path
      */
-    public function __construct(array $items = [])
+    public function __construct(array $items = [], ?string $cachePath = null)
     {
         $this->items = $items;
+        $this->cachePath = $cachePath;
     }
 
     /**
@@ -125,6 +132,12 @@ class Repository
 
         $this->configPath = $directory;
 
+        // Try to load from cache first
+        if ($this->cachePath !== null && file_exists($this->cachePath)) {
+            $this->loadFromCache();
+            return;
+        }
+
         if ($eager) {
             // Eager load all config files (current behavior)
             $files = glob($directory . '/*.php');
@@ -134,6 +147,28 @@ class Repository
             }
         }
         // If lazy, files will be loaded on first access via lazyLoadConfig()
+    }
+
+    /**
+     * Load configuration from compiled cache file.
+     *
+     * @return void
+     */
+    private function loadFromCache(): void
+    {
+        if ($this->cachePath === null || !file_exists($this->cachePath)) {
+            return;
+        }
+
+        $cached = require $this->cachePath;
+
+        if (is_array($cached)) {
+            $this->items = $cached;
+            // Mark all as loaded
+            foreach (array_keys($cached) as $name) {
+                $this->loaded[$name] = true;
+            }
+        }
     }
 
     /**
