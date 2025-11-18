@@ -19,14 +19,24 @@ final class CsrfProtection implements MiddlewareInterface
     private const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
     private const TOKEN_FIELDS = ['_token', '_csrf', 'csrf_token'];
 
+    /**
+     * @param CsrfTokenManagerInterface $tokenManager
+     * @param array $except URIs to exclude from CSRF verification (supports wildcards)
+     */
     public function __construct(
-        private CsrfTokenManagerInterface $tokenManager
+        private CsrfTokenManagerInterface $tokenManager,
+        private array $except = []
     ) {}
 
     public function handle(Request $request, Response $response, callable $next): mixed
     {
         // Skip CSRF validation for safe methods
         if ($this->isSafeMethod($request->method())) {
+            return $next($request, $response);
+        }
+
+        // Skip CSRF validation for excluded URIs
+        if ($this->shouldExcludeUri($request->path())) {
             return $next($request, $response);
         }
 
@@ -106,6 +116,44 @@ final class CsrfProtection implements MiddlewareInterface
         foreach (self::TOKEN_FIELDS as $key) {
             if ($this->tokenManager->validate($token, $key)) {
                 return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if URI should be excluded from CSRF verification.
+     *
+     * Supports wildcard patterns using asterisk.
+     *
+     * Performance: O(N*M) where N = except patterns, M = path length
+     * Typically very fast as N is small (usually < 10 patterns)
+     *
+     * @param string $path Request path
+     * @return bool True if URI should be excluded
+     */
+    private function shouldExcludeUri(string $path): bool
+    {
+        // Normalize path (ensure leading slash, remove trailing slash)
+        $path = '/' . trim($path, '/');
+
+        foreach ($this->except as $pattern) {
+            // Normalize pattern
+            $pattern = '/' . trim($pattern, '/');
+
+            // Exact match
+            if ($pattern === $path) {
+                return true;
+            }
+
+            // Wildcard pattern matching
+            if (str_contains($pattern, '*')) {
+                // Convert wildcard pattern to regex
+                $regex = '#^' . str_replace(['*', '/'], ['.*', '\/'], preg_quote($pattern, '#')) . '$#';
+                if (preg_match($regex, $path)) {
+                    return true;
+                }
             }
         }
 

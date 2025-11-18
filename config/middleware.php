@@ -36,7 +36,11 @@ return [
         'web' => [
             // Web routes middleware
             AddSecurityHeaders::class,  // Security headers for web
-            CsrfProtection::class,      // CSRF protection for state-changing requests
+            // CSRF protection with excluded URIs from config
+            fn($container) => new CsrfProtection(
+                $container->get('csrf'),
+                $container->get('config')->get('security.csrf.except', [])
+            ),
             // ReplayAttackProtection middleware with config from security.php
             fn($container) => new ReplayAttackProtection(
                 $container->get('replay'),

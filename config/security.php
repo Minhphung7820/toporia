@@ -21,6 +21,22 @@ return [
     'csrf' => [
         'enabled' => true,
         'token_name' => '_token',
+
+        /*
+        |--------------------------------------------------------------------------
+        | CSRF Excluded URIs
+        |--------------------------------------------------------------------------
+        |
+        | List of URIs that should be excluded from CSRF verification.
+        | Useful for webhooks, API endpoints, or third-party integrations.
+        |
+        | Supports wildcard patterns using asterisk.
+        |
+        */
+        'except' => [
+            // Add URIs to exclude from CSRF verification here
+            // Supports wildcard patterns: '/api/webhook/*', '/api/*/callback'
+        ],
     ],
 
     /*
