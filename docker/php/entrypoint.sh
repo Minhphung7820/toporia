@@ -17,6 +17,12 @@ opcache.revalidate_freq=${OPCACHE_REVALIDATE_FREQ}
 opcache.fast_shutdown=1
 EOF
 
+# Fix permissions for source files and directories
+# This ensures www-data user can read all PHP files and traverse directories
+# Directories need execute permission for traversal, files need read permission
+find /var/www/html -type d -exec chmod 755 {} \; 2>/dev/null || true
+find /var/www/html -type f -exec chmod 644 {} \; 2>/dev/null || true
+
 # Fix permissions for storage directories
 # This ensures www-data user can write logs, cache, etc.
 if [ -d /var/www/html/storage ]; then
