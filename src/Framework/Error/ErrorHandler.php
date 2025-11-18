@@ -41,6 +41,12 @@ final class ErrorHandler implements ErrorHandlerInterface
         private bool $debug = true,
         private ?ErrorRendererInterface $renderer = null
     ) {
+        // Security: Force debug=false in production to prevent information disclosure
+        $appEnv = env('APP_ENV', 'local');
+        if ($appEnv === 'production') {
+            $this->debug = false;
+        }
+
         // Default to HTML renderer if none provided
         $this->renderer ??= new HtmlErrorRenderer($this->debug);
     }

@@ -115,6 +115,40 @@ class QueryBuilder implements QueryBuilderInterface
     ) {}
 
     /**
+     * Get database connection (protected for child classes).
+     *
+     * @return ConnectionInterface
+     */
+    protected function getConnection(): ConnectionInterface
+    {
+        return $this->connection;
+    }
+
+    /**
+     * Safely quote a value for use in SQL (security: prevents SQL injection).
+     *
+     * Uses PDO::quote() which properly escapes and quotes values.
+     * This is safer than addslashes() which can be bypassed.
+     *
+     * @param mixed $value Value to quote
+     * @return string Quoted value safe for SQL
+     */
+    protected function quoteValue(mixed $value): string
+    {
+        if (is_null($value)) {
+            return 'NULL';
+        }
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        // Use PDO::quote() for strings (properly escapes and quotes)
+        return $this->connection->getPdo()->quote((string) $value, \PDO::PARAM_STR);
+    }
+
+    /**
      * Set the working table for the query.
      */
     public function table(string $table): self

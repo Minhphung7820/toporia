@@ -54,9 +54,13 @@ return [
                 $container->get('config')->get('security.cors', [])
             ),
             ValidateJsonRequest::class,  // Validate JSON for API
+            // Rate limiting: 60 requests per minute by default (security best practice)
+            fn($container) => ThrottleRequests::with(
+                $container->get('rate_limiter'),
+                60,  // max attempts
+                1    // decay minutes
+            ),
             // ValidateFormRequest is now handled automatically by Router (no middleware needed)
-            // ThrottleRequests middleware should be added per-route with specific limits
-            // Example: ->middleware([ThrottleRequests::with($limiter, 60, 1)])
             // LogRequest::class,         // Uncomment to log API requests
         ],
     ],

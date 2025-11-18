@@ -199,13 +199,14 @@ class ModelQueryBuilder extends QueryBuilder
         if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
             $whereClause = $matches[1];
 
-            // Replace placeholders with actual values (escaped)
+            // Replace placeholders with actual values (safely quoted)
+            // Security: Use PDO::quote() instead of addslashes() to prevent SQL injection
             $relationBindings = $relationQuery->getBindings();
             $boundWhereClause = $whereClause;
             foreach ($relationBindings as $binding) {
-                // Escape and quote value
-                $escaped = is_string($binding) ? "'" . addslashes($binding) . "'" : $binding;
-                $boundWhereClause = preg_replace('/\?/', (string)$escaped, $boundWhereClause, 1);
+                // Safely quote value using PDO::quote() (prevents SQL injection)
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
             }
 
             $subquerySql .= " AND ({$boundWhereClause})";
@@ -440,13 +441,14 @@ class ModelQueryBuilder extends QueryBuilder
         if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
             $whereClause = $matches[1];
 
-            // Replace placeholders with actual values (escaped)
+            // Replace placeholders with actual values (safely quoted)
+            // Security: Use PDO::quote() instead of addslashes() to prevent SQL injection
             $relationBindings = $relationQuery->getBindings();
             $boundWhereClause = $whereClause;
             foreach ($relationBindings as $binding) {
-                // Escape and quote value
-                $escaped = is_string($binding) ? "'" . addslashes($binding) . "'" : $binding;
-                $boundWhereClause = preg_replace('/\?/', (string)$escaped, $boundWhereClause, 1);
+                // Safely quote value using PDO::quote() (prevents SQL injection)
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
             }
 
             $subquery .= " AND ({$boundWhereClause})";
@@ -509,13 +511,14 @@ class ModelQueryBuilder extends QueryBuilder
         if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
             $whereClause = $matches[1];
 
-            // Replace placeholders with actual values (escaped)
+            // Replace placeholders with actual values (safely quoted)
+            // Security: Use PDO::quote() instead of addslashes() to prevent SQL injection
             $relationBindings = $relationQuery->getBindings();
             $boundWhereClause = $whereClause;
             foreach ($relationBindings as $binding) {
-                // Escape and quote value
-                $escaped = is_string($binding) ? "'" . addslashes($binding) . "'" : $binding;
-                $boundWhereClause = preg_replace('/\?/', (string)$escaped, $boundWhereClause, 1);
+                // Safely quote value using PDO::quote() (prevents SQL injection)
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
             }
 
             $subquery .= " AND ({$boundWhereClause})";

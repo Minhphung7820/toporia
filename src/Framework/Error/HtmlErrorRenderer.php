@@ -26,7 +26,13 @@ final class HtmlErrorRenderer implements ErrorRendererInterface
 {
     public function __construct(
         private bool $debug = true
-    ) {}
+    ) {
+        // Security: Force debug=false in production to prevent information disclosure
+        $appEnv = env('APP_ENV', 'local');
+        if ($appEnv === 'production') {
+            $this->debug = false;
+        }
+    }
 
     /**
      * {@inheritdoc}
