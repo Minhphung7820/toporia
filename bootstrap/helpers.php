@@ -976,3 +976,47 @@ if (!function_exists('vite_assets')) {
         throw new \RuntimeException('Vite service not available. Register ViteServiceProvider.');
     }
 }
+
+// ========================================
+// Bus Helpers
+// ========================================
+
+if (!function_exists('dispatch')) {
+    /**
+     * Dispatch a command/query/job to its handler.
+     *
+     * @template T
+     * @param T $command Command instance
+     * @return \Toporia\Framework\Bus\PendingDispatch<T>
+     */
+    function dispatch(mixed $command): \Toporia\Framework\Bus\PendingDispatch
+    {
+        return \Toporia\Framework\Bus\Bus::dispatch2($command);
+    }
+}
+
+if (!function_exists('dispatch_sync')) {
+    /**
+     * Dispatch a command/query/job synchronously.
+     *
+     * @param mixed $command Command instance
+     * @return mixed Handler result
+     */
+    function dispatch_sync(mixed $command): mixed
+    {
+        return \Toporia\Framework\Bus\Bus::dispatchSync($command);
+    }
+}
+
+if (!function_exists('batch')) {
+    /**
+     * Create a new batch of jobs.
+     *
+     * @param array<mixed> $jobs Jobs array
+     * @return \Toporia\Framework\Bus\PendingBatch
+     */
+    function batch(array $jobs): \Toporia\Framework\Bus\PendingBatch
+    {
+        return \Toporia\Framework\Bus\Bus::batch($jobs);
+    }
+}

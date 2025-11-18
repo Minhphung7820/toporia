@@ -1,0 +1,128 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Toporia\Framework\Bus;
+
+use Toporia\Framework\Bus\Contracts\BatchRepositoryInterface;
+use Toporia\Framework\Bus\Contracts\DispatcherInterface;
+
+/**
+ * Pending Batch
+ *
+ * Fluent API for creating and dispatching batches.
+ *
+ * Performance:
+ * - Lazy execution (only creates batch when dispatched)
+ * - O(1) option setting
+ * - Bulk job dispatching
+ */
+final class PendingBatch
+{
+    private string $name = '';
+    private array $options = [];
+
+    /**
+     * @param BatchRepositoryInterface $repository Batch repository
+     * @param DispatcherInterface $dispatcher Dispatcher
+     * @param array<mixed> $jobs Jobs to batch
+     */
+    public function __construct(
+        private BatchRepositoryInterface $repository,
+        private DispatcherInterface $dispatcher,
+        private array $jobs = []
+    ) {
+    }
+
+    /**
+     * Set the batch name.
+     */
+    public function name(string $name): self
+    {
+        $this->name = $name;
+        return $this;
+    }
+
+    /**
+     * Set an option.
+     */
+    public function option(string $key, mixed $value): self
+    {
+        $this->options[$key] = $value;
+        return $this;
+    }
+
+    /**
+     * Set callback to run when batch finishes.
+     */
+    public function then(callable $callback): self
+    {
+        $this->options['then'] = $callback;
+        return $this;
+    }
+
+    /**
+     * Set callback to run if any job fails.
+     */
+    public function catch(callable $callback): self
+    {
+        $this->options['catch'] = $callback;
+        return $this;
+    }
+
+    /**
+     * Set callback to run after batch completes (success or failure).
+     */
+    public function finally(callable $callback): self
+    {
+        $this->options['finally'] = $callback;
+        return $this;
+    }
+
+    /**
+     * Allow failures without stopping the batch.
+     */
+    public function allowFailures(bool $allow = true): self
+    {
+        $this->options['allow_failures'] = $allow;
+        return $this;
+    }
+
+    /**
+     * Dispatch the batch.
+     */
+    public function dispatch(): Batch
+    {
+        $batch = new Batch(
+            id: $this->generateId(),
+            name: $this->name ?: 'Batch',
+            totalJobs: count($this->jobs),
+            options: $this->options
+        );
+
+        $batch->setRepository($this->repository);
+
+        // Store batch
+        $this->repository->store($batch);
+
+        // Dispatch all jobs
+        foreach ($this->jobs as $job) {
+            // Set batch ID on job if it supports it
+            if (method_exists($job, 'setBatchId')) {
+                $job->setBatchId($batch->id());
+            }
+
+            $this->dispatcher->dispatch($job);
+        }
+
+        return $batch;
+    }
+
+    /**
+     * Generate unique batch ID.
+     */
+    private function generateId(): string
+    {
+        return uniqid('batch_', true);
+    }
+}
