@@ -9,7 +9,7 @@ use Toporia\Framework\Database\Migration\Migration;
  *
  * Creates table for storing batch job information.
  */
-return new class extends Migration
+class CreateJobBatchesTable extends Migration
 {
     /**
      * Run the migration.
@@ -17,7 +17,7 @@ return new class extends Migration
     public function up(): void
     {
         $this->schema->create('job_batches', function ($table) {
-            $table->string('id', 255)->primary();
+            $table->string('id', 255);
             $table->string('name');
             $table->integer('total_jobs')->unsigned();
             $table->integer('processed_jobs')->unsigned()->default(0);
@@ -26,6 +26,9 @@ return new class extends Migration
             $table->integer('created_at')->unsigned();
             $table->integer('finished_at')->unsigned()->nullable();
             $table->integer('cancelled_at')->unsigned()->nullable();
+
+            // Primary key
+            $table->primaryKey('id');
 
             // Indexes for queries
             $table->index('created_at');

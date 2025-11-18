@@ -20,25 +20,27 @@
     <!-- Vite JavaScript -->
     <?= vite('resources/js/app.js') ?>
 
-    <!-- Debug: Check if script loaded -->
-    <script>
-        window.addEventListener('DOMContentLoaded', function() {
-            console.log('✅ DOM loaded');
-            const scripts = document.querySelectorAll('script[type="module"]');
-            console.log('📜 Module scripts found:', scripts.length);
-            scripts.forEach((script, index) => {
-                console.log(`  Script ${index + 1}:`, script.src);
+    <?php if (env('APP_DEBUG', false)): ?>
+        <!-- Debug: Check if script loaded (Development only) -->
+        <script>
+            window.addEventListener('DOMContentLoaded', function() {
+                console.log('✅ DOM loaded');
+                const scripts = document.querySelectorAll('script[type="module"]');
+                console.log('📜 Module scripts found:', scripts.length);
+                scripts.forEach((script, index) => {
+                    console.log(`  Script ${index + 1}:`, script.src);
+                });
+
+                // Check if #app exists
+                const appElement = document.getElementById('app');
+                console.log('🎯 #app element:', appElement ? 'found' : 'NOT FOUND');
             });
 
-            // Check if #app exists
-            const appElement = document.getElementById('app');
-            console.log('🎯 #app element:', appElement ? 'found' : 'NOT FOUND');
-        });
-
-        window.addEventListener('error', function(e) {
-            console.error('❌ Global error:', e.message, e.filename, e.lineno);
-        });
-    </script>
+            window.addEventListener('error', function(e) {
+                console.error('❌ Global error:', e.message, e.filename, e.lineno);
+            });
+        </script>
+    <?php endif; ?>
 
     <!-- Fallback if Vue fails to load -->
     <noscript>
