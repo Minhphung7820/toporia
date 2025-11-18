@@ -6,7 +6,7 @@ namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
-use Toporia\Framework\Console\{Application, CommandRegistry};
+use Toporia\Framework\Console\Application;
 
 /**
  * Console Service Provider
@@ -19,26 +19,23 @@ final class ConsoleServiceProvider extends ServiceProvider
 {
   public function register(ContainerInterface $container): void
   {
-    // Register command registry
-    $container->singleton(CommandRegistry::class, fn() => new CommandRegistry());
-
     // Register console application
     $container->singleton(Application::class, fn($c) => new Application($c));
   }
 
   public function boot(ContainerInterface $container): void
   {
-    $registry = $container->get(CommandRegistry::class);
+    $application = $container->get(Application::class);
 
     // Register FRAMEWORK commands here (framework layer)
-    $this->registerFrameworkCommands($registry);
+    $this->registerFrameworkCommands($application);
 
     // Bootstrap APPLICATION kernel (application layer)
     // App must register a callback or service to bootstrap its kernel
     if ($container->has('console.kernel.bootstrap')) {
       $bootstrap = $container->get('console.kernel.bootstrap');
       if (is_callable($bootstrap)) {
-        $bootstrap($container->get(Application::class), $registry);
+        $bootstrap($application);
       }
     }
   }
@@ -46,12 +43,12 @@ final class ConsoleServiceProvider extends ServiceProvider
   /**
    * Register framework-level commands.
    *
-   * @param CommandRegistry $registry
+   * @param Application $application
    * @return void
    */
-  private function registerFrameworkCommands(CommandRegistry $registry): void
+  private function registerFrameworkCommands(Application $application): void
   {
-    $registry->registerMany([
+    $application->registerMany([
       // Database commands
       \Toporia\Framework\Console\Commands\MigrateCommand::class,
       \Toporia\Framework\Console\Commands\MigrateRollbackCommand::class,

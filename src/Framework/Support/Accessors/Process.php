@@ -201,8 +201,8 @@ final class Process extends ServiceAccessor
         if (isset($_SERVER['REQUEST_METHOD']) || isset($_SERVER['HTTP_HOST'])) {
             throw new \RuntimeException(
                 'Process::run()/map()/filter()/reduce() cannot be called from HTTP context. ' .
-                'Use Queue jobs for async processing in web requests. ' .
-                'Multi-process execution is only safe in CLI context (console commands).'
+                    'Use Queue jobs for async processing in web requests. ' .
+                    'Multi-process execution is only safe in CLI context (console commands).'
             );
         }
 
@@ -210,8 +210,8 @@ final class Process extends ServiceAccessor
         if (PHP_SAPI !== 'cli' && PHP_SAPI !== 'phpdbg') {
             throw new \RuntimeException(
                 'Process::run()/map()/filter()/reduce() requires CLI SAPI. ' .
-                'Current SAPI: ' . PHP_SAPI . '. ' .
-                'Multi-process execution is only safe in CLI context (console commands).'
+                    'Current SAPI: ' . PHP_SAPI . '. ' .
+                    'Multi-process execution is only safe in CLI context (console commands).'
             );
         }
     }

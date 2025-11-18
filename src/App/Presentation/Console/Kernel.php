@@ -23,15 +23,12 @@ final class Kernel
     /**
      * Bootstrap console commands into application.
      *
-     * @param mixed $app Application instance
-     * @param mixed $registry Command registry
+     * @param mixed $application Application instance
      * @return void
      */
-    public function bootstrap(mixed $app, mixed $registry): void
+    public function bootstrap(mixed $application): void
     {
-        foreach ($this->commands() as $commandClass) {
-            $registry->register($commandClass);
-        }
+        $application->registerMany($this->commands());
     }
 
     /**

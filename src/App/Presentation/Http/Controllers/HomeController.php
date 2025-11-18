@@ -42,7 +42,13 @@ final class HomeController extends BaseController
      */
     public function index(Request $request)
     {
-        Log::info('HomeController@index', ['request' => $request->all()]);
+        Log::info('HomeController@index', [
+            'method' => $request->method(),
+            'path' => $request->path(),
+            'query' => $request->query(),
+            'body' => $request->all(),
+            'ip' => $request->ip() ?? 'unknown',
+        ]);
         // Use default timezone from config (Asia/Ho_Chi_Minh, UTC+7)
         // dd(Chronos::now()->format('Y-m-d H:i:s'));
         // Process::run([
@@ -89,7 +95,23 @@ final class HomeController extends BaseController
 
         // Alternative: Using dispatch() helper
         // dispatch(new SendEmailJob(...));
-        TestProcess::dispatch();
+        try {
+            $pendingDispatch = TestProcess::dispatch();
+            // Explicitly dispatch to ensure job is queued immediately
+            $jobId = $pendingDispatch->dispatch();
+            Log::info('TestProcess dispatched', [
+                'pending_dispatch_class' => get_class($pendingDispatch),
+                'job_id' => $jobId,
+                'queue_driver' => config('queue.default', 'unknown'),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to dispatch TestProcess', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+        }
         $products = ProductModel::query()
             ->where(function ($q) {
                 $q->where('stock', '>', 0);

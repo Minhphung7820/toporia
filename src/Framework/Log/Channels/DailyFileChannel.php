@@ -72,6 +72,16 @@ final class DailyFileChannel implements ChannelInterface
         $logEntry .= PHP_EOL;
 
         // Atomic write to prevent race conditions
+        // Ensure file exists and has writable permissions for queue workers
+        if (!file_exists($logFile)) {
+            // Create file with permissions that allow queue workers to write
+            touch($logFile);
+            @chmod($logFile, 0666); // Read/write for all (safe for log files)
+        } else {
+            // Ensure existing file is writable (fix permission issues)
+            @chmod($logFile, 0666);
+        }
+
         file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
 
         // Cleanup old logs if retention policy is set

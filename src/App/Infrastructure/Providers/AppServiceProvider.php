@@ -54,9 +54,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Register console kernel bootstrap callback
         $container->singleton('console.kernel.bootstrap', function (ContainerInterface $c) {
-            return function ($app, $registry) {
+            return function ($application) {
                 $kernel = new Kernel();
-                $kernel->bootstrap($app, $registry);
+                $kernel->bootstrap($application);
             };
         });
 

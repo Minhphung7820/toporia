@@ -46,6 +46,19 @@ final class Application
   }
 
   /**
+   * Register multiple command classes.
+   *
+   * @param array<class-string<Command>> $commandClasses
+   * @return void
+   */
+  public function registerMany(array $commandClasses): void
+  {
+    foreach ($commandClasses as $commandClass) {
+      $this->register($commandClass);
+    }
+  }
+
+  /**
    * Run the console application.
    *
    * @param array<int, string> $argv
