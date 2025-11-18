@@ -8,7 +8,9 @@
     "aws/aws-sdk-php": "^3.359",
     "php-amqplib/php-amqplib": "^3.0",
     "nmred/kafka-php": "^0.2.0",
-    "elasticsearch/elasticsearch": "^8.13"
+    "elasticsearch/elasticsearch": "^8.13",
+    "phpoffice/phpspreadsheet": "^5.2",
+    "openspout/openspout": "^4.28"
   },
   "require-dev": {
     "jetbrains/phpstorm-stubs": "*"

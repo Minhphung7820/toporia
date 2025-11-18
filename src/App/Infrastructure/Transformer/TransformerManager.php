@@ -111,13 +111,18 @@ final class TransformerManager
     /**
      * Register default transformers.
      *
+     * Developers should register their transformers here or via register() method.
+     *
      * @return void
      */
     private function registerDefaultTransformers(): void
     {
-        $this->mapping = [
-            \App\Domain\User\User::class => UserTransformer::class,
-        ];
+        // Example:
+        // $this->mapping = [
+        //     \App\Domain\User\User::class => UserTransformer::class,
+        //     \App\Domain\Product\Product::class => ProductTransformer::class,
+        // ];
+
+        $this->mapping = [];
     }
 }
-

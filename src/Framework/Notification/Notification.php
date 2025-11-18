@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Notification;
 
-use Toporia\Framework\Notification\Contracts\NotificationInterface;
 use Toporia\Framework\Notification\Contracts\{NotificationInterface, NotifiableInterface};
 
 /**

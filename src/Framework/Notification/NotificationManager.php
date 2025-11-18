@@ -6,12 +6,6 @@ namespace Toporia\Framework\Notification;
 
 use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface, NotificationManagerInterface};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
-use Toporia\Framework\Notification\Contracts\{
-    ChannelInterface,
-    NotifiableInterface,
-    NotificationInterface,
-    NotificationManagerInterface
-};
 
 /**
  * Notification Manager
@@ -304,7 +298,7 @@ final class NotificationManager implements NotificationManagerInterface
         if (!$realtime) {
             throw new \RuntimeException(
                 'Broadcast channel requires RealtimeManager in container. ' .
-                'Ensure RealtimeServiceProvider is registered in bootstrap/app.php'
+                    'Ensure RealtimeServiceProvider is registered in bootstrap/app.php'
             );
         }
 

@@ -31,7 +31,7 @@ final class ExcelExporter extends BaseExporter
     /**
      * @var callable|null Row mapper function
      */
-    private ?callable $rowMapper = null;
+    private $rowMapper = null;
 
     /**
      * Set row mapper function.
@@ -143,7 +143,7 @@ final class ExcelExporter extends BaseExporter
 
         // OpenSpout
         if ($writer instanceof \OpenSpout\Writer\WriterInterface) {
-            $cells = array_map(fn($header) => new \OpenSpout\Common\Entity\Cell\StringCell($header), $headers);
+            $cells = array_map(fn($header) => new \OpenSpout\Common\Entity\Cell\StringCell($header, null), $headers);
             $row = new \OpenSpout\Common\Entity\Row($cells);
             $writer->addRow($row);
             return;
@@ -181,9 +181,9 @@ final class ExcelExporter extends BaseExporter
                 $cells = [];
                 foreach ($rowData as $value) {
                     if (is_numeric($value)) {
-                        $cells[] = new \OpenSpout\Common\Entity\Cell\NumericCell((float) $value);
+                        $cells[] = new \OpenSpout\Common\Entity\Cell\NumericCell((float) $value, null);
                     } else {
-                        $cells[] = new \OpenSpout\Common\Entity\Cell\StringCell((string) $value);
+                        $cells[] = new \OpenSpout\Common\Entity\Cell\StringCell((string) $value, null);
                     }
                 }
                 $row = new \OpenSpout\Common\Entity\Row($cells);

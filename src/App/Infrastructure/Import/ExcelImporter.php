@@ -31,7 +31,7 @@ final class ExcelImporter extends BaseImporter
     /**
      * @var callable|null Row mapper function
      */
-    private ?callable $rowMapper = null;
+    private $rowMapper = null;
 
     /**
      * @var bool Whether first row is header

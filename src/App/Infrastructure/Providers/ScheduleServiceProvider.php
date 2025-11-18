@@ -107,12 +107,12 @@ final class ScheduleServiceProvider extends ServiceProvider
         //     ->description('Weekly database backup');
 
         // Example 8: Generate daily report (weekdays only)
-        $scheduler->call(function () {
-            TestProcess::dispatch();
-        })->weekdays()
-            ->dailyAt('22:00')
-            ->timezone('Asia/Ho_Chi_Minh')
-            ->description('Generate daily report');
+        // $scheduler->call(function () {
+        //     TestProcess::dispatch();
+        // })->weekdays()
+        //     ->dailyAt('22:00')
+        //     ->timezone('Asia/Ho_Chi_Minh')
+        //     ->description('Generate daily report');
 
         // Example 9: Run database migrations on deploy (using command)
         // $scheduler->command('migrate')->description('Run pending migrations');
