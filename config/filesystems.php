@@ -6,7 +6,6 @@ declare(strict_types=1);
  * Filesystem Configuration
  *
  * Configure storage disks for file uploads and storage.
- * Laravel-compatible configuration.
  */
 
 return [

@@ -6,7 +6,7 @@ import toporiaVitePlugin from './src/Framework/Support/Vite/ToporiaVitePlugin.js
  * Vite Configuration for Toporia Framework
  *
  * This configuration file sets up Vite for asset bundling.
- * Uses custom Toporia Vite Plugin (no Laravel dependency).
+ * Uses custom Toporia Vite Plugin.
  *
  * Installation:
  *   npm install --save-dev vite
