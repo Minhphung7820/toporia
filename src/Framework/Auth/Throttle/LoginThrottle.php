@@ -52,8 +52,7 @@ final class LoginThrottle
         private CacheInterface $cache,
         private int $maxAttempts = self::DEFAULT_MAX_ATTEMPTS,
         private int $decaySeconds = self::DEFAULT_DECAY_SECONDS
-    ) {
-    }
+    ) {}
 
     /**
      * Increment login attempts for an identifier.
@@ -160,4 +159,3 @@ final class LoginThrottle
         return 'login_throttle:' . hash('sha256', $identifier);
     }
 }
-

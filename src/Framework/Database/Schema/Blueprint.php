@@ -36,8 +36,7 @@ class Blueprint
      */
     public function __construct(
         private string $table
-    ) {
-    }
+    ) {}
 
     /**
      * Add auto-increment ID column.

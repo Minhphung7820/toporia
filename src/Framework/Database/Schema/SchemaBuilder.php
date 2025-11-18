@@ -18,8 +18,7 @@ class SchemaBuilder
      */
     public function __construct(
         private ConnectionInterface $connection
-    ) {
-    }
+    ) {}
 
     /**
      * Create a new table.
