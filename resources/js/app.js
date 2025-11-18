@@ -1,18 +1,36 @@
 /**
- * Main Application Entry Point
+ * Vue SPA Application Entry Point
  *
- * This is the main JavaScript entry point for your Toporia application.
- * Vite will bundle this file and all its dependencies.
- *
- * Development: Served directly from Vite dev server with HMR
- * Production: Bundled and optimized by Vite
+ * Single Page Application using Vue 3 and Vue Router
  */
 
-console.log('Toporia Framework - Vite Integration');
-console.log('Application loaded successfully!');
+import { createApp } from 'vue';
+import App from './App.vue';
+import router from './router';
 
-// Example: React, Vue, or vanilla JS code here
-// import { createApp } from 'vue';
-// import App from './App.vue';
-// createApp(App).mount('#app');
+// Create and mount Vue app
+try {
+  const app = createApp(App);
+  app.use(router);
 
+  // Mount Vue app
+  const rootElement = document.getElementById('app');
+  if (!rootElement) {
+    throw new Error('Root element #app not found!');
+  }
+
+  app.mount('#app');
+  console.log('✅ Vue app mounted successfully!');
+} catch (error) {
+  console.error('❌ Failed to mount Vue app:', error);
+  const appElement = document.getElementById('app');
+  if (appElement) {
+    appElement.innerHTML = `
+      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+        <h1 style="color: red;">Error Loading Application</h1>
+        <p>${error.message}</p>
+        <p>Please check the browser console for more details.</p>
+      </div>
+    `;
+  }
+}

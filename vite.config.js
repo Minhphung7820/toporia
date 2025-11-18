@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 import toporiaVitePlugin from './src/Framework/Support/Vite/ToporiaVitePlugin.js';
 
 /**
@@ -17,6 +18,7 @@ import toporiaVitePlugin from './src/Framework/Support/Vite/ToporiaVitePlugin.js
 
 export default defineConfig({
   plugins: [
+    vue(),
     toporiaVitePlugin({
       input: [
         'resources/js/app.js',
@@ -28,10 +30,18 @@ export default defineConfig({
       publicDir: 'public',
     }),
   ],
+  resolve: {
+    alias: {
+      '@': '/resources/js',
+    },
+  },
   build: {
     outDir: 'public/build',
     manifest: true,
     rollupOptions: {
+      input: {
+        app: 'resources/js/app.js',
+      },
       output: {
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
@@ -45,6 +55,7 @@ export default defineConfig({
     hmr: {
       host: 'localhost',
     },
+    cors: true,
   },
 });
 

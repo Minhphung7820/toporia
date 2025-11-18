@@ -46,6 +46,10 @@ yarn-error.log
 /build/
 /dist/
 
+# Vite Build Output
+public/build/
+!public/build/.gitkeep
+
 # Testing
 .phpunit.result.cache
 /coverage/

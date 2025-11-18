@@ -205,8 +205,13 @@ final class Router implements RouterInterface
         // Build middleware pipeline using MiddlewarePipeline class
         $pipeline = $this->middlewarePipeline->build($route->getMiddleware(), $coreHandler);
 
-        // Execute pipeline
-        $pipeline($this->request, $this->response);
+        // Execute pipeline and get result
+        $result = $pipeline($this->request, $this->response);
+
+        // Send response if result is a string (HTML content)
+        if (is_string($result)) {
+            $this->response->html($result);
+        }
     }
 
     /**

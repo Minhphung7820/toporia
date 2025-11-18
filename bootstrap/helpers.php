@@ -212,6 +212,64 @@ if (!function_exists('mail')) {
     }
 }
 
+if (!function_exists('vite')) {
+    /**
+     * Generate Vite script tag for entry point.
+     *
+     * @param string $entry Entry point file (e.g., 'resources/js/app.js')
+     * @param array $attributes Additional HTML attributes
+     * @return string HTML script tag
+     */
+    function vite(string $entry, array $attributes = []): string
+    {
+        if (function_exists('app') && app()->has('vite')) {
+            return app('vite')->script($entry, $attributes);
+        }
+
+        // Fallback if Vite service not available
+        return '<!-- Vite service not available -->';
+    }
+}
+
+if (!function_exists('vite_css')) {
+    /**
+     * Generate Vite CSS link tags for entry point.
+     *
+     * @param string $entry Entry point file
+     * @param array $attributes Additional HTML attributes
+     * @return string HTML link tags
+     */
+    function vite_css(string $entry, array $attributes = []): string
+    {
+        if (function_exists('app') && app()->has('vite')) {
+            return app('vite')->css($entry, $attributes);
+        }
+
+        // Fallback if Vite service not available
+        return '';
+    }
+}
+
+if (!function_exists('vite_assets')) {
+    /**
+     * Generate both Vite script and CSS tags.
+     *
+     * @param string $entry Entry point file
+     * @param array $scriptAttributes Script tag attributes
+     * @param array $cssAttributes CSS link tag attributes
+     * @return string Combined HTML tags
+     */
+    function vite_assets(string $entry, array $scriptAttributes = [], array $cssAttributes = []): string
+    {
+        if (function_exists('app') && app()->has('vite')) {
+            return app('vite')->assets($entry, $scriptAttributes, $cssAttributes);
+        }
+
+        // Fallback if Vite service not available
+        return '';
+    }
+}
+
 if (!function_exists('http')) {
     /**
      * Get the HTTP client manager or make a request.
