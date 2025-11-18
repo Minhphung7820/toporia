@@ -199,7 +199,7 @@ final class Router implements RouterInterface
     {
         $handler = $route->getHandler();
 
-        // Store route parameters in request attributes (Laravel behavior)
+        // Store route parameters in request attributes
         // This allows FormRequest->route() and middleware to access route parameters
         foreach ($parameters as $key => $value) {
             $this->request->setAttribute("route.{$key}", $value);
@@ -243,7 +243,6 @@ final class Router implements RouterInterface
 
                 // Use container->call() for method parameter injection
                 // Container automatically validates FormRequest during dependency resolution
-                // This matches Laravel's behavior - validation happens in dependency resolution
                 return $this->container->call([$controller, $method], $parameters);
             }
 

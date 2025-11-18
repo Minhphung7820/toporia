@@ -11,7 +11,7 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 /**
  * Form Request
  *
- * Professional form validation request class with Laravel-like features.
+ * Professional form validation request class.
  *
  * Features:
  * - Auto-validation before controller method
@@ -421,7 +421,6 @@ abstract class FormRequest
     /**
      * Get a route parameter.
      *
-     * Laravel-compatible method to access route parameters.
      * Route parameters are stored in request attributes by Router.
      *
      * Performance: O(1) - Direct access

@@ -9,7 +9,7 @@ use Toporia\Framework\Console\Command;
 /**
  * Test Command
  *
- * Run PHPUnit tests with Laravel-like interface.
+ * Run PHPUnit tests.
  *
  * Usage:
  *   php console test
