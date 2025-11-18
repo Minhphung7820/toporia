@@ -55,4 +55,3 @@ class ExamplePerformanceTest extends TestCase
         );
     }
 }
-

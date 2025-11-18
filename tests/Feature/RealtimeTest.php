@@ -102,4 +102,3 @@ class RealtimeTest extends TestCase
         $this->assertMessageNotPublished('user.2');
     }
 }
-

@@ -110,4 +110,3 @@ abstract class Factory
         return $attributes;
     }
 }
-

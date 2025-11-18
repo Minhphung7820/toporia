@@ -100,4 +100,3 @@ trait InteractsWithQueue
         $this->fakeQueue = false;
     }
 }
-
