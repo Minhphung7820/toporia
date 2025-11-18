@@ -28,9 +28,14 @@ final class HtmlErrorRenderer implements ErrorRendererInterface
         private bool $debug = true
     ) {
         // Security: Force debug=false in production to prevent information disclosure
-        $appEnv = env('APP_ENV', 'local');
+        // Use $_ENV directly since env() helper may not be loaded yet
+        $appEnv = $_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? 'local';
         if ($appEnv === 'production') {
+            // Always disable debug in production (security)
             $this->debug = false;
+        } else {
+            // In non-production, respect the $debug parameter passed in
+            $this->debug = $debug;
         }
     }
 

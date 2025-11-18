@@ -42,10 +42,13 @@ final class ErrorHandler implements ErrorHandlerInterface
         private ?ErrorRendererInterface $renderer = null
     ) {
         // Security: Force debug=false in production to prevent information disclosure
-        $appEnv = env('APP_ENV', 'local');
+        // Use $_ENV directly since env() helper may not be loaded yet
+        $appEnv = $_ENV['APP_ENV'] ?? $_SERVER['APP_ENV'] ?? 'local';
         if ($appEnv === 'production') {
+            // Always disable debug in production (security)
             $this->debug = false;
         }
+        // In non-production, respect the $debug parameter passed in
 
         // Default to HTML renderer if none provided
         $this->renderer ??= new HtmlErrorRenderer($this->debug);
