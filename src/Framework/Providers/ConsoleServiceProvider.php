@@ -85,6 +85,9 @@ final class ConsoleServiceProvider extends ServiceProvider
 
       // Development server
       \Toporia\Framework\Console\Commands\ServeCommand::class,
+
+      // Testing
+      \Toporia\Framework\Console\Commands\TestCommand::class,
     ]);
   }
 }

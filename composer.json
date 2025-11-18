@@ -13,7 +13,10 @@
     "openspout/openspout": "^4.28"
   },
   "require-dev": {
-    "jetbrains/phpstorm-stubs": "*"
+    "jetbrains/phpstorm-stubs": "*",
+    "phpunit/phpunit": "^11.0",
+    "mockery/mockery": "^1.6",
+    "fakerphp/faker": "^1.24"
   },
   "suggest": {
     "ext-redis": "Required for Redis Pub/Sub broker and cache driver (native C performance)",
@@ -37,9 +40,23 @@
       "src/Framework/Support/helpers.php"
     ]
   },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
   "config": {
     "allow-plugins": {
       "php-http/discovery": true
     }
+  },
+  "scripts": {
+    "test": "vendor/bin/phpunit",
+    "test:unit": "vendor/bin/phpunit --testsuite Unit",
+    "test:feature": "vendor/bin/phpunit --testsuite Feature",
+    "test:integration": "vendor/bin/phpunit --testsuite Integration",
+    "test:performance": "vendor/bin/phpunit --testsuite Performance",
+    "test:coverage": "vendor/bin/phpunit --coverage-html coverage",
+    "test:filter": "vendor/bin/phpunit --filter"
   }
 }
