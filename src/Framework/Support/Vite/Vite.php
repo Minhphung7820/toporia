@@ -120,7 +120,7 @@ final class Vite
             if (!file_exists($this->manifestPath)) {
                 throw new \RuntimeException(
                     "Vite manifest not found: {$this->manifestPath}. " .
-                    "Run 'npm run build' to generate the manifest."
+                        "Run 'npm run build' to generate the manifest."
                 );
             }
 
@@ -257,4 +257,3 @@ final class Vite
         return empty($html) ? '' : ' ' . implode(' ', $html);
     }
 }
-
