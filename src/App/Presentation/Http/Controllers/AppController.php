@@ -25,8 +25,3 @@ final class AppController extends BaseController
         return $this->view('app');
     }
 }
-
-
-
-
-
