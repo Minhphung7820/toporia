@@ -4,104 +4,141 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Cache;
 
-use Toporia\Framework\Cache\Contracts\CacheInterface;
+use Toporia\Framework\Cache\Contracts\{CacheInterface, TaggableCacheInterface};
+
 /**
  * Tagged Cache
  *
- * Provides tag-based cache invalidation for grouped cache entries.
- * Tag-based cache invalidation API.
- *
- * Features:
- * - Group related cache entries with tags
- * - Flush all entries with specific tags
- * - Efficient tag-based invalidation
+ * Wraps a cache driver with tag support.
+ * Allows grouping related cache entries and clearing by tag.
  *
  * Performance:
- * - O(1) tag lookup
- * - O(N) flush where N = entries with tag
+ * - Tag operations: O(N) where N = keys in tag
+ * - Tag clearing: O(N*M) where N = tags, M = keys per tag
  *
- * Example:
- * ```php
- * $cache->tags(['products', 'featured'])->put('featured_products', $data, 3600);
- * $cache->tags(['products'])->flush(); // Removes all product-related cache
- * ```
+ * Clean Architecture:
+ * - Single Responsibility: Only handles tag management
+ * - Dependency Inversion: Uses CacheInterface
+ * - Decorator pattern: Wraps existing cache
  *
- * @package Toporia\Framework\Cache
+ * SOLID Principles:
+ * - S: Only handles tagging
+ * - O: Extensible via different tag storage
+ * - L: Behaves like CacheInterface
+ * - I: Focused interface
+ * - D: Depends on CacheInterface abstraction
  */
-final class TaggedCache implements CacheInterface
+final class TaggedCache implements TaggableCacheInterface
 {
     /**
-     * @var array<string> Cache tags
+     * @var array<string> Active tags
      */
-    private array $tags;
+    private array $tags = [];
 
     /**
-     * @param CacheInterface $store Underlying cache store
-     * @param array<string> $tags Cache tags
+     * @param CacheInterface $cache Base cache driver
+     * @param CacheInterface $tagStore Cache for storing tag-key mappings
+     * @param array<string> $tags Initial tags
      */
     public function __construct(
-        private readonly CacheInterface $store,
+        private CacheInterface $cache,
+        private CacheInterface $tagStore,
         array $tags = []
     ) {
         $this->tags = $tags;
     }
 
     /**
-     * {@inheritdoc}
+     * Tag a cache key.
+     *
+     * @param string|array $tags Tag name(s)
+     * @return TaggableCacheInterface Tagged cache instance
+     */
+    public function tags(string|array $tags): TaggableCacheInterface
+    {
+        $tags = is_array($tags) ? $tags : [$tags];
+        return new self($this->cache, $this->tagStore, $tags);
+    }
+
+    /**
+     * Get a value from cache.
+     *
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
      */
     public function get(string $key, mixed $default = null): mixed
     {
-        return $this->store->get($this->taggedKey($key), $default);
+        $taggedKey = $this->getTaggedKey($key);
+        return $this->cache->get($taggedKey, $default);
     }
 
     /**
-     * {@inheritdoc}
+     * Set a value in cache.
+     *
+     * @param string $key
+     * @param mixed $value
+     * @param int|null $ttl
+     * @return bool
      */
     public function set(string $key, mixed $value, ?int $ttl = null): bool
     {
-        $taggedKey = $this->taggedKey($key);
+        $taggedKey = $this->getTaggedKey($key);
+        $result = $this->cache->set($taggedKey, $value, $ttl);
 
-        // Store the value
-        $stored = $this->store->set($taggedKey, $value, $ttl);
-
-        // Track this key under tags
-        if ($stored) {
-            $this->trackKeyUnderTags($key, $ttl);
+        if ($result) {
+            $this->addKeyToTags($key);
         }
 
-        return $stored;
+        return $result;
     }
 
     /**
-     * {@inheritdoc}
+     * Check if a key exists.
+     *
+     * @param string $key
+     * @return bool
      */
     public function has(string $key): bool
     {
-        return $this->store->has($this->taggedKey($key));
+        $taggedKey = $this->getTaggedKey($key);
+        return $this->cache->has($taggedKey);
     }
 
     /**
-     * {@inheritdoc}
+     * Delete a value from cache.
+     *
+     * @param string $key
+     * @return bool
      */
     public function delete(string $key): bool
     {
-        return $this->store->delete($this->taggedKey($key));
+        $taggedKey = $this->getTaggedKey($key);
+        $result = $this->cache->delete($taggedKey);
+
+        if ($result) {
+            $this->removeKeyFromTags($key);
+        }
+
+        return $result;
     }
 
     /**
-     * {@inheritdoc}
+     * Clear all cache.
+     *
+     * @return bool
      */
     public function clear(): bool
     {
-        foreach ($this->tags as $tag) {
-            $this->flushTag($tag);
-        }
-
-        return true;
+        return $this->flushTags($this->tags);
     }
 
     /**
-     * {@inheritdoc}
+     * Get multiple values.
+     *
+     * @param array $keys
+     * @param mixed $default
+     * @return array
      */
     public function getMultiple(array $keys, mixed $default = null): array
     {
@@ -113,73 +150,116 @@ final class TaggedCache implements CacheInterface
     }
 
     /**
-     * {@inheritdoc}
+     * Set multiple values.
+     *
+     * @param array $values
+     * @param int|null $ttl
+     * @return bool
      */
     public function setMultiple(array $values, ?int $ttl = null): bool
     {
+        $success = true;
         foreach ($values as $key => $value) {
-            if (!$this->set((string) $key, $value, $ttl)) {
-                return false;
+            if (!$this->set($key, $value, $ttl)) {
+                $success = false;
             }
         }
-        return true;
+        return $success;
     }
 
     /**
-     * {@inheritdoc}
+     * Delete multiple values.
+     *
+     * @param array $keys
+     * @return bool
      */
     public function deleteMultiple(array $keys): bool
     {
+        $success = true;
         foreach ($keys as $key) {
             if (!$this->delete($key)) {
-                return false;
+                $success = false;
             }
         }
-        return true;
+        return $success;
     }
 
     /**
-     * {@inheritdoc}
+     * Increment a numeric value.
+     *
+     * @param string $key
+     * @param int $value
+     * @return int|false
      */
     public function increment(string $key, int $value = 1): int|false
     {
-        return $this->store->increment($this->taggedKey($key), $value);
+        $taggedKey = $this->getTaggedKey($key);
+        return $this->cache->increment($taggedKey, $value);
     }
 
     /**
-     * {@inheritdoc}
+     * Decrement a numeric value.
+     *
+     * @param string $key
+     * @param int $value
+     * @return int|false
      */
     public function decrement(string $key, int $value = 1): int|false
     {
-        return $this->store->decrement($this->taggedKey($key), $value);
+        $taggedKey = $this->getTaggedKey($key);
+        return $this->cache->decrement($taggedKey, $value);
     }
 
     /**
-     * Store cache entry (alias for set()).
+     * Remember a value using closure.
+     *
+     * @param string $key
+     * @param int|null $ttl
+     * @param callable $callback
+     * @return mixed
      */
-    public function put(string $key, mixed $value, ?int $ttl = null): bool
+    public function remember(string $key, ?int $ttl, callable $callback): mixed
     {
-        return $this->set($key, $value, $ttl);
+        $value = $this->get($key);
+        if ($value !== null) {
+            return $value;
+        }
+
+        $value = $callback();
+        $this->set($key, $value, $ttl);
+        return $value;
     }
 
     /**
-     * Delete cache entry (alias for delete()).
+     * Remember a value forever.
+     *
+     * @param string $key
+     * @param callable $callback
+     * @return mixed
      */
-    public function forget(string $key): bool
+    public function rememberForever(string $key, callable $callback): mixed
     {
-        return $this->delete($key);
+        return $this->remember($key, null, $callback);
     }
 
     /**
-     * Flush all tagged entries (alias for clear()).
+     * Store a value forever.
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return bool
      */
-    public function flush(): bool
+    public function forever(string $key, mixed $value): bool
     {
-        return $this->clear();
+        return $this->set($key, $value, null);
     }
 
     /**
-     * Get and delete cache entry.
+     * Get and delete a value.
+     *
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
      */
     public function pull(string $key, mixed $default = null): mixed
     {
@@ -189,118 +269,89 @@ final class TaggedCache implements CacheInterface
     }
 
     /**
-     * Store cache entry forever (no expiration).
+     * Clear all cache entries with given tags.
+     *
+     * @param string|array $tags
+     * @return bool
      */
-    public function forever(string $key, mixed $value): bool
+    public function flushTags(string|array $tags): bool
     {
-        return $this->set($key, $value, null);
+        $tags = is_array($tags) ? $tags : [$tags];
+        $success = true;
+
+        foreach ($tags as $tag) {
+            $tagKey = $this->getTagKey($tag);
+            $keys = $this->tagStore->get($tagKey, []);
+
+            if (is_array($keys)) {
+                foreach ($keys as $key) {
+                    $taggedKey = $this->getTaggedKey($key, $tag);
+                    $this->cache->delete($taggedKey);
+                }
+            }
+
+            $this->tagStore->delete($tagKey);
+        }
+
+        return $success;
     }
 
     /**
      * Get tagged cache key.
      *
-     * @param string $key Original key
-     * @return string Tagged key
+     * @param string $key
+     * @param string|null $tag Optional specific tag
+     * @return string
      */
-    private function taggedKey(string $key): string
+    private function getTaggedKey(string $key, ?string $tag = null): string
     {
-        if (empty($this->tags)) {
-            return $key;
-        }
-
-        // Create namespace from tags
-        $namespace = $this->getTagNamespace();
-
-        return "{$namespace}:{$key}";
+        $tags = $tag !== null ? [$tag] : $this->tags;
+        $tagString = implode('|', $tags);
+        return "tagged:{$tagString}:{$key}";
     }
 
     /**
-     * Get tag namespace (versioned).
+     * Get tag storage key.
      *
-     * @return string Tag namespace
+     * @param string $tag
+     * @return string
      */
-    private function getTagNamespace(): string
+    private function getTagKey(string $tag): string
     {
-        $parts = [];
-
-        foreach ($this->tags as $tag) {
-            $parts[] = $this->getTagVersion($tag);
-        }
-
-        return implode('|', $parts);
+        return "cache_tags:{$tag}";
     }
 
     /**
-     * Get tag version (for cache invalidation).
+     * Add key to tag tracking.
      *
-     * @param string $tag Tag name
-     * @return string Tag version
-     */
-    private function getTagVersion(string $tag): string
-    {
-        $versionKey = "tag:{$tag}:version";
-        $version = $this->store->get($versionKey);
-
-        if ($version === null) {
-            $version = $this->resetTagVersion($tag);
-        }
-
-        return "{$tag}:{$version}";
-    }
-
-    /**
-     * Reset tag version (invalidates all entries with this tag).
-     *
-     * @param string $tag Tag name
-     * @return string New version
-     */
-    private function resetTagVersion(string $tag): string
-    {
-        $version = (string) time();
-        $versionKey = "tag:{$tag}:version";
-
-        // Store version forever (no TTL)
-        $this->store->set($versionKey, $version, null);
-
-        return $version;
-    }
-
-    /**
-     * Flush all entries with specific tag.
-     *
-     * @param string $tag Tag name
+     * @param string $key
      * @return void
      */
-    private function flushTag(string $tag): void
-    {
-        // Reset tag version (makes all old entries inaccessible)
-        $this->resetTagVersion($tag);
-    }
-
-    /**
-     * Track key under tags (for garbage collection).
-     *
-     * @param string $key Cache key
-     * @param int|null $ttl Time to live
-     * @return void
-     */
-    private function trackKeyUnderTags(string $key, ?int $ttl): void
+    private function addKeyToTags(string $key): void
     {
         foreach ($this->tags as $tag) {
-            $trackingKey = "tag:{$tag}:keys";
-
-            // Get existing keys
-            $keys = $this->store->get($trackingKey, []);
-            if (!is_array($keys)) {
-                $keys = [];
+            $tagKey = $this->getTagKey($tag);
+            $keys = $this->tagStore->get($tagKey, []);
+            if (!in_array($key, $keys, true)) {
+                $keys[] = $key;
+                $this->tagStore->forever($tagKey, $keys);
             }
+        }
+    }
 
-            // Add new key
-            $keys[] = $key;
-            $keys = array_unique($keys);
-
-            // Store back (with same TTL as tag version)
-            $this->store->set($trackingKey, $keys, $ttl);
+    /**
+     * Remove key from tag tracking.
+     *
+     * @param string $key
+     * @return void
+     */
+    private function removeKeyFromTags(string $key): void
+    {
+        foreach ($this->tags as $tag) {
+            $tagKey = $this->getTagKey($tag);
+            $keys = $this->tagStore->get($tagKey, []);
+            $keys = array_filter($keys, fn($k) => $k !== $key);
+            $this->tagStore->forever($tagKey, array_values($keys));
         }
     }
 }

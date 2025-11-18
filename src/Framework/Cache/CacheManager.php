@@ -4,12 +4,31 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Cache;
 
-use Toporia\Framework\Cache\Contracts\{CacheInterface, CacheManagerInterface};
+use Toporia\Framework\Cache\Contracts\{CacheInterface, CacheManagerInterface, TaggableCacheInterface};
+use Toporia\Framework\Cache\TaggedCache;
+
 /**
  * Cache Manager
  *
  * Manages multiple cache drivers and provides a unified interface.
- * Supports driver switching and fallback mechanisms.
+ * Supports driver switching, fallback mechanisms, and tag support.
+ *
+ * Performance:
+ * - O(1) driver resolution (cached after first call)
+ * - Lazy driver instantiation
+ * - Tag support for organized cache clearing
+ *
+ * Clean Architecture:
+ * - Single Responsibility: Only manages cache drivers
+ * - Dependency Inversion: Depends on CacheInterface
+ * - Open/Closed: Extensible via new drivers
+ *
+ * SOLID Principles:
+ * - S: Only manages caches
+ * - O: Extensible via drivers
+ * - L: All drivers interchangeable
+ * - I: Focused interfaces
+ * - D: Depends on abstractions
  */
 final class CacheManager implements CacheManagerInterface
 {
@@ -150,5 +169,20 @@ final class CacheManager implements CacheManagerInterface
     public function getDefaultDriver(): string
     {
         return $this->defaultDriver ?? 'file';
+    }
+
+    /**
+     * Get a tagged cache instance.
+     *
+     * Performance: O(1) - Creates tagged wrapper
+     *
+     * @param string|array $tags Tag name(s)
+     * @return TaggableCacheInterface Tagged cache instance
+     */
+    public function tags(string|array $tags): TaggableCacheInterface
+    {
+        $cache = $this->driver();
+        $tagStore = $this->driver('memory'); // Use memory cache for tag tracking
+        return new TaggedCache($cache, $tagStore, is_array($tags) ? $tags : [$tags]);
     }
 }

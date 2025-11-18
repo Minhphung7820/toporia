@@ -40,6 +40,7 @@ final class FrameworkServiceProvider extends ServiceProvider
             \Toporia\Framework\Providers\AuthServiceProvider::class,
             \Toporia\Framework\Providers\HashServiceProvider::class,
             \Toporia\Framework\Providers\SecurityServiceProvider::class,
+            \Toporia\Framework\Providers\SessionServiceProvider::class,
             \Toporia\Framework\Providers\CacheServiceProvider::class,
             \Toporia\Framework\Providers\QueueServiceProvider::class,
             \Toporia\Framework\Providers\ScheduleServiceProvider::class,

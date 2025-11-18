@@ -1,0 +1,222 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Toporia\Framework\Session\Drivers;
+
+use Toporia\Framework\Session\Contracts\SessionStoreInterface;
+use Redis;
+
+/**
+ * Redis Session Driver
+ *
+ * Stores sessions in Redis for high performance.
+ * Ideal for distributed systems and horizontal scaling.
+ *
+ * Performance:
+ * - O(1) get/set (in-memory during request)
+ * - O(1) save (single Redis SET command)
+ * - Sub-millisecond latency
+ *
+ * Clean Architecture:
+ * - Single Responsibility: Only handles Redis session storage
+ * - Dependency Inversion: Uses Redis abstraction
+ */
+final class RedisSessionDriver implements SessionStoreInterface
+{
+    private bool $started = false;
+    private array $data = [];
+    private string $id;
+    private string $name;
+    private string $prefix;
+
+    public function __construct(
+        private Redis $redis,
+        string $name = 'PHPSESSID',
+        private int $lifetime = 7200,
+        string $prefix = 'session:'
+    ) {
+        $this->name = $name;
+        $this->prefix = $prefix;
+        $this->id = $this->generateId();
+    }
+
+    /**
+     * Start the session.
+     *
+     * @return bool True on success
+     */
+    public function start(): bool
+    {
+        if ($this->started) {
+            return true;
+        }
+
+        // Load session from Redis
+        $key = $this->getRedisKey($this->id);
+        $payload = $this->redis->get($key);
+
+        if ($payload !== false) {
+            $this->data = unserialize($payload) ?: [];
+        } else {
+            $this->data = [];
+        }
+
+        $this->started = true;
+        return true;
+    }
+
+    /**
+     * Get a session value.
+     *
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    public function get(string $key, mixed $default = null): mixed
+    {
+        return $this->data[$key] ?? $default;
+    }
+
+    /**
+     * Set a session value.
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
+     */
+    public function set(string $key, mixed $value): void
+    {
+        $this->data[$key] = $value;
+    }
+
+    /**
+     * Check if a session key exists.
+     *
+     * @param string $key
+     * @return bool
+     */
+    public function has(string $key): bool
+    {
+        return array_key_exists($key, $this->data);
+    }
+
+    /**
+     * Remove a session value.
+     *
+     * @param string $key
+     * @return void
+     */
+    public function remove(string $key): void
+    {
+        unset($this->data[$key]);
+    }
+
+    /**
+     * Get all session data.
+     *
+     * @return array
+     */
+    public function all(): array
+    {
+        return $this->data;
+    }
+
+    /**
+     * Clear all session data.
+     *
+     * @return void
+     */
+    public function flush(): void
+    {
+        $this->data = [];
+    }
+
+    /**
+     * Regenerate session ID.
+     *
+     * @param bool $deleteOldSession
+     * @return bool True on success
+     */
+    public function regenerate(bool $deleteOldSession = false): bool
+    {
+        $oldId = $this->id;
+        $this->id = $this->generateId();
+
+        if ($deleteOldSession) {
+            $oldKey = $this->getRedisKey($oldId);
+            $this->redis->del($oldKey);
+        }
+
+        return true;
+    }
+
+    /**
+     * Get session ID.
+     *
+     * @return string
+     */
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    /**
+     * Set session ID.
+     *
+     * @param string $id
+     * @return void
+     */
+    public function setId(string $id): void
+    {
+        $this->id = $id;
+    }
+
+    /**
+     * Get session name.
+     *
+     * @return string
+     */
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * Save session data.
+     *
+     * @return bool True on success
+     */
+    public function save(): bool
+    {
+        if (!$this->started) {
+            return true;
+        }
+
+        $key = $this->getRedisKey($this->id);
+        $payload = serialize($this->data);
+
+        return $this->redis->setex($key, $this->lifetime, $payload) !== false;
+    }
+
+    /**
+     * Get Redis key for session ID.
+     *
+     * @param string $id
+     * @return string
+     */
+    private function getRedisKey(string $id): string
+    {
+        return $this->prefix . $id;
+    }
+
+    /**
+     * Generate a cryptographically secure session ID.
+     *
+     * @return string
+     */
+    private function generateId(): string
+    {
+        return bin2hex(random_bytes(32));
+    }
+}

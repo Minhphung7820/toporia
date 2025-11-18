@@ -2,40 +2,34 @@
 
 declare(strict_types=1);
 
-use Toporia\Framework\Database\Migration\Migration;
+use Toporia\Framework\Database\Schema\SchemaBuilder;
 
 /**
- * Create sessions table for database session driver.
+ * Create Sessions Table Migration
+ *
+ * Creates the sessions table for database session driver.
  */
-class CreateSessionsTable extends Migration
+return new class
 {
-    /**
-     * Run the migration.
-     */
-    public function up(): void
+    public function up(SchemaBuilder $schema): void
     {
-        $this->schema->create('sessions', function ($table) {
+        $schema->create('sessions', function ($table) {
             $table->string('id', 255);
-            $table->integer('user_id')->unsigned()->nullable();
-            $table->string('ip_address', 45)->nullable();
-            $table->text('user_agent')->nullable();
             $table->text('payload');
             $table->integer('last_activity')->unsigned();
+            $table->integer('expires_at')->unsigned();
 
             // Primary key
             $table->primaryKey('id');
 
-            // Indexes
-            $table->index('user_id');
+            // Index for cleanup queries
+            $table->index('expires_at');
             $table->index('last_activity');
         });
     }
 
-    /**
-     * Reverse the migration.
-     */
-    public function down(): void
+    public function down(SchemaBuilder $schema): void
     {
-        $this->schema->dropIfExists('sessions');
+        $schema->drop('sessions');
     }
-}
+};

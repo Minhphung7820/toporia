@@ -27,20 +27,6 @@ use Toporia\Framework\Pipeline\Contracts\PipelineInterface;
  * - Lazy evaluation (pipeline built once, executed once)
  * - Zero overhead for unused features
  *
- * Example:
- * ```php
- * $result = Pipeline::make($container)
- *     ->send($user)
- *     ->through([
- *         ValidateUser::class,
- *         NormalizeData::class,
- *         function($user, $next) {
- *             $user->verified = true;
- *             return $next($user);
- *         }
- *     ])
- *     ->thenReturn();
- * ```
  */
 final class Pipeline implements PipelineInterface
 {

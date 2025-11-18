@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support;
 
+use Toporia\Framework\Support\Collection\Collection;
+
 /**
  * Stringable - Fluent string builder.
  *
@@ -13,8 +15,7 @@ class Stringable implements \Stringable
 {
     public function __construct(
         protected string $value = ''
-    ) {
-    }
+    ) {}
 
     /**
      * Get the string value.

@@ -137,35 +137,81 @@ final class CookieJar
     }
 
     /**
-     * Encrypt a cookie value
+     * Encrypt a cookie value.
+     *
+     * Security: Uses AES-256-CBC with random IV for each encryption.
+     * Performance: O(N) where N = value length
      *
      * @param string $value
-     * @return string
+     * @return string Encrypted value (base64 encoded)
      */
-    private function encrypt(string $value): string
+    public function encrypt(string $value): string
     {
+        if ($this->encryptionKey === null) {
+            return $value; // No encryption if key not set
+        }
+
+        // Derive encryption key from APP_KEY (32 bytes for AES-256)
+        $key = $this->deriveKey($this->encryptionKey);
+
         $iv = random_bytes(16);
-        $encrypted = openssl_encrypt($value, 'AES-256-CBC', $this->encryptionKey, 0, $iv);
+        $encrypted = openssl_encrypt($value, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+        if ($encrypted === false) {
+            throw new \RuntimeException('Cookie encryption failed');
+        }
+
+        // Prepend IV to encrypted data
         return base64_encode($iv . $encrypted);
     }
 
     /**
-     * Decrypt a cookie value
+     * Decrypt a cookie value.
      *
-     * @param string $value
-     * @return string|null
+     * Security: Validates IV and handles decryption errors gracefully.
+     * Performance: O(N) where N = value length
+     *
+     * @param string $value Encrypted value (base64 encoded)
+     * @return string|null Decrypted value or null on failure
      */
-    private function decrypt(string $value): ?string
+    public function decrypt(string $value): ?string
     {
-        $data = base64_decode($value);
-        if ($data === false || strlen($data) < 16) {
-            return null;
+        if ($this->encryptionKey === null) {
+            return $value; // No decryption if key not set
         }
 
+        $data = base64_decode($value, true);
+        if ($data === false || strlen($data) < 16) {
+            return null; // Invalid format
+        }
+
+        // Extract IV and encrypted data
         $iv = substr($data, 0, 16);
         $encrypted = substr($data, 16);
 
-        $decrypted = openssl_decrypt($encrypted, 'AES-256-CBC', $this->encryptionKey, 0, $iv);
+        // Derive encryption key from APP_KEY
+        $key = $this->deriveKey($this->encryptionKey);
+
+        $decrypted = openssl_decrypt($encrypted, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
         return $decrypted !== false ? $decrypted : null;
+    }
+
+    /**
+     * Derive encryption key from APP_KEY.
+     *
+     * Security: Uses HKDF to derive a 32-byte key for AES-256.
+     * Performance: O(1) - Single hash operation
+     *
+     * @param string $key APP_KEY
+     * @return string 32-byte encryption key
+     */
+    private function deriveKey(string $key): string
+    {
+        // Use HKDF to derive a 32-byte key for AES-256
+        if (function_exists('hash_hkdf')) {
+            return hash_hkdf('sha256', $key, 32, 'cookie-encryption');
+        }
+
+        // Fallback: hash and take first 32 bytes
+        return substr(hash('sha256', $key . 'cookie-encryption', true), 0, 32);
     }
 }

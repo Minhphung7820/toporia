@@ -1,0 +1,261 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Toporia\Framework\Session\Drivers;
+
+use Toporia\Framework\Session\Contracts\SessionStoreInterface;
+
+/**
+ * File-based Session Driver
+ *
+ * Stores sessions as files in the filesystem.
+ * Uses PHP's native session handler with custom save path.
+ *
+ * Performance:
+ * - O(1) get/set (in-memory during request)
+ * - O(N) save where N = session data size
+ * - File I/O only on save/load
+ *
+ * Clean Architecture:
+ * - Single Responsibility: Only handles file-based session storage
+ * - Dependency Inversion: Implements SessionStoreInterface
+ */
+final class FileSessionDriver implements SessionStoreInterface
+{
+    private bool $started = false;
+    private array $data = [];
+    private string $id;
+    private string $name;
+
+    public function __construct(
+        private string $path,
+        string $name = 'PHPSESSID',
+        private int $lifetime = 7200
+    ) {
+        $this->name = $name;
+        $this->ensureDirectoryExists();
+        $this->id = $this->generateId();
+    }
+
+    /**
+     * Start the session.
+     *
+     * @return bool True on success
+     */
+    public function start(): bool
+    {
+        if ($this->started) {
+            return true;
+        }
+
+        // Load session data if exists
+        $file = $this->getFilePath($this->id);
+        if (file_exists($file)) {
+            $this->data = $this->loadFromFile($file);
+        } else {
+            $this->data = [];
+        }
+
+        $this->started = true;
+        return true;
+    }
+
+    /**
+     * Get a session value.
+     *
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    public function get(string $key, mixed $default = null): mixed
+    {
+        return $this->data[$key] ?? $default;
+    }
+
+    /**
+     * Set a session value.
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
+     */
+    public function set(string $key, mixed $value): void
+    {
+        $this->data[$key] = $value;
+    }
+
+    /**
+     * Check if a session key exists.
+     *
+     * @param string $key
+     * @return bool
+     */
+    public function has(string $key): bool
+    {
+        return array_key_exists($key, $this->data);
+    }
+
+    /**
+     * Remove a session value.
+     *
+     * @param string $key
+     * @return void
+     */
+    public function remove(string $key): void
+    {
+        unset($this->data[$key]);
+    }
+
+    /**
+     * Get all session data.
+     *
+     * @return array
+     */
+    public function all(): array
+    {
+        return $this->data;
+    }
+
+    /**
+     * Clear all session data.
+     *
+     * @return void
+     */
+    public function flush(): void
+    {
+        $this->data = [];
+    }
+
+    /**
+     * Regenerate session ID.
+     *
+     * @param bool $deleteOldSession
+     * @return bool True on success
+     */
+    public function regenerate(bool $deleteOldSession = false): bool
+    {
+        $oldId = $this->id;
+        $this->id = $this->generateId();
+
+        if ($deleteOldSession) {
+            $oldFile = $this->getFilePath($oldId);
+            if (file_exists($oldFile)) {
+                unlink($oldFile);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Get session ID.
+     *
+     * @return string
+     */
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    /**
+     * Set session ID.
+     *
+     * @param string $id
+     * @return void
+     */
+    public function setId(string $id): void
+    {
+        $this->id = $id;
+    }
+
+    /**
+     * Get session name.
+     *
+     * @return string
+     */
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * Save session data.
+     *
+     * @return bool True on success
+     */
+    public function save(): bool
+    {
+        if (!$this->started) {
+            return true;
+        }
+
+        $file = $this->getFilePath($this->id);
+        $data = serialize([
+            'data' => $this->data,
+            'expires_at' => time() + $this->lifetime,
+        ]);
+
+        return file_put_contents($file, $data, LOCK_EX) !== false;
+    }
+
+    /**
+     * Get file path for session ID.
+     *
+     * @param string $id
+     * @return string
+     */
+    private function getFilePath(string $id): string
+    {
+        return $this->path . '/sess_' . $id;
+    }
+
+    /**
+     * Load session data from file.
+     *
+     * @param string $file
+     * @return array
+     */
+    private function loadFromFile(string $file): array
+    {
+        $content = file_get_contents($file);
+        if ($content === false) {
+            return [];
+        }
+
+        $data = unserialize($content);
+        if (!is_array($data) || !isset($data['data'], $data['expires_at'])) {
+            return [];
+        }
+
+        // Check expiration
+        if ($data['expires_at'] < time()) {
+            unlink($file);
+            return [];
+        }
+
+        return $data['data'];
+    }
+
+    /**
+     * Generate a cryptographically secure session ID.
+     *
+     * @return string
+     */
+    private function generateId(): string
+    {
+        return bin2hex(random_bytes(32));
+    }
+
+    /**
+     * Ensure session directory exists.
+     *
+     * @return void
+     */
+    private function ensureDirectoryExists(): void
+    {
+        if (!is_dir($this->path)) {
+            mkdir($this->path, 0755, true);
+        }
+    }
+}

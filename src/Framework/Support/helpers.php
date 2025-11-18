@@ -545,6 +545,37 @@ if (!function_exists('request')) {
     }
 }
 
+if (!function_exists('session')) {
+    /**
+     * Get session instance or retrieve/store session value.
+     *
+     * Performance: O(1) - Direct access or method call
+     *
+     * @param string|null $key Session key (null = get session instance)
+     * @param mixed $default Default value if key doesn't exist
+     * @return mixed Session instance or session value
+     */
+    function session(?string $key = null, mixed $default = null): mixed
+    {
+        if (function_exists('app') && app()->has('session')) {
+            $session = app('session');
+
+            if ($key === null) {
+                return $session;
+            }
+
+            return $session->get($key, $default);
+        }
+
+        // Fallback to $_SESSION if session service not available
+        if ($key === null) {
+            return $_SESSION ?? [];
+        }
+
+        return $_SESSION[$key] ?? $default;
+    }
+}
+
 if (!function_exists('response')) {
     /**
      * Get the current HTTP response instance from the container.
@@ -649,5 +680,36 @@ if (!function_exists('dispatch_sync')) {
         }
 
         return app('dispatcher')->dispatchSync($job);
+    }
+}
+
+// =============================================================================
+// Event Helper Functions
+// =============================================================================
+
+if (!function_exists('event')) {
+    /**
+     * Dispatch an event or get event dispatcher instance.
+     *
+     * Performance: O(1) - Direct dispatcher call
+     *
+     * @param string|\Toporia\Framework\Events\Contracts\EventInterface|null $event Event name or event object (null = get dispatcher)
+     * @param array $payload Event data (used if event is string)
+     * @return \Toporia\Framework\Events\Contracts\EventInterface|\Toporia\Framework\Events\Contracts\EventDispatcherInterface Event instance or dispatcher
+     * @throws RuntimeException if event dispatcher not available
+     */
+    function event(string|\Toporia\Framework\Events\Contracts\EventInterface|null $event = null, array $payload = []): \Toporia\Framework\Events\Contracts\EventInterface|\Toporia\Framework\Events\Contracts\EventDispatcherInterface
+    {
+        if (!function_exists('app') || !app()->has('events')) {
+            throw new RuntimeException('Event dispatcher not available in container. Please register EventServiceProvider.');
+        }
+
+        $dispatcher = app('events');
+
+        if ($event === null) {
+            return $dispatcher;
+        }
+
+        return $dispatcher->dispatch($event, $payload);
     }
 }

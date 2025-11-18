@@ -31,7 +31,22 @@ Framework này có **mức độ bảo mật TỐT** với nhiều lớp bảo v
   - Session-based token management
   - Cryptographically secure random tokens
   - `hash_equals()` để so sánh tokens (timing-safe)
+  - **URI Exclusion**: Hỗ trợ ignore CSRF cho một số URI (webhooks, API endpoints)
+  - **Wildcard Support**: Hỗ trợ pattern matching với `*` (ví dụ: `/api/webhook/*`)
 - **Location**: `src/Framework/Http/Middleware/CsrfProtection.php`
+- **Configuration**: `config/security.php` → `csrf.except`
+- **Usage**:
+  ```php
+  // config/security.php
+  'csrf' => [
+      'enabled' => true,
+      'except' => [
+          '/api/webhook/*',        // Ignore tất cả webhook
+          '/api/stripe/webhook',   // Ignore exact path
+          '/api/*/callback',       // Ignore tất cả callback
+      ],
+  ],
+  ```
 - **Risk Level**: 🟢 **LOW**
 
 ### 4. **Replay Attack Protection** ✅
@@ -96,100 +111,72 @@ Framework này có **mức độ bảo mật TỐT** với nhiều lớp bảo v
 - **Location**: `src/Framework/Error/HtmlErrorRenderer.php`
 - **Risk Level**: 🟡 **MEDIUM** (nếu `APP_DEBUG=true` trong production)
 
-## ⚠️ Điểm Yếu (Cần Cải Thiện)
+## ⚠️ Điểm Yếu (Đã Được Sửa)
 
-### 1. **ModelQueryBuilder - Potential SQL Injection** ⚠️
-- **Status**: ⚠️ **CẦN CẢI THIỆN**
-- **Problem**:
-  - Sử dụng `addslashes()` thay vì prepared statements trong một số chỗ
-  - String concatenation trong subqueries
-- **Location**: `src/Framework/Database/ORM/ModelQueryBuilder.php:207`
-- **Code**:
-  ```php
-  $escaped = is_string($binding) ? "'" . addslashes($binding) . "'" : $binding;
-  $boundWhereClause = preg_replace('/\?/', (string)$escaped, $boundWhereClause, 1);
-  ```
-- **Risk Level**: 🟡 **MEDIUM**
-- **Recommendation**:
-  - Nên refactor để dùng prepared statements thay vì string replacement
-  - Hoặc ít nhất validate input kỹ hơn
+Tất cả các điểm yếu đã được sửa trong các phiên bản gần đây:
 
-### 2. **File Upload - Missing MIME Type Validation** ⚠️
-- **Status**: ⚠️ **CẦN CẢI THIỆN**
-- **Problem**:
-  - Chỉ check `is_uploaded_file()` nhưng không validate MIME type
-  - Không có whitelist cho file extensions
-  - Client có thể fake MIME type
+### 1. **ModelQueryBuilder - SQL Injection** ✅ **ĐÃ SỬA**
+- **Status**: ✅ **ĐÃ SỬA**
+- **Fix**: Sử dụng `PDO::quote()` thay vì `addslashes()` để quote values an toàn
+- **Location**: `src/Framework/Database/Query/QueryBuilder.php` (method `quoteValue()`)
+- **Risk Level**: 🟢 **LOW** (đã fix)
+
+### 2. **File Upload - MIME Type Validation** ✅ **ĐÃ SỬA**
+- **Status**: ✅ **ĐÃ SỬA**
+- **Fix**:
+  - Thêm `getRealMimeType()` với server-side detection (`finfo_file()`)
+  - Thêm `isValidMimeType()` và `isValidExtension()` methods
+  - Validate cả client và server MIME type
 - **Location**: `src/Framework/Storage/UploadedFile.php`
-- **Risk Level**: 🟡 **MEDIUM**
-- **Recommendation**:
-  - Thêm MIME type validation bằng `finfo_file()` (server-side)
-  - Thêm whitelist cho allowed extensions
-  - Validate file content, không chỉ dựa vào extension
+- **Risk Level**: 🟢 **LOW** (đã fix)
 
-### 3. **Error Information Disclosure** ⚠️
-- **Status**: ⚠️ **CẦN CẢI THIỆN**
-- **Problem**:
-  - Debug mode có thể leak thông tin nhạy cảm (stack trace, file paths, etc.)
-  - Cần đảm bảo `APP_DEBUG=false` trong production
-- **Location**: `src/Framework/Error/HtmlErrorRenderer.php`
-- **Risk Level**: 🟡 **MEDIUM** (nếu config sai)
-- **Recommendation**:
-  - Thêm check để force `APP_DEBUG=false` trong production
-  - Hoặc thêm IP whitelist cho debug mode
+### 3. **Error Information Disclosure** ✅ **ĐÃ SỬA**
+- **Status**: ✅ **ĐÃ SỬA**
+- **Fix**: Auto-disable debug mode khi `APP_ENV=production`
+- **Location**: `src/Framework/Error/ErrorHandler.php`, `HtmlErrorRenderer.php`, `JsonErrorRenderer.php`
+- **Risk Level**: 🟢 **LOW** (đã fix)
 
-### 4. **Rate Limiting - Not Enabled by Default** ⚠️
-- **Status**: ⚠️ **CẦN CẢI THIỆN**
-- **Problem**:
-  - Rate limiting có sẵn nhưng không được enable mặc định
-  - Cần manually add middleware cho từng route
-- **Location**: `config/middleware.php`
-- **Risk Level**: 🟡 **MEDIUM**
-- **Recommendation**:
-  - Enable rate limiting mặc định cho API routes
-  - Hoặc thêm global rate limiting với config
+### 4. **Rate Limiting - Not Enabled by Default** ✅ **ĐÃ SỬA**
+- **Status**: ✅ **ĐÃ SỬA**
+- **Fix**: Enable rate limiting mặc định cho API routes (60 requests/minute)
+- **Location**: `config/middleware.php`, `src/Framework/Providers/SecurityServiceProvider.php`
+- **Risk Level**: 🟢 **LOW** (đã fix)
 
 ## 🔒 Best Practices Đã Áp Dụng
 
 1. ✅ **Prepared Statements** cho tất cả database queries
 2. ✅ **Password Hashing** với bcrypt/argon2id
-3. ✅ **CSRF Protection** tự động
+3. ✅ **CSRF Protection** tự động với URI exclusion support
 4. ✅ **XSS Protection** với multiple methods
 5. ✅ **Security Headers** đầy đủ
 6. ✅ **Input Validation** comprehensive
 7. ✅ **Replay Attack Protection**
-8. ✅ **File Upload Validation** cơ bản
+8. ✅ **File Upload Validation** với MIME type detection
+9. ✅ **Rate Limiting** enabled by default cho API routes
 
-## 📋 Khuyến Nghị Cải Thiện
+## 📋 Khuyến Nghị Cải Thiện (Tùy Chọn)
 
-### Priority 1 (High)
-1. **Fix ModelQueryBuilder SQL Injection risk**
-   - Refactor để dùng prepared statements
-   - Hoặc validate input kỹ hơn
+### Priority 1 (High) - ✅ Đã hoàn thành
+Tất cả các vấn đề priority 1 đã được sửa.
 
-2. **Add File Upload MIME Type Validation**
-   - Server-side MIME type detection
-   - Whitelist cho extensions
-   - Content validation
+### Priority 2 (Medium) - ✅ Đã hoàn thành
+Tất cả các vấn đề priority 2 đã được sửa.
 
-### Priority 2 (Medium)
-3. **Enable Rate Limiting by Default**
-   - Thêm vào API middleware group
-   - Configurable limits
-
-4. **Strengthen Error Handling**
-   - Force `APP_DEBUG=false` check trong production
-   - IP whitelist cho debug mode
-
-### Priority 3 (Low)
-5. **Add Security Logging**
+### Priority 3 (Low) - Tùy chọn
+1. **Add Security Logging**
    - Log failed authentication attempts
    - Log suspicious activities
    - Rate limit violations
+   - CSRF token validation failures
 
-6. **Add Content Security Policy (CSP)**
+2. **Add Content Security Policy (CSP)**
    - Tune CSP headers cho ứng dụng cụ thể
    - Report-only mode để test
+   - Dynamic CSP generation based on route
+
+3. **Add IP Whitelist for Debug Mode**
+   - Cho phép debug mode chỉ cho một số IP nhất định
+   - Hữu ích cho staging environments
 
 ## 🎯 Kết Luận
 
@@ -202,6 +189,7 @@ Framework này có **nền tảng bảo mật RẤT TỐT** với nhiều lớp 
 - ✅ Added MIME type validation cho file upload (server-side detection)
 - ✅ Enabled rate limiting mặc định cho API routes (60 req/min)
 - ✅ Strengthened error handling (force APP_DEBUG=false trong production)
+- ✅ Added CSRF URI exclusion với wildcard pattern support
 
 Framework hiện tại đạt **mức độ bảo mật RẤT TỐT (9/10)** và sẵn sàng cho production.
 

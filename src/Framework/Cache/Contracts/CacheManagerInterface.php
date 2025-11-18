@@ -7,7 +7,7 @@ namespace Toporia\Framework\Cache\Contracts;
 /**
  * Cache Manager Interface
  *
- * Contract for multi-driver cache management.
+ * Contract for multi-driver cache management with tag support.
  */
 interface CacheManagerInterface extends CacheInterface
 {
@@ -25,4 +25,12 @@ interface CacheManagerInterface extends CacheInterface
      * @return string
      */
     public function getDefaultDriver(): string;
+
+    /**
+     * Get a tagged cache instance
+     *
+     * @param string|array $tags Tag name(s)
+     * @return TaggableCacheInterface Tagged cache instance
+     */
+    public function tags(string|array $tags): TaggableCacheInterface;
 }
