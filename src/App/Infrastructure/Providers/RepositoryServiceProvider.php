@@ -8,9 +8,7 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
-use App\Domain\Contracts\Product\ProductRepositoryInterface;
 use App\Domain\Contracts\Repository\UserRepository;
-use App\Infrastructure\Persistence\Product\PdoProductRepository;
 use App\Infrastructure\Repository\Transaction\TransactionManager;
 use App\Infrastructure\Repository\UnitOfWork;
 use App\Infrastructure\Repository\InMemoryUserRepository;
@@ -22,7 +20,7 @@ use App\Infrastructure\Repository\InMemoryUserRepository;
  * This is where you configure which repository implementation to use.
  *
  * Clean Architecture:
- * - Binds Domain interfaces (ProductRepository, UserRepository) to Infrastructure implementations
+ * - Binds Domain interfaces (UserRepository) to Infrastructure implementations
  * - This is the Dependency Inversion in action
  * - Domain layer doesn't know about Infrastructure
  *
@@ -50,40 +48,11 @@ class RepositoryServiceProvider extends ServiceProvider
 
         // Register Unit of Work (singleton)
         $container->singleton(UnitOfWork::class, function (ContainerInterface $c) {
-            $uow = new UnitOfWork($c->get(TransactionManager::class));
-            // Register repositories with Unit of Work
-            $uow->register($c->get(ProductRepositoryInterface::class));
-            return $uow;
-        });
-
-        // Bind ProductRepositoryInterface to PDO implementation
-        // Clean Architecture: Domain interface → Infrastructure implementation
-        $container->singleton(ProductRepositoryInterface::class, function (ContainerInterface $c) {
-            return new PdoProductRepository(
-                $c->get(ConnectionInterface::class)
-            );
+            return new UnitOfWork($c->get(TransactionManager::class));
         });
 
         // Bind UserRepository to InMemory implementation (for now)
         // TODO: Replace with EloquentUserRepository for production
         $container->singleton(UserRepository::class, fn() => new InMemoryUserRepository());
-
-        // Alternative implementations (commented out):
-        //
-        // Use in-memory implementation (for testing)
-        // $container->bind(ProductRepository::class, fn() => new InMemoryProductRepository());
-        //
-        // Use PDO repository (custom SQL)
-        // $container->bind(ProductRepository::class, function(ContainerInterface $c) {
-        //     return new PdoProductRepository($c->get('db'));
-        // });
-        //
-        // Use Cached repository (decorator pattern)
-        // $container->bind(ProductRepository::class, function(ContainerInterface $c) {
-        //     $baseRepo = new EloquentProductRepository(
-        //         $c->get(ConnectionInterface::class)
-        //     );
-        //     return new CachedProductRepository($baseRepo, $c->get(CacheInterface::class));
-        // });
     }
 }

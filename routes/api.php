@@ -8,13 +8,6 @@ declare(strict_types=1);
  * These routes are loaded by RouteServiceProvider within the 'api' middleware group.
  * All routes here are automatically prefixed with '/api'.
  * All routes receive the middleware from the 'api' group in config/middleware.php.
- *
- * Example routes available:
- * - GET    /api/products
- * - GET    /api/products/{id}
- * - POST   /api/products
- * - PUT    /api/products/{id}
- * - DELETE /api/products/{id}
  */
 
 use Toporia\Framework\Routing\Router;
@@ -24,16 +17,6 @@ use Toporia\Framework\Routing\Router;
 // Example API routes (commented out - uncomment when you have API controllers)
 
 /*
-// Product API endpoints
-$router->get('/products', [ProductApiController::class, 'index']);
-$router->get('/products/{id}', [ProductApiController::class, 'show']);
-$router->post('/products', [ProductApiController::class, 'store'])
-    ->middleware(['auth:api']);
-$router->put('/products/{id}', [ProductApiController::class, 'update'])
-    ->middleware(['auth:api']);
-$router->delete('/products/{id}', [ProductApiController::class, 'destroy'])
-    ->middleware(['auth:api']);
-
 // Health check endpoint (public)
 $router->get('/health', function() {
     return ['status' => 'ok', 'timestamp' => time()];

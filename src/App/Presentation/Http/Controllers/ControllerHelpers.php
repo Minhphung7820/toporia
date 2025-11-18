@@ -23,7 +23,7 @@ namespace App\Presentation\Http\Controllers;
  *
  *     public function index(Request $request, Response $response)
  *     {
- *         return $this->view('products/index', ['products' => $products]);
+ *         return $this->view('home/index', ['data' => $data]);
  *     }
  * }
  * ```

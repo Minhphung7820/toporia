@@ -24,7 +24,7 @@ use Toporia\Framework\Http\Response;
  * {
  *     public function index()
  *     {
- *         return $this->view('products/index');
+ *         return $this->view('home/index');
  *     }
  * }
  * ```
@@ -37,7 +37,7 @@ use Toporia\Framework\Http\Response;
  *
  *     public function index(Request $request, Response $response)
  *     {
- *         return $this->view('products/index');
+ *         return $this->view('home/index');
  *     }
  * }
  * ```

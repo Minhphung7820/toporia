@@ -188,11 +188,10 @@ abstract class Mailable
         // Convert dot notation to path
         $path = str_replace('.', '/', $view);
 
-        // Try different locations
+        // View location
         $basePath = dirname(__DIR__, 3); // Project root
         $locations = [
             "{$basePath}/src/App/Presentation/Views/emails/{$path}.php",
-            "{$basePath}/resources/views/emails/{$path}.php",
         ];
 
         foreach ($locations as $location) {

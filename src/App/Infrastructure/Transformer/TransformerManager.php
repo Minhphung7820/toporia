@@ -116,7 +116,6 @@ final class TransformerManager
     private function registerDefaultTransformers(): void
     {
         $this->mapping = [
-            \App\Domain\Product\Product::class => ProductTransformer::class,
             \App\Domain\User\User::class => UserTransformer::class,
         ];
     }

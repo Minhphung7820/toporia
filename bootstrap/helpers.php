@@ -836,3 +836,85 @@ if (!function_exists('allow')) {
         return \Toporia\Framework\Auth\Access\Response::allow($message);
     }
 }
+
+// =============================================================================
+// Vite Helper Functions
+// =============================================================================
+
+if (!function_exists('vite')) {
+    /**
+     * Generate Vite script tag for an entry point.
+     *
+     * Automatically switches between dev server (HMR) and production manifest.
+     *
+     * @param string $entry Entry point file (e.g., 'resources/js/app.js')
+     * @param array $attributes Additional HTML attributes
+     * @return string HTML script tag
+     *
+     * @example
+     * // In view template
+     * {!! vite('resources/js/app.js') !!}
+     * {!! vite('resources/js/admin.js', ['defer' => true]) !!}
+     */
+    function vite(string $entry, array $attributes = []): string
+    {
+        if (function_exists('app') && app()->has('vite')) {
+            return app('vite')->script($entry, $attributes);
+        }
+
+        throw new \RuntimeException('Vite service not available. Register ViteServiceProvider.');
+    }
+}
+
+if (!function_exists('vite_css')) {
+    /**
+     * Generate Vite CSS link tags for an entry point.
+     *
+     * Returns empty string in development (CSS handled by Vite).
+     * Returns CSS links in production (from manifest).
+     *
+     * @param string $entry Entry point file
+     * @param array $attributes Additional HTML attributes
+     * @return string HTML link tags
+     *
+     * @example
+     * // In view template <head>
+     * {!! vite_css('resources/js/app.js') !!}
+     */
+    function vite_css(string $entry, array $attributes = []): string
+    {
+        if (function_exists('app') && app()->has('vite')) {
+            return app('vite')->css($entry, $attributes);
+        }
+
+        throw new \RuntimeException('Vite service not available. Register ViteServiceProvider.');
+    }
+}
+
+if (!function_exists('vite_assets')) {
+    /**
+     * Generate both Vite script and CSS tags.
+     *
+     * Convenience function to output both script and CSS in one call.
+     *
+     * @param string $entry Entry point file
+     * @param array $scriptAttributes Script tag attributes
+     * @param array $cssAttributes CSS link tag attributes
+     * @return string Combined HTML tags
+     *
+     * @example
+     * // In view template
+     * {!! vite_assets('resources/js/app.js') !!}
+     */
+    function vite_assets(
+        string $entry,
+        array $scriptAttributes = [],
+        array $cssAttributes = []
+    ): string {
+        if (function_exists('app') && app()->has('vite')) {
+            return app('vite')->assets($entry, $scriptAttributes, $cssAttributes);
+        }
+
+        throw new \RuntimeException('Vite service not available. Register ViteServiceProvider.');
+    }
+}

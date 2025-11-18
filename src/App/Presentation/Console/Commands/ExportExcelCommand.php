@@ -14,8 +14,8 @@ use Toporia\Framework\Console\Command;
  * Supports millions of rows with memory-efficient streaming.
  *
  * Usage:
- *   php console excel:export /path/to/output.xlsx --model=Product
- *   php console excel:export /path/to/output.xlsx --query="SELECT * FROM products"
+ *   php console excel:export /path/to/output.xlsx --model=User
+ *   php console excel:export /path/to/output.xlsx --query="SELECT * FROM users"
  *   php console excel:export /path/to/output.xlsx --chunk-size=5000
  *
  * Performance:

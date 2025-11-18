@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Infrastructure\Providers;
 
 use App\Domain\Contracts\Transformer\TransformerInterface;
-use App\Infrastructure\Transformer\ProductTransformer;
 use App\Infrastructure\Transformer\TransformerManager;
 use App\Infrastructure\Transformer\UserTransformer;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
@@ -36,14 +35,6 @@ final class TransformerServiceProvider extends ServiceProvider
     public function register(ContainerInterface $container): void
     {
         // Register transformers as singletons
-        $container->singleton(
-            ProductTransformer::class,
-            function (ContainerInterface $container) {
-                $cache = $container->has('cache') ? $container->get('cache') : null;
-                return new ProductTransformer($cache, true, 3600);
-            }
-        );
-
         $container->singleton(
             UserTransformer::class,
             function (ContainerInterface $container) {

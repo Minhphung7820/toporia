@@ -40,11 +40,5 @@ class EventServiceProvider extends ServiceProvider
             $payload = $event->getPayload();
             error_log('[Login] ' . ($payload['email'] ?? 'unknown'));
         });
-
-        // Product events
-        $events->listen('ProductCreated', function ($event) {
-            $payload = $event->getPayload();
-            error_log('[ProductCreated] ' . json_encode($payload));
-        });
     }
 }

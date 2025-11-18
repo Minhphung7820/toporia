@@ -52,6 +52,7 @@ final class FrameworkServiceProvider extends ServiceProvider
             \Toporia\Framework\Providers\ProcessServiceProvider::class,
             \Toporia\Framework\Providers\SearchServiceProvider::class,
             \Toporia\Framework\Providers\ObserverServiceProvider::class,
+            \Toporia\Framework\Providers\ViteServiceProvider::class,
         ];
     }
 

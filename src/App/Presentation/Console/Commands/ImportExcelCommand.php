@@ -16,7 +16,7 @@ use Toporia\Framework\Console\Command;
  * Usage:
  *   php console excel:import /path/to/file.xlsx
  *   php console excel:import /path/to/file.xlsx --chunk-size=5000
- *   php console excel:import /path/to/file.xlsx --processor=ProductImporter
+ *   php console excel:import /path/to/file.xlsx --processor=UserImporter
  *
  * Performance:
  * - Streaming: O(1) memory usage
