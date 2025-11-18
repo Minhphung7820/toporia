@@ -4,17 +4,40 @@
 
 ### Cách 1: Dùng Console Command (Giống Laravel - Khuyến nghị)
 
+**⚠️ Lưu ý:** Nếu chạy trên host thiếu PHP extensions (như `mbstring`), hãy chạy trong Docker container:
+
+**Cách 1: Dùng script helper (Dễ nhất - Khuyến nghị)**
+
 ```bash
 # Chạy tất cả tests
-php console test
+./test.sh
 
 # Chạy với filter
-php console test --filter=test_name
+./test.sh --filter=test_name
 
 # Chạy test suite cụ thể
-php console test --testsuite=Unit
-php console test --testsuite=Feature
-php console test --testsuite=Performance
+./test.sh --testsuite=Unit
+./test.sh --testsuite=Feature
+./test.sh --testsuite=Performance
+
+# Chạy với coverage
+./test.sh --coverage
+./test.sh --coverage-html
+```
+
+**Cách 2: Chạy trực tiếp trong Docker**
+
+```bash
+# Chạy tất cả tests
+docker exec project_topo_app sh -c "cd /var/www/html && php console test"
+
+# Chạy với filter
+docker exec project_topo_app sh -c "cd /var/www/html && php console test --filter=test_name"
+
+# Chạy test suite cụ thể
+docker exec project_topo_app sh -c "cd /var/www/html && php console test --testsuite=Unit"
+docker exec project_topo_app sh -c "cd /var/www/html && php console test --testsuite=Feature"
+docker exec project_topo_app sh -c "cd /var/www/html && php console test --testsuite=Performance"
 
 # Chạy với coverage
 php console test --coverage
