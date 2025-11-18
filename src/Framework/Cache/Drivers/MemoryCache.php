@@ -2,38 +2,40 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Cache;
+namespace Toporia\Framework\Cache\Drivers;
 
 use Toporia\Framework\Cache\Contracts\CacheInterface;
-/**
- * File-based Cache Driver
- *
- * Stores cache entries as serialized files in the filesystem.
- * Good for simple deployments without external dependencies.
- */
-final class FileCache implements CacheInterface
-{
-    private string $directory;
 
-    public function __construct(string $directory = '/tmp/cache')
-    {
-        $this->directory = rtrim($directory, '/');
-        $this->ensureDirectoryExists();
-    }
+/**
+ * In-Memory Cache Driver
+ *
+ * Stores cache in PHP memory (array). Data is lost at the end of request.
+ * Useful for testing or caching data within a single request.
+ *
+ * Performance:
+ * - O(1) get/set operations (array access)
+ * - O(N) clear where N = number of keys
+ * - Zero I/O overhead
+ *
+ * Clean Architecture:
+ * - Single Responsibility: Only handles in-memory caching
+ * - Dependency Inversion: Implements CacheInterface
+ */
+final class MemoryCache implements CacheInterface
+{
+    private array $storage = [];
 
     public function get(string $key, mixed $default = null): mixed
     {
-        $file = $this->getFilePath($key);
-
-        if (!file_exists($file)) {
+        if (!isset($this->storage[$key])) {
             return $default;
         }
 
-        $data = unserialize(file_get_contents($file));
+        $data = $this->storage[$key];
 
         // Check if expired
         if ($data['expires_at'] !== null && $data['expires_at'] < time()) {
-            $this->delete($key);
+            unset($this->storage[$key]);
             return $default;
         }
 
@@ -42,16 +44,14 @@ final class FileCache implements CacheInterface
 
     public function set(string $key, mixed $value, ?int $ttl = null): bool
     {
-        $file = $this->getFilePath($key);
         $expiresAt = $ttl !== null ? time() + $ttl : null;
 
-        $data = [
+        $this->storage[$key] = [
             'value' => $value,
             'expires_at' => $expiresAt,
         ];
 
-        $result = file_put_contents($file, serialize($data), LOCK_EX);
-        return $result !== false;
+        return true;
     }
 
     public function has(string $key): bool
@@ -61,25 +61,13 @@ final class FileCache implements CacheInterface
 
     public function delete(string $key): bool
     {
-        $file = $this->getFilePath($key);
-
-        if (file_exists($file)) {
-            return unlink($file);
-        }
-
+        unset($this->storage[$key]);
         return true;
     }
 
     public function clear(): bool
     {
-        $files = glob($this->directory . '/*');
-
-        foreach ($files as $file) {
-            if (is_file($file)) {
-                unlink($file);
-            }
-        }
-
+        $this->storage = [];
         return true;
     }
 
@@ -96,28 +84,20 @@ final class FileCache implements CacheInterface
 
     public function setMultiple(array $values, ?int $ttl = null): bool
     {
-        $success = true;
-
         foreach ($values as $key => $value) {
-            if (!$this->set($key, $value, $ttl)) {
-                $success = false;
-            }
+            $this->set($key, $value, $ttl);
         }
 
-        return $success;
+        return true;
     }
 
     public function deleteMultiple(array $keys): bool
     {
-        $success = true;
-
         foreach ($keys as $key) {
-            if (!$this->delete($key)) {
-                $success = false;
-            }
+            $this->delete($key);
         }
 
-        return $success;
+        return true;
     }
 
     public function increment(string $key, int $value = 1): int|false
@@ -171,26 +151,13 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Get the file path for a cache key
+     * Get all cached data (for debugging)
      *
-     * @param string $key
-     * @return string
+     * @return array
      */
-    private function getFilePath(string $key): string
+    public function all(): array
     {
-        $hash = md5($key);
-        return $this->directory . '/' . $hash . '.cache';
-    }
-
-    /**
-     * Ensure the cache directory exists
-     *
-     * @return void
-     */
-    private function ensureDirectoryExists(): void
-    {
-        if (!is_dir($this->directory)) {
-            mkdir($this->directory, 0755, true);
-        }
+        return $this->storage;
     }
 }
+

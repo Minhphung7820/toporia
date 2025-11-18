@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Cache;
+namespace Toporia\Framework\Cache\Drivers;
 
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Redis;
@@ -12,6 +12,15 @@ use Redis;
  *
  * High-performance caching using Redis.
  * Requires phpredis extension.
+ *
+ * Performance:
+ * - O(1) get/set operations (Redis commands)
+ * - O(N) clear where N = number of keys with prefix
+ * - Sub-millisecond latency
+ *
+ * Clean Architecture:
+ * - Single Responsibility: Only handles Redis caching
+ * - Dependency Inversion: Implements CacheInterface
  */
 final class RedisCache implements CacheInterface
 {
@@ -28,7 +37,7 @@ final class RedisCache implements CacheInterface
      * Create RedisCache from connection config
      *
      * @param array $config ['host' => '127.0.0.1', 'port' => 6379, 'password' => null, 'database' => 0]
-     * @param string $prefix
+     * @param string $prefix Cache key prefix
      * @return self
      */
     public static function fromConfig(array $config, string $prefix = 'cache:'): self
@@ -206,3 +215,4 @@ final class RedisCache implements CacheInterface
         return $this->prefix . $key;
     }
 }
+
