@@ -47,11 +47,11 @@ final class AuthController extends BaseController
     /**
      * Show login form (web only).
      *
-     * @return void
+     * @return string
      */
-    public function showLoginForm(): void
+    public function showLoginForm(): string
     {
-        $this->view('auth/login', [
+        return $this->view('auth/login', [
             'title' => 'Login',
         ]);
     }
@@ -95,11 +95,11 @@ final class AuthController extends BaseController
     /**
      * Show registration form (web only).
      *
-     * @return void
+     * @return string
      */
-    public function showRegisterForm(): void
+    public function showRegisterForm(): string
     {
-        $this->view('auth/register', [
+        return $this->view('auth/register', [
             'title' => 'Register',
         ]);
     }
