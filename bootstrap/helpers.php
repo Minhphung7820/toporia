@@ -1020,3 +1020,22 @@ if (!function_exists('batch')) {
         return \Toporia\Framework\Bus\Bus::batch($jobs);
     }
 }
+
+if (!function_exists('chain')) {
+    /**
+     * Create a new chain of jobs (sequential execution).
+     *
+     * Performance:
+     * - O(1) creation (lazy execution)
+     * - Jobs executed sequentially when dispatch() is called
+     * - Early termination on failure
+     *
+     * @template T
+     * @param array<mixed> $jobs Jobs to chain (executed sequentially)
+     * @return \Toporia\Framework\Bus\PendingChain<T>
+     */
+    function chain(array $jobs): \Toporia\Framework\Bus\PendingChain
+    {
+        return \Toporia\Framework\Bus\Bus::chain($jobs);
+    }
+}

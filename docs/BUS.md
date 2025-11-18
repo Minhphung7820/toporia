@@ -202,6 +202,47 @@ final class LogCommand
 }
 ```
 
+### Chain Operations
+
+Execute jobs sequentially (one after another):
+
+```php
+use App\Jobs\ProcessVideo;
+use Toporia\Framework\Bus\Bus;
+
+// Create chain (jobs execute sequentially)
+$result = Bus::chain([
+    new DownloadVideoCommand('video1.mp4'),
+    new TranscodeVideoCommand('video1.mp4'),
+    new GenerateThumbnailCommand('video1.mp4'),
+])
+->onQueue('videos') // Optional: set queue for all jobs
+->delay(60) // Optional: set delay for all jobs
+->catch(function ($exception, $jobIndex, $job) {
+    // Handle failure
+    error_log("Job {$jobIndex} failed: " . $exception->getMessage());
+})
+->finally(function ($success, $exception) {
+    // Cleanup or logging
+    log_info("Chain completed: " . ($success ? 'success' : 'failed'));
+})
+->dispatch();
+
+// Result is the return value from the last job
+```
+
+**Performance:**
+- O(1) creation (lazy execution)
+- O(N) sequential execution (N = number of jobs)
+- Early termination on failure (stops immediately)
+- Zero-copy job passing
+
+**Key Differences from Batch:**
+- **Chain**: Jobs execute **sequentially** (one after another)
+- **Batch**: Jobs execute **in parallel** (simultaneously)
+- **Chain**: Stops on first failure (unless catch callback handles it)
+- **Batch**: Continues processing other jobs even if one fails (if `allowFailures()` is set)
+
 ### Batch Operations
 
 Process multiple jobs and track progress:
@@ -380,50 +421,55 @@ echo "Batch ID: {$batch->id()}\n";
 
 ### Example 3: Video Processing Pipeline
 
+**Using Chain (Recommended):**
+
 ```php
 // Commands
-final class DownloadVideoCommand implements ShouldQueueInterface
+final class DownloadVideoCommand
 {
-    use Queueable;
-
     public function __construct(public readonly string $url) {}
 }
 
-final class TranscodeVideoCommand implements ShouldQueueInterface
+final class TranscodeVideoCommand
 {
-    use Queueable;
-
     public function __construct(public readonly string $path) {}
 }
 
-final class GenerateThumbnailCommand implements ShouldQueueInterface
+final class GenerateThumbnailCommand
 {
-    use Queueable;
-
     public function __construct(public readonly string $path) {}
 }
 
-// Usage with chaining
+// Usage with chain (sequential execution)
 public function processVideo(string $url): void
 {
-    // Step 1: Download
-    dispatch(new DownloadVideoCommand($url))
-        ->onQueue('downloads');
-
-    // After download completes, trigger transcoding and thumbnail
-    // (In handler, dispatch next commands)
+    $result = chain([
+        new DownloadVideoCommand($url),
+        new TranscodeVideoCommand($url), // Will receive result from previous job
+        new GenerateThumbnailCommand($url),
+    ])
+    ->catch(function ($exception, $index, $job) {
+        error_log("Video processing failed at step {$index}");
+    })
+    ->dispatch();
 }
+```
 
-// Handler with chaining
+**Alternative: Manual Chaining in Handler**
+
+```php
+// Handler with manual chaining
 final class DownloadVideoCommandHandler
 {
-    public function __invoke(DownloadVideoCommand $cmd): void
+    public function __invoke(DownloadVideoCommand $cmd): string
     {
         $path = $this->download($cmd->url);
 
-        // Chain next commands
-        dispatch(new TranscodeVideoCommand($path))->onQueue('transcoding');
-        dispatch(new GenerateThumbnailCommand($path))->onQueue('thumbnails');
+        // Chain next commands manually
+        dispatch(new TranscodeVideoCommand($path));
+        dispatch(new GenerateThumbnailCommand($path));
+
+        return $path; // Return value can be used by next job in chain
     }
 }
 ```
@@ -489,9 +535,12 @@ Bus::dispatch($command): mixed
 Bus::dispatchSync($command): mixed
 Bus::dispatchAfterResponse($command): PendingDispatch
 
-// Batches
+// Batches (parallel execution)
 Bus::batch(array $jobs): PendingBatch
 Bus::findBatch(string $id): ?Batch
+
+// Chains (sequential execution)
+Bus::chain(array $jobs): PendingChain
 
 // Configuration
 Bus::map(array $mappings): void
@@ -517,6 +566,17 @@ batch($jobs)
     ->finally(callable $callback): self
     ->allowFailures(bool $allow = true): self
     ->dispatch(): Batch
+```
+
+### PendingChain
+
+```php
+chain($jobs)
+    ->onQueue(string $queue): self
+    ->delay(int $seconds): self
+    ->catch(callable $callback): self  // Receives (Throwable $exception, int $jobIndex, mixed $job)
+    ->finally(callable $callback): self  // Receives (bool $success, ?Throwable $exception)
+    ->dispatch(): mixed  // Returns result from last job, or null if failed
 ```
 
 ### Batch

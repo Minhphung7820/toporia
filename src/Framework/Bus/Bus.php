@@ -101,6 +101,23 @@ final class Bus
     }
 
     /**
+     * Create a new chain (sequential job execution).
+     *
+     * Performance:
+     * - O(1) creation (lazy execution)
+     * - Jobs executed sequentially when dispatch() is called
+     * - Early termination on failure
+     *
+     * @template T
+     * @param array<mixed> $jobs Jobs to chain (executed sequentially)
+     * @return PendingChain<T>
+     */
+    public static function chain(array $jobs): PendingChain
+    {
+        return new PendingChain(self::getDispatcher(), $jobs);
+    }
+
+    /**
      * Find a batch by ID.
      */
     public static function findBatch(string $batchId): ?Batch
