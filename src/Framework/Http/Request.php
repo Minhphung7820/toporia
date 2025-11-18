@@ -49,6 +49,11 @@ final class Request implements RequestInterface
     private string $rawBody;
 
     /**
+     * @var array<string, mixed> Request attributes (for middleware/route data)
+     */
+    private array $attributes = [];
+
+    /**
      * Create a Request instance from PHP globals.
      *
      * @return self
@@ -312,5 +317,42 @@ final class Request implements RequestInterface
     public function except(array $keys): array
     {
         return array_diff_key($this->body, array_flip($keys));
+    }
+
+    /**
+     * Set a request attribute.
+     *
+     * Attributes are used to store additional data about the request
+     * (e.g., route handler, route parameters, etc.)
+     *
+     * @param string $key Attribute key
+     * @param mixed $value Attribute value
+     * @return void
+     */
+    public function setAttribute(string $key, mixed $value): void
+    {
+        $this->attributes[$key] = $value;
+    }
+
+    /**
+     * Get a request attribute.
+     *
+     * @param string $key Attribute key
+     * @param mixed $default Default value if not found
+     * @return mixed
+     */
+    public function getAttribute(string $key, mixed $default = null): mixed
+    {
+        return $this->attributes[$key] ?? $default;
+    }
+
+    /**
+     * Get all request attributes.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAttributes(): array
+    {
+        return $this->attributes;
     }
 }

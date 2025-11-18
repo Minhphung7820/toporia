@@ -43,6 +43,7 @@ return [
                 $container->get('config')->get('security.replay.nonce_ttl', 300),
                 $container->get('config')->get('security.replay.cleanup_probability', 100)
             ),
+            // ValidateFormRequest is now handled automatically by Router (no middleware needed)
             // LogRequest::class,        // Uncomment to log web requests
         ],
 
@@ -53,6 +54,7 @@ return [
                 $container->get('config')->get('security.cors', [])
             ),
             ValidateJsonRequest::class,  // Validate JSON for API
+            // ValidateFormRequest is now handled automatically by Router (no middleware needed)
             // ThrottleRequests middleware should be added per-route with specific limits
             // Example: ->middleware([ThrottleRequests::with($limiter, 60, 1)])
             // LogRequest::class,         // Uncomment to log API requests

@@ -115,6 +115,12 @@ final class Container implements ContainerInterface
             // Fire resolving callbacks
             $this->fireResolvingCallbacks($id, $instance);
 
+            // Auto-validate FormRequest instances after resolution (Laravel behavior)
+            // This ensures validation happens once per instance, even if resolved multiple times
+            if ($instance instanceof \Toporia\Framework\Http\FormRequest) {
+                $instance->validate();
+            }
+
             // Cache if singleton
             if (isset($this->bindings[$id]['shared']) && $this->bindings[$id]['shared']) {
                 $this->instances[$id] = $instance;
@@ -491,12 +497,11 @@ final class Container implements ContainerInterface
 
             if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
                 $className = $type->getName();
-                $instance = $this->get($className);
 
-                // Auto-validate FormRequest instances
-                if ($instance instanceof \Toporia\Framework\Http\FormRequest) {
-                    $instance->validate();
-                }
+                // Resolve dependency using container
+                // FormRequest validation happens automatically in get() method
+                // This matches Laravel's behavior - validation in dependency resolution
+                $instance = $this->get($className);
 
                 $dependencies[] = $instance;
                 continue;
