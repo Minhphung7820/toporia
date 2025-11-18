@@ -1,0 +1,278 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Toporia\Framework\Auth\OAuth2\Repositories;
+
+use Toporia\Framework\Auth\OAuth2\Contracts\TokenRepositoryInterface;
+use Toporia\Framework\Auth\OAuth2\Models\{OAuth2AccessToken, OAuth2RefreshToken};
+use Toporia\Framework\Hashing\HashManager;
+
+/**
+ * OAuth2 Token Repository
+ *
+ * Manages OAuth2 access and refresh tokens.
+ *
+ * Performance:
+ * - O(1) token lookup (indexed by token hash)
+ * - O(1) token creation (single insert)
+ * - O(N) revocation where N = number of tokens
+ *
+ * Clean Architecture:
+ * - Infrastructure Layer: Database implementation of TokenRepositoryInterface
+ * - Dependency Inversion: Implements domain contract
+ *
+ * SOLID Principles:
+ * - S: Only manages OAuth2 tokens
+ * - I: Implements focused TokenRepositoryInterface
+ * - D: Depends on TokenRepositoryInterface abstraction
+ */
+final class TokenRepository implements TokenRepositoryInterface
+{
+    /**
+     * Default access token expiration (1 hour).
+     */
+    private const DEFAULT_ACCESS_TOKEN_EXPIRES_IN = 3600;
+
+    /**
+     * Default refresh token expiration (30 days).
+     */
+    private const DEFAULT_REFRESH_TOKEN_EXPIRES_IN = 2592000;
+
+    /**
+     * {@inheritdoc}
+     */
+    public function createAccessToken(string $clientId, ?string $userId, array $scopes, int $expiresIn): string
+    {
+        $expiresIn = $expiresIn > 0 ? $expiresIn : self::DEFAULT_ACCESS_TOKEN_EXPIRES_IN;
+        $expiresAt = time() + $expiresIn;
+
+        // Generate JWT token (simplified - in production use proper JWT library)
+        $token = $this->generateJwtToken($clientId, $userId, $scopes, $expiresAt);
+
+        // Store token in database for revocation tracking
+        OAuth2AccessToken::create([
+            'token' => $this->hashToken($token),
+            'client_id' => $clientId,
+            'user_id' => $userId,
+            'scopes' => $scopes,
+            'expires_at' => date('Y-m-d H:i:s', $expiresAt),
+        ]);
+
+        return $token;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function createRefreshToken(string $clientId, string $userId, array $scopes, int $expiresIn): string
+    {
+        $expiresIn = $expiresIn > 0 ? $expiresIn : self::DEFAULT_REFRESH_TOKEN_EXPIRES_IN;
+        $expiresAt = time() + $expiresIn;
+
+        // Generate random token
+        $token = bin2hex(random_bytes(32)); // 64 character hex string
+
+        // Store token in database
+        OAuth2RefreshToken::create([
+            'token' => $this->hashToken($token),
+            'client_id' => $clientId,
+            'user_id' => $userId,
+            'scopes' => $scopes,
+            'expires_at' => date('Y-m-d H:i:s', $expiresAt),
+        ]);
+
+        return $token;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function validateAccessToken(string $token): ?array
+    {
+        // Decode JWT token
+        $payload = $this->decodeJwtToken($token);
+        if ($payload === null) {
+            return null;
+        }
+
+        // Check if token is revoked in database
+        $hashedToken = $this->hashToken($token);
+        $tokenModel = OAuth2AccessToken::where('token', $hashedToken)->first();
+
+        if ($tokenModel === null || $tokenModel->isRevoked() || $tokenModel->isExpired()) {
+            return null;
+        }
+
+        return [
+            'client_id' => $payload['client_id'],
+            'user_id' => $payload['user_id'] ?? null,
+            'scopes' => $payload['scopes'] ?? [],
+            'expires_at' => $payload['exp'] ?? 0,
+        ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function validateRefreshToken(string $token): ?array
+    {
+        $hashedToken = $this->hashToken($token);
+        $tokenModel = OAuth2RefreshToken::where('token', $hashedToken)->first();
+
+        if ($tokenModel === null || $tokenModel->isRevoked() || $tokenModel->isExpired()) {
+            return null;
+        }
+
+        return [
+            'client_id' => $tokenModel->getAttribute('client_id'),
+            'user_id' => $tokenModel->getAttribute('user_id'),
+            'scopes' => $tokenModel->getAttribute('scopes') ?? [],
+            'expires_at' => is_string($tokenModel->getAttribute('expires_at'))
+                ? strtotime($tokenModel->getAttribute('expires_at'))
+                : $tokenModel->getAttribute('expires_at')->getTimestamp(),
+        ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function revokeAccessToken(string $token): bool
+    {
+        $hashedToken = $this->hashToken($token);
+        $tokenModel = OAuth2AccessToken::where('token', $hashedToken)->first();
+
+        if ($tokenModel === null) {
+            return false;
+        }
+
+        $tokenModel->update(['revoked_at' => date('Y-m-d H:i:s')]);
+        return true;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function revokeRefreshToken(string $token): bool
+    {
+        $hashedToken = $this->hashToken($token);
+        $tokenModel = OAuth2RefreshToken::where('token', $hashedToken)->first();
+
+        if ($tokenModel === null) {
+            return false;
+        }
+
+        $tokenModel->update(['revoked_at' => date('Y-m-d H:i:s')]);
+        return true;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function revokeUserTokens(string $userId): int
+    {
+        $revoked = OAuth2AccessToken::where('user_id', $userId)
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => date('Y-m-d H:i:s')]);
+
+        OAuth2RefreshToken::where('user_id', $userId)
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => date('Y-m-d H:i:s')]);
+
+        return $revoked;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function revokeClientTokens(string $clientId): int
+    {
+        $revoked = OAuth2AccessToken::where('client_id', $clientId)
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => date('Y-m-d H:i:s')]);
+
+        OAuth2RefreshToken::where('client_id', $clientId)
+            ->whereNull('revoked_at')
+            ->update(['revoked_at' => date('Y-m-d H:i:s')]);
+
+        return $revoked;
+    }
+
+    /**
+     * Generate a JWT token (simplified implementation).
+     *
+     * In production, use a proper JWT library like firebase/php-jwt.
+     *
+     * @param string $clientId Client ID
+     * @param string|null $userId User ID
+     * @param array<string> $scopes Token scopes
+     * @param int $expiresAt Expiration timestamp
+     * @return string JWT token
+     */
+    private function generateJwtToken(string $clientId, ?string $userId, array $scopes, int $expiresAt): string
+    {
+        $secret = $_ENV['APP_KEY'] ?? 'default-secret-key';
+        $header = base64_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
+        $payload = base64_encode(json_encode([
+            'client_id' => $clientId,
+            'user_id' => $userId,
+            'scopes' => $scopes,
+            'exp' => $expiresAt,
+            'iat' => time(),
+        ]));
+
+        $signature = hash_hmac('sha256', "{$header}.{$payload}", $secret, true);
+        $signatureEncoded = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
+
+        return "{$header}.{$payload}.{$signatureEncoded}";
+    }
+
+    /**
+     * Decode and validate a JWT token.
+     *
+     * @param string $token JWT token
+     * @return array<string, mixed>|null Decoded payload or null if invalid
+     */
+    private function decodeJwtToken(string $token): ?array
+    {
+        $parts = explode('.', $token);
+        if (count($parts) !== 3) {
+            return null;
+        }
+
+        [$headerEncoded, $payloadEncoded, $signatureEncoded] = $parts;
+
+        // Verify signature
+        $secret = $_ENV['APP_KEY'] ?? 'default-secret-key';
+        $signature = base64_decode(str_replace(['-', '_'], ['+', '/'], $signatureEncoded));
+        $expectedSignature = hash_hmac('sha256', "{$headerEncoded}.{$payloadEncoded}", $secret, true);
+
+        if (!hash_equals($expectedSignature, $signature)) {
+            return null;
+        }
+
+        // Decode payload
+        $payload = json_decode(base64_decode($payloadEncoded), true);
+        if ($payload === null) {
+            return null;
+        }
+
+        // Check expiration
+        if (isset($payload['exp']) && $payload['exp'] < time()) {
+            return null;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Hash a token for storage.
+     *
+     * @param string $token Plain text token
+     * @return string Hashed token
+     */
+    private function hashToken(string $token): string
+    {
+        return hash('sha256', $token);
+    }
+}

@@ -211,6 +211,25 @@ class Blueprint
     }
 
     /**
+     * Add JSON column.
+     *
+     * @param string $name Column name.
+     * @return ColumnDefinition
+     */
+    public function json(string $name): ColumnDefinition
+    {
+        $column = [
+            'name' => $name,
+            'type' => 'json',
+            'nullable' => false
+        ];
+
+        $this->columns[] = $column;
+
+        return new ColumnDefinition($this->columns[array_key_last($this->columns)]);
+    }
+
+    /**
      * Add created_at and updated_at timestamp columns.
      *
      * @return self

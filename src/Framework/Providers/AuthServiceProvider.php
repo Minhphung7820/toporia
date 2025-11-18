@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Auth\AuthManager;
-use Toporia\Framework\Auth\Contracts\AuthManagerInterface;
-use Toporia\Framework\Auth\Contracts\UserProviderInterface;
-use Toporia\Framework\Auth\Guards\{SessionGuard, TokenGuard};
+use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, TokenRepositoryInterface, UserProviderInterface};
+use Toporia\Framework\Auth\Guards\{SanctumGuard, SessionGuard, TokenGuard};
+use Toporia\Framework\Auth\Repositories\TokenRepository;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Http\Request;
@@ -29,6 +29,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function register(ContainerInterface $container): void
     {
+        $this->registerTokenRepository($container);
         $this->registerAuthManager($container);
         $this->registerAuthAlias($container);
     }
@@ -45,6 +46,7 @@ class AuthServiceProvider extends ServiceProvider
             $guardFactories = [
                 'web' => fn() => $this->createSessionGuard($c, 'web'),
                 'api' => fn() => $this->createTokenGuard($c, 'api'),
+                'sanctum' => fn() => $this->createSanctumGuard($c),
                 // Add more guards here as needed:
                 // 'admin' => fn() => $this->createSessionGuard($c, 'admin'),
             ];
@@ -119,5 +121,45 @@ class AuthServiceProvider extends ServiceProvider
         $request = $container->get(Request::class);
 
         return new TokenGuard($userProvider, $request, $name);
+    }
+
+    /**
+     * Register Token Repository for Sanctum guard.
+     *
+     * @param ContainerInterface $container
+     * @return void
+     */
+    protected function registerTokenRepository(ContainerInterface $container): void
+    {
+        $container->singleton(TokenRepositoryInterface::class, function (ContainerInterface $c) {
+            $connection = $c->has('db') ? $c->get('db') : null;
+            $cache = $c->has('cache') ? $c->get('cache') : null;
+
+            if ($connection === null) {
+                throw new \RuntimeException('Database connection required for TokenRepository. Please register DatabaseServiceProvider.');
+            }
+
+            return new TokenRepository($connection, $cache);
+        });
+
+        $container->bind('auth.tokens', fn($c) => $c->get(TokenRepositoryInterface::class));
+    }
+
+    /**
+     * Create a Sanctum guard instance for API token authentication.
+     *
+     * Sanctum guard uses database-stored tokens (personal access tokens).
+     * Provides token management, scopes, and revocation capabilities.
+     *
+     * @param ContainerInterface $container
+     * @return SanctumGuard
+     */
+    protected function createSanctumGuard(ContainerInterface $container): SanctumGuard
+    {
+        $userProvider = $container->get(UserProviderInterface::class);
+        $request = $container->get(Request::class);
+        $tokens = $container->get(TokenRepositoryInterface::class);
+
+        return new SanctumGuard($request, $userProvider, $tokens);
     }
 }

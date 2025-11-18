@@ -62,6 +62,7 @@ final class ConsoleServiceProvider extends ServiceProvider
       // Config commands
       \Toporia\Framework\Console\Commands\ConfigCacheCommand::class,
       \Toporia\Framework\Console\Commands\ConfigClearCommand::class,
+      \Toporia\Framework\Console\Commands\KeyGenerateCommand::class,
 
       // Cache commands
       \Toporia\Framework\Console\Commands\CacheClearCommand::class,

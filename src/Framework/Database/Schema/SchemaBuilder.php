@@ -192,6 +192,12 @@ class SchemaBuilder
                 'sqlite' => 'TEXT',
                 default => 'DATETIME'
             },
+            'json' => match ($driver) {
+                'mysql' => 'JSON', // MySQL 5.7+
+                'pgsql' => 'JSONB', // PostgreSQL JSONB (better performance)
+                'sqlite' => 'TEXT', // SQLite doesn't have JSON type, use TEXT
+                default => 'TEXT'
+            },
             default => strtoupper($type)
         };
     }

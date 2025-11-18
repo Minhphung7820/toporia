@@ -405,6 +405,34 @@ final class Validator implements ValidatorInterface
             'confirmed' => "The {$fieldName} confirmation does not match.",
             'unique' => "The {$fieldName} has already been taken.",
             'exists' => "The selected {$fieldName} is invalid.",
+            'date' => "The {$fieldName} must be a valid date.",
+            'after' => "The {$fieldName} must be a date after {$parameters[0]}.",
+            'before' => "The {$fieldName} must be a date before {$parameters[0]}.",
+            'between' => "The {$fieldName} must be between {$parameters[0]} and {$parameters[1]}.",
+            'date_valid' => "The {$fieldName} must be a valid date.",
+            'time' => "The {$fieldName} must be a valid time.",
+            'date_time' => "The {$fieldName} must be a valid date and time.",
+            'json' => "The {$fieldName} must be a valid JSON string.",
+            'uuid' => "The {$fieldName} must be a valid UUID.",
+            'mac_address' => "The {$fieldName} must be a valid MAC address.",
+            'credit_card' => "The {$fieldName} must be a valid credit card number.",
+            'base64' => "The {$fieldName} must be a valid base64 string.",
+            'file' => "The {$fieldName} must be a valid file.",
+            'image' => "The {$fieldName} must be an image.",
+            'mime_type' => "The {$fieldName} must be a file of type: " . implode(', ', $parameters) . ".",
+            'extension' => "The {$fieldName} must have one of the following extensions: " . implode(', ', $parameters) . ".",
+            'size' => "The {$fieldName} must be {$parameters[0]}.",
+            'phone' => "The {$fieldName} must be a valid phone number.",
+            'postal_code' => "The {$fieldName} must be a valid postal code.",
+            'color' => "The {$fieldName} must be a valid color.",
+            'present' => "The {$fieldName} field must be present.",
+            'filled' => "The {$fieldName} field must have a value.",
+            'nullable' => "The {$fieldName} field may be null.",
+            'sometimes' => "The {$fieldName} field is optional.",
+            'required_if' => "The {$fieldName} field is required when {$parameters[0]} is {$parameters[1]}.",
+            'required_unless' => "The {$fieldName} field is required unless {$parameters[0]} is {$parameters[1]}.",
+            'required_with' => "The {$fieldName} field is required when {$parameters[0]} is present.",
+            'required_without' => "The {$fieldName} field is required when {$parameters[0]} is not present.",
             default => "The {$fieldName} is invalid."
         };
     }
@@ -809,5 +837,535 @@ final class Validator implements ValidatorInterface
         }
 
         throw new \RuntimeException('Database connection must be PDO or QueryBuilder instance');
+    }
+
+    // =========================================================================
+    // Additional Validation Rules (Laravel-compatible)
+    // =========================================================================
+
+    /**
+     * Validate date format.
+     */
+    private function validateDate(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        $format = $parameters[0] ?? 'Y-m-d';
+        $date = \DateTime::createFromFormat($format, $value);
+        return $date !== false && $date->format($format) === $value;
+    }
+
+    /**
+     * Validate date is after another date.
+     */
+    private function validateAfter(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        $afterDate = $parameters[0] ?? null;
+        if ($afterDate === null) {
+            return false;
+        }
+
+        // Try to get from data array if it's a field name
+        if (isset($data[$afterDate])) {
+            $afterDate = $data[$afterDate];
+        }
+
+        $valueTime = strtotime($value);
+        $afterTime = strtotime($afterDate);
+
+        return $valueTime !== false && $afterTime !== false && $valueTime > $afterTime;
+    }
+
+    /**
+     * Validate date is before another date.
+     */
+    private function validateBefore(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        $beforeDate = $parameters[0] ?? null;
+        if ($beforeDate === null) {
+            return false;
+        }
+
+        if (isset($data[$beforeDate])) {
+            $beforeDate = $data[$beforeDate];
+        }
+
+        $valueTime = strtotime($value);
+        $beforeTime = strtotime($beforeDate);
+
+        return $valueTime !== false && $beforeTime !== false && $valueTime < $beforeTime;
+    }
+
+    /**
+     * Validate value is between min and max.
+     */
+    private function validateBetween(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        if (count($parameters) < 2) {
+            return false;
+        }
+
+        $min = (int) $parameters[0];
+        $max = (int) $parameters[1];
+
+        if (is_numeric($value)) {
+            return $value >= $min && $value <= $max;
+        }
+
+        if (is_string($value)) {
+            $length = mb_strlen($value);
+            return $length >= $min && $length <= $max;
+        }
+
+        if (is_array($value)) {
+            $count = count($value);
+            return $count >= $min && $count <= $max;
+        }
+
+        return false;
+    }
+
+    /**
+     * Validate value is a valid date.
+     */
+    private function validateDateValid(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        return strtotime($value) !== false;
+    }
+
+    /**
+     * Validate value is a valid time.
+     */
+    private function validateTime(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        return preg_match('/^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/', $value) === 1;
+    }
+
+    /**
+     * Validate value is a valid date-time.
+     */
+    private function validateDateTime(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        return strtotime($value) !== false;
+    }
+
+    /**
+     * Validate value is a valid JSON string.
+     */
+    private function validateJson(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        if (!is_string($value)) {
+            return false;
+        }
+
+        json_decode($value);
+        return json_last_error() === JSON_ERROR_NONE;
+    }
+
+    /**
+     * Validate value is a valid UUID.
+     */
+    private function validateUuid(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        $pattern = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
+        return preg_match($pattern, $value) === 1;
+    }
+
+    /**
+     * Validate value is a valid MAC address.
+     */
+    private function validateMacAddress(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_MAC) !== false;
+    }
+
+    /**
+     * Validate value is a valid credit card number (Luhn algorithm).
+     */
+    private function validateCreditCard(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        $value = preg_replace('/\D/', '', $value);
+        if (strlen($value) < 13 || strlen($value) > 19) {
+            return false;
+        }
+
+        // Luhn algorithm
+        $sum = 0;
+        $alternate = false;
+        for ($i = strlen($value) - 1; $i >= 0; $i--) {
+            $n = (int) $value[$i];
+            if ($alternate) {
+                $n *= 2;
+                if ($n > 9) {
+                    $n = ($n % 10) + 1;
+                }
+            }
+            $sum += $n;
+            $alternate = !$alternate;
+        }
+
+        return $sum % 10 === 0;
+    }
+
+    /**
+     * Validate value is a valid base64 string.
+     */
+    private function validateBase64(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        if (!is_string($value)) {
+            return false;
+        }
+
+        $decoded = base64_decode($value, true);
+        return $decoded !== false && base64_encode($decoded) === $value;
+    }
+
+    /**
+     * Validate value is a valid file (for file uploads).
+     */
+    private function validateFile(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value)) {
+            return true;
+        }
+
+        return is_uploaded_file($value) || (is_object($value) && method_exists($value, 'isValid') && $value->isValid());
+    }
+
+    /**
+     * Validate value is a valid image file.
+     */
+    private function validateImage(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value)) {
+            return true;
+        }
+
+        if (is_string($value) && file_exists($value)) {
+            $imageInfo = @getimagesize($value);
+            return $imageInfo !== false;
+        }
+
+        if (is_object($value) && method_exists($value, 'getMimeType')) {
+            $mimeType = $value->getMimeType();
+            return str_starts_with($mimeType, 'image/');
+        }
+
+        return false;
+    }
+
+    /**
+     * Validate value matches a specific MIME type.
+     */
+    private function validateMimeType(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value)) {
+            return true;
+        }
+
+        if (empty($parameters)) {
+            return false;
+        }
+
+        $mimeType = null;
+        if (is_string($value) && file_exists($value)) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeType = finfo_file($finfo, $value);
+            finfo_close($finfo);
+        } elseif (is_object($value) && method_exists($value, 'getMimeType')) {
+            $mimeType = $value->getMimeType();
+        }
+
+        if ($mimeType === null) {
+            return false;
+        }
+
+        return in_array($mimeType, $parameters, true);
+    }
+
+    /**
+     * Validate value is a valid file extension.
+     */
+    private function validateExtension(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value)) {
+            return true;
+        }
+
+        if (empty($parameters)) {
+            return false;
+        }
+
+        $extension = null;
+        if (is_string($value)) {
+            $extension = strtolower(pathinfo($value, PATHINFO_EXTENSION));
+        } elseif (is_object($value) && method_exists($value, 'getClientOriginalExtension')) {
+            $extension = strtolower($value->getClientOriginalExtension());
+        }
+
+        if ($extension === null) {
+            return false;
+        }
+
+        return in_array($extension, array_map('strtolower', $parameters), true);
+    }
+
+    /**
+     * Validate value size (for files, strings, arrays, numbers).
+     */
+    private function validateSize(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        if (empty($parameters)) {
+            return false;
+        }
+
+        $size = (int) $parameters[0];
+
+        if (is_numeric($value)) {
+            return $value == $size;
+        }
+
+        if (is_string($value)) {
+            return mb_strlen($value) == $size;
+        }
+
+        if (is_array($value)) {
+            return count($value) == $size;
+        }
+
+        if (is_object($value) && method_exists($value, 'getSize')) {
+            return $value->getSize() == $size;
+        }
+
+        return false;
+    }
+
+    /**
+     * Validate value is a valid phone number (basic validation).
+     */
+    private function validatePhone(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        // Basic phone validation - allows digits, spaces, dashes, parentheses, plus
+        return preg_match('/^[\d\s\-\+\(\)]+$/', $value) === 1 && strlen(preg_replace('/\D/', '', $value)) >= 10;
+    }
+
+    /**
+     * Validate value is a valid postal code (basic validation).
+     */
+    private function validatePostalCode(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        // Basic postal code validation - alphanumeric, 4-10 characters
+        return preg_match('/^[A-Z0-9\s\-]{4,10}$/i', $value) === 1;
+    }
+
+    /**
+     * Validate value is a valid color (hex or rgb).
+     */
+    private function validateColor(mixed $value, array $parameters, array $data): bool
+    {
+        if (is_null($value) || $value === '') {
+            return true;
+        }
+
+        // Hex color
+        if (preg_match('/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/', $value) === 1) {
+            return true;
+        }
+
+        // RGB color
+        if (preg_match('/^rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$/', $value) === 1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Validate value is present (not null, not empty).
+     */
+    private function validatePresent(mixed $value, array $parameters, array $data): bool
+    {
+        return array_key_exists('', $data) || isset($data['']);
+    }
+
+    /**
+     * Validate value is filled (not empty if present).
+     */
+    private function validateFilled(mixed $value, array $parameters, array $data): bool
+    {
+        if (!isset($data[''])) {
+            return true; // Field not present, so it's "filled"
+        }
+
+        if (is_null($value)) {
+            return false;
+        }
+
+        if (is_string($value) && trim($value) === '') {
+            return false;
+        }
+
+        if (is_array($value) && count($value) === 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate value is nullable (always passes if null).
+     */
+    private function validateNullable(mixed $value, array $parameters, array $data): bool
+    {
+        // This rule is typically used with other rules to allow null
+        // If value is null, validation passes
+        return true;
+    }
+
+    /**
+     * Validate value is sometimes (only validate if present).
+     */
+    private function validateSometimes(mixed $value, array $parameters, array $data): bool
+    {
+        // This is a modifier rule - doesn't validate, just marks field as optional
+        return true;
+    }
+
+    /**
+     * Validate value is required if another field has a value.
+     */
+    private function validateRequiredIf(mixed $value, array $parameters, array $data): bool
+    {
+        if (count($parameters) < 2) {
+            return false;
+        }
+
+        $otherField = $parameters[0];
+        $otherValue = $parameters[1];
+
+        $otherFieldValue = $this->getValue($data, $otherField);
+
+        if ($otherFieldValue == $otherValue) {
+            return $this->validateRequired($value, [], $data);
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate value is required unless another field has a value.
+     */
+    private function validateRequiredUnless(mixed $value, array $parameters, array $data): bool
+    {
+        if (count($parameters) < 2) {
+            return false;
+        }
+
+        $otherField = $parameters[0];
+        $otherValue = $parameters[1];
+
+        $otherFieldValue = $this->getValue($data, $otherField);
+
+        if ($otherFieldValue != $otherValue) {
+            return $this->validateRequired($value, [], $data);
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate value is required with another field.
+     */
+    private function validateRequiredWith(mixed $value, array $parameters, array $data): bool
+    {
+        if (empty($parameters)) {
+            return false;
+        }
+
+        $otherField = $parameters[0];
+        $otherValue = $this->getValue($data, $otherField);
+
+        if ($otherValue !== null) {
+            return $this->validateRequired($value, [], $data);
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate value is required without another field.
+     */
+    private function validateRequiredWithout(mixed $value, array $parameters, array $data): bool
+    {
+        if (empty($parameters)) {
+            return false;
+        }
+
+        $otherField = $parameters[0];
+        $otherValue = $this->getValue($data, $otherField);
+
+        if ($otherValue === null) {
+            return $this->validateRequired($value, [], $data);
+        }
+
+        return true;
     }
 }

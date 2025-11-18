@@ -85,4 +85,23 @@ return [
             'name' => env('SESSION_NAME', 'PHPSESSID'),
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Security
+    |--------------------------------------------------------------------------
+    |
+    | Configure session security features:
+    | - IP binding: Bind session to IP address (prevents session hijacking)
+    | - Device fingerprinting: Bind session to device (User-Agent, etc.)
+    | - Session rotation: Regenerate session ID periodically
+    | - Maximum lifetime: Force session expiration after specified time
+    |
+    */
+    'security' => [
+        'enable_ip_binding' => env('SESSION_SECURITY_IP_BINDING', true),
+        'enable_fingerprinting' => env('SESSION_SECURITY_FINGERPRINTING', true),
+        'rotation_interval' => env('SESSION_SECURITY_ROTATION_INTERVAL', 300), // 5 minutes
+        'max_lifetime' => env('SESSION_SECURITY_MAX_LIFETIME', 0), // 0 = no limit
+    ],
 ];
