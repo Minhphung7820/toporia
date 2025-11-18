@@ -44,45 +44,6 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
  * - I: Interface Segregation - focused interface
  * - D: Dependency Inversion - depends on ValidatorInterface
  *
- * Usage:
- * ```php
- * final class CreateProductRequest extends FormRequest
- * {
- *     public function authorize(): bool
- *     {
- *         return $this->user() !== null;
- *     }
- *
- *     public function rules(): array
- *     {
- *         return [
- *             'title' => 'required|string|max:255',
- *             'price' => 'required|numeric|min:0',
- *             'email' => 'required|email|unique:users,email',
- *         ];
- *     }
- *
- *     public function messages(): array
- *     {
- *         return [
- *             'title.required' => 'Product title is required',
- *         ];
- *     }
- *
- *     protected function prepareForValidation(): void
- *     {
- *         $this->merge(['slug' => Str::slug($this->title)]);
- *     }
- * }
- *
- * // In controller:
- * public function store(CreateProductRequest $request)
- * {
- *     $validated = $request->validated(); // Only validated data
- *     // Validation already passed!
- * }
- * ```
- *
  * @package Toporia\Framework\Http
  */
 abstract class FormRequest
