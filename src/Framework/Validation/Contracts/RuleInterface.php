@@ -2,25 +2,27 @@
 
 declare(strict_types=1);
 
-namespace {{ namespace }};
-
-use Toporia\Framework\Validation\Contracts\RuleInterface;
+namespace Toporia\Framework\Validation\Contracts;
 
 /**
- * {{ class }} Rule
+ * Rule Interface
  *
- * Standard validation rule - only runs when field has a value.
+ * Base contract for all validation rules.
+ *
+ * SOLID Principles:
+ * - Single Responsibility: Each rule validates one specific condition
+ * - Open/Closed: Open for extension via new rule classes
+ * - Interface Segregation: Focused interface for rule validation
+ * - Dependency Inversion: Validator depends on RuleInterface abstraction
  *
  * Performance:
- * - Stateless by default (can be cached/reused)
- * - Fast validation with O(1) complexity where possible
+ * - Rules are stateless by default (can be cached/reused)
  * - No side effects in passes() method
+ * - Fast validation with O(1) complexity where possible
  *
- * Clean Architecture:
- * - Framework-agnostic (depends only on RuleInterface)
- * - Single Responsibility: Validates one specific condition
+ * @package Toporia\Framework\Validation\Contracts
  */
-final class {{ class }} implements RuleInterface
+interface RuleInterface
 {
     /**
      * Determine if the validation rule passes.
@@ -32,11 +34,7 @@ final class {{ class }} implements RuleInterface
      * @param mixed $value The value being validated
      * @return bool True if validation passes, false otherwise
      */
-    public function passes(string $attribute, mixed $value): bool
-    {
-        // TODO: Implement validation logic
-        return true;
-    }
+    public function passes(string $attribute, mixed $value): bool;
 
     /**
      * Get the validation error message.
@@ -48,8 +46,6 @@ final class {{ class }} implements RuleInterface
      *
      * @return string The error message (supports :attribute placeholder)
      */
-    public function message(): string
-    {
-        return 'The :attribute is invalid.';
-    }
+    public function message(): string;
 }
+

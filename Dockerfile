@@ -22,6 +22,10 @@ RUN apk add --no-cache \
     # Compression
     zlib-dev \
     libzip-dev \
+    # GD image processing (required by phpoffice/phpspreadsheet)
+    freetype-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
     # Git for Composer
     git \
     unzip \
@@ -37,7 +41,8 @@ RUN docker-php-ext-install \
     pdo_pgsql \
     zip \
     pcntl \
-    sockets
+    sockets \
+    gd
 
 # Install PECL extensions (Redis + RdKafka)
 RUN pecl install redis-6.0.2 && \

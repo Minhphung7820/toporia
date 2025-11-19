@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Toporia\Framework\Validation;
 
 use Toporia\Framework\Validation\Contracts\ValidatorInterface;
+use Toporia\Framework\Validation\Contracts\RuleInterface;
+use Toporia\Framework\Validation\Contracts\ImplicitRuleInterface;
+use Toporia\Framework\Validation\Contracts\DataAwareRuleInterface;
 
 /**
  * Validator
@@ -74,12 +77,73 @@ final class Validator implements ValidatorInterface
         $this->validatedData = [];
         $this->passes = true;
 
+        // Create ValidationData for data-aware rules
+        $validationData = ValidationData::fromArray($data);
+
         foreach ($rules as $field => $fieldRules) {
             $value = $this->getValue($data, $field);
             $ruleList = is_string($fieldRules) ? explode('|', $fieldRules) : $fieldRules;
 
+            // Check if this is an array field with wildcard/index notation
+            if (ArrayValidator::isArrayField($field) && is_array($value)) {
+                // Handle array validation with nested rules
+                $arrayErrors = ArrayValidator::validateArrayField(
+                    $field,
+                    $value,
+                    $ruleList,
+                    $data,
+                    $messages,
+                    $this
+                );
+                $this->errors = array_merge($this->errors, $arrayErrors);
+                continue;
+            }
+
+            // Separate implicit rules (run even when empty) from regular rules
+            $implicitRules = [];
+            $regularRules = [];
+            $stringRules = [];
+
             foreach ($ruleList as $rule) {
+                $resolvedRule = $this->resolveRule($rule);
+
+                // Handle Rule objects
+                if ($resolvedRule instanceof RuleInterface) {
+                    // Set data for data-aware rules
+                    if ($resolvedRule instanceof DataAwareRuleInterface) {
+                        $resolvedRule->setData($validationData);
+                    }
+
+                    if ($resolvedRule instanceof ImplicitRuleInterface) {
+                        $implicitRules[] = $resolvedRule;
+                    } else {
+                        $regularRules[] = $resolvedRule;
+                    }
+                } else {
+                    // String rule (built-in or callable) - handle via old method
+                    $stringRules[] = $resolvedRule;
+                }
+            }
+
+            // Run implicit rules first (fail-fast optimization)
+            foreach ($implicitRules as $rule) {
+                $this->validateRuleObject($field, $value, $rule, $validationData, $messages);
+            }
+
+            // Run string rules (backward compatibility)
+            foreach ($stringRules as $rule) {
                 $this->validateRule($field, $value, $rule, $data, $messages);
+            }
+
+            // Skip regular rules if value is empty (unless implicit rule failed)
+            if (($value === null || $value === '') && !isset($this->errors[$field])) {
+                // Still need to check if any string rules require the field
+                continue;
+            }
+
+            // Run regular rules
+            foreach ($regularRules as $rule) {
+                $this->validateRuleObject($field, $value, $rule, $validationData, $messages);
             }
 
             // Store validated data (only if field passed validation)
@@ -265,7 +329,66 @@ final class Validator implements ValidatorInterface
     }
 
     /**
-     * Validate a single rule.
+     * Resolve rule from string or object.
+     *
+     * @param string|RuleInterface $rule Rule string or Rule object
+     * @return RuleInterface|string Rule object or string for built-in rules
+     */
+    private function resolveRule(string|RuleInterface $rule): RuleInterface|string
+    {
+        // Already a Rule object
+        if ($rule instanceof RuleInterface) {
+            return $rule;
+        }
+
+        // Check if it's a custom rule (callable)
+        [$ruleName] = $this->parseRule($rule);
+        if (isset(self::$customRules[$ruleName])) {
+            // Return string for backward compatibility with callable rules
+            return $rule;
+        }
+
+        // Try to resolve via RuleManager
+        try {
+            return RuleManager::resolve($rule);
+        } catch (\Throwable $e) {
+            // Fall back to built-in rule (string)
+            return $rule;
+        }
+    }
+
+    /**
+     * Validate using Rule object.
+     *
+     * @param string $field Field name
+     * @param mixed $value Field value
+     * @param RuleInterface $rule Rule object
+     * @param ValidationData $data All validation data
+     * @param array $messages Custom messages
+     * @return void
+     */
+    private function validateRuleObject(
+        string $field,
+        mixed $value,
+        RuleInterface $rule,
+        ValidationData $data,
+        array $messages
+    ): void {
+        $attribute = ValidationAttribute::fromName($field);
+        $passes = $rule->passes($attribute->getName(), $value);
+
+        if (!$passes) {
+            $ruleClass = get_class($rule);
+            $message = $messages["{$field}.{$ruleClass}"]
+                ?? $messages[$field]
+                ?? $this->replaceAttributePlaceholder($rule->message(), $attribute->getDisplayName());
+
+            $this->errors[$field][] = $message;
+        }
+    }
+
+    /**
+     * Validate a single rule (backward compatibility with string rules).
      *
      * @param string $field Field name
      * @param mixed $value Field value
@@ -303,6 +426,18 @@ final class Validator implements ValidatorInterface
         if (!$passes) {
             $this->addError($field, $ruleName, $parameters, $messages);
         }
+    }
+
+    /**
+     * Replace :attribute placeholder in message.
+     *
+     * @param string $message Error message
+     * @param string $attribute Attribute display name
+     * @return string
+     */
+    private function replaceAttributePlaceholder(string $message, string $attribute): string
+    {
+        return str_replace(':attribute', $attribute, $message);
     }
 
     /**
@@ -392,6 +527,8 @@ final class Validator implements ValidatorInterface
             'integer' => "The {$fieldName} must be an integer.",
             'string' => "The {$fieldName} must be a string.",
             'array' => "The {$fieldName} must be an array.",
+            'distinct' => "The {$fieldName} must have unique values.",
+            'array_distinct' => "The {$fieldName} must have unique values.",
             'boolean' => "The {$fieldName} must be true or false.",
             'url' => "The {$fieldName} must be a valid URL.",
             'ip' => "The {$fieldName} must be a valid IP address.",
@@ -570,7 +707,27 @@ final class Validator implements ValidatorInterface
             return true;
         }
 
-        return is_array($value);
+        if (!is_array($value)) {
+            return false;
+        }
+
+        // If parameters provided, validate array structure
+        // array:min,max - validate array size
+        if (!empty($parameters)) {
+            $min = isset($parameters[0]) ? (int) $parameters[0] : null;
+            $max = isset($parameters[1]) ? (int) $parameters[1] : null;
+            $count = count($value);
+
+            if ($min !== null && $count < $min) {
+                return false;
+            }
+
+            if ($max !== null && $count > $max) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -723,16 +880,19 @@ final class Validator implements ValidatorInterface
      *
      * Usage:
      * - unique:table,column
-     * - unique:table,column,ignoreValue,ignoreColumn
+     * - unique:table,column,ignoreValue,ignoreColumn (single ignore)
+     * - unique:table,column,ignoreColumn1:ignoreValue1,ignoreColumn2:ignoreValue2 (multiple ignores)
      *
      * Examples:
      * - 'email' => 'unique:users,email'
-     * - 'email' => 'unique:users,email,' . $userId . ',id'
+     * - 'email' => 'unique:users,email,1,id' (ignore id=1)
+     * - 'email' => 'unique:users,email,id:1,status:deleted' (ignore id=1 AND status=deleted)
+     * - 'email' => 'unique:users,email,id:1,name:John' (ignore id=1 AND name=John)
      *
      * Performance: O(1) - Single indexed query with prepared statement
      *
      * @param mixed $value Value to validate
-     * @param array $parameters [table, column, ignoreValue, ignoreColumn]
+     * @param array $parameters [table, column, ...ignoreConditions]
      * @param array $data All form data
      * @return bool
      * @throws \RuntimeException If database not available
@@ -744,24 +904,31 @@ final class Validator implements ValidatorInterface
             return true;
         }
 
+        // Handle array values (for array validation)
+        if (is_array($value)) {
+            return $this->validateUniqueArray($value, $parameters, $data);
+        }
+
         // Lazy load database connection (auto-resolve from container)
         $db = self::getConnection();
 
         $table = $parameters[0] ?? null;
         $column = $parameters[1] ?? null;
-        $ignoreValue = $parameters[2] ?? null;
-        $ignoreColumn = $parameters[3] ?? 'id';
 
         if (!$table || !$column) {
             throw new \InvalidArgumentException('unique rule requires table and column parameters');
         }
+
+        // Parse ignore conditions
+        $ignoreConditions = $this->parseIgnoreConditions(array_slice($parameters, 2), $data);
 
         // Build query based on database type
         if (method_exists($db, 'table')) {
             // QueryBuilder
             $query = $db->table($table)->where($column, $value);
 
-            if ($ignoreValue !== null) {
+            // Apply ignore conditions
+            foreach ($ignoreConditions as $ignoreColumn => $ignoreValue) {
                 $query->where($ignoreColumn, '!=', $ignoreValue);
             }
 
@@ -773,7 +940,7 @@ final class Validator implements ValidatorInterface
             $sql = "SELECT COUNT(*) FROM {$table} WHERE {$column} = ?";
             $params = [$value];
 
-            if ($ignoreValue !== null) {
+            foreach ($ignoreConditions as $ignoreColumn => $ignoreValue) {
                 $sql .= " AND {$ignoreColumn} != ?";
                 $params[] = $ignoreValue;
             }
@@ -788,18 +955,114 @@ final class Validator implements ValidatorInterface
     }
 
     /**
+     * Parse ignore conditions from parameters.
+     *
+     * Supports formats:
+     * - [value, column] -> single ignore (backward compatible)
+     * - ['column:value', 'column2:value2'] -> multiple ignores
+     * - ['column', 'value'] -> single ignore (backward compatible)
+     *
+     * @param array $parameters Ignore condition parameters
+     * @param array $data All form data
+     * @return array<string, mixed> ['column' => 'value', ...]
+     */
+    private function parseIgnoreConditions(array $parameters, array $data): array
+    {
+        if (empty($parameters)) {
+            return [];
+        }
+
+        $conditions = [];
+
+        // Check if first parameter contains ':' (new format: column:value)
+        if (count($parameters) === 1 && str_contains($parameters[0], ':')) {
+            // Multiple ignores in format: "column1:value1,column2:value2"
+            $pairs = explode(',', $parameters[0]);
+            foreach ($pairs as $pair) {
+                if (str_contains($pair, ':')) {
+                    [$ignoreColumn, $ignoreValue] = explode(':', $pair, 2);
+                    $conditions[trim($ignoreColumn)] = $this->resolveIgnoreValue(trim($ignoreValue), $data);
+                }
+            }
+        } elseif (count($parameters) >= 2) {
+            // Backward compatible: [value, column] or [column, value]
+            // Try to detect format
+            if (is_numeric($parameters[0]) || !is_numeric($parameters[1])) {
+                // Format: [value, column]
+                $conditions[$parameters[1] ?? 'id'] = $this->resolveIgnoreValue($parameters[0], $data);
+            } else {
+                // Format: [column, value] or multiple [column:value, column2:value2]
+                foreach ($parameters as $param) {
+                    if (str_contains($param, ':')) {
+                        [$ignoreColumn, $ignoreValue] = explode(':', $param, 2);
+                        $conditions[trim($ignoreColumn)] = $this->resolveIgnoreValue(trim($ignoreValue), $data);
+                    }
+                }
+            }
+        }
+
+        return $conditions;
+    }
+
+    /**
+     * Resolve ignore value (supports field references from data).
+     *
+     * @param mixed $value Ignore value (can be field name or actual value)
+     * @param array $data All form data
+     * @return mixed
+     */
+    private function resolveIgnoreValue(mixed $value, array $data): mixed
+    {
+        // If value is a string and exists in data, use it (field reference)
+        if (is_string($value) && isset($data[$value])) {
+            return $data[$value];
+        }
+
+        return $value;
+    }
+
+    /**
+     * Validate array of unique values.
+     *
+     * @param array<mixed> $values Array of values
+     * @param array $parameters Rule parameters
+     * @param array $data All form data
+     * @return bool
+     */
+    private function validateUniqueArray(array $values, array $parameters, array $data): bool
+    {
+        // First check if all values are unique in the array itself
+        $uniqueValues = array_unique($values);
+        if (count($uniqueValues) !== count($values)) {
+            return false;
+        }
+
+        // Then check each value against database
+        foreach ($values as $value) {
+            if (!$this->validateUnique($value, $parameters, $data)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Validate value exists in database.
      *
      * Usage:
      * - exists:table,column
+     * - exists:table,column,column1:value1,column2:value2 (with additional conditions)
      *
-     * Example:
+     * Examples:
      * - 'category_id' => 'exists:categories,id'
+     * - 'category_id' => 'exists:categories,id,status:active' (must exist AND status=active)
+     * - 'user_id' => 'exists:users,id,status:active,deleted_at:null' (must exist AND status=active AND deleted_at IS NULL)
      *
      * Performance: O(1) - Single indexed query with prepared statement
      *
      * @param mixed $value Value to validate
-     * @param array $parameters [table, column]
+     * @param array $parameters [table, column, ...conditions]
      * @param array $data All form data
      * @return bool
      * @throws \RuntimeException If database not available
@@ -809,6 +1072,11 @@ final class Validator implements ValidatorInterface
     {
         if (is_null($value) || $value === '') {
             return true;
+        }
+
+        // Handle array values (for array validation)
+        if (is_array($value)) {
+            return $this->validateExistsArray($value, $parameters, $data);
         }
 
         // Lazy load database connection (auto-resolve from container)
@@ -821,22 +1089,105 @@ final class Validator implements ValidatorInterface
             throw new \InvalidArgumentException('exists rule requires table parameter');
         }
 
+        // Parse additional conditions
+        $conditions = $this->parseExistsConditions(array_slice($parameters, 2), $data);
+
         // Build query based on database type
         if (method_exists($db, 'table')) {
             // QueryBuilder
-            return $db->table($table)->where($column, $value)->exists();
+            $query = $db->table($table)->where($column, $value);
+
+            // Apply additional conditions
+            foreach ($conditions as $conditionColumn => $conditionValue) {
+                if ($conditionValue === null || $conditionValue === 'null') {
+                    $query->whereNull($conditionColumn);
+                } else {
+                    $query->where($conditionColumn, $conditionValue);
+                }
+            }
+
+            return $query->exists();
         }
 
         if ($db instanceof \PDO) {
             // PDO
             $sql = "SELECT COUNT(*) FROM {$table} WHERE {$column} = ?";
+            $params = [$value];
+
+            foreach ($conditions as $conditionColumn => $conditionValue) {
+                if ($conditionValue === null || $conditionValue === 'null') {
+                    $sql .= " AND {$conditionColumn} IS NULL";
+                } else {
+                    $sql .= " AND {$conditionColumn} = ?";
+                    $params[] = $conditionValue;
+                }
+            }
+
             $stmt = $db->prepare($sql);
-            $stmt->execute([$value]);
+            $stmt->execute($params);
 
             return (int) $stmt->fetchColumn() > 0;
         }
 
         throw new \RuntimeException('Database connection must be PDO or QueryBuilder instance');
+    }
+
+    /**
+     * Parse additional conditions for exists rule.
+     *
+     * Supports format: ['column:value', 'column2:value2']
+     *
+     * @param array $parameters Condition parameters
+     * @param array $data All form data
+     * @return array<string, mixed> ['column' => 'value', ...]
+     */
+    private function parseExistsConditions(array $parameters, array $data): array
+    {
+        if (empty($parameters)) {
+            return [];
+        }
+
+        $conditions = [];
+
+        foreach ($parameters as $param) {
+            if (str_contains($param, ':')) {
+                [$column, $value] = explode(':', $param, 2);
+                $column = trim($column);
+                $value = trim($value);
+
+                // Resolve value (can be field reference or actual value)
+                $actualValue = $this->resolveIgnoreValue($value, $data);
+
+                // Handle null values
+                if ($actualValue === 'null' || $actualValue === null) {
+                    $conditions[$column] = null;
+                } else {
+                    $conditions[$column] = $actualValue;
+                }
+            }
+        }
+
+        return $conditions;
+    }
+
+    /**
+     * Validate array of exists values.
+     *
+     * @param array<mixed> $values Array of values
+     * @param array $parameters Rule parameters
+     * @param array $data All form data
+     * @return bool
+     */
+    private function validateExistsArray(array $values, array $parameters, array $data): bool
+    {
+        // Check each value against database
+        foreach ($values as $value) {
+            if (!$this->validateExists($value, $parameters, $data)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     // =========================================================================
@@ -1367,5 +1718,39 @@ final class Validator implements ValidatorInterface
         }
 
         return true;
+    }
+
+    /**
+     * Validate array has distinct values.
+     *
+     * Performance: O(n) where n = array size
+     *
+     * @param mixed $value Value to validate
+     * @param array $parameters Rule parameters
+     * @param array $data All data
+     * @return bool
+     */
+    private function validateDistinct(mixed $value, array $parameters, array $data): bool
+    {
+        if (!is_array($value)) {
+            return false;
+        }
+
+        // Check for duplicates
+        $unique = array_unique($value, SORT_REGULAR);
+        return count($unique) === count($value);
+    }
+
+    /**
+     * Validate array distinct (alias for distinct).
+     *
+     * @param mixed $value Value to validate
+     * @param array $parameters Rule parameters
+     * @param array $data All data
+     * @return bool
+     */
+    private function validateArrayDistinct(mixed $value, array $parameters, array $data): bool
+    {
+        return $this->validateDistinct($value, $parameters, $data);
     }
 }

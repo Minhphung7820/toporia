@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace {{ namespace }};
+namespace App\Application\Rules;
 
 use Toporia\Framework\Validation\Contracts\RuleInterface;
 
 /**
- * {{ class }} Rule
+ * TestRule Rule
  *
  * Standard validation rule - only runs when field has a value.
  *
@@ -20,7 +20,7 @@ use Toporia\Framework\Validation\Contracts\RuleInterface;
  * - Framework-agnostic (depends only on RuleInterface)
  * - Single Responsibility: Validates one specific condition
  */
-final class {{ class }} implements RuleInterface
+final class TestRule implements RuleInterface
 {
     /**
      * Determine if the validation rule passes.

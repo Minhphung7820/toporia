@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\ORM;
 
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\RelationInterface;
 
 /**
  * Model Query Builder - Extends QueryBuilder with Model-aware functionality.
@@ -28,11 +29,56 @@ class ModelQueryBuilder extends QueryBuilder
      * @param ConnectionInterface $connection Database connection
      * @param class-string<TModel> $modelClass Model class to hydrate results into
      */
+    /**
+     * Whether to skip applying global scopes.
+     * Used by SoftDeletes::withTrashed() to bypass scopes.
+     *
+     * @var bool
+     */
+    private bool $skipGlobalScopes = false;
+
     public function __construct(
         ConnectionInterface $connection,
-        private readonly string $modelClass
+        private readonly string $modelClass,
+        bool $skipGlobalScopes = false
     ) {
         parent::__construct($connection);
+
+        $this->skipGlobalScopes = $skipGlobalScopes;
+
+        // Apply global scopes if not skipped
+        if (!$this->skipGlobalScopes) {
+            $this->applyGlobalScopes();
+        }
+    }
+
+    /**
+     * Apply global scopes to the query.
+     *
+     * Checks if model uses HasQueryScopes trait and applies all global scopes.
+     * Also applies SoftDeletes scopes if model uses SoftDeletes trait.
+     *
+     * @return void
+     */
+    private function applyGlobalScopes(): void
+    {
+        // Apply scopes from HasQueryScopes trait
+        if (method_exists($this->modelClass, 'getGlobalScopes')) {
+            $globalScopes = call_user_func([$this->modelClass, 'getGlobalScopes']);
+
+            foreach ($globalScopes as $scope) {
+                $scope($this);
+            }
+        }
+
+        // Apply scopes from SoftDeletes trait (works independently)
+        if (method_exists($this->modelClass, 'getSoftDeleteGlobalScopes')) {
+            $softDeleteScopes = call_user_func([$this->modelClass, 'getSoftDeleteGlobalScopes']);
+
+            foreach ($softDeleteScopes as $scope) {
+                $scope($this);
+            }
+        }
     }
 
     /**
@@ -165,7 +211,7 @@ class ModelQueryBuilder extends QueryBuilder
 
         $relationInstance = $model->$relation();
 
-        if (!$relationInstance instanceof Relations\RelationInterface) {
+        if (!$relationInstance instanceof RelationInterface) {
             throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
         }
 
@@ -409,7 +455,7 @@ class ModelQueryBuilder extends QueryBuilder
         $model = new $this->modelClass([]);
         $relationInstance = $model->$relation();
 
-        if (!$relationInstance instanceof Relations\RelationInterface) {
+        if (!$relationInstance instanceof RelationInterface) {
             throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
         }
 
@@ -483,7 +529,7 @@ class ModelQueryBuilder extends QueryBuilder
         $model = new $this->modelClass([]);
         $relationInstance = $model->$relation();
 
-        if (!$relationInstance instanceof Relations\RelationInterface) {
+        if (!$relationInstance instanceof RelationInterface) {
             throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
         }
 

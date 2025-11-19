@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Presentation\Http\Controllers;
 
+use App\Domain\Product;
+
 /**
  * SPA Application Controller
  *
