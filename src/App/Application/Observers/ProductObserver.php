@@ -45,7 +45,25 @@ final class ProductObserver
      */
     public function created(Product $product): void
     {
-        //
+        // Ghi log khi tạo sản phẩm
+        $logMessage = sprintf(
+            '[Product Created] ID: %s, Title: %s, Created At: %s',
+            $product->getKey(),
+            $product->title ?? 'N/A',
+            $product->created_at ?? date('Y-m-d H:i:s')
+        );
+
+        // Ghi log vào file hoặc system log
+        error_log($logMessage);
+
+        // Hoặc sử dụng logger nếu có
+        if (function_exists('logger')) {
+            logger()->info('Product created', [
+                'product_id' => $product->getKey(),
+                'product_title' => $product->title ?? null,
+                'created_at' => $product->created_at ?? null,
+            ]);
+        }
     }
 
     /**

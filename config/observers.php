@@ -21,9 +21,10 @@ declare(strict_types=1);
  */
 
 return [
-    // Product Model Observers (Infrastructure Layer)
-    \App\Infrastructure\Persistence\Models\ProductModel::class => [
-        \App\Observers\ProductObserver::class,
+    // Product Model Observers
+    // Cách 1: Đăng ký qua config (không cần khai báo $observers trong model)
+    \App\Domain\Product::class => [
+        \App\Application\Observers\ProductObserver::class,
     ],
 
     // Add more observers here

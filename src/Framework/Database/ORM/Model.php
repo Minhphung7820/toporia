@@ -875,6 +875,13 @@ abstract class Model implements ModelInterface, ObservableInterface
      */
     private function fireEvent(string $event): void
     {
+        // Boot observers if not already booted
+        static::bootObservers();
+
+        // Fire model-specific observers (HasObservers trait)
+        // This calls observer methods like created(), updating(), etc.
+        $this->fireModelEvent($event);
+
         $method = $event;
 
         // Call model hook method if exists
@@ -896,7 +903,7 @@ abstract class Model implements ModelInterface, ObservableInterface
             $eventData['is_dirty'] = !empty($eventData['dirty']);
         }
 
-        // Notify observers about the event
+        // Notify generic observers about the event (Observable trait)
         $this->notify($event, $eventData);
     }
 

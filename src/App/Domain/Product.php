@@ -4,10 +4,20 @@ declare(strict_types=1);
 
 namespace App\Domain;
 
+use App\Application\Observers\ProductObserver;
 use Toporia\Framework\Database\ORM\Model;
 
 final class Product extends Model
 {
+    /**
+     * The observers registered for this model.
+     *
+     * @var array<string>
+     */
+    protected static array $observers = [
+        ProductObserver::class,
+    ];
+
     /**
      * The table associated with the model.
      */
@@ -22,7 +32,11 @@ final class Product extends Model
      * The attributes that are mass assignable.
      */
     protected static array $fillable = [
-        //
+        'title',
+        'description',
+        'price',
+        'stock',
+        'is_active',
     ];
 
     /**
