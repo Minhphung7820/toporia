@@ -35,7 +35,6 @@ RUN apk add --no-cache \
 RUN docker-php-ext-install \
     pdo_mysql \
     pdo_pgsql \
-    opcache \
     zip \
     pcntl \
     sockets
@@ -44,18 +43,6 @@ RUN docker-php-ext-install \
 RUN pecl install redis-6.0.2 && \
     pecl install rdkafka-6.0.3 && \
     docker-php-ext-enable redis rdkafka
-
-# Configure OPcache (default: enabled with timestamp validation for development)
-# Can be overridden via environment variables in docker-compose.yml
-RUN { \
-    echo 'opcache.enable=1'; \
-    echo 'opcache.memory_consumption=256'; \
-    echo 'opcache.interned_strings_buffer=16'; \
-    echo 'opcache.max_accelerated_files=10000'; \
-    echo 'opcache.validate_timestamps=1'; \
-    echo 'opcache.revalidate_freq=0'; \
-    echo 'opcache.fast_shutdown=1'; \
-    } > /usr/local/etc/php/conf.d/opcache.ini
 
 # Configure PHP settings
 RUN { \
@@ -75,15 +62,19 @@ WORKDIR /var/www/html
 # Copy composer files first (for layer caching)
 COPY composer.json composer.lock* ./
 
-# Install Composer dependencies (including enqueue/rdkafka)
+# Install Composer dependencies
+# Use --ignore-platform-reqs to skip platform requirement checks in Docker
+# (extensions are installed via docker-php-ext-install/pecl)
 RUN composer install \
     --no-dev \
     --no-scripts \
     --no-autoloader \
-    --prefer-dist
+    --prefer-dist \
+    --ignore-platform-reqs
 
-# Install enqueue/rdkafka specifically
-RUN composer require enqueue/rdkafka --no-interaction
+# Install enqueue/rdkafka specifically (if needed)
+# Note: rdkafka extension is already installed via pecl above
+RUN composer require enqueue/rdkafka --no-interaction --ignore-platform-reqs || true
 
 # Copy entrypoint script early (before copying all files)
 COPY docker/php/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -93,7 +84,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY . .
 
 # Generate optimized autoloader
-RUN composer dump-autoload --optimize --classmap-authoritative
+RUN composer dump-autoload --optimize --classmap-authoritative --ignore-platform-reqs
 
 # Create storage directories with proper permissions
 RUN mkdir -p /var/www/html/storage/logs \
@@ -111,6 +102,6 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
     CMD php -v || exit 1
 
-# Start PHP-FPM with entrypoint (entrypoint configures OPcache dynamically)
+# Start PHP-FPM with entrypoint
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["php-fpm"]
