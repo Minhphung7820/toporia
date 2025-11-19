@@ -30,6 +30,71 @@ if (!function_exists('app')) {
     }
 }
 
+if (!function_exists('base_path')) {
+    /**
+     * Get the path to the base of the application.
+     *
+     * @param string $path Path to append to base path
+     * @return string
+     */
+    function base_path(string $path = ''): string
+    {
+        return app()->path($path);
+    }
+}
+
+if (!function_exists('storage_path')) {
+    /**
+     * Get the path to the storage folder.
+     *
+     * @param string $path Path to append to storage path
+     * @return string
+     */
+    function storage_path(string $path = ''): string
+    {
+        return base_path('storage' . ($path !== '' ? DIRECTORY_SEPARATOR . ltrim($path, '/\\') : ''));
+    }
+}
+
+if (!function_exists('resource_path')) {
+    /**
+     * Get the path to the resources folder.
+     *
+     * @param string $path Path to append to resources path
+     * @return string
+     */
+    function resource_path(string $path = ''): string
+    {
+        return base_path('resources' . ($path !== '' ? DIRECTORY_SEPARATOR . ltrim($path, '/\\') : ''));
+    }
+}
+
+if (!function_exists('public_path')) {
+    /**
+     * Get the path to the public folder.
+     *
+     * @param string $path Path to append to public path
+     * @return string
+     */
+    function public_path(string $path = ''): string
+    {
+        return base_path('public' . ($path !== '' ? DIRECTORY_SEPARATOR . ltrim($path, '/\\') : ''));
+    }
+}
+
+if (!function_exists('config_path')) {
+    /**
+     * Get the path to the config folder.
+     *
+     * @param string $path Path to append to config path
+     * @return string
+     */
+    function config_path(string $path = ''): string
+    {
+        return base_path('config' . ($path !== '' ? DIRECTORY_SEPARATOR . ltrim($path, '/\\') : ''));
+    }
+}
+
 if (!function_exists('event')) {
     /**
      * Dispatch an event.
