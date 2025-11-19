@@ -36,4 +36,3 @@ final class Trans extends ServiceAccessor
         return 'translation';
     }
 }
-
