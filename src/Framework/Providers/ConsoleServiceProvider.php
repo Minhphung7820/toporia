@@ -53,6 +53,7 @@ final class ConsoleServiceProvider extends ServiceProvider
       \Toporia\Framework\Console\Commands\MigrateCommand::class,
       \Toporia\Framework\Console\Commands\MigrateRollbackCommand::class,
       \Toporia\Framework\Console\Commands\MigrateStatusCommand::class,
+      \Toporia\Framework\Console\Commands\MigrateAlterCommand::class,
 
       // Route commands
       \Toporia\Framework\Console\Commands\RouteCacheCommand::class,

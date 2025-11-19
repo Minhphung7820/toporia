@@ -38,6 +38,38 @@ class SchemaBuilder
     }
 
     /**
+     * Alter an existing table.
+     *
+     * @param string $table Table name.
+     * @param callable $callback Callback receives Blueprint.
+     * @return void
+     */
+    public function table(string $table, callable $callback): void
+    {
+        $blueprint = new Blueprint($table, true);
+        $callback($blueprint);
+
+        // Handle table rename separately
+        if ($renameTo = $blueprint->getRenameTo()) {
+            $this->rename($table, $renameTo);
+        }
+
+        $sql = $this->compileAlter($blueprint);
+
+        if (empty($sql)) {
+            return;
+        }
+
+        // Execute multiple statements separately (for PostgreSQL/SQLite compatibility)
+        $statements = array_filter(array_map('trim', explode(';', $sql)));
+        foreach ($statements as $statement) {
+            if (!empty($statement)) {
+                $this->connection->execute($statement);
+            }
+        }
+    }
+
+    /**
      * Drop a table if exists.
      *
      * @param string $table Table name.
@@ -45,8 +77,70 @@ class SchemaBuilder
      */
     public function dropIfExists(string $table): void
     {
-        $sql = "DROP TABLE IF EXISTS {$table}";
+        $driver = $this->connection->getDriverName();
+        $tableName = $this->quoteIdentifier($table, $driver);
+        $sql = "DROP TABLE IF EXISTS {$tableName}";
         $this->connection->execute($sql);
+    }
+
+    /**
+     * Drop a table.
+     *
+     * @param string $table Table name.
+     * @return void
+     */
+    public function drop(string $table): void
+    {
+        $driver = $this->connection->getDriverName();
+        $tableName = $this->quoteIdentifier($table, $driver);
+        $sql = "DROP TABLE {$tableName}";
+        $this->connection->execute($sql);
+    }
+
+    /**
+     * Rename a table.
+     *
+     * @param string $from Old table name.
+     * @param string $to New table name.
+     * @return void
+     */
+    public function rename(string $from, string $to): void
+    {
+        $driver = $this->connection->getDriverName();
+        $fromName = $this->quoteIdentifier($from, $driver);
+        $toName = $this->quoteIdentifier($to, $driver);
+
+        $sql = match ($driver) {
+            'mysql' => "RENAME TABLE {$fromName} TO {$toName}",
+            'pgsql', 'sqlite' => "ALTER TABLE {$fromName} RENAME TO {$toName}",
+            default => throw new \RuntimeException("Unsupported driver: {$driver}")
+        };
+
+        $this->connection->execute($sql);
+    }
+
+    /**
+     * Check if column exists in table.
+     *
+     * @param string $table Table name.
+     * @param string $column Column name.
+     * @return bool
+     */
+    public function hasColumn(string $table, string $column): bool
+    {
+        $driver = $this->connection->getDriverName();
+        $tableName = $this->quoteIdentifier($table, $driver);
+        $columnName = $this->quoteIdentifier($column, $driver);
+
+        $sql = match ($driver) {
+            'mysql' => "SHOW COLUMNS FROM {$tableName} LIKE {$columnName}",
+            'pgsql' => "SELECT column_name FROM information_schema.columns WHERE table_name = '{$table}' AND column_name = '{$column}'",
+            'sqlite' => "PRAGMA table_info({$tableName})",
+            default => throw new \RuntimeException("Unsupported driver: {$driver}")
+        };
+
+        $result = $this->connection->selectOne($sql);
+        return $result !== null;
     }
 
     /**
@@ -80,35 +174,279 @@ class SchemaBuilder
     private function compileCreate(Blueprint $blueprint): string
     {
         $driver = $this->connection->getDriverName();
+        $tableName = $this->quoteIdentifier($blueprint->getTable(), $driver);
 
         $columns = array_map(
-            fn($column) => $this->compileColumn($column, $driver),
+            fn($column) => $this->compileColumn($column, $driver, false),
             $blueprint->getColumns()
         );
 
         // Add primary key
         if ($pk = $blueprint->getPrimaryKey()) {
-            $columns[] = "PRIMARY KEY (" . $this->quoteIdentifier($pk, $driver) . ")";
+            if (is_array($pk)) {
+                $cols = implode(', ', array_map(fn($col) => $this->quoteIdentifier($col, $driver), $pk));
+                $columns[] = "PRIMARY KEY ({$cols})";
+            } else {
+                $columns[] = "PRIMARY KEY (" . $this->quoteIdentifier($pk, $driver) . ")";
+            }
         }
 
         // Add indexes
         foreach ($blueprint->getIndexes() as $index) {
-            if ($index['type'] === 'unique') {
-                $cols = implode(', ', array_map(fn($col) => $this->quoteIdentifier($col, $driver), $index['columns']));
-                $columns[] = "UNIQUE ({$cols})";
-            } elseif ($index['type'] === 'foreign') {
-                $columns[] = sprintf(
-                    'FOREIGN KEY (%s) REFERENCES %s(%s)',
-                    $this->quoteIdentifier($index['column'], $driver),
-                    $this->quoteIdentifier($index['on'], $driver),
-                    $this->quoteIdentifier($index['references'], $driver)
-                );
+            $cols = implode(', ', array_map(fn($col) => $this->quoteIdentifier($col, $driver), $index['columns']));
+            $indexName = $index['name'] ? $this->quoteIdentifier($index['name'], $driver) : null;
+
+            match ($index['type']) {
+                'unique' => $columns[] = $indexName ? "CONSTRAINT {$indexName} UNIQUE ({$cols})" : "UNIQUE ({$cols})",
+                'index' => $columns[] = $indexName ? "INDEX {$indexName} ({$cols})" : "INDEX ({$cols})",
+                'fulltext' => $columns[] = $indexName ? "FULLTEXT INDEX {$indexName} ({$cols})" : "FULLTEXT INDEX ({$cols})",
+                'spatial' => $columns[] = $indexName ? "SPATIAL INDEX {$indexName} ({$cols})" : "SPATIAL INDEX ({$cols})",
+                default => null,
+            };
+        }
+
+        // Add foreign keys
+        foreach ($blueprint->getForeignKeys() as $fk) {
+            $localCols = implode(', ', array_map(fn($col) => $this->quoteIdentifier($col, $driver), $fk['columns']));
+            $refCols = implode(', ', array_map(fn($col) => $this->quoteIdentifier($col, $driver), $fk['references']));
+            $refTable = $this->quoteIdentifier($fk['on'], $driver);
+            $fkName = $fk['name'] ? $this->quoteIdentifier($fk['name'], $driver) : null;
+
+            $fkSql = $fkName ? "CONSTRAINT {$fkName} FOREIGN KEY ({$localCols}) REFERENCES {$refTable}({$refCols})"
+                : "FOREIGN KEY ({$localCols}) REFERENCES {$refTable}({$refCols})";
+
+            if (isset($fk['onDelete'])) {
+                $fkSql .= " ON DELETE {$fk['onDelete']}";
             }
+            if (isset($fk['onUpdate'])) {
+                $fkSql .= " ON UPDATE {$fk['onUpdate']}";
+            }
+
+            $columns[] = $fkSql;
         }
 
         $columnsSql = implode(', ', $columns);
 
-        return "CREATE TABLE IF NOT EXISTS " . $this->quoteIdentifier($blueprint->getTable(), $driver) . " ({$columnsSql})";
+        $sql = "CREATE TABLE IF NOT EXISTS {$tableName} ({$columnsSql})";
+
+        // Add table options
+        if ($engine = $blueprint->getEngine()) {
+            $sql .= " ENGINE={$engine}";
+        }
+        if ($charset = $blueprint->getCharset()) {
+            $sql .= " DEFAULT CHARSET={$charset}";
+        }
+        if ($collation = $blueprint->getCollation()) {
+            $sql .= " COLLATE={$collation}";
+        }
+        if ($comment = $blueprint->getTableComment()) {
+            $commentEscaped = addslashes($comment);
+            $sql .= " COMMENT='{$commentEscaped}'";
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Compile ALTER TABLE statement.
+     *
+     * @param Blueprint $blueprint Table blueprint.
+     * @return string SQL statement.
+     */
+    private function compileAlter(Blueprint $blueprint): string
+    {
+        $driver = $this->connection->getDriverName();
+        $tableName = $this->quoteIdentifier($blueprint->getTable(), $driver);
+        $alterStatements = [];
+        $separateStatements = [];
+
+        // Drop columns
+        foreach ($blueprint->getDrops() as $drop) {
+            if (is_string($drop)) {
+                $alterStatements[] = "DROP COLUMN " . $this->quoteIdentifier($drop, $driver);
+            } elseif (is_array($drop) && $drop['type'] === 'primary') {
+                $alterStatements[] = "DROP PRIMARY KEY";
+            }
+        }
+
+        // Drop indexes (some drivers need separate DROP INDEX)
+        foreach ($blueprint->getDropIndexes() as $dropIndex) {
+            $indexName = $dropIndex['name'];
+            $columns = $dropIndex['columns'];
+
+            if ($indexName) {
+                $indexNameQuoted = $this->quoteIdentifier($indexName, $driver);
+                match ($driver) {
+                    'mysql' => $alterStatements[] = "DROP INDEX {$indexNameQuoted}",
+                    'pgsql', 'sqlite' => $separateStatements[] = "DROP INDEX {$indexNameQuoted}",
+                    default => $alterStatements[] = "DROP INDEX {$indexNameQuoted}",
+                };
+            } elseif ($columns) {
+                $indexName = $this->generateIndexName($blueprint->getTable(), $columns, $dropIndex['type']);
+                $indexNameQuoted = $this->quoteIdentifier($indexName, $driver);
+                match ($driver) {
+                    'mysql' => $alterStatements[] = "DROP INDEX {$indexNameQuoted}",
+                    'pgsql', 'sqlite' => $separateStatements[] = "DROP INDEX {$indexNameQuoted}",
+                    default => $alterStatements[] = "DROP INDEX {$indexNameQuoted}",
+                };
+            }
+        }
+
+        // Drop foreign keys
+        foreach ($blueprint->getDropForeignKeys() as $dropFk) {
+            if (is_string($dropFk)) {
+                $fkName = $this->quoteIdentifier($dropFk, $driver);
+                match ($driver) {
+                    'mysql' => $alterStatements[] = "DROP FOREIGN KEY {$fkName}",
+                    'pgsql' => $alterStatements[] = "DROP CONSTRAINT {$fkName}",
+                    'sqlite' => null, // SQLite doesn't support dropping foreign keys easily
+                    default => $alterStatements[] = "DROP FOREIGN KEY {$fkName}",
+                };
+            }
+        }
+
+        // Add/modify columns
+        foreach ($blueprint->getColumns() as $column) {
+            if (isset($column['rename'])) {
+                // Rename column
+                $oldName = $this->quoteIdentifier($column['name'], $driver);
+                $newName = $this->quoteIdentifier($column['rename'], $driver);
+                $alterStatements[] = match ($driver) {
+                    'mysql' => "CHANGE COLUMN {$oldName} {$newName} " . $this->getColumnType($column, $driver),
+                    'pgsql' => "RENAME COLUMN {$oldName} TO {$newName}",
+                    'sqlite' => "RENAME COLUMN {$oldName} TO {$newName}",
+                    default => throw new \RuntimeException("Unsupported driver: {$driver}")
+                };
+            } elseif (isset($column['change']) || $this->isAlterColumn($column)) {
+                // Modify column
+                $alterStatements[] = match ($driver) {
+                    'mysql' => "MODIFY COLUMN " . $this->compileColumn($column, $driver, true),
+                    'pgsql' => "ALTER COLUMN " . $this->quoteIdentifier($column['name'], $driver) . " TYPE " . $this->getColumnType($column, $driver),
+                    'sqlite' => null, // SQLite has limited ALTER TABLE support
+                    default => "MODIFY COLUMN " . $this->compileColumn($column, $driver, true),
+                };
+            } else {
+                // Add column
+                $columnSql = match ($driver) {
+                    'mysql' => "ADD COLUMN " . $this->compileColumn($column, $driver, true),
+                    'pgsql' => "ADD COLUMN " . $this->compileColumn($column, $driver, true),
+                    'sqlite' => "ADD COLUMN " . $this->compileColumn($column, $driver, true),
+                    default => "ADD COLUMN " . $this->compileColumn($column, $driver, true),
+                };
+
+                if ($driver === 'mysql') {
+                    if (isset($column['after'])) {
+                        $columnSql .= " AFTER " . $this->quoteIdentifier($column['after'], $driver);
+                    } elseif (isset($column['first'])) {
+                        $columnSql .= " FIRST";
+                    }
+                }
+
+                $alterStatements[] = $columnSql;
+            }
+        }
+
+        // Add indexes (some need separate CREATE INDEX)
+        foreach ($blueprint->getIndexes() as $index) {
+            $cols = implode(', ', array_map(fn($col) => $this->quoteIdentifier($col, $driver), $index['columns']));
+            $indexName = $index['name'] ? $this->quoteIdentifier($index['name'], $driver) : $this->generateIndexName($blueprint->getTable(), $index['columns'], $index['type']);
+
+            match ($index['type']) {
+                'primary' => $alterStatements[] = "ADD PRIMARY KEY ({$cols})",
+                'unique' => match ($driver) {
+                    'mysql' => $alterStatements[] = "ADD UNIQUE KEY {$indexName} ({$cols})",
+                    'pgsql' => $alterStatements[] = "ADD CONSTRAINT {$indexName} UNIQUE ({$cols})",
+                    'sqlite' => $alterStatements[] = "ADD UNIQUE ({$cols})",
+                    default => $alterStatements[] = "ADD UNIQUE ({$cols})",
+                },
+                'index' => match ($driver) {
+                    'mysql' => $alterStatements[] = "ADD INDEX {$indexName} ({$cols})",
+                    'pgsql', 'sqlite' => $separateStatements[] = "CREATE INDEX {$indexName} ON {$tableName} ({$cols})",
+                    default => $alterStatements[] = "ADD INDEX ({$cols})",
+                },
+                'fulltext' => match ($driver) {
+                    'mysql' => $alterStatements[] = "ADD FULLTEXT INDEX {$indexName} ({$cols})",
+                    default => null, // Not supported
+                },
+                'spatial' => match ($driver) {
+                    'mysql', 'pgsql' => $alterStatements[] = "ADD SPATIAL INDEX {$indexName} ({$cols})",
+                    default => null, // Not supported
+                },
+                default => null,
+            };
+        }
+
+        // Add foreign keys
+        foreach ($blueprint->getForeignKeys() as $fk) {
+            $localCols = implode(', ', array_map(fn($col) => $this->quoteIdentifier($col, $driver), $fk['columns']));
+            $refCols = implode(', ', array_map(fn($col) => $this->quoteIdentifier($col, $driver), $fk['references']));
+            $refTable = $this->quoteIdentifier($fk['on'], $driver);
+            $fkName = $fk['name'] ? $this->quoteIdentifier($fk['name'], $driver) : $this->generateIndexName($blueprint->getTable(), $fk['columns'], 'foreign');
+
+            $fkSql = match ($driver) {
+                'mysql' => $fkName ? "ADD CONSTRAINT {$fkName} FOREIGN KEY ({$localCols}) REFERENCES {$refTable}({$refCols})"
+                    : "ADD FOREIGN KEY ({$localCols}) REFERENCES {$refTable}({$refCols})",
+                'pgsql' => "ADD CONSTRAINT {$fkName} FOREIGN KEY ({$localCols}) REFERENCES {$refTable}({$refCols})",
+                'sqlite' => "ADD FOREIGN KEY ({$localCols}) REFERENCES {$refTable}({$refCols})",
+                default => "ADD FOREIGN KEY ({$localCols}) REFERENCES {$refTable}({$refCols})",
+            };
+
+            if (isset($fk['onDelete'])) {
+                $fkSql .= " ON DELETE {$fk['onDelete']}";
+            }
+            if (isset($fk['onUpdate'])) {
+                $fkSql .= " ON UPDATE {$fk['onUpdate']}";
+            }
+
+            $alterStatements[] = $fkSql;
+        }
+
+        // Combine all statements
+        $allStatements = [];
+
+        // ALTER TABLE statement
+        if (!empty($alterStatements)) {
+            $allStatements[] = "ALTER TABLE {$tableName} " . implode(', ', $alterStatements);
+        }
+
+        // Separate statements (CREATE INDEX, etc.)
+        $allStatements = array_merge($allStatements, $separateStatements);
+
+        return implode('; ', array_filter($allStatements));
+    }
+
+    /**
+     * Generate index name from table and columns.
+     *
+     * @param string $table Table name.
+     * @param array $columns Column names.
+     * @param string $type Index type.
+     * @return string Index name.
+     */
+    private function generateIndexName(string $table, array $columns, string $type): string
+    {
+        $prefix = match ($type) {
+            'unique' => 'unique',
+            'index' => 'index',
+            'fulltext' => 'fulltext',
+            'spatial' => 'spatial',
+            default => 'index',
+        };
+
+        $suffix = implode('_', $columns);
+        return "{$table}_{$prefix}_{$suffix}";
+    }
+
+    /**
+     * Check if column should be treated as ALTER (modify existing).
+     *
+     * @param array $column Column definition.
+     * @return bool
+     */
+    private function isAlterColumn(array $column): bool
+    {
+        // If column has 'change' flag or is being modified
+        return isset($column['change']) || isset($column['modify']);
     }
 
     /**
@@ -116,9 +454,10 @@ class SchemaBuilder
      *
      * @param array $column Column definition.
      * @param string $driver Database driver.
+     * @param bool $isAlter Whether this is for ALTER TABLE.
      * @return string Column SQL.
      */
-    private function compileColumn(array $column, string $driver): string
+    private function compileColumn(array $column, string $driver, bool $isAlter = false): string
     {
         $sql = $this->quoteIdentifier($column['name'], $driver) . ' ';
 
@@ -144,6 +483,42 @@ class SchemaBuilder
         if (array_key_exists('default', $column)) {
             $default = $this->quoteValue($column['default']);
             $sql .= " DEFAULT {$default}";
+        } elseif (isset($column['useCurrent']) && $column['useCurrent']) {
+            $sql .= match ($driver) {
+                'mysql' => ' DEFAULT CURRENT_TIMESTAMP',
+                'pgsql' => ' DEFAULT CURRENT_TIMESTAMP',
+                'sqlite' => ' DEFAULT CURRENT_TIMESTAMP',
+                default => ''
+            };
+        }
+
+        if (isset($column['useCurrentOnUpdate']) && $column['useCurrentOnUpdate']) {
+            $sql .= match ($driver) {
+                'mysql' => ' ON UPDATE CURRENT_TIMESTAMP',
+                default => ''
+            };
+        }
+
+        if (isset($column['comment'])) {
+            $commentEscaped = addslashes($column['comment']);
+            $sql .= match ($driver) {
+                'mysql' => " COMMENT '{$commentEscaped}'",
+                default => ''
+            };
+        }
+
+        if (isset($column['charset'])) {
+            $sql .= match ($driver) {
+                'mysql' => " CHARACTER SET {$column['charset']}",
+                default => ''
+            };
+        }
+
+        if (isset($column['collation'])) {
+            $sql .= match ($driver) {
+                'mysql' => " COLLATE {$column['collation']}",
+                default => ''
+            };
         }
 
         return $sql;
@@ -161,21 +536,75 @@ class SchemaBuilder
         $type = $column['type'];
 
         return match ($type) {
+            'bigInteger' => match ($driver) {
+                'mysql' => 'BIGINT',
+                'pgsql' => !empty($column['autoIncrement']) ? 'BIGSERIAL' : 'BIGINT',
+                'sqlite' => 'INTEGER',
+                default => 'BIGINT'
+            },
             'integer' => match ($driver) {
-                'mysql' => !empty($column['autoIncrement']) ? 'INT' : 'INT',
+                'mysql' => 'INT',
                 'pgsql' => !empty($column['autoIncrement']) ? 'SERIAL' : 'INTEGER',
                 'sqlite' => 'INTEGER',
                 default => 'INTEGER'
+            },
+            'mediumInteger' => match ($driver) {
+                'mysql' => 'MEDIUMINT',
+                'pgsql' => 'INTEGER',
+                'sqlite' => 'INTEGER',
+                default => 'INTEGER'
+            },
+            'smallInteger' => match ($driver) {
+                'mysql' => 'SMALLINT',
+                'pgsql' => 'SMALLINT',
+                'sqlite' => 'INTEGER',
+                default => 'SMALLINT'
+            },
+            'tinyInteger' => match ($driver) {
+                'mysql' => 'TINYINT',
+                'pgsql' => 'SMALLINT',
+                'sqlite' => 'INTEGER',
+                default => 'TINYINT'
             },
             'string' => match ($driver) {
                 'mysql', 'pgsql' => 'VARCHAR(' . ($column['length'] ?? 255) . ')',
                 'sqlite' => 'TEXT',
                 default => 'VARCHAR(255)'
             },
+            'char' => match ($driver) {
+                'mysql', 'pgsql' => 'CHAR(' . ($column['length'] ?? 255) . ')',
+                'sqlite' => 'TEXT',
+                default => 'CHAR(255)'
+            },
             'text' => 'TEXT',
+            'mediumText' => match ($driver) {
+                'mysql' => 'MEDIUMTEXT',
+                'pgsql', 'sqlite' => 'TEXT',
+                default => 'TEXT'
+            },
+            'longText' => match ($driver) {
+                'mysql' => 'LONGTEXT',
+                'pgsql', 'sqlite' => 'TEXT',
+                default => 'TEXT'
+            },
+            'tinyText' => match ($driver) {
+                'mysql' => 'TINYTEXT',
+                'pgsql', 'sqlite' => 'TEXT',
+                default => 'TEXT'
+            },
             'decimal' => sprintf(
                 'DECIMAL(%d, %d)',
                 $column['precision'] ?? 10,
+                $column['scale'] ?? 2
+            ),
+            'float' => sprintf(
+                'FLOAT(%d, %d)',
+                $column['precision'] ?? 8,
+                $column['scale'] ?? 2
+            ),
+            'double' => sprintf(
+                'DOUBLE(%d, %d)',
+                $column['precision'] ?? 8,
                 $column['scale'] ?? 2
             ),
             'boolean' => match ($driver) {
@@ -191,11 +620,105 @@ class SchemaBuilder
                 'sqlite' => 'TEXT',
                 default => 'DATETIME'
             },
+            'timestamp' => match ($driver) {
+                'mysql' => 'TIMESTAMP',
+                'pgsql' => 'TIMESTAMP',
+                'sqlite' => 'TEXT',
+                default => 'TIMESTAMP'
+            },
+            'time' => 'TIME',
+            'year' => match ($driver) {
+                'mysql' => 'YEAR',
+                'pgsql' => 'INTEGER',
+                'sqlite' => 'INTEGER',
+                default => 'INTEGER'
+            },
             'json' => match ($driver) {
-                'mysql' => 'JSON', // MySQL 5.7+
-                'pgsql' => 'JSONB', // PostgreSQL JSONB (better performance)
-                'sqlite' => 'TEXT', // SQLite doesn't have JSON type, use TEXT
+                'mysql' => 'JSON',
+                'pgsql' => 'JSONB',
+                'sqlite' => 'TEXT',
                 default => 'TEXT'
+            },
+            'jsonb' => match ($driver) {
+                'pgsql' => 'JSONB',
+                'mysql', 'sqlite' => 'JSON',
+                default => 'JSON'
+            },
+            'binary' => match ($driver) {
+                'mysql' => 'BINARY(' . ($column['length'] ?? 255) . ')',
+                'pgsql' => 'BYTEA',
+                'sqlite' => 'BLOB',
+                default => 'BINARY'
+            },
+            'blob' => match ($driver) {
+                'mysql' => 'BLOB',
+                'pgsql' => 'BYTEA',
+                'sqlite' => 'BLOB',
+                default => 'BLOB'
+            },
+            'longBlob' => match ($driver) {
+                'mysql' => 'LONGBLOB',
+                'pgsql' => 'BYTEA',
+                'sqlite' => 'BLOB',
+                default => 'BLOB'
+            },
+            'uuid' => match ($driver) {
+                'pgsql' => 'UUID',
+                'mysql' => 'CHAR(36)',
+                'sqlite' => 'TEXT',
+                default => 'CHAR(36)'
+            },
+            'enum' => match ($driver) {
+                'mysql' => 'ENUM(' . implode(', ', array_map(fn($v) => "'" . addslashes($v) . "'", $column['values'] ?? [])) . ')',
+                'pgsql' => 'VARCHAR', // PostgreSQL uses CHECK constraint instead
+                'sqlite' => 'TEXT',
+                default => 'VARCHAR'
+            },
+            'set' => match ($driver) {
+                'mysql' => 'SET(' . implode(', ', array_map(fn($v) => "'" . addslashes($v) . "'", $column['values'] ?? [])) . ')',
+                'pgsql' => 'VARCHAR',
+                'sqlite' => 'TEXT',
+                default => 'VARCHAR'
+            },
+            'geometry' => match ($driver) {
+                'mysql', 'pgsql' => 'GEOMETRY',
+                'sqlite' => 'BLOB',
+                default => 'GEOMETRY'
+            },
+            'point' => match ($driver) {
+                'mysql', 'pgsql' => 'POINT',
+                'sqlite' => 'BLOB',
+                default => 'POINT'
+            },
+            'lineString' => match ($driver) {
+                'mysql', 'pgsql' => 'LINESTRING',
+                'sqlite' => 'BLOB',
+                default => 'LINESTRING'
+            },
+            'polygon' => match ($driver) {
+                'mysql', 'pgsql' => 'POLYGON',
+                'sqlite' => 'BLOB',
+                default => 'POLYGON'
+            },
+            'multiPoint' => match ($driver) {
+                'mysql', 'pgsql' => 'MULTIPOINT',
+                'sqlite' => 'BLOB',
+                default => 'MULTIPOINT'
+            },
+            'multiLineString' => match ($driver) {
+                'mysql', 'pgsql' => 'MULTILINESTRING',
+                'sqlite' => 'BLOB',
+                default => 'MULTILINESTRING'
+            },
+            'multiPolygon' => match ($driver) {
+                'mysql', 'pgsql' => 'MULTIPOLYGON',
+                'sqlite' => 'BLOB',
+                default => 'MULTIPOLYGON'
+            },
+            'geometryCollection' => match ($driver) {
+                'mysql', 'pgsql' => 'GEOMETRYCOLLECTION',
+                'sqlite' => 'BLOB',
+                default => 'GEOMETRYCOLLECTION'
             },
             default => strtoupper($type)
         };
