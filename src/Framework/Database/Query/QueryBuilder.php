@@ -115,16 +115,6 @@ class QueryBuilder implements QueryBuilderInterface
     ) {}
 
     /**
-     * Get database connection (protected for child classes).
-     *
-     * @return ConnectionInterface
-     */
-    protected function getConnection(): ConnectionInterface
-    {
-        return $this->connection;
-    }
-
-    /**
      * Safely quote a value for use in SQL (security: prevents SQL injection).
      *
      * Uses PDO::quote() which properly escapes and quotes values.
