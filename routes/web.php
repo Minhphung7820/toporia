@@ -15,6 +15,6 @@ use App\Presentation\Http\Controllers\TestController;
 
 // SPA Fallback Route - Catches all routes for Vue Router
 // This allows Vue Router to handle client-side routing
-// Route::any('/{any}', [AppController::class, 'index'])->where('any', '.*');
+Route::any('/{any}', [AppController::class, 'index'])->where('any', '.*');
 // routes/web.php hoặc routes/api.php
-Route::get('/test/create-product', [TestController::class, 'createProduct']);
+// Route::get('/test/create-product', [TestController::class, 'createProduct']);
