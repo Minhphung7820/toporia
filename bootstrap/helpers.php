@@ -1039,3 +1039,126 @@ if (!function_exists('chain')) {
         return \Toporia\Framework\Bus\Bus::chain($jobs);
     }
 }
+
+// ============================================================================
+// Translation Helpers
+// ============================================================================
+
+if (!function_exists('__')) {
+    /**
+     * Translate the given message (Laravel-compatible).
+     *
+     * This is the primary translation helper function, compatible with Laravel's __().
+     *
+     * Usage:
+     * - __('messages.welcome') - Simple translation
+     * - __('messages.welcome', [':name' => 'John']) - With replacements
+     * - __('messages.welcome', [':name' => 'John'], 'vi') - With locale
+     *
+     * Performance:
+     * - O(1) service lookup (cached)
+     * - O(1) translation cache (in-memory)
+     * - Lazy loading (only loads when needed)
+     *
+     * @param string $key Translation key (dot notation supported)
+     * @param array<string, mixed> $replace Replacements for placeholders
+     * @param string|null $locale Target locale (null = use current locale)
+     * @return string Translated message or key if not found
+     *
+     * @example
+     * // Simple translation
+     * echo __('messages.welcome'); // "Welcome"
+     *
+     * // With replacements
+     * echo __('messages.welcome', [':name' => 'John']); // "Welcome, John"
+     *
+     * // With locale
+     * echo __('messages.welcome', [], 'vi'); // "Chào mừng"
+     */
+    function __(string $key, array $replace = [], ?string $locale = null): string
+    {
+        if (!function_exists('app') || !app()->has('translation')) {
+            // Fallback if translation service not available
+            return $key;
+        }
+
+        return app('translation')->get($key, $replace, $locale);
+    }
+}
+
+if (!function_exists('trans')) {
+    /**
+     * Translate the given message (alias for __).
+     *
+     * Usage:
+     * - trans('messages.welcome')
+     * - trans('messages.welcome', [':name' => 'John'])
+     * - trans('messages.welcome', [':name' => 'John'], 'vi')
+     *
+     * @param string $key Translation key
+     * @param array<string, mixed> $replace Replacements
+     * @param string|null $locale Target locale
+     * @return string Translated message
+     */
+    function trans(string $key, array $replace = [], ?string $locale = null): string
+    {
+        return __($key, $replace, $locale);
+    }
+}
+
+if (!function_exists('trans_choice')) {
+    /**
+     * Translate the given message with pluralization.
+     *
+     * Supports Laravel-style pluralization:
+     * - Simple: "one|many"
+     * - Complex: "{0} No apples|{1} One apple|[2,*] Many apples"
+     *
+     * Usage:
+     * - trans_choice('messages.apples', 5)
+     * - trans_choice('messages.apples', 5, [':name' => 'John'])
+     * - trans_choice('messages.apples', 5, [':name' => 'John'], 'vi')
+     *
+     * @param string $key Translation key
+     * @param int|array<string, mixed> $number Number for pluralization or replacements
+     * @param array<string, mixed> $replace Replacements
+     * @param string|null $locale Target locale
+     * @return string Translated message
+     *
+     * @example
+     * // Translation file: "one|many"
+     * trans_choice('messages.apples', 1); // "one"
+     * trans_choice('messages.apples', 5); // "many"
+     *
+     * // Translation file: "{0} No apples|{1} One apple|[2,*] Many apples"
+     * trans_choice('messages.apples', 0); // "No apples"
+     * trans_choice('messages.apples', 1); // "One apple"
+     * trans_choice('messages.apples', 5); // "Many apples"
+     */
+    function trans_choice(string $key, int|array $number, array $replace = [], ?string $locale = null): string
+    {
+        if (!function_exists('app') || !app()->has('translation')) {
+            return $key;
+        }
+
+        return app('translation')->choice($key, $number, $replace, $locale);
+    }
+}
+
+if (!function_exists('trans_has')) {
+    /**
+     * Check if a translation exists for the given key.
+     *
+     * @param string $key Translation key
+     * @param string|null $locale Target locale
+     * @return bool True if translation exists
+     */
+    function trans_has(string $key, ?string $locale = null): bool
+    {
+        if (!function_exists('app') || !app()->has('translation')) {
+            return false;
+        }
+
+        return app('translation')->has($key, $locale);
+    }
+}
