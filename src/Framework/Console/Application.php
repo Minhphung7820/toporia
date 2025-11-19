@@ -98,6 +98,9 @@ final class Application
       /** @var Command $command */
       $command = $this->container->get($this->registry[$commandName]);
 
+      // Parse signature to get argument names and map positional arguments
+      $this->mapArgumentsFromSignature($command->getSignature());
+
       // Inject Input/Output
       $command->setInput($this->input);
       $command->setOutput($this->output);
@@ -105,13 +108,64 @@ final class Application
       // Execute command
       return $command->handle();
     } catch (\Throwable $e) {
-      $this->output->error("Command failed: {$e->getMessage()}");
+      $this->renderException($e);
+      return 1;
+    }
+  }
 
-      if ($this->input->hasOption('verbose') || $this->input->hasOption('v')) {
-        $this->output->error($e->getTraceAsString());
+  /**
+   * Parse command signature and map positional arguments to their names
+   *
+   * @param string $signature
+   * @return void
+   */
+  private function mapArgumentsFromSignature(string $signature): void
+  {
+    // Extract argument definitions from signature: {name} {name?} {name=default}
+    preg_match_all('/\{([^-][^}]*)\}/', $signature, $matches);
+
+    if (empty($matches[1])) {
+      return;
+    }
+
+    $arguments = $this->input->getArguments();
+    $mappedArguments = [];
+    $positionalIndex = 0;
+
+    foreach ($matches[1] as $definition) {
+      // Skip options (they start with --)
+      if (str_starts_with($definition, '-')) {
+        continue;
       }
 
-      return 1;
+      // Parse argument: name, name?, name=default, or name : description
+      $parts = explode(':', $definition, 2);
+      $argDef = trim($parts[0]);
+
+      // Handle optional marker and default value
+      $isOptional = str_ends_with($argDef, '?');
+      $argDef = rtrim($argDef, '?');
+
+      // Handle default value
+      $default = null;
+      if (str_contains($argDef, '=')) {
+        [$argDef, $default] = explode('=', $argDef, 2);
+      }
+
+      $argName = trim($argDef);
+
+      // Map positional argument to named argument
+      if (isset($arguments[$positionalIndex])) {
+        $mappedArguments[$argName] = $arguments[$positionalIndex];
+        $positionalIndex++;
+      } elseif ($default !== null) {
+        $mappedArguments[$argName] = $default;
+      }
+    }
+
+    // Update input with mapped arguments
+    if ($this->input instanceof Input) {
+      $this->input->setArguments($mappedArguments);
     }
   }
 
@@ -157,5 +211,17 @@ final class Application
   public function setOutput(OutputInterface $output): void
   {
     $this->output = $output;
+  }
+
+  /**
+   * Render an exception with beautiful formatting.
+   *
+   * @param \Throwable $e
+   * @return void
+   */
+  private function renderException(\Throwable $e): void
+  {
+    $renderer = new ExceptionRenderer();
+    $renderer->render($e);
   }
 }

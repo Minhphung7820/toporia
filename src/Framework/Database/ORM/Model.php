@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM;
 
-use Toporia\Framework\Database\Contracts\{ConnectionInterface, ModelInterface};
+use Toporia\Framework\Database\Contracts\{ConnectionInterface, ModelInterface, RelationInterface};
 use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
 use Toporia\Framework\Database\ORM\{ModelCollection, Relations};
 use Toporia\Framework\Observer\Traits\Observable;
 use Toporia\Framework\Observer\Contracts\ObservableInterface;
+use Toporia\Framework\Database\ORM\Concerns\HasObservers;
 
 /**
  * Base Active Record model.
@@ -30,6 +31,10 @@ use Toporia\Framework\Observer\Contracts\ObservableInterface;
 abstract class Model implements ModelInterface, ObservableInterface
 {
     use Observable;
+    use HasObservers {
+        Observable::getObservers insteadof HasObservers;
+        HasObservers::getObservers as getModelObservers;
+    }
     /**
      * Database table name (override in child class).
      *
@@ -1498,7 +1503,7 @@ abstract class Model implements ModelInterface, ObservableInterface
             if (!$this->relationLoaded($relation)) {
                 $result = $this->{$relation}();
 
-                if ($result instanceof Relations\RelationInterface) {
+                if ($result instanceof RelationInterface) {
                     $this->setRelation($relation, $result->getResults());
                 }
             }
@@ -1637,7 +1642,7 @@ abstract class Model implements ModelInterface, ObservableInterface
             $relation = $model->$name();
 
             // Check if it's actually a relation
-            if (!$relation instanceof Relations\RelationInterface) {
+            if (!$relation instanceof RelationInterface) {
                 continue;
             }
 
@@ -1698,11 +1703,11 @@ abstract class Model implements ModelInterface, ObservableInterface
      * - Single Responsibility: Only handles column selection logic
      * - Open/Closed: Works with any relation type (HasMany, BelongsTo, etc.)
      *
-     * @param Relations\RelationInterface $relation Relation instance
+     * @param RelationInterface $relation Relation instance
      * @param array<string> $columns Columns to select
      * @return void
      */
-    protected static function applyColumnSelection(Relations\RelationInterface $relation, array $columns): void
+    protected static function applyColumnSelection(RelationInterface $relation, array $columns): void
     {
         // Get the query builder from relation
         $query = $relation->getQuery();
@@ -1717,4 +1722,3 @@ abstract class Model implements ModelInterface, ObservableInterface
         $query->select($columns);
     }
 }
-

@@ -54,6 +54,12 @@ final class ConsoleServiceProvider extends ServiceProvider
       \Toporia\Framework\Console\Commands\MigrateRollbackCommand::class,
       \Toporia\Framework\Console\Commands\MigrateStatusCommand::class,
       \Toporia\Framework\Console\Commands\MigrateAlterCommand::class,
+      \Toporia\Framework\Console\Commands\Database\MigrateFreshCommand::class,
+      \Toporia\Framework\Console\Commands\Database\MigrateRefreshCommand::class,
+      \Toporia\Framework\Console\Commands\Database\DbSeedCommand::class,
+      \Toporia\Framework\Console\Commands\Database\DbWipeCommand::class,
+      \Toporia\Framework\Console\Commands\Database\DbShowCommand::class,
+      \Toporia\Framework\Console\Commands\Database\DbTableCommand::class,
 
       // Route commands
       \Toporia\Framework\Console\Commands\RouteCacheCommand::class,
@@ -67,23 +73,83 @@ final class ConsoleServiceProvider extends ServiceProvider
 
       // Cache commands
       \Toporia\Framework\Console\Commands\CacheClearCommand::class,
+      \Toporia\Framework\Console\Commands\Optimize\CacheTableCommand::class,
 
       // Queue commands
       \Toporia\Framework\Console\Commands\QueueWorkCommand::class,
+      \Toporia\Framework\Console\Commands\Queue\QueueListenCommand::class,
+      \Toporia\Framework\Console\Commands\Queue\QueueRestartCommand::class,
+      \Toporia\Framework\Console\Commands\Queue\QueueRetryCommand::class,
+      \Toporia\Framework\Console\Commands\Queue\QueueFailedCommand::class,
+      \Toporia\Framework\Console\Commands\Queue\QueueFlushCommand::class,
+      \Toporia\Framework\Console\Commands\Queue\QueueTableCommand::class,
+      \Toporia\Framework\Console\Commands\Queue\QueueFailedTableCommand::class,
+      \Toporia\Framework\Console\Commands\Queue\QueueMonitorCommand::class,
 
       // Schedule commands
       \Toporia\Framework\Console\Commands\ScheduleRunCommand::class,
       \Toporia\Framework\Console\Commands\ScheduleWorkCommand::class,
       \Toporia\Framework\Console\Commands\ScheduleListCommand::class,
 
+      // Event commands
+      \Toporia\Framework\Console\Commands\Event\EventListCommand::class,
+      \Toporia\Framework\Console\Commands\Event\EventCacheCommand::class,
+      \Toporia\Framework\Console\Commands\Event\EventClearCommand::class,
+      \Toporia\Framework\Console\Commands\Event\EventGenerateCommand::class,
+
       // Realtime commands
       \Toporia\Framework\Console\Commands\RealtimeServeCommand::class,
       \Toporia\Framework\Console\Commands\RealtimeKafkaConsumerCommand::class,
       \Toporia\Framework\Console\Commands\RealtimeRedisConsumerCommand::class,
       \Toporia\Framework\Console\Commands\RealtimeRabbitMqConsumerCommand::class,
+      \Toporia\Framework\Console\Commands\Realtime\ChannelListCommand::class,
+      \Toporia\Framework\Console\Commands\Realtime\RealtimePublishCommand::class,
+
+      // Notification commands
+      \Toporia\Framework\Console\Commands\Notification\NotificationTableCommand::class,
 
       // Search
       \Toporia\Framework\Console\Commands\ReindexSearchCommand::class,
+
+      // Optimization commands
+      \Toporia\Framework\Console\Commands\Optimize\OptimizeCommand::class,
+      \Toporia\Framework\Console\Commands\Optimize\OptimizeClearCommand::class,
+      \Toporia\Framework\Console\Commands\Optimize\ViewCacheCommand::class,
+      \Toporia\Framework\Console\Commands\Optimize\ViewClearCommand::class,
+      \Toporia\Framework\Console\Commands\Optimize\StorageLinkCommand::class,
+
+      // Make commands (code generation)
+      \Toporia\Framework\Console\Commands\Make\MakeCommandCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeControllerCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeModelCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeMigrationCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeMiddlewareCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeEventCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeListenerCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeSubscriberCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeNotificationCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeJobCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeRequestCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakePolicyCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeProviderCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeActionCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeEntityCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeHandlerCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeRuleCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeExceptionCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeSeederCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeFactoryCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeRepositoryCommand::class,
+      \Toporia\Framework\Console\Commands\Make\MakeObserverCommand::class,
+
+      // App commands
+      \Toporia\Framework\Console\Commands\App\AboutCommand::class,
+      \Toporia\Framework\Console\Commands\App\EnvCommand::class,
+      \Toporia\Framework\Console\Commands\App\DownCommand::class,
+      \Toporia\Framework\Console\Commands\App\UpCommand::class,
+      \Toporia\Framework\Console\Commands\App\InspireCommand::class,
+      \Toporia\Framework\Console\Commands\App\TinkerCommand::class,
+      \Toporia\Framework\Console\Commands\App\StubPublishCommand::class,
 
       // Development server
       \Toporia\Framework\Console\Commands\ServeCommand::class,
