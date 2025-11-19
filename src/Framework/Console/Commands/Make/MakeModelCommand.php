@@ -21,7 +21,7 @@ final class MakeModelCommand extends GeneratorCommand
 
     protected function getDefaultNamespace(): string
     {
-        return 'App\\Domain';
+        return 'App\\Infrastructure\\Persistence\\Models';
     }
 
     protected function buildClass(string $name): string
