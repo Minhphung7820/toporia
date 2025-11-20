@@ -77,7 +77,6 @@ final class PdoUserRepository implements UserRepository
      */
     public function save(User $user): User
     {
-        Log::info("âf");
         if ($user->id === null) {
             // Create new user using Model
             // Use new + save() instead of create() to ensure proper insertion

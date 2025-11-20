@@ -31,18 +31,31 @@ final class RegisterProviders
             // Framework providers (auto-loaded from FrameworkServiceProvider)
             ...FrameworkServiceProvider::providers(),
 
-            // Application providers
-            // DomainServiceProvider: Registers all domain-level services (Repositories, UnitOfWork, Auth)
-            // This provider manages dependency order internally, eliminating inter-provider dependencies
+            // =====================================================================
+            // ACTIVE PROVIDERS
+            // =====================================================================
+
+            // Domain Layer - Repositories, Auth, UnitOfWork
+            // MUST be first because other providers depend on it
             \App\Infrastructure\Providers\DomainServiceProvider::class,
 
-            // Application-level services (Business logic, Kafka, etc.)
+            // Application Layer - Business logic services (Kafka, CSRF, etc.)
             \App\Infrastructure\Providers\AppServiceProvider::class,
 
-            // Infrastructure services
+            // Infrastructure Layer - Events, Routes, Schedules
             \App\Infrastructure\Providers\EventServiceProvider::class,
             \App\Infrastructure\Providers\RouteServiceProvider::class,
             \App\Infrastructure\Providers\ScheduleServiceProvider::class,
+
+            // =====================================================================
+            // OPTIONAL PROVIDERS (uncomment when needed)
+            // =====================================================================
+
+            // API Transformers - For formatting API responses
+            // \App\Infrastructure\Providers\TransformerServiceProvider::class,
+
+            // Macro System - For extending framework classes dynamically
+            // \App\Infrastructure\Providers\MacroServiceProvider::class,
         ]);
     }
 }
