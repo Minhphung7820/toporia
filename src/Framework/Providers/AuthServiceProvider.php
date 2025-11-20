@@ -6,7 +6,7 @@ namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Auth\AuthManager;
 use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, TokenRepositoryInterface, UserProviderInterface};
-use Toporia\Framework\Auth\Guards\{SanctumGuard, SessionGuard, TokenGuard};
+use Toporia\Framework\Auth\Guards\{PersonalTokenGuard, SessionGuard, TokenGuard};
 use Toporia\Framework\Auth\Repositories\TokenRepository;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
@@ -46,7 +46,7 @@ class AuthServiceProvider extends ServiceProvider
             $guardFactories = [
                 'web' => fn() => $this->createSessionGuard($c, 'web'),
                 'api' => fn() => $this->createTokenGuard($c, 'api'),
-                'sanctum' => fn() => $this->createSanctumGuard($c),
+                'personal-token' => fn() => $this->createPersonalTokenGuard($c),
                 // Add more guards here as needed:
                 // 'admin' => fn() => $this->createSessionGuard($c, 'admin'),
             ];
@@ -124,7 +124,7 @@ class AuthServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register Token Repository for Sanctum guard.
+     * Register Token Repository for Personal Token guard.
      *
      * @param ContainerInterface $container
      * @return void
@@ -146,20 +146,20 @@ class AuthServiceProvider extends ServiceProvider
     }
 
     /**
-     * Create a Sanctum guard instance for API token authentication.
+     * Create a Personal Token guard instance for API token authentication.
      *
-     * Sanctum guard uses database-stored tokens (personal access tokens).
+     * Personal Token guard uses database-stored tokens (personal access tokens).
      * Provides token management, scopes, and revocation capabilities.
      *
      * @param ContainerInterface $container
-     * @return SanctumGuard
+     * @return PersonalTokenGuard
      */
-    protected function createSanctumGuard(ContainerInterface $container): SanctumGuard
+    protected function createPersonalTokenGuard(ContainerInterface $container): PersonalTokenGuard
     {
         $userProvider = $container->get(UserProviderInterface::class);
         $request = $container->get(Request::class);
         $tokens = $container->get(TokenRepositoryInterface::class);
 
-        return new SanctumGuard($request, $userProvider, $tokens);
+        return new PersonalTokenGuard($request, $userProvider, $tokens);
     }
 }

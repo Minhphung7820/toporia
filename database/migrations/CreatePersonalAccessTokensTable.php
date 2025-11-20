@@ -7,7 +7,7 @@ use Toporia\Framework\Database\Migration\Migration;
 /**
  * Create Personal Access Tokens Table Migration
  *
- * Creates the database table for storing API tokens (Sanctum-style).
+ * Creates the database table for storing personal access tokens.
  *
  * Table Structure:
  * - id: Primary key

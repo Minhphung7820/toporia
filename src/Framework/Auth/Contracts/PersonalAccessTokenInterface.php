@@ -7,7 +7,7 @@ namespace Toporia\Framework\Auth\Contracts;
 /**
  * Personal Access Token Interface
  *
- * Contract for personal access tokens (Sanctum-style).
+ * Contract for personal access tokens.
  *
  * Clean Architecture:
  * - Domain layer interface

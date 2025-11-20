@@ -8,9 +8,9 @@ use Toporia\Framework\Auth\Contracts\{GuardInterface, HasApiTokensInterface, Tok
 use Toporia\Framework\Http\Request;
 
 /**
- * Sanctum Guard
+ * Personal Token Guard
  *
- * Token-based authentication guard.
+ * Token-based authentication guard using personal access tokens.
  *
  * Authentication Flow:
  * 1. Extract token from Authorization header (Bearer token)
@@ -34,7 +34,7 @@ use Toporia\Framework\Http\Request;
  *
  * @package Toporia\Framework\Auth\Guards
  */
-final class SanctumGuard implements GuardInterface
+final class PersonalTokenGuard implements GuardInterface
 {
     /**
      * Authenticated user instance.
@@ -44,7 +44,7 @@ final class SanctumGuard implements GuardInterface
     private ?HasApiTokensInterface $user = null;
 
     /**
-     * Create Sanctum guard instance.
+     * Create Personal Token guard instance.
      *
      * @param Request $request HTTP request
      * @param UserProviderInterface $provider User provider
@@ -226,3 +226,4 @@ final class SanctumGuard implements GuardInterface
         return null;
     }
 }
+

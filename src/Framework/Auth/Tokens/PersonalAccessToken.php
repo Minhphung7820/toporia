@@ -10,7 +10,7 @@ use Toporia\Framework\Database\ORM\Model;
 /**
  * Personal Access Token Model
  *
- * ORM model for personal access tokens (Sanctum-style).
+ * ORM model for personal access tokens.
  *
  * Clean Architecture:
  * - Uses Framework ORM Model (Active Record)

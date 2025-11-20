@@ -34,7 +34,9 @@ return [
         |
         */
         'except' => [
-            // Add URIs to exclude from CSRF verification here
+            // API Auth routes - excluded from CSRF (use HttpOnly cookies for security)
+            '/api/auth/*',
+            // Add other URIs to exclude from CSRF verification here
             // Supports wildcard patterns: '/api/webhook/*', '/api/*/callback'
         ],
     ],
@@ -131,7 +133,7 @@ return [
         'exposed_headers' => [
             // Headers that client can access via getResponseHeader()
         ],
-        'credentials' => false, // Set to true to allow cookies/credentials
+        'credentials' => true, // Allow cookies/credentials for SPA authentication
         'max_age' => 3600, // 1 hour preflight cache
     ],
 ];

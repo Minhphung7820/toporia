@@ -52,7 +52,7 @@ final class EnsureTokenIsValid implements MiddlewareInterface
     public function handle(Request $request, Response $response, callable $next): mixed
     {
         // Authenticate user via token
-        $user = $this->auth->guard('sanctum')->user();
+        $user = $this->auth->guard('personal-token')->user();
 
         if ($user === null) {
             $response->json([

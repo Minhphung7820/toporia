@@ -132,6 +132,21 @@ final class Request implements RequestInterface
     }
 
     /**
+     * Get JSON data from request body.
+     *
+     * Convenience method for API requests that expect JSON payload.
+     * Returns the parsed JSON body as an array.
+     *
+     * Performance: O(1) - Returns already parsed body
+     *
+     * @return array<string, mixed> Parsed JSON data
+     */
+    public function json(): array
+    {
+        return $this->body;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function header(string $name, ?string $default = null): ?string

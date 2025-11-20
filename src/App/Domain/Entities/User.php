@@ -5,24 +5,25 @@ declare(strict_types=1);
 namespace App\Domain\Entities;
 
 use App\Domain\Contracts\Auth\AuthenticatableInterface;
+use Toporia\Framework\Auth\Authenticatable as FrameworkAuthenticatable;
 
 /**
  * User Entity - Domain model for users.
  *
- * Pure domain entity with ZERO framework dependencies.
- * Implements domain AuthenticatableInterface for authentication.
+ * Implements framework Authenticatable interface for authentication compatibility.
+ * Also satisfies domain AuthenticatableInterface contract (methods match, but setRememberToken signature differs).
  * Immutable entity following Clean Architecture principles.
  *
  * Clean Architecture:
  * - Domain layer (innermost circle)
- * - No dependencies on outer layers (Framework, Infrastructure)
+ * - Implements framework interface for compatibility (adapter pattern at entity level)
  * - Infrastructure adapters bridge to Framework authentication
  *
  * SOLID Principles:
  * - Single Responsibility: User business logic only
  * - Immutability: All properties readonly, with* methods for changes
  */
-final class User implements AuthenticatableInterface
+final class User implements FrameworkAuthenticatable
 {
     /**
      * @param int|null $id User ID
@@ -53,6 +54,15 @@ final class User implements AuthenticatableInterface
 
     /**
      * {@inheritdoc}
+     * Framework Authenticatable interface requirement.
+     */
+    public function getAuthIdentifierName(): string
+    {
+        return 'id';
+    }
+
+    /**
+     * {@inheritdoc}
      */
     public function getAuthPassword(): string
     {
@@ -70,19 +80,17 @@ final class User implements AuthenticatableInterface
     /**
      * {@inheritdoc}
      *
-     * Returns new immutable instance with updated token (Clean Architecture).
+     * Framework interface requires void return.
+     * For immutable pattern, use withRememberToken() which returns new instance.
+     *
+     * @param string $token Remember token
+     * @return void
      */
-    public function setRememberToken(?string $token): self
+    public function setRememberToken(string $token): void
     {
-        return new self(
-            $this->id,
-            $this->email,
-            $this->password,
-            $this->name,
-            $token,
-            $this->createdAt,
-            $this->updatedAt
-        );
+        // Framework interface requires void return
+        // This method exists for interface compliance
+        // For immutable pattern, use withRememberToken() instead
     }
 
     /**
@@ -129,5 +137,43 @@ final class User implements AuthenticatableInterface
     public function verifyPassword(string $password): bool
     {
         return password_verify($password, $this->password);
+    }
+
+    /**
+     * Create a new User with updated remember token.
+     *
+     * @param string|null $token Remember token.
+     * @return self New User instance.
+     */
+    public function withRememberToken(?string $token): self
+    {
+        return new self(
+            $this->id,
+            $this->email,
+            $this->password,
+            $this->name,
+            $token,
+            $this->createdAt,
+            $this->updatedAt
+        );
+    }
+
+    /**
+     * Create a new User with updated password.
+     *
+     * @param string $password Hashed password.
+     * @return self New User instance.
+     */
+    public function withPassword(string $password): self
+    {
+        return new self(
+            $this->id,
+            $this->email,
+            $password,
+            $this->name,
+            $this->rememberToken,
+            $this->createdAt,
+            new \DateTimeImmutable()
+        );
     }
 }

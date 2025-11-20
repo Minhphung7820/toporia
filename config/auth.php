@@ -17,7 +17,7 @@ return [
     | This option controls the default authentication guard that will be
     | used to authenticate users. You may change it as needed.
     |
-    | Supported: "web", "api"
+    | Supported: "web", "api", "personal-token"
     |
     */
     'defaults' => [
@@ -32,7 +32,7 @@ return [
     | Guards define how users are authenticated for each request.
     | A guard is a combination of a driver (session, token) and a user provider.
     |
-    | Supported drivers: "session", "token"
+    | Supported drivers: "session", "token", "personal-token"
     |
     */
     'guards' => [
@@ -43,6 +43,11 @@ return [
 
         'api' => [
             'driver' => 'token',
+            'provider' => 'users',
+        ],
+
+        'personal-token' => [
+            'driver' => 'personal-token',
             'provider' => 'users',
         ],
     ],

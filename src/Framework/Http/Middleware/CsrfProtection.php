@@ -18,6 +18,7 @@ final class CsrfProtection implements MiddlewareInterface
 {
     private const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
     private const TOKEN_FIELDS = ['_token', '_csrf', 'csrf_token'];
+    private const CSRF_COOKIE_NAME = 'XSRF-TOKEN'; // Standard SPA CSRF cookie name
 
     /**
      * @param CsrfTokenManagerInterface $tokenManager
@@ -70,29 +71,46 @@ final class CsrfProtection implements MiddlewareInterface
     /**
      * Get CSRF token from request
      *
-     * Checks multiple locations:
-     * 1. Request body/input
+     * Checks multiple locations (in order of preference):
+     * 1. Request body/input fields (_token, _csrf, csrf_token)
      * 2. X-CSRF-TOKEN header
-     * 3. X-XSRF-TOKEN header (common with frontend frameworks)
+     * 3. X-XSRF-TOKEN header (frontend reads XSRF-TOKEN cookie and sends as header)
+     * 4. XSRF-TOKEN cookie (direct cookie access, fallback)
+     *
+     * Performance: O(N) where N = number of token fields (typically 3-4 checks)
+     * Optimized: Early return on first match
      *
      * @param Request $request
      * @return string|null
      */
     private function getTokenFromRequest(Request $request): ?string
     {
-        // Try input fields first
+        // Try input fields first (form submissions)
         foreach (self::TOKEN_FIELDS as $field) {
             $token = $request->input($field);
-            if ($token !== null) {
+            if ($token !== null && $token !== '') {
                 return $token;
             }
         }
 
-        // Try headers
+        // Try headers (SPA typically sends X-XSRF-TOKEN header)
         $headerToken = $request->header('X-CSRF-TOKEN')
             ?? $request->header('X-XSRF-TOKEN');
 
-        return $headerToken;
+        if ($headerToken !== null && $headerToken !== '') {
+            return $headerToken;
+        }
+
+        // Try cookie directly (fallback for SPA)
+        // Cookie name is XSRF-TOKEN (standard SPA CSRF cookie name)
+        if (isset($_COOKIE[self::CSRF_COOKIE_NAME])) {
+            $cookieToken = $_COOKIE[self::CSRF_COOKIE_NAME];
+            if ($cookieToken !== null && $cookieToken !== '') {
+                return $cookieToken;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -150,7 +168,12 @@ final class CsrfProtection implements MiddlewareInterface
             // Wildcard pattern matching
             if (str_contains($pattern, '*')) {
                 // Convert wildcard pattern to regex
-                $regex = '#^' . str_replace(['*', '/'], ['.*', '\/'], preg_quote($pattern, '#')) . '$#';
+                // First, escape special regex chars except * and /
+                $escaped = preg_quote($pattern, '#');
+                // Unescape * and / (they were escaped by preg_quote)
+                $escaped = str_replace(['\\*', '\\/'], ['*', '/'], $escaped);
+                // Now replace * with .* and / with \/
+                $regex = '#^' . str_replace(['*', '/'], ['.*', '\/'], $escaped) . '$#';
                 if (preg_match($regex, $path)) {
                     return true;
                 }

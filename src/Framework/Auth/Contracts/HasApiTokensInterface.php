@@ -9,7 +9,7 @@ use Toporia\Framework\Support\Collection\Collection;
 /**
  * Has API Tokens Interface
  *
- * Contract for models that can issue API tokens (Sanctum-style).
+ * Contract for models that can issue API tokens.
  *
  * SOLID Principles:
  * - Interface Segregation: Focused on token management only

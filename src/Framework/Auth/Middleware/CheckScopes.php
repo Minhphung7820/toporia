@@ -70,7 +70,7 @@ final class CheckScopes implements MiddlewareInterface
     public function handle(Request $request, Response $response, callable $next): mixed
     {
         // Get authenticated user
-        $user = $this->auth->guard('sanctum')->user();
+        $user = $this->auth->guard('personal-token')->user();
 
         if ($user === null || !$user instanceof HasApiTokensInterface) {
             $response->json([

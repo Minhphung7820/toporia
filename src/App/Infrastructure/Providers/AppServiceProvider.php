@@ -12,10 +12,12 @@ use App\Infrastructure\Repository\InMemoryUserRepository;
 use App\Infrastructure\Services\Kafka\KafkaTopicService;
 use App\Infrastructure\Services\Kafka\KafkaHealthChecker;
 use App\Infrastructure\Services\Kafka\KafkaClusterIdFixer;
+use App\Infrastructure\Auth\RepositoryUserProvider;
 use App\Presentation\Console\Kernel;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Realtime\RealtimeManager;
+use Toporia\Framework\Auth\Contracts\UserProviderInterface;
 
 /**
  * Application Service Provider
@@ -35,6 +37,12 @@ class AppServiceProvider extends ServiceProvider
         // User Repository - Singleton
         // TODO: Replace InMemoryUserRepository with PdoUserRepository for production
         $container->singleton(UserRepository::class, fn() => new InMemoryUserRepository());
+
+        // User Provider - Required by AuthServiceProvider for authentication guards
+        // Bridges authentication system with domain UserRepository
+        $container->singleton(UserProviderInterface::class, function (ContainerInterface $c) {
+            return new RepositoryUserProvider($c->get(UserRepository::class));
+        });
 
         // Kafka Services - Register domain interfaces with infrastructure implementations
         $container->singleton(HealthCheckerInterface::class, function (ContainerInterface $c) {
@@ -60,10 +68,24 @@ class AppServiceProvider extends ServiceProvider
             };
         });
 
-        // Register other application services here
-        // Examples:
-        // - Custom services
-        // - Business logic handlers
-        // - Domain-specific repositories
+        // Register Application Services (auto-wired via constructor injection)
+        // Services are resolved automatically by container, no need to register explicitly
+        // But we can register them as singletons for performance if needed
+
+        // Auth Services - Auto-wired, but register as singletons for performance
+        $container->singleton(\App\Application\Services\RegisterUserService::class);
+        $container->singleton(\App\Application\Services\LoginService::class);
+        $container->singleton(\App\Application\Services\ForgotPasswordService::class);
+        $container->singleton(\App\Application\Services\ResetPasswordService::class);
+        $container->singleton(\App\Application\Services\ChangePasswordService::class);
+        // Issue CSRF Cookie Service - inject production flag
+        $container->singleton(\App\Application\Services\IssueCsrfCookieService::class, function ($c) {
+            $isProduction = env('APP_ENV') === 'production';
+            return new \App\Application\Services\IssueCsrfCookieService(
+                $c->get(\Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface::class),
+                $c->get(\Toporia\Framework\Http\CookieJar::class),
+                $isProduction
+            );
+        });
     }
 }

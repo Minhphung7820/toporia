@@ -43,11 +43,12 @@ use Toporia\Framework\Queue\Middleware\JobMiddleware;
  * dependencies via type-hinted parameters. The Worker uses the container
  * to automatically inject dependencies.
  */
-abstract class Job implements JobInterface
+abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\QueueableInterface
 {
     protected string $id;
     protected string $queue = 'default';
     protected int $attempts = 0;
+    protected int $delay = 0;
 
     /**
      * Maximum number of retry attempts.
@@ -108,7 +109,7 @@ abstract class Job implements JobInterface
         return $this->id;
     }
 
-    public function getQueue(): string
+    public function getQueue(): ?string
     {
         return $this->queue;
     }
@@ -254,6 +255,16 @@ abstract class Job implements JobInterface
     }
 
     /**
+     * Get the delay in seconds.
+     *
+     * @return int
+     */
+    public function getDelay(): int
+    {
+        return $this->delay;
+    }
+
+    /**
      * Delay the job execution
      *
      * @param int $seconds
@@ -261,7 +272,7 @@ abstract class Job implements JobInterface
      */
     public function delay(int $seconds): self
     {
-        // This would be handled by the queue driver
+        $this->delay = $seconds;
         return $this;
     }
 

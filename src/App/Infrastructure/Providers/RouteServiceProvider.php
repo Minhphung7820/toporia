@@ -32,11 +32,11 @@ class RouteServiceProvider extends ServiceProvider
         $middlewareConfig = $container->get('config')->get('middleware', []);
         $middlewareGroups = $middlewareConfig['groups'] ?? [];
 
-        // Load web routes with 'web' middleware group
-        $this->loadWebRoutes($app, $router, $middlewareGroups['web'] ?? []);
-
-        // Load API routes with 'api' middleware group
+        // Load API routes FIRST (before web routes) to ensure they match before catch-all
         $this->loadApiRoutes($app, $router, $middlewareGroups['api'] ?? []);
+
+        // Load web routes with 'web' middleware group (catch-all should be last)
+        $this->loadWebRoutes($app, $router, $middlewareGroups['web'] ?? []);
     }
 
     /**

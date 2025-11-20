@@ -10,7 +10,7 @@ use Toporia\Framework\Support\Collection\Collection;
 /**
  * Has API Tokens Trait
  *
- * Adds API token functionality to User models (Sanctum-style).
+ * Adds API token functionality to User models.
  *
  * Usage:
  * ```php
