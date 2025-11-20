@@ -16,6 +16,8 @@ use Toporia\Framework\Foundation\Application;
  *   php console serve
  *   php console serve --port=8080
  *   php console serve --port=3000
+ *   php console serve --host=0.0.0.0 --port=8080
+ *   php console serve --host=localhost --port=8083
  *
  * Performance:
  * - O(1) path resolution
@@ -36,7 +38,7 @@ use Toporia\Framework\Foundation\Application;
  */
 final class ServeCommand extends Command
 {
-    protected string $signature = 'serve {--port=8000}';
+    protected string $signature = 'serve {--port=8000} {--host=127.0.0.1}';
     protected string $description = 'Start PHP built-in development server';
 
     /**
@@ -123,8 +125,14 @@ final class ServeCommand extends Command
      */
     private function getHost(): string
     {
-        // Future: support --host option
-        return self::DEFAULT_HOST;
+        $host = $this->option('host', self::DEFAULT_HOST);
+
+        // Convert to string if needed
+        if (!is_string($host)) {
+            $host = (string) $host;
+        }
+
+        return $host ?: self::DEFAULT_HOST;
     }
 
     /**
