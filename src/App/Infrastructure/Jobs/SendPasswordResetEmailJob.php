@@ -54,4 +54,3 @@ final class SendPasswordResetEmailJob extends Job implements ShouldQueueInterfac
         error_log("Failed to send password reset email to {$this->email}: " . $exception->getMessage());
     }
 }
-
