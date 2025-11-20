@@ -41,7 +41,7 @@ return [
     | Set to false to always use production manifest.
     |
     */
-    'dev_server_enabled' => env('VITE_DEV_SERVER_ENABLED', false), // Set to false to use production build
+    'dev_server_enabled' => env('VITE_DEV_SERVER_ENABLED', true), // Enable dev server for hot reload
 
     /*
     |--------------------------------------------------------------------------
@@ -73,4 +73,3 @@ return [
         'resources/js/app.js',
     ],
 ];
-

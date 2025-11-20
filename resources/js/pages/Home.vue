@@ -154,16 +154,95 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .hero {
+    padding: 3rem 2rem;
+    margin-bottom: 2rem;
+  }
+
   .hero-title {
     font-size: 2.5rem;
+    padding: 0 1rem;
+    margin-bottom: 0.75rem;
   }
 
   .hero-subtitle {
     font-size: 1.2rem;
+    padding: 0 1.5rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+  }
+
+  .section-title {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
   }
 
   .features-grid {
     grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .feature-card {
+    padding: 2rem 1.75rem;
+  }
+
+  .feature-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+    padding: 0 0.5rem;
+  }
+
+  .feature-card p {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    padding: 0 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    padding: 2.5rem 1.75rem;
+    border-radius: 8px;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+    padding: 0 0.75rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.1rem;
+    padding: 0 1.25rem;
+    line-height: 1.5;
+  }
+
+  .section-title {
+    font-size: 1.75rem;
+    padding: 0 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .feature-card {
+    padding: 1.75rem 1.5rem;
+    border-radius: 8px;
+  }
+
+  .feature-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .feature-card h3 {
+    font-size: 1.15rem;
+    padding: 0 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature-card p {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    padding: 0 0.75rem;
   }
 }
 </style>
