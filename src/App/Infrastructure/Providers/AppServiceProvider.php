@@ -83,7 +83,6 @@ class AppServiceProvider extends ServiceProvider
             $isProduction = env('APP_ENV') === 'production';
             return new \App\Application\Services\IssueCsrfCookieService(
                 $c->get(\Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface::class),
-                $c->get(\Toporia\Framework\Http\CookieJar::class),
                 $isProduction
             );
         });

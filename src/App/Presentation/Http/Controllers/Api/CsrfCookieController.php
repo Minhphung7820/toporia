@@ -6,7 +6,7 @@ namespace App\Presentation\Http\Controllers\Api;
 
 use App\Application\Services\IssueCsrfCookieService;
 use App\Presentation\Http\Controllers\BaseController;
-use Toporia\Framework\Http\{Request, Response, CookieJar};
+use Toporia\Framework\Http\{Request, Response};
 
 /**
  * CSRF Cookie Controller
@@ -28,8 +28,7 @@ final class CsrfCookieController extends BaseController
     public function __construct(
         protected Request $request,
         protected Response $response,
-        private readonly IssueCsrfCookieService $issueCsrfCookieService,
-        private readonly CookieJar $cookieJar
+        private readonly IssueCsrfCookieService $issueCsrfCookieService
     ) {
         parent::__construct($request, $response);
     }
@@ -46,10 +45,8 @@ final class CsrfCookieController extends BaseController
      */
     public function __invoke(): void
     {
+        // Service handles cookie sending directly (no encryption for CSRF token)
         $this->issueCsrfCookieService->execute();
-
-        // Send queued cookies (CSRF cookie)
-        $this->cookieJar->sendQueued();
 
         // Return 204 No Content
         // No body needed - cookie is set via Set-Cookie header

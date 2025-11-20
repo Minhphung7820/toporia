@@ -34,10 +34,12 @@ return [
         |
         */
         'except' => [
-            // API Auth routes - excluded from CSRF (use HttpOnly cookies for security)
-            '/api/auth/*',
-            // Add other URIs to exclude from CSRF verification here
+            // Add URIs to exclude from CSRF verification here
             // Supports wildcard patterns: '/api/webhook/*', '/api/*/callback'
+
+            // Note: GET requests (like /api/csrf-cookie) are automatically safe
+            // Note: /api/auth/* uses CSRF protection via XSRF-TOKEN cookie
+            // This is the recommended Laravel Sanctum approach for SPAs
         ],
     ],
 

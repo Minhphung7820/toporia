@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Services;
 
 use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
-use Toporia\Framework\Http\CookieJar;
+use Toporia\Framework\Http\Cookie;
 
 /**
  * Issue CSRF Cookie Service
@@ -42,7 +42,6 @@ final class IssueCsrfCookieService
 
     public function __construct(
         private readonly CsrfTokenManagerInterface $tokenManager,
-        private readonly CookieJar $cookieJar,
         private readonly bool $isProduction = false
     ) {}
 
@@ -64,12 +63,13 @@ final class IssueCsrfCookieService
             $token = $this->tokenManager->generate('_token');
         }
 
-        // Set CSRF token as cookie (HttpOnly, SameSite=Lax for SPA)
+        // Set CSRF token as cookie (NOT encrypted - frontend needs to read raw token)
         // Note: Cookie name is XSRF-TOKEN (standard SPA CSRF cookie name)
         // Frontend will read this cookie and send it as X-XSRF-TOKEN header
-        $this->cookieJar->make(
+        // We use Cookie::make() directly instead of CookieJar to avoid encryption
+        $cookie = Cookie::make(
             self::CSRF_COOKIE_NAME,
-            $token,
+            $token, // Raw token (not encrypted - frontend needs to read it)
             self::CSRF_COOKIE_LIFETIME,
             [
                 'path' => '/',
@@ -78,6 +78,9 @@ final class IssueCsrfCookieService
                 'secure' => $this->isProduction, // HTTPS only in production
             ]
         );
+
+        // Send cookie immediately (don't queue - we need it now)
+        $cookie->send();
 
         return [
             'success' => true,

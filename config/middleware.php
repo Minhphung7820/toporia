@@ -52,6 +52,10 @@ return [
         ],
 
         'api' => [
+            fn($container) => new CsrfProtection(
+                $container->get('csrf'),
+                $container->get('config')->get('security.csrf.except', [])
+            ),
             // API routes middleware
             // CORS middleware with config from security.php
             fn($container) => new HandleCors(

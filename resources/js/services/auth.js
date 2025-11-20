@@ -18,6 +18,10 @@ let csrfCookiePromise = null;
 
 /**
  * Get CSRF token from cookie
+ *
+ * Performance: O(N) where N = number of cookies (typically < 10)
+ * Browser automatically URL-decodes cookie values from document.cookie
+ *
  * @returns {string|null}
  */
 function getCsrfToken() {
@@ -25,7 +29,9 @@ function getCsrfToken() {
   for (let cookie of cookies) {
     const [name, value] = cookie.trim().split('=');
     if (name === CSRF_COOKIE_NAME) {
-      return decodeURIComponent(value);
+      // Browser already decoded the cookie value
+      // Do NOT call decodeURIComponent() again - causes double decoding
+      return value;
     }
   }
   return null;

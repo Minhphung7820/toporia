@@ -6,6 +6,12 @@ import Register from '../pages/Register.vue';
 import ForgotPassword from '../pages/ForgotPassword.vue';
 import ResetPassword from '../pages/ResetPassword.vue';
 import ChangePassword from '../pages/ChangePassword.vue';
+
+// Error pages
+import Error403 from '../pages/errors/Error403.vue';
+import Error404 from '../pages/errors/Error404.vue';
+import Error500 from '../pages/errors/Error500.vue';
+
 import { useAuthStore } from '../stores/auth';
 
 const routes = [
@@ -48,6 +54,30 @@ const routes = [
         name: 'change-password',
         component: ChangePassword,
         meta: { requiresAuth: true },
+    },
+
+    // Error pages
+    {
+        path: '/error/403',
+        name: 'error-403',
+        component: Error403,
+    },
+    {
+        path: '/error/404',
+        name: 'error-404',
+        component: Error404,
+    },
+    {
+        path: '/error/500',
+        name: 'error-500',
+        component: Error500,
+    },
+
+    // Catch-all 404 route (must be last)
+    {
+        path: '/:pathMatch(.*)*',
+        name: 'not-found',
+        component: Error404,
     },
 ];
 

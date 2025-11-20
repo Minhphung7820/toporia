@@ -46,11 +46,11 @@ final class CsrfProtection implements MiddlewareInterface
 
         // Validate token
         if (!$this->validateToken($token)) {
-            $response->setStatus(403);
+            $response->setStatus(419);
             $response->json([
                 'error' => 'CSRF token mismatch',
                 'message' => 'The CSRF token is invalid or has expired. Please reload the page and try again.'
-            ], 403);
+            ], 419);
             return null; // Short-circuit
         }
 
@@ -94,19 +94,27 @@ final class CsrfProtection implements MiddlewareInterface
         }
 
         // Try headers (SPA typically sends X-XSRF-TOKEN header)
+        // Headers may be URL-encoded by browser/client, so decode them
         $headerToken = $request->header('X-CSRF-TOKEN')
             ?? $request->header('X-XSRF-TOKEN');
 
         if ($headerToken !== null && $headerToken !== '') {
-            return $headerToken;
+            // Decode URL-encoded header value if needed
+            // urldecode is safe - it only affects %XX sequences
+            // CSRF tokens are hex strings, but browsers may encode them anyway
+            return urldecode($headerToken);
         }
 
         // Try cookie directly (fallback for SPA)
         // Cookie name is XSRF-TOKEN (standard SPA CSRF cookie name)
+        // PHP automatically URL-decodes cookie values in $_COOKIE
+        // But if cookie was set with setcookie(), it may still be encoded
         if (isset($_COOKIE[self::CSRF_COOKIE_NAME])) {
             $cookieToken = $_COOKIE[self::CSRF_COOKIE_NAME];
             if ($cookieToken !== null && $cookieToken !== '') {
-                return $cookieToken;
+                // Decode in case cookie value is still URL-encoded
+                // urldecode is idempotent for non-encoded strings
+                return urldecode($cookieToken);
             }
         }
 
