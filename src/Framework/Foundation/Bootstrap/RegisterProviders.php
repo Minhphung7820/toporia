@@ -32,8 +32,14 @@ final class RegisterProviders
             ...FrameworkServiceProvider::providers(),
 
             // Application providers
+            // DomainServiceProvider: Registers all domain-level services (Repositories, UnitOfWork, Auth)
+            // This provider manages dependency order internally, eliminating inter-provider dependencies
+            \App\Infrastructure\Providers\DomainServiceProvider::class,
+
+            // Application-level services (Business logic, Kafka, etc.)
             \App\Infrastructure\Providers\AppServiceProvider::class,
-            \App\Infrastructure\Providers\RepositoryServiceProvider::class,
+
+            // Infrastructure services
             \App\Infrastructure\Providers\EventServiceProvider::class,
             \App\Infrastructure\Providers\RouteServiceProvider::class,
             \App\Infrastructure\Providers\ScheduleServiceProvider::class,

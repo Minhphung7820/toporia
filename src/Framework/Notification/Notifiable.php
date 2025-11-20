@@ -47,11 +47,12 @@ trait Notifiable
      * Send a notification to this entity.
      *
      * Convenience method that delegates to NotificationManager.
+     * Renamed from notify() to sendNotification() to avoid conflict with Observable::notify()
      *
      * @param NotificationInterface $notification
      * @return void
      */
-    public function notify(NotificationInterface $notification): void
+    public function sendNotification(NotificationInterface $notification): void
     {
         app('notification')->send($this, $notification);
     }
@@ -66,6 +67,6 @@ trait Notifiable
     public function notifyLater(NotificationInterface $notification, string $queueName = 'notifications'): void
     {
         $notification->onQueue($queueName);
-        $this->notify($notification);
+        $this->sendNotification($notification);
     }
 }

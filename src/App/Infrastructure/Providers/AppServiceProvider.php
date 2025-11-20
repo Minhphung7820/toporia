@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Providers;
 
-use App\Domain\Contracts\Repository\UserRepository;
 use App\Domain\Contracts\Services\TopicServiceInterface;
 use App\Domain\Contracts\Services\HealthCheckerInterface;
 use App\Domain\Contracts\Services\ClusterFixerInterface;
-use App\Infrastructure\Repository\InMemoryUserRepository;
 use App\Infrastructure\Services\Kafka\KafkaTopicService;
 use App\Infrastructure\Services\Kafka\KafkaHealthChecker;
 use App\Infrastructure\Services\Kafka\KafkaClusterIdFixer;
-use App\Infrastructure\Auth\RepositoryUserProvider;
 use App\Presentation\Console\Kernel;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Realtime\RealtimeManager;
-use Toporia\Framework\Auth\Contracts\UserProviderInterface;
 
 /**
  * Application Service Provider
@@ -34,15 +30,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(ContainerInterface $container): void
     {
-        // User Repository - Singleton
-        // TODO: Replace InMemoryUserRepository with PdoUserRepository for production
-        $container->singleton(UserRepository::class, fn() => new InMemoryUserRepository());
-
-        // User Provider - Required by AuthServiceProvider for authentication guards
-        // Bridges authentication system with domain UserRepository
-        $container->singleton(UserProviderInterface::class, function (ContainerInterface $c) {
-            return new RepositoryUserProvider($c->get(UserRepository::class));
-        });
+        // NOTE: UserRepository and UserProvider are now registered in DomainServiceProvider
+        // This eliminates inter-provider dependency issues
 
         // Kafka Services - Register domain interfaces with infrastructure implementations
         $container->singleton(HealthCheckerInterface::class, function (ContainerInterface $c) {

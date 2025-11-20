@@ -176,4 +176,42 @@ final class User implements FrameworkAuthenticatable
             new \DateTimeImmutable()
         );
     }
+
+    /**
+     * Create a new User with updated created_at timestamp.
+     *
+     * @param \DateTimeImmutable $createdAt Creation timestamp.
+     * @return self New User instance.
+     */
+    public function withCreatedAt(\DateTimeImmutable $createdAt): self
+    {
+        return new self(
+            $this->id,
+            $this->email,
+            $this->password,
+            $this->name,
+            $this->rememberToken,
+            $createdAt,
+            $this->updatedAt
+        );
+    }
+
+    /**
+     * Create a new User with updated updated_at timestamp.
+     *
+     * @param \DateTimeImmutable $updatedAt Last update timestamp.
+     * @return self New User instance.
+     */
+    public function withUpdatedAt(\DateTimeImmutable $updatedAt): self
+    {
+        return new self(
+            $this->id,
+            $this->email,
+            $this->password,
+            $this->name,
+            $this->rememberToken,
+            $this->createdAt,
+            $updatedAt
+        );
+    }
 }
