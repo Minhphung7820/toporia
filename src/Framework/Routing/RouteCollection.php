@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Routing;
 
 use Toporia\Framework\Routing\Contracts\{RouteCollectionInterface, RouteInterface};
+
 /**
  * Collection of routes with efficient lookup.
  *
