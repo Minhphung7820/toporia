@@ -10,14 +10,33 @@ use Toporia\Framework\Cache\Contracts\CacheInterface;
 /**
  * Cache-based Rate Limiter
  *
- * Uses cache backend for rate limiting with sliding window algorithm.
+ * Uses cache backend for rate limiting with fixed window algorithm.
  * Works with any cache driver (File, Redis, Memory).
+ *
+ * Rate Limiting Behavior:
+ * - Fixed Window: Reset time is fixed when limit is first reached
+ * - No penalty accumulation: Spamming after rate limit doesn't increase wait time
+ * - Reset time decreases naturally: "Try again in 60s" → "Try again in 50s" → etc.
+ *
+ * To enable "sliding window" (reset timer on each violation):
+ * - Uncomment the code in tooManyAttempts() method
+ * - This will reset/extend reset time each time rate limit is exceeded
  */
 final class CacheRateLimiter implements RateLimiterInterface
 {
+    /**
+     * @var bool Whether to reset timer on each violation (sliding window behavior)
+     * If true: Each spam request extends reset time
+     * If false: Reset time is fixed (current behavior)
+     */
+    private bool $resetOnViolation = false;
+
     public function __construct(
-        private CacheInterface $cache
-    ) {}
+        private CacheInterface $cache,
+        bool $resetOnViolation = false
+    ) {
+        $this->resetOnViolation = $resetOnViolation;
+    }
 
     public function attempt(string $key, int $maxAttempts, int $decaySeconds): bool
     {
@@ -31,23 +50,39 @@ final class CacheRateLimiter implements RateLimiterInterface
 
     public function tooManyAttempts(string $key, int $maxAttempts): bool
     {
+        $resetTime = $this->cache->get($this->resetTimeKey($key));
+        $currentTime = time();
+
+        // If resetTime has expired, reset attempts counter
+        // This fixes the bug where attempts still exist after reset time expires
+        if ($resetTime !== null && $resetTime < $currentTime) {
+            // Reset time expired - clear attempts to allow new requests
+            $this->cache->delete($this->attemptsKey($key));
+            $this->cache->delete($this->resetTimeKey($key));
+
+            // Now check if attempts still exist (should be 0 after delete)
+            // But if cache TTL hasn't expired, attempts might still exist
+            // So we check again
+        }
+
         $attempts = $this->attempts($key);
         $exceeded = $attempts >= $maxAttempts;
 
-        // If rate limit is exceeded but resetTime is not set, we need to set it
-        // This ensures availableIn() can calculate retry_after correctly
         if ($exceeded) {
-            $resetTime = $this->cache->get($this->resetTimeKey($key));
-            if ($resetTime === null) {
-                // ResetTime not set - this happens when rate limit is exceeded
-                // but hit() was never called (request was blocked before hit())
-                // We need to estimate reset time based on when the limit was first reached
-                // Since we don't know the exact decay, we'll use a default
-                // The actual fix should be in hit() to always set resetTime
-                // But this is a safety fallback
+            if ($resetTime === null || $resetTime < $currentTime) {
+                // ResetTime not set or expired - set new reset time
                 $defaultDecay = 60; // Default 60 seconds
-                $this->cache->set($this->resetTimeKey($key), time() + $defaultDecay, $defaultDecay);
+                $this->cache->set($this->resetTimeKey($key), $currentTime + $defaultDecay, $defaultDecay);
+            } elseif ($this->resetOnViolation) {
+                // SLIDING WINDOW: Reset timer on each violation
+                // Each spam request extends the reset time
+                $defaultDecay = 60; // Should ideally get from decaySeconds parameter
+                $newResetTime = $currentTime + $defaultDecay;
+                $this->cache->set($this->resetTimeKey($key), $newResetTime, $defaultDecay);
             }
+            // FIXED WINDOW (default): Keep reset time fixed
+            // Reset time decreases naturally: 60s → 50s → 40s → ... → 0s
+            // Spamming doesn't extend the wait time
         }
 
         return $exceeded;
