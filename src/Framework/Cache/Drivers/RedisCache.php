@@ -43,17 +43,20 @@ final class RedisCache implements CacheInterface
     public static function fromConfig(array $config, string $prefix = 'cache:'): self
     {
         $redis = new Redis();
-        $redis->connect(
-            $config['host'] ?? '127.0.0.1',
-            $config['port'] ?? 6379
-        );
+
+        // CRITICAL: Cast port to int - env() returns string, but Redis::connect() requires int
+        $host = $config['host'] ?? '127.0.0.1';
+        $port = isset($config['port']) ? (int) $config['port'] : 6379;
+
+        $redis->connect($host, $port);
 
         if (!empty($config['password'])) {
             $redis->auth($config['password']);
         }
 
+        // CRITICAL: Cast database to int - env() returns string
         if (isset($config['database'])) {
-            $redis->select($config['database']);
+            $redis->select((int) $config['database']);
         }
 
         return new self($redis, $prefix);
@@ -61,13 +64,60 @@ final class RedisCache implements CacheInterface
 
     public function get(string $key, mixed $default = null): mixed
     {
-        $value = $this->redis->get($this->prefixKey($key));
+        $prefixedKey = $this->prefixKey($key);
+        $value = $this->redis->get($prefixedKey);
 
-        if ($value === false) {
+        // Redis::get() returns false if key doesn't exist
+        if ($value === false || $value === null) {
             return $default;
         }
 
-        return unserialize($value);
+        // CRITICAL: Handle both raw integers (from INCRBY) and serialized values
+        // Raw integers from increment() are stored without serialization for performance
+        if (is_numeric($value) && is_string($value)) {
+            // This might be a raw integer string from increment operations
+            // Check if it's actually serialized by trying unserialize
+            $unserialized = @unserialize($value);
+            if ($unserialized !== false) {
+                // It was serialized after all
+                return $unserialized;
+            }
+            // It's a raw integer string - return as integer
+            return (int)$value;
+        }
+
+        // If value is already integer (from Redis GET on integer key)
+        if (is_int($value)) {
+            return $value;
+        }
+
+        // CRITICAL: Handle unserialize errors gracefully
+        // If data is corrupted or not serialized, return default instead of throwing error
+        try {
+            // Check if value looks like serialized data (PHP serialized strings start with specific chars)
+            // This helps detect corrupted or non-serialized data early
+            if (is_string($value) && strlen($value) > 0 && !preg_match('/^[aOdNs]:/', $value) && $value !== serialize(false) && $value !== serialize(null)) {
+                // Value doesn't look like serialized data - might be corrupted
+                // But don't delete yet, try unserialize first
+            }
+
+            $unserialized = @unserialize($value, ['allowed_classes' => true]);
+
+            // @unserialize returns false if data cannot be unserialized
+            // But false is also a valid value, so check if original was serialized false
+            if ($unserialized === false && $value !== serialize(false) && $value !== 'b:0;') {
+                // Data is corrupted or not serialized - delete it and return default
+                $this->redis->del($prefixedKey);
+                return $default;
+            }
+
+            return $unserialized;
+        } catch (\Throwable $e) {
+            // Corrupted data - delete it and return default
+            error_log("RedisCache unserialize error for key {$prefixedKey}: " . $e->getMessage());
+            $this->redis->del($prefixedKey);
+            return $default;
+        }
     }
 
     public function set(string $key, mixed $value, ?int $ttl = null): bool
@@ -112,7 +162,30 @@ final class RedisCache implements CacheInterface
 
         $result = [];
         foreach ($keys as $i => $key) {
-            $result[$key] = $values[$i] !== false ? unserialize($values[$i]) : $default;
+            $value = $values[$i];
+
+            // Handle false/null from Redis
+            if ($value === false || $value === null) {
+                $result[$key] = $default;
+                continue;
+            }
+
+            // CRITICAL: Handle unserialize errors gracefully
+            try {
+                $unserialized = @unserialize($value);
+
+                if ($unserialized === false && $value !== serialize(false)) {
+                    // Corrupted data - delete and use default
+                    $this->redis->del($prefixedKeys[$i]);
+                    $result[$key] = $default;
+                } else {
+                    $result[$key] = $unserialized;
+                }
+            } catch (\Throwable $e) {
+                // Corrupted data - delete and use default
+                $this->redis->del($prefixedKeys[$i]);
+                $result[$key] = $default;
+            }
         }
 
         return $result;
@@ -147,8 +220,44 @@ final class RedisCache implements CacheInterface
 
     public function increment(string $key, int $value = 1): int|false
     {
-        $result = $this->redis->incrBy($this->prefixKey($key), $value);
-        return $result !== false ? (int)$result : false;
+        $prefixedKey = $this->prefixKey($key);
+
+        // CRITICAL: Redis INCRBY requires integer values, not serialized strings
+        // Check if key exists and is serialized
+        $existing = $this->redis->get($prefixedKey);
+
+        if ($existing === false) {
+            // Key doesn't exist - set integer value directly (not serialized)
+            $this->redis->set($prefixedKey, $value);
+            return $value;
+        }
+
+        // Check if value is serialized or raw integer
+        // Serialized integers look like "i:1;" or "s:1:"1""
+        // Raw integers from Redis INCRBY are just integers
+        if (is_numeric($existing)) {
+            // Value is already an integer - use INCRBY directly
+            $result = $this->redis->incrBy($prefixedKey, $value);
+            return $result !== false ? (int)$result : false;
+        }
+
+        // Value is serialized - unserialize, increment, serialize back
+        try {
+            $unserialized = @unserialize($existing);
+
+            if (is_numeric($unserialized)) {
+                $newValue = (int)$unserialized + $value;
+                // Store as raw integer for future INCRBY operations
+                $this->redis->set($prefixedKey, $newValue);
+                return $newValue;
+            }
+
+            // Not a numeric value - cannot increment
+            return false;
+        } catch (\Throwable $e) {
+            // Corrupted data - cannot increment
+            return false;
+        }
     }
 
     public function decrement(string $key, int $value = 1): int|false
@@ -215,4 +324,3 @@ final class RedisCache implements CacheInterface
         return $this->prefix . $key;
     }
 }
-
