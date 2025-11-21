@@ -25,6 +25,11 @@ use Toporia\Framework\Cache\Contracts\CacheInterface;
 final class CacheRateLimiter implements RateLimiterInterface
 {
     /**
+     * Default decay time in seconds (used as fallback when decay unknown).
+     */
+    private const DEFAULT_DECAY_SECONDS = 60;
+
+    /**
      * @var bool Whether to reset timer on each violation (sliding window behavior)
      * If true: Each spam request extends reset time
      * If false: Reset time is fixed (current behavior)
@@ -50,42 +55,64 @@ final class CacheRateLimiter implements RateLimiterInterface
 
     public function tooManyAttempts(string $key, int $maxAttempts): bool
     {
-        $resetTime = $this->cache->get($this->resetTimeKey($key));
+        // Validate input
+        if ($maxAttempts <= 0) {
+            return false; // No limit if maxAttempts <= 0
+        }
+
         $currentTime = time();
+        $resetTime = $this->cache->get($this->resetTimeKey($key));
 
         // If resetTime has expired, reset attempts counter
         // This fixes the bug where attempts still exist after reset time expires
         if ($resetTime !== null && $resetTime < $currentTime) {
-            // Reset time expired - clear attempts to allow new requests
-            $this->cache->delete($this->attemptsKey($key));
-            $this->cache->delete($this->resetTimeKey($key));
-
-            // Now check if attempts still exist (should be 0 after delete)
-            // But if cache TTL hasn't expired, attempts might still exist
-            // So we check again
+            $this->resetAttempts($key);
+            $resetTime = null; // Mark as reset
         }
 
+        // Check attempts after potential reset
         $attempts = $this->attempts($key);
         $exceeded = $attempts >= $maxAttempts;
 
+        // If rate limit exceeded, ensure resetTime is set
         if ($exceeded) {
-            if ($resetTime === null || $resetTime < $currentTime) {
-                // ResetTime not set or expired - set new reset time
-                $defaultDecay = 60; // Default 60 seconds
-                $this->cache->set($this->resetTimeKey($key), $currentTime + $defaultDecay, $defaultDecay);
-            } elseif ($this->resetOnViolation) {
-                // SLIDING WINDOW: Reset timer on each violation
-                // Each spam request extends the reset time
-                $defaultDecay = 60; // Should ideally get from decaySeconds parameter
-                $newResetTime = $currentTime + $defaultDecay;
-                $this->cache->set($this->resetTimeKey($key), $newResetTime, $defaultDecay);
-            }
-            // FIXED WINDOW (default): Keep reset time fixed
-            // Reset time decreases naturally: 60s → 50s → 40s → ... → 0s
-            // Spamming doesn't extend the wait time
+            $this->ensureResetTime($key, $resetTime, $currentTime);
         }
 
         return $exceeded;
+    }
+
+    /**
+     * Ensure reset time is set when rate limit is exceeded.
+     *
+     * @param string $key
+     * @param int|null $existingResetTime
+     * @param int $currentTime
+     * @return void
+     */
+    private function ensureResetTime(string $key, ?int $existingResetTime, int $currentTime): void
+    {
+        // If resetTime doesn't exist or expired, set new one
+        if ($existingResetTime === null || $existingResetTime < $currentTime) {
+            $decay = self::DEFAULT_DECAY_SECONDS;
+            $this->cache->set(
+                $this->resetTimeKey($key),
+                $currentTime + $decay,
+                $decay
+            );
+            return;
+        }
+
+        // Sliding window: Reset timer on each violation
+        if ($this->resetOnViolation) {
+            $decay = self::DEFAULT_DECAY_SECONDS;
+            $this->cache->set(
+                $this->resetTimeKey($key),
+                $currentTime + $decay,
+                $decay
+            );
+        }
+        // Fixed window (default): Keep reset time unchanged
     }
 
     public function attempts(string $key): int
@@ -110,10 +137,9 @@ final class CacheRateLimiter implements RateLimiterInterface
             $attempts = $this->attempts($key);
 
             if ($attempts > 0) {
-                // Attempts exist but no reset time - this is a bug
-                // Reset time should have been set when first request hit the limit
-                // Use provided decaySeconds or default 60 seconds as fallback
-                $decay = $decaySeconds ?? 60;
+                // Attempts exist but no reset time - estimate based on decay
+                // Use provided decaySeconds or default as fallback
+                $decay = $decaySeconds ?? self::DEFAULT_DECAY_SECONDS;
                 $resetTime = time() + $decay;
 
                 // Store reset time for future calls with proper TTL
@@ -151,7 +177,7 @@ final class CacheRateLimiter implements RateLimiterInterface
      * @param int $decaySeconds
      * @return int New attempt count
      */
-    public function hit(string $key, int $decaySeconds = 60): int
+    public function hit(string $key, int $decaySeconds = self::DEFAULT_DECAY_SECONDS): int
     {
         $attemptsKey = $this->attemptsKey($key);
         $resetTimeKey = $this->resetTimeKey($key);
