@@ -67,7 +67,7 @@ return [
             fn($container) => ThrottleRequests::with(
                 $container->get('rate_limiter'),
                 20,  // max attempts (increased from 60)
-                1     // decay minutes
+                2     // decay minutes
             ),
             // ValidateFormRequest is now handled automatically by Router (no middleware needed)
             // LogRequest::class,         // Uncomment to log API requests

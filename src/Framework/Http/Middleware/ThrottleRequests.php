@@ -27,7 +27,8 @@ final class ThrottleRequests implements MiddlewareInterface
     {
         $key = $this->resolveRequestSignature($request);
 
-        if ($this->limiter->tooManyAttempts($key, $this->maxAttempts)) {
+        $decaySeconds = $this->decayMinutes * 60;
+        if ($this->limiter->tooManyAttempts($key, $this->maxAttempts, $decaySeconds)) {
             return $this->buildRateLimitResponse($response, $key);
         }
 

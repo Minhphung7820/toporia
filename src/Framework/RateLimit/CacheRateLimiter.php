@@ -45,7 +45,7 @@ final class CacheRateLimiter implements RateLimiterInterface
 
     public function attempt(string $key, int $maxAttempts, int $decaySeconds): bool
     {
-        if ($this->tooManyAttempts($key, $maxAttempts)) {
+        if ($this->tooManyAttempts($key, $maxAttempts, $decaySeconds)) {
             return false;
         }
 
@@ -53,7 +53,7 @@ final class CacheRateLimiter implements RateLimiterInterface
         return true;
     }
 
-    public function tooManyAttempts(string $key, int $maxAttempts): bool
+    public function tooManyAttempts(string $key, int $maxAttempts, ?int $decaySeconds = null): bool
     {
         // Validate input
         if ($maxAttempts <= 0) {
@@ -133,22 +133,42 @@ final class CacheRateLimiter implements RateLimiterInterface
 
         // CRITICAL FIX: When rate limit is FIRST exceeded, reset resetTime to NOW + decaySeconds
         // This ensures user waits the FULL decaySeconds from when they exceed, not from window start
+        // But we should ONLY reset if resetTime was set at window start, not if it was already reset
 
-        // Calculate when resetTime was originally set
+        // Calculate when resetTime was originally set (window start time)
+        // If resetTime = now + decay, then originalResetTime = now
+        // If resetTime was set from window start, originalResetTime would be in the past
         $originalResetTime = $existingResetTime - $decay;
-        $timeSinceResetSet = $currentTime - $originalResetTime;
+        $timeSinceWindowStart = $currentTime - $originalResetTime;
 
-        // If resetTime was set more than a few seconds ago (at window start),
-        // reset it to NOW to ensure user waits full decaySeconds from when they exceed
-        // Use 2s buffer to account for timing differences and ensure we catch window start case
-        if ($timeSinceResetSet > 2) {
-            // ResetTime was set at window start, not when limit was exceeded
+        // Calculate how much time is left in the current resetTime
+        $timeLeftInResetTime = $existingResetTime - $currentTime;
+
+        // CRITICAL: Only reset if resetTime was set from window start (not from exceeding limit)
+        // Check if we already reset when exceeding (using a flag in cache)
+        $resetFlagKey = $this->resetFlagKey($key);
+        $alreadyResetWhenExceeded = $this->cache->get($resetFlagKey);
+
+        // If already reset when exceeded, don't reset again
+        if ($alreadyResetWhenExceeded) {
+            return; // Already reset, keep current resetTime
+        }
+
+        // Check if resetTime was set from window start (more than 3s ago)
+        $wasSetFromWindowStart = $timeSinceWindowStart > 3;
+
+        // If resetTime was set from window start, reset it to NOW + decaySeconds
+        // and set flag to prevent resetting again
+        if ($wasSetFromWindowStart) {
             // Reset to NOW to ensure user waits full decaySeconds from when they exceed
             $this->cache->set(
                 $this->resetTimeKey($key),
                 $currentTime + $decay,
                 $decay
             );
+            // Set flag to indicate we already reset when exceeding
+            // Flag expires when resetTime expires
+            $this->cache->set($resetFlagKey, true, $decay);
             return;
         }
 
@@ -305,5 +325,16 @@ final class CacheRateLimiter implements RateLimiterInterface
     private function resetTimeKey(string $key): string
     {
         return "rate_limit:{$key}:reset";
+    }
+
+    /**
+     * Get the cache key for reset flag (tracks if resetTime was reset when exceeding)
+     *
+     * @param string $key
+     * @return string
+     */
+    private function resetFlagKey(string $key): string
+    {
+        return "rate_limit:{$key}:reset_flag";
     }
 }

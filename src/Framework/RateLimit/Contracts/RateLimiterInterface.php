@@ -27,9 +27,10 @@ interface RateLimiterInterface
      *
      * @param string $key
      * @param int $maxAttempts
+     * @param int|null $decaySeconds Optional decay seconds to use when resetting time
      * @return bool True if too many attempts
      */
-    public function tooManyAttempts(string $key, int $maxAttempts): bool;
+    public function tooManyAttempts(string $key, int $maxAttempts, ?int $decaySeconds = null): bool;
 
     /**
      * Get the number of attempts for a key
