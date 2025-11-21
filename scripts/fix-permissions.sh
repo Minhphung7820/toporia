@@ -2,7 +2,7 @@
 
 # Fix permissions for Toporia project in WSL2
 # This script runs automatically after npm install (via postinstall hook)
-# You can also run it manually: bash fix-permissions.sh
+# You can also run it manually: bash scripts/fix-permissions.sh
 
 echo "🔧 Fixing file permissions for node_modules..."
 
