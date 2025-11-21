@@ -52,9 +52,10 @@ interface RateLimiterInterface
      * Get the time until the rate limit resets
      *
      * @param string $key
+     * @param int|null $decaySeconds Optional decay seconds to use as fallback if reset time not set
      * @return int Seconds until reset
      */
-    public function availableIn(string $key): int;
+    public function availableIn(string $key, ?int $decaySeconds = null): int;
 
     /**
      * Clear all attempts for a key

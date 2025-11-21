@@ -50,7 +50,16 @@ final class ThrottleRequests implements MiddlewareInterface
      */
     private function buildRateLimitResponse(Response $response, string $key): null
     {
-        $retryAfter = $this->limiter->availableIn($key);
+        // Ensure we have a valid retry after time
+        // Pass decaySeconds to availableIn() to help calculate reset time if not set
+        $decaySeconds = $this->decayMinutes * 60;
+        $retryAfter = $this->limiter->availableIn($key, $decaySeconds);
+
+        // Fallback: If retryAfter is still 0 or negative, use decaySeconds
+        // This ensures we always show a meaningful retry time
+        if ($retryAfter <= 0) {
+            $retryAfter = $decaySeconds;
+        }
 
         $response->setStatus(429);
         $response->header('Retry-After', (string)$retryAfter);
