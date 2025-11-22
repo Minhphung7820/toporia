@@ -681,5 +681,3 @@ class OrderTrackingObserver
         $this->callOrder[] = 'created';
     }
 }
-
-
