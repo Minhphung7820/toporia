@@ -1,31 +1,67 @@
 #!/bin/bash
+# Fix permissions for Node.js executables
+# This script ensures all binaries in node_modules/.bin/ have execute permissions
+# and all JavaScript files in bin/ directories can be executed
 
-# Fix permissions for Toporia project in WSL2
-# This script runs automatically after npm install (via postinstall hook)
-# You can also run it manually: bash scripts/fix-permissions.sh
+set -e
 
-echo "🔧 Fixing file permissions for node_modules..."
+echo "=== Fixing Node.js executable permissions ==="
 
-# Fix node_modules executables (all files in .bin directory)
+# Get the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+cd "$PROJECT_ROOT"
+
+# Check if node_modules exists
+if [ ! -d "node_modules" ]; then
+    echo "⚠️  node_modules directory not found. Skipping permission fix."
+    exit 0
+fi
+
+echo "📁 Fixing permissions in node_modules/.bin/..."
+
+# Fix permissions for all symlinks and files in node_modules/.bin/
 if [ -d "node_modules/.bin" ]; then
-    echo "  → Fixing node_modules/.bin executables..."
-    find node_modules/.bin -type f -exec chmod +x {} \; 2>/dev/null
+    # Add execute permission to all files and symlinks in .bin directory
+    find node_modules/.bin -type f -exec chmod +x {} \; 2>/dev/null || true
+    find node_modules/.bin -type l -exec chmod +x {} \; 2>/dev/null || true
+
+    echo "✓ Fixed permissions for node_modules/.bin/"
+else
+    echo "⚠️  node_modules/.bin/ directory not found"
 fi
 
-# Fix vite binary specifically
+echo "📁 Fixing permissions for JavaScript bin files..."
+
+# Fix permissions for all JavaScript files in bin/ directories
+# These are the actual executables that symlinks point to
+find node_modules -type f -path "*/bin/*.js" -exec chmod +x {} \; 2>/dev/null || true
+find node_modules -type f -path "*/bin/*.sh" -exec chmod +x {} \; 2>/dev/null || true
+find node_modules -type f -path "*/bin/*" ! -name "*.json" -exec chmod +x {} \; 2>/dev/null || true
+
+echo "✓ Fixed permissions for bin files"
+
+# Fix specific common binaries that might have permission issues
 if [ -f "node_modules/vite/bin/vite.js" ]; then
-    chmod +x node_modules/vite/bin/vite.js 2>/dev/null
+    chmod +x node_modules/vite/bin/vite.js
+    echo "✓ Fixed vite.js"
 fi
 
-# Fix esbuild binaries
-if [ -d "node_modules/@esbuild" ]; then
-    echo "  → Fixing esbuild binaries..."
-    find node_modules/@esbuild -type f -name "esbuild*" -exec chmod +x {} \; 2>/dev/null
+if [ -f "node_modules/esbuild/bin/esbuild" ]; then
+    chmod +x node_modules/esbuild/bin/esbuild 2>/dev/null || true
+    echo "✓ Fixed esbuild"
 fi
 
-# Fix other common binary directories
-if [ -d "node_modules/.vite" ]; then
-    find node_modules/.vite -type f -exec chmod +x {} \; 2>/dev/null 2>/dev/null
-fi
+echo "✅ All permissions fixed successfully!"
+echo ""
 
-echo "✅ Node modules permissions fixed!"
+# Verify that vite can be executed
+if [ -f "node_modules/.bin/vite" ]; then
+    if [ -x "node_modules/.bin/vite" ]; then
+        echo "✓ vite is executable"
+    else
+        echo "⚠️  WARNING: vite is still not executable"
+        exit 1
+    fi
+fi

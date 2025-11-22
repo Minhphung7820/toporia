@@ -85,6 +85,10 @@ RUN composer require enqueue/rdkafka --no-interaction --ignore-platform-reqs || 
 COPY docker/php/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# CRITICAL: Copy custom PHP-FPM pool config to listen on all interfaces
+# This allows Nginx container to connect via Docker network
+COPY docker/php/www.conf /usr/local/etc/php-fpm.d/www.conf
+
 # Copy application code
 COPY . .
 
