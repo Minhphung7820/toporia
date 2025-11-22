@@ -1,63 +1,155 @@
-# Composer
-/vendor
+# ==========================================
+# Composer Dependencies
+# ==========================================
+/vendor/
 composer.lock
 
-# Environment
+# ==========================================
+# Environment & Configuration
+# ==========================================
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
-# IDE
+# ==========================================
+# Storage & Runtime Files
+# ==========================================
+# Storage directories
+/storage/app/*
+!/storage/app/.gitkeep
+!/storage/app/public/
+!/storage/app/public/.gitkeep
+
+/storage/cache/*
+!/storage/cache/.gitkeep
+
+/storage/logs/*
+!/storage/logs/.gitkeep
+
+/storage/sessions/*
+!/storage/sessions/.gitkeep
+
+/storage/temp/*
+!/storage/temp/.gitkeep
+
+# Queue & Process files
+/storage/queue-worker.pid
+*.pid
+
+# Bootstrap cache (if framework generates it)
+/bootstrap/cache/*
+!/bootstrap/cache/.gitkeep
+
+# ==========================================
+# Node.js & Frontend
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ==========================================
+# Build Artifacts
+# ==========================================
+/build/
+/dist/
+/public/build/
+!/public/build/.gitkeep
+/public/hot
+/public/storage
+!/public/storage/.gitkeep
+
+# Vite
+.vite/
+
+# ==========================================
+# Testing
+# ==========================================
+.phpunit.cache/
+.phpunit.result.cache
+/coverage/
+*.phpunit.result.cache
+/clover.xml
+
+# ==========================================
+# IDE & Editor Files
+# ==========================================
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
 
-# OS
+# ==========================================
+# OS Files
+# ==========================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
 
-# Logs
+# ==========================================
+# Temporary & Backup Files
+# ==========================================
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+*.swp
+*.swo
+
+# ==========================================
+# Docker
+# ==========================================
+# Docker volumes (if using local volumes)
+/docker-data/
+
+# ==========================================
+# Logs (all locations)
+# ==========================================
 *.log
-/storage/logs/*.log
+logs/
+*.log.*
 
-# Cache
-/storage/cache/*
-!/storage/cache/.gitkeep
+# ==========================================
+# Deployment & CI/CD
+# ==========================================
+deployment/
+.vercel/
+.netlify/
 
-# Session
-/storage/sessions/*
-!/storage/sessions/.gitkeep
+# ==========================================
+# Framework Specific
+# ==========================================
+# Config symlinks (actual files are in configs/)
+/.npmrc
+/.nvmrc
+/.dockerignore
 
-# Temp files
-/storage/temp/*
-!/storage/temp/.gitkeep
-
-# Claude Code AI
+# Claude Code AI (optional - can be committed if needed)
 CLAUDE.md
 
-# Node modules (if using frontend assets)
-node_modules/
-npm-debug.log
-yarn-error.log
-
-# Build artifacts
-/build/
-/dist/
-
-# Vite Build Output
-public/build/
-!public/build/.gitkeep
-
-# Testing
-.phpunit.result.cache
-.phpunit.cache
-/coverage/
-
-# Deployment
-deployment/
-
-# Docs & Examples
+# ==========================================
+# Documentation & Examples
+# ==========================================
+# Uncomment if you want to ignore docs/examples
 #docs/
-examples/
+#examples/
