@@ -132,7 +132,7 @@ logs/
 # ==========================================
 # Deployment & CI/CD
 # ==========================================
-deployment/
+# deployment/ - Removed (was not used)
 .vercel/
 .netlify/
 
@@ -150,6 +150,6 @@ CLAUDE.md
 # ==========================================
 # Documentation & Examples
 # ==========================================
-# Uncomment if you want to ignore docs/examples
+# examples/ - Removed (was not used)
+# Uncomment if you want to ignore docs
 #docs/
-#examples/
