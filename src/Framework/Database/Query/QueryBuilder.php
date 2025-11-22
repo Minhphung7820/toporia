@@ -28,6 +28,11 @@ use Toporia\Framework\Database\Query\RowCollection;
 class QueryBuilder implements QueryBuilderInterface
 {
     use \Toporia\Framework\Support\Macroable;
+    use Concerns\BuildsWhereClausesAdvanced;
+    use Concerns\BuildsSubqueries;
+    use Concerns\BuildsConditionalClauses;
+    use Concerns\BuildsUnions;
+    use Concerns\BuildsLocks;
     /**
      * Target table name.
      *
@@ -339,7 +344,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function whereNull(string $column): self
     {
         $this->wheres[] = [
-            'type' => 'null',
+            'type' => 'Null',
             'column' => $column,
             'boolean' => 'AND'
         ];
@@ -400,7 +405,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function whereRaw(string $sql, array $bindings = []): self
     {
         $this->wheres[] = [
-            'type' => 'raw',
+            'type' => 'Raw',
             'sql' => $sql,
             'boolean' => 'AND'
         ];
@@ -418,7 +423,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function whereNotNull(string $column): self
     {
         $this->wheres[] = [
-            'type' => 'not_null',
+            'type' => 'NotNull',
             'column' => $column,
             'boolean' => 'AND'
         ];
@@ -831,6 +836,146 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
+     * Increment a column's value.
+     *
+     * Example:
+     * ```php
+     * // Increment views by 1
+     * DB::table('posts')->where('id', 1)->increment('views');
+     *
+     * // Increment score by 10
+     * DB::table('users')->where('id', 1)->increment('score', 10);
+     *
+     * // Increment and update other columns
+     * DB::table('users')->where('id', 1)->increment('login_count', 1, [
+     *     'last_login' => now()
+     * ]);
+     * ```
+     *
+     * Performance: Single UPDATE query, atomic operation
+     *
+     * @param string $column Column to increment
+     * @param int|float $amount Amount to increment by (default: 1)
+     * @param array<string,mixed> $extra Extra columns to update
+     * @return int Number of affected rows
+     */
+    public function increment(string $column, int|float $amount = 1, array $extra = []): int
+    {
+        $sets = ["{$column} = {$column} + ?"];
+        $bindings = [$amount];
+
+        foreach ($extra as $col => $value) {
+            $sets[] = "{$col} = ?";
+            $bindings[] = $value;
+        }
+
+        // Add WHERE bindings
+        $bindings = array_merge($bindings, $this->bindings);
+
+        $sql = sprintf(
+            'UPDATE %s SET %s%s',
+            $this->table,
+            implode(', ', $sets),
+            $this->compileWheres()
+        );
+
+        return $this->connection->affectingStatement($sql, $bindings);
+    }
+
+    /**
+     * Decrement a column's value.
+     *
+     * Example:
+     * ```php
+     * // Decrement stock by 1
+     * DB::table('products')->where('id', 1)->decrement('stock');
+     *
+     * // Decrement balance by 100
+     * DB::table('wallets')->where('user_id', 1)->decrement('balance', 100);
+     *
+     * // Decrement and update other columns
+     * DB::table('products')->where('id', 1)->decrement('stock', 1, [
+     *     'updated_at' => now()
+     * ]);
+     * ```
+     *
+     * Performance: Single UPDATE query, atomic operation
+     *
+     * @param string $column Column to decrement
+     * @param int|float $amount Amount to decrement by (default: 1)
+     * @param array<string,mixed> $extra Extra columns to update
+     * @return int Number of affected rows
+     */
+    public function decrement(string $column, int|float $amount = 1, array $extra = []): int
+    {
+        $sets = ["{$column} = {$column} - ?"];
+        $bindings = [$amount];
+
+        foreach ($extra as $col => $value) {
+            $sets[] = "{$col} = ?";
+            $bindings[] = $value;
+        }
+
+        // Add WHERE bindings
+        $bindings = array_merge($bindings, $this->bindings);
+
+        $sql = sprintf(
+            'UPDATE %s SET %s%s',
+            $this->table,
+            implode(', ', $sets),
+            $this->compileWheres()
+        );
+
+        return $this->connection->affectingStatement($sql, $bindings);
+    }
+
+    /**
+     * Insert or update a record matching the attributes.
+     *
+     * Example:
+     * ```php
+     * // Update if exists, insert if not
+     * DB::table('users')->updateOrInsert(
+     *     ['email' => 'john@example.com'],  // Match condition
+     *     ['name' => 'John Doe', 'active' => true]  // Values to set
+     * );
+     * ```
+     *
+     * Performance:
+     * - 2 queries: SELECT + (UPDATE or INSERT)
+     * - For bulk operations, use upsert() instead
+     *
+     * @param array<string,mixed> $attributes Columns to match
+     * @param array<string,mixed> $values Values to set
+     * @return bool True if row was updated or inserted
+     */
+    public function updateOrInsert(array $attributes, array $values = []): bool
+    {
+        // Try to find existing record
+        $exists = $this->where(function($query) use ($attributes) {
+            foreach ($attributes as $column => $value) {
+                $query->where($column, $value);
+            }
+        })->exists();
+
+        if ($exists) {
+            // Update existing record
+            $this->where(function($query) use ($attributes) {
+                foreach ($attributes as $column => $value) {
+                    $query->where($column, $value);
+                }
+            })->update($values);
+
+            return true;
+        }
+
+        // Insert new record
+        $this->insert(array_merge($attributes, $values));
+
+        return true;
+    }
+
+    /**
      * Insert or update records (upsert).
      *
      * Inserts multiple records, and if a unique key conflict occurs,
@@ -1083,8 +1228,8 @@ class QueryBuilder implements QueryBuilderInterface
     {
         $distinct = $this->distinct ? 'DISTINCT ' : '';
 
-        return sprintf(
-            'SELECT %s%s FROM %s%s%s%s%s%s%s',
+        $sql = sprintf(
+            'SELECT %s%s FROM %s%s%s%s%s%s%s%s%s',
             $distinct,
             implode(', ', $this->columns),
             $this->table,
@@ -1094,8 +1239,12 @@ class QueryBuilder implements QueryBuilderInterface
             $this->compileHavings(),
             $this->compileOrders(),
             $this->compileLimit(),
-            $this->compileOffset()
+            $this->compileOffset(),
+            $this->compileLock()
         );
+
+        // Add unions if present
+        return $sql . $this->compileUnions();
     }
 
     /**
@@ -1195,13 +1344,23 @@ class QueryBuilder implements QueryBuilderInterface
             $boolean = $index === 0 ? 'WHERE' : $where['boolean'];
 
             $sql .= match ($where['type']) {
-                'basic'    => sprintf(' %s %s %s ?', $boolean, $where['column'], $where['operator']),
-                'in'       => sprintf(' %s %s IN (%s)', $boolean, $where['column'], implode(', ', array_fill(0, count($where['values']), '?'))),
-                'null'     => sprintf(' %s %s IS NULL', $boolean, $where['column']),
-                'not_null' => sprintf(' %s %s IS NOT NULL', $boolean, $where['column']),
-                'raw'      => sprintf(' %s %s', $boolean, $where['sql']),
-                'nested'   => $this->compileNestedWhere($where, $boolean),
-                default    => ''
+                'basic'      => sprintf(' %s %s %s ?', $boolean, $where['column'], $where['operator']),
+                'in'         => sprintf(' %s %s IN (%s)', $boolean, $where['column'], implode(', ', array_fill(0, count($where['values']), '?'))),
+                'Null'       => sprintf(' %s %s IS NULL', $boolean, $where['column']),
+                'NotNull'    => sprintf(' %s %s IS NOT NULL', $boolean, $where['column']),
+                'Raw'        => sprintf(' %s %s', $boolean, $where['sql']),
+                'nested'     => $this->compileNestedWhere($where, $boolean),
+                'DateBasic'  => sprintf(' %s DATE(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'MonthBasic' => sprintf(' %s MONTH(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'DayBasic'   => sprintf(' %s DAY(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'YearBasic'  => sprintf(' %s YEAR(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'TimeBasic'  => sprintf(' %s TIME(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'Column'     => sprintf(' %s %s %s %s', $boolean, $where['first'], $where['operator'], $where['second']),
+                'Exists'     => $this->compileExistsWhere($where, $boolean),
+                'NotExists'  => $this->compileNotExistsWhere($where, $boolean),
+                'InSub'      => $this->compileInSubWhere($where, $boolean),
+                'NotInSub'   => $this->compileNotInSubWhere($where, $boolean),
+                default      => ''
             };
         }
 
@@ -1235,6 +1394,66 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         return sprintf(' %s (%s)', $boolean, $nestedWheres);
+    }
+
+    /**
+     * Compile a WHERE EXISTS clause.
+     *
+     * @param array  $where   WHERE clause data containing 'query' key
+     * @param string $boolean Boolean operator (AND/OR/WHERE)
+     * @return string
+     */
+    private function compileExistsWhere(array $where, string $boolean): string
+    {
+        /** @var QueryBuilder $subquery */
+        $subquery = $where['query'];
+
+        return sprintf(' %s EXISTS (%s)', $boolean, $subquery->toSql());
+    }
+
+    /**
+     * Compile a WHERE NOT EXISTS clause.
+     *
+     * @param array  $where   WHERE clause data containing 'query' key
+     * @param string $boolean Boolean operator (AND/OR/WHERE)
+     * @return string
+     */
+    private function compileNotExistsWhere(array $where, string $boolean): string
+    {
+        /** @var QueryBuilder $subquery */
+        $subquery = $where['query'];
+
+        return sprintf(' %s NOT EXISTS (%s)', $boolean, $subquery->toSql());
+    }
+
+    /**
+     * Compile a WHERE IN subquery clause.
+     *
+     * @param array  $where   WHERE clause data containing 'column' and 'query' keys
+     * @param string $boolean Boolean operator (AND/OR/WHERE)
+     * @return string
+     */
+    private function compileInSubWhere(array $where, string $boolean): string
+    {
+        /** @var QueryBuilder $subquery */
+        $subquery = $where['query'];
+
+        return sprintf(' %s %s IN (%s)', $boolean, $where['column'], $subquery->toSql());
+    }
+
+    /**
+     * Compile a WHERE NOT IN subquery clause.
+     *
+     * @param array  $where   WHERE clause data containing 'column' and 'query' keys
+     * @param string $boolean Boolean operator (AND/OR/WHERE)
+     * @return string
+     */
+    private function compileNotInSubWhere(array $where, string $boolean): string
+    {
+        /** @var QueryBuilder $subquery */
+        $subquery = $where['query'];
+
+        return sprintf(' %s %s NOT IN (%s)', $boolean, $where['column'], $subquery->toSql());
     }
 
     /**
@@ -1316,6 +1535,66 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         return $sql;
+    }
+
+    /**
+     * Compile UNION clauses.
+     *
+     * Performance: O(N) where N = number of unions
+     *
+     * @return string
+     */
+    private function compileUnions(): string
+    {
+        if (empty($this->unions)) {
+            return '';
+        }
+
+        $sql = '';
+
+        foreach ($this->unions as $union) {
+            /** @var QueryBuilder $query */
+            $query = $union['query'];
+            $keyword = $union['all'] ? 'UNION ALL' : 'UNION';
+
+            $sql .= sprintf(' %s %s', $keyword, $query->toSql());
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Compile lock clause for pessimistic locking.
+     *
+     * Database-specific implementations:
+     * - MySQL/MariaDB: FOR UPDATE / LOCK IN SHARE MODE
+     * - PostgreSQL: FOR UPDATE / FOR SHARE
+     * - SQLite: Not supported (returns empty string)
+     *
+     * @return string
+     */
+    private function compileLock(): string
+    {
+        $lock = $this->getLock();
+
+        if ($lock === null) {
+            return '';
+        }
+
+        $driver = $this->connection->getDriverName();
+
+        return match ($lock) {
+            'update' => match ($driver) {
+                'mysql', 'pgsql' => ' FOR UPDATE',
+                default => '' // SQLite doesn't support locks
+            },
+            'shared' => match ($driver) {
+                'mysql' => ' LOCK IN SHARE MODE',
+                'pgsql' => ' FOR SHARE',
+                default => '' // SQLite doesn't support locks
+            },
+            default => ''
+        };
     }
 
     /**

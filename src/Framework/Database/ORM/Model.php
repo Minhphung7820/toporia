@@ -36,6 +36,12 @@ abstract class Model implements ModelInterface, ObservableInterface
         Observable::getObservers insteadof HasObservers;
         HasObservers::getObservers as getModelObservers;
     }
+    use Concerns\HasAccessorsAndMutators;
+    use Concerns\HasSerialization;
+    use Concerns\HasEvents;
+    use Concerns\HasGlobalScopes;
+    use Concerns\HasModelCollections;
+    use Concerns\HasMassAssignmentProtection;
     /**
      * Database table name (override in child class).
      *
@@ -607,11 +613,19 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Insert the model attributes and mark as existing.
      *
-     * @internal Emits "creating" and "created" hooks.
+     * @internal Emits "saving", "creating", "created", and "saved" hooks.
      */
     private function performInsert(): bool
     {
-        $this->fireEvent('creating');
+        // Fire saving event (before create or update)
+        if ($this->fireEvent('saving') === false) {
+            return false;
+        }
+
+        // Fire creating event (can cancel)
+        if ($this->fireEvent('creating') === false) {
+            return false;
+        }
 
         if (static::$timestamps) {
             $this->updateTimestamps();
@@ -623,7 +637,11 @@ abstract class Model implements ModelInterface, ObservableInterface
         $this->exists = true;
         $this->syncOriginal();
 
+        // Fire created event
         $this->fireEvent('created');
+
+        // Fire saved event (after create or update)
+        $this->fireEvent('saved');
 
         return true;
     }
@@ -631,7 +649,7 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Update dirty attributes on an existing model.
      *
-     * @internal Emits "updating" and "updated" hooks.
+     * @internal Emits "saving", "updating", "updated", and "saved" hooks.
      */
     private function performUpdate(): bool
     {
@@ -639,7 +657,15 @@ abstract class Model implements ModelInterface, ObservableInterface
             return true;
         }
 
-        $this->fireEvent('updating');
+        // Fire saving event (before create or update)
+        if ($this->fireEvent('saving') === false) {
+            return false;
+        }
+
+        // Fire updating event (can cancel)
+        if ($this->fireEvent('updating') === false) {
+            return false;
+        }
 
         if (static::$timestamps) {
             $this->attributes['updated_at'] = date('Y-m-d H:i:s');
@@ -653,7 +679,11 @@ abstract class Model implements ModelInterface, ObservableInterface
 
         $this->syncOriginal();
 
+        // Fire updated event
         $this->fireEvent('updated');
+
+        // Fire saved event (after create or update)
+        $this->fireEvent('saved');
 
         return true;
     }
@@ -669,7 +699,10 @@ abstract class Model implements ModelInterface, ObservableInterface
             return false;
         }
 
-        $this->fireEvent('deleting');
+        // Fire deleting event (can cancel)
+        if ($this->fireEvent('deleting') === false) {
+            return false;
+        }
 
         static::query()
             ->where(static::$primaryKey, $this->getKey())
@@ -710,6 +743,33 @@ abstract class Model implements ModelInterface, ObservableInterface
     }
 
     /**
+     * Set whether this instance exists in the database.
+     * Used internally by traits and model methods.
+     */
+    protected function setExists(bool $exists): void
+    {
+        $this->exists = $exists;
+    }
+
+    /**
+     * Accessor for 'exists' attribute.
+     * Returns the private exists property value.
+     */
+    protected function getExistsAttribute(): bool
+    {
+        return $this->exists;
+    }
+
+    /**
+     * Mutator for 'exists' attribute.
+     * Sets the private exists property value.
+     */
+    protected function setExistsAttribute(bool $value): void
+    {
+        $this->exists = $value;
+    }
+
+    /**
      * Mass-assign attributes using fillable/guarded rules.
      *
      * @param array<string,mixed> $attributes
@@ -720,8 +780,11 @@ abstract class Model implements ModelInterface, ObservableInterface
         foreach ($attributes as $key => $value) {
             // Ensure key is string for mass assignment
             $keyString = (string) $key;
-            if ($this->isFillable($keyString)) {
+            
+            if ($this->isFillableWithProtection($keyString)) {
                 $this->setAttribute($keyString, $value);
+            } else {
+                $this->handleNonFillableAttribute($keyString);
             }
         }
 
@@ -777,21 +840,116 @@ abstract class Model implements ModelInterface, ObservableInterface
     }
 
     /**
-     * Get an attribute with casting applied if configured.
+     * Get the primary key column name.
+     */
+    public static function getKeyName(): string
+    {
+        return static::$primaryKey;
+    }
+
+    /**
+     * Get an attribute with accessor/casting support.
+     *
+     * Checks for accessor method first, then applies casting.
      */
     public function getAttribute(string $key): mixed
     {
-        $value = $this->attributes[$key] ?? null;
+        // Use accessor/mutator trait method
+        return $this->getAttributeValue($key);
+    }
 
+    /**
+     * Set an attribute with mutator support.
+     *
+     * Checks for mutator method first, then sets directly.
+     */
+    public function setAttribute(string $key, mixed $value): void
+    {
+        // Use accessor/mutator trait method
+        $this->setAttributeValue($key, $value);
+    }
+
+    /**
+     * Parent implementation of getAttribute (used by trait).
+     *
+     * @param string $key
+     * @return mixed
+     */
+    protected function parentGetAttribute(string $key): mixed
+    {
+        if (!array_key_exists($key, $this->attributes)) {
+            // Handle missing attribute if prevention is enabled
+            if (method_exists($this, 'handleMissingAttribute')) {
+                $this->handleMissingAttribute($key);
+            }
+            return null;
+        }
+        
+        $value = $this->attributes[$key];
         return $this->castAttribute($key, $value);
     }
 
     /**
-     * Set a raw attribute value (no casting).
+     * Parent implementation of setAttribute (used by trait).
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
      */
-    public function setAttribute(string $key, mixed $value): void
+    protected function parentSetAttribute(string $key, mixed $value): void
     {
         $this->attributes[$key] = $value;
+    }
+
+    /**
+     * Get raw attribute value without casting or accessor logic.
+     *
+     * This method is useful for accessor methods that need to access
+     * the underlying raw attribute values.
+     *
+     * @param string $key Attribute key
+     * @param mixed $default Default value if key doesn't exist
+     * @return mixed
+     */
+    protected function getRawAttribute(string $key, mixed $default = null): mixed
+    {
+        return $this->attributes[$key] ?? $default;
+    }
+
+    /**
+     * Set raw attribute value without mutator logic.
+     *
+     * @param string $key Attribute key
+     * @param mixed $value Value to set
+     * @return void
+     */
+    protected function setRawAttribute(string $key, mixed $value): void
+    {
+        $this->attributes[$key] = $value;
+    }
+
+    /**
+     * Get all raw attributes.
+     *
+     * Returns the complete attributes array without any processing.
+     * Useful for serialization and debugging.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getAllAttributes(): array
+    {
+        return $this->attributes;
+    }
+
+    /**
+     * Set all model attributes from an array.
+     * Used internally by traits and model methods.
+     *
+     * @param array<string, mixed> $attributes
+     */
+    protected function setRawAttributes(array $attributes): void
+    {
+        $this->attributes = $attributes;
     }
 
     /**
@@ -870,24 +1028,42 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Dispatch a lifecycle hook if the corresponding method is implemented.
      *
-     * Available hooks: creating, created, updating, updated, deleting, deleted.
+     * Available hooks: retrieved, creating, created, updating, updated,
+     * saving, saved, deleting, deleted, restoring, restored, replicating.
      *
      * Also notifies observers about the event.
+     *
+     * @return bool False if event was cancelled
      */
-    private function fireEvent(string $event): void
+    private function fireEvent(string $event): bool
     {
         // Boot observers if not already booted
         static::bootObservers();
 
+        // Fire event callbacks (HasEvents trait) - can cancel operation
+        if ($this->fireModelEventCallbacks($event) === false) {
+            return false;
+        }
+
         // Fire model-specific observers (HasObservers trait)
         // This calls observer methods like created(), updating(), etc.
-        $this->fireModelEvent($event);
+        if ($this->fireModelEvent($event) === false) {
+            return false;
+        }
 
         $method = $event;
 
-        // Call model hook method if exists
+        // Call model hook method if exists (only instance methods, not static)
         if (method_exists($this, $method)) {
-            $this->{$method}();
+            $reflection = new \ReflectionMethod($this, $method);
+            // Only call if it's not a static method (avoid calling event registration methods)
+            if (!$reflection->isStatic()) {
+                $result = $this->{$method}();
+                // If method returns false, cancel the operation
+                if ($result === false) {
+                    return false;
+                }
+            }
         }
 
         // Prepare event data with dirty fields information
@@ -906,6 +1082,8 @@ abstract class Model implements ModelInterface, ObservableInterface
 
         // Notify generic observers about the event (Observable trait)
         $this->notify($event, $eventData);
+
+        return true;
     }
 
     /**
