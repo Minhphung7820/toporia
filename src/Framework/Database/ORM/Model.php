@@ -32,10 +32,7 @@ use Toporia\Framework\Database\ORM\Concerns\HasObservers;
 abstract class Model implements ModelInterface, ObservableInterface
 {
     use Observable;
-    use HasObservers {
-        Observable::getObservers insteadof HasObservers;
-        HasObservers::getObservers as getModelObservers;
-    }
+    use HasObservers;
     use Concerns\HasAccessorsAndMutators;
     use Concerns\HasSerialization;
     use Concerns\HasEvents;
@@ -780,7 +777,7 @@ abstract class Model implements ModelInterface, ObservableInterface
         foreach ($attributes as $key => $value) {
             // Ensure key is string for mass assignment
             $keyString = (string) $key;
-            
+
             if ($this->isFillableWithProtection($keyString)) {
                 $this->setAttribute($keyString, $value);
             } else {
@@ -884,7 +881,7 @@ abstract class Model implements ModelInterface, ObservableInterface
             }
             return null;
         }
-        
+
         $value = $this->attributes[$key];
         return $this->castAttribute($key, $value);
     }

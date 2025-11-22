@@ -71,10 +71,10 @@ trait HasModelCaching
     /**
      * Set the cache driver.
      *
-     * @param object $driver Cache driver instance
+     * @param object|null $driver Cache driver instance, or null to clear
      * @return void
      */
-    public static function setCacheDriver(object $driver): void
+    public static function setCacheDriver(?object $driver): void
     {
         static::$cacheDriver = $driver;
     }
@@ -202,8 +202,13 @@ trait HasModelCaching
             return;
         }
 
+        $modelKey = $model->getKey();
+        if ($modelKey === null) {
+            return; // Cannot cache model without a key
+        }
+
         $cache = static::getCacheDriver();
-        $key = static::getCacheKey($model->getKey());
+        $key = static::getCacheKey($modelKey);
         $ttl = $ttl ?? static::$cacheTtl;
 
         if (method_exists($cache, 'put')) {

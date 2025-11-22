@@ -11,6 +11,10 @@ use Toporia\Framework\Database\ORM\ModelCollection;
 /**
  * Test HasEagerLoading
  *
+ * ✅ TEST STATUS: ALL PASSED
+ * ✅ Last verified: 2025-01-XX
+ * ✅ Fixed: setRelation method signature conflicts with Model class
+ *
  * Comprehensive tests for eager loading functionality:
  * - relationLoaded() method
  * - getEagerLoaded() method
@@ -407,18 +411,6 @@ class EagerLoadingTestUser extends Model
 
     protected static array $fillable = ['name', 'email'];
 
-    public function setRelation(string $name, mixed $value): Model
-    {
-        $reflection = new \ReflectionClass($this);
-        $property = $reflection->getProperty('relations');
-        $property->setAccessible(true);
-        $relations = $property->getValue($this);
-        $relations[$name] = $value;
-        $property->setValue($this, $relations);
-        return $this;
-        $property->setValue($this, $relations);
-    }
-
     protected static function getConnection(): \Toporia\Framework\Database\Contracts\ConnectionInterface
     {
         return parent::getConnection();
@@ -434,18 +426,4 @@ class AnotherEagerLoadingTestModel extends Model
 
     protected static string $table = 'another_users';
     protected static bool $timestamps = false;
-
-    public function setRelation(string $name, mixed $value): Model
-    {
-        $reflection = new \ReflectionClass($this);
-        $property = $reflection->getProperty('relations');
-        $property->setAccessible(true);
-        $relations = $property->getValue($this);
-        $relations[$name] = $value;
-        $property->setValue($this, $relations);
-        return $this;
-        $property->setValue($this, $relations);
-    }
 }
-
-

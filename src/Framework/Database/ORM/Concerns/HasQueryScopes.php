@@ -26,13 +26,6 @@ use Toporia\Framework\Database\Query\QueryBuilder;
 trait HasQueryScopes
 {
     /**
-     * Global scopes registered for this model.
-     *
-     * @var array<string, callable>
-     */
-    protected static array $globalScopes = [];
-
-    /**
      * Local scopes registered for this model.
      *
      * @var array<string, callable>
@@ -42,12 +35,32 @@ trait HasQueryScopes
     /**
      * Boot the query scopes trait.
      *
+     * This is called automatically when the model is first used.
+     * We use lazy initialization to discover scopes on first access.
+     *
      * @return void
      */
     protected static function bootHasQueryScopes(): void
     {
         // Auto-discover local scopes (methods starting with "scope")
         static::discoverLocalScopes();
+    }
+
+    /**
+     * Ensure scopes are discovered before use.
+     * Called lazily when scopes are accessed.
+     *
+     * @return void
+     */
+    protected static function ensureScopesDiscovered(): void
+    {
+        static $discovered = [];
+        $class = static::class;
+
+        if (!isset($discovered[$class])) {
+            static::discoverLocalScopes();
+            $discovered[$class] = true;
+        }
     }
 
     /**
@@ -81,59 +94,91 @@ trait HasQueryScopes
     }
 
     /**
-     * Add a global scope.
+     * Add a global scope (delegates to HasGlobalScopes trait).
      *
-     * Global scopes are automatically applied to all queries for this model.
+     * Note: This matches Model's signature from HasGlobalScopes trait.
+     * Model already includes HasGlobalScopes which handles global scopes.
+     * We access the trait's static property directly to ensure correct class context.
      *
-     * Performance: O(1) - Simple array assignment
-     *
-     * @param string $name Scope name
-     * @param callable $callback Scope callback (QueryBuilder $query) => void
+     * @param string|object $scope Scope name or scope object
+     * @param \Closure|null $implementation Closure if scope is string name
      * @return void
-     *
-     * @example
-     * ```php
-     * // In model boot method
-     * static::addGlobalScope('active', function (QueryBuilder $query) {
-     *     $query->where('is_active', true);
-     * });
-     * ```
      */
-    public static function addGlobalScope(string $name, callable $callback): void
+    public static function addGlobalScope(string|object $scope, ?\Closure $implementation = null): void
     {
-        static::$globalScopes[$name] = $callback;
+        // Access HasGlobalScopes trait's static property directly
+        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        $property = $reflection->getProperty('globalScopes');
+        $property->setAccessible(true);
+        $globalScopes = $property->getValue(null) ?? [];
+
+        $class = static::class;
+        if (!isset($globalScopes[$class])) {
+            $globalScopes[$class] = [];
+        }
+
+        if (is_string($scope)) {
+            if ($implementation === null) {
+                throw new \InvalidArgumentException('Global scope implementation required when scope name is string');
+            }
+            $globalScopes[$class][$scope] = $implementation;
+        } else {
+            $scopeName = get_class($scope);
+            $globalScopes[$class][$scopeName] = $scope;
+        }
+
+        $property->setValue(null, $globalScopes);
     }
 
     /**
-     * Remove a global scope.
-     *
-     * @param string $name Scope name
-     * @return void
-     */
-    public static function removeGlobalScope(string $name): void
-    {
-        unset(static::$globalScopes[$name]);
-    }
-
-    /**
-     * Get all global scopes.
+     * Get all global scopes (delegates to HasGlobalScopes trait).
      *
      * @return array<string, callable>
      */
     public static function getGlobalScopes(): array
     {
-        return static::$globalScopes;
+        // Access HasGlobalScopes trait's static property with correct class context
+        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        $property = $reflection->getProperty('globalScopes');
+        $property->setAccessible(true);
+        $globalScopes = $property->getValue(null) ?? [];
+        return $globalScopes[static::class] ?? [];
     }
 
     /**
-     * Check if a global scope exists.
+     * Check if a global scope exists (delegates to HasGlobalScopes trait).
      *
      * @param string $name Scope name
      * @return bool
      */
     public static function hasGlobalScope(string $name): bool
     {
-        return isset(static::$globalScopes[$name]);
+        // Access HasGlobalScopes trait's static property with correct class context
+        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        $property = $reflection->getProperty('globalScopes');
+        $property->setAccessible(true);
+        $globalScopes = $property->getValue(null) ?? [];
+        return isset($globalScopes[static::class][$name]);
+    }
+
+    /**
+     * Remove a global scope (delegates to HasGlobalScopes trait).
+     *
+     * @param string $name Scope name
+     * @return void
+     */
+    public static function removeGlobalScope(string $name): void
+    {
+        // Access HasGlobalScopes trait's static property with correct class context
+        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        $property = $reflection->getProperty('globalScopes');
+        $property->setAccessible(true);
+        $globalScopes = $property->getValue(null) ?? [];
+        $class = static::class;
+        if (isset($globalScopes[$class][$name])) {
+            unset($globalScopes[$class][$name]);
+            $property->setValue(null, $globalScopes);
+        }
     }
 
     /**
@@ -164,6 +209,7 @@ trait HasQueryScopes
      */
     public static function getLocalScopes(): array
     {
+        static::ensureScopesDiscovered();
         return static::$localScopes;
     }
 
@@ -175,25 +221,10 @@ trait HasQueryScopes
      */
     public static function hasLocalScope(string $name): bool
     {
+        static::ensureScopesDiscovered();
         return isset(static::$localScopes[$name]);
     }
 
-    /**
-     * Apply global scopes to a query.
-     *
-     * Performance: O(n) where n = number of global scopes
-     *
-     * @param QueryBuilder $query Query builder instance
-     * @return QueryBuilder
-     */
-    public static function applyGlobalScopes(QueryBuilder $query): QueryBuilder
-    {
-        foreach (static::$globalScopes as $scope) {
-            $scope($query);
-        }
-
-        return $query;
-    }
 
     /**
      * Apply a local scope to a query.
@@ -207,11 +238,40 @@ trait HasQueryScopes
      */
     public static function applyLocalScope(QueryBuilder $query, string $name, mixed ...$args): QueryBuilder
     {
+        static::ensureScopesDiscovered();
+
         if (!isset(static::$localScopes[$name])) {
             throw new \InvalidArgumentException("Local scope '{$name}' does not exist on " . static::class);
         }
 
         $scope = static::$localScopes[$name];
-        return $scope($query, ...$args);
+        $result = $scope($query, ...$args);
+
+        // Ensure we return QueryBuilder (scope might return null)
+        return $result ?? $query;
+    }
+
+    /**
+     * Apply global scopes to a query (static helper for tests).
+     *
+     * Note: Model has protected instance method applyGlobalScopes() from HasGlobalScopes trait.
+     * This static method is a helper for tests that need to apply global scopes manually.
+     *
+     * @param QueryBuilder $query Query builder instance
+     * @return QueryBuilder
+     */
+    public static function applyQueryGlobalScopes(QueryBuilder $query): QueryBuilder
+    {
+        // Get global scopes from HasGlobalScopes trait if available
+        if (method_exists(static::class, 'getGlobalScopes')) {
+            $scopes = static::getGlobalScopes();
+            foreach ($scopes as $name => $scope) {
+                if ($scope instanceof \Closure) {
+                    $scope($query);
+                }
+            }
+        }
+
+        return $query;
     }
 }

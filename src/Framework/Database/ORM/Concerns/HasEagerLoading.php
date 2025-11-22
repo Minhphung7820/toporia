@@ -132,6 +132,7 @@ trait HasEagerLoading
         // Set results on models
         foreach ($models as $index => $model) {
             if (isset($results[$index])) {
+                // Use Model's setRelation method (returns self, but we ignore return value)
                 $model->setRelation($relationName, $results[$index]);
                 $model->eagerLoaded[$relationName] = true;
             }
@@ -141,11 +142,21 @@ trait HasEagerLoading
     /**
      * Set a relationship on the model.
      *
+     * This method is called by the trait but should be provided by the class
+     * using the trait (e.g., Model class). Model already has setRelation returning self.
+     * We use a wrapper here to ignore the return value for trait compatibility.
+     *
      * @param string $relation Relationship name
      * @param mixed $value Relationship value
      * @return void
      */
-    abstract public function setRelation(string $relation, mixed $value): void;
+    protected function setRelationForEagerLoading(string $relation, mixed $value): void
+    {
+        // Call the parent's setRelation (from Model) and ignore return value
+        if (method_exists($this, 'setRelation')) {
+            $this->setRelation($relation, $value);
+        }
+    }
 
     /**
      * Check if a relationship is eager loaded.

@@ -60,9 +60,12 @@ trait HasObservers
     /**
      * Get all observers for the model.
      *
+     * Note: This is aliased as getModelObservers in Model class to avoid conflict
+     * with Observable trait's getObservers() method.
+     *
      * @return array<object>
      */
-    public static function getObservers(): array
+    public static function getModelObservers(): array
     {
         return static::$modelObservers[static::class] ?? [];
     }

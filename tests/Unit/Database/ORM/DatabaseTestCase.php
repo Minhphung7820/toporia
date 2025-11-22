@@ -104,6 +104,8 @@ abstract class DatabaseTestCase extends TestCase
      */
     protected function createTable(string $table, string $schema): void
     {
+        // Drop table first if exists to avoid conflicts
+        $this->dropTable($table);
         $this->pdo->exec($schema);
     }
 

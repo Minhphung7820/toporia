@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Database\ORM;
 
 use Toporia\Framework\Database\ORM\Model;
+use Toporia\Framework\Database\ORM\ModelQueryBuilder;
 use Toporia\Framework\Database\ORM\Relations\Relation;
 use Toporia\Framework\Database\Query\QueryBuilder;
 
@@ -159,10 +160,14 @@ class RelationBaseTest extends DatabaseTestCase
         $user2->save();
 
         // Create posts
-        $this->executeQuery("INSERT INTO posts (user_id, title) VALUES (?, ?)",
-            [$user1->id, 'Post 1']);
-        $this->executeQuery("INSERT INTO posts (user_id, title) VALUES (?, ?)",
-            [$user2->id, 'Post 2']);
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title) VALUES (?, ?)",
+            [$user1->id, 'Post 1']
+        );
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title) VALUES (?, ?)",
+            [$user2->id, 'Post 2']
+        );
 
         $relation = $user1->postsRelation();
 
@@ -255,10 +260,14 @@ class RelationBaseTest extends DatabaseTestCase
         $user->save();
 
         // Create posts
-        $this->executeQuery("INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)",
-            [$user->id, 'Post 1', 'Content 1']);
-        $this->executeQuery("INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)",
-            [$user->id, 'Post 2', 'Content 2']);
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)",
+            [$user->id, 'Post 1', 'Content 1']
+        );
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title, content) VALUES (?, ?, ?)",
+            [$user->id, 'Post 2', 'Content 2']
+        );
 
         $relation = $user->postsRelation();
 
@@ -302,10 +311,14 @@ class RelationBaseTest extends DatabaseTestCase
         $user2->save();
 
         // Create posts for each user
-        $this->executeQuery("INSERT INTO posts (user_id, title) VALUES (?, ?)",
-            [$user1->id, 'John Post']);
-        $this->executeQuery("INSERT INTO posts (user_id, title) VALUES (?, ?)",
-            [$user2->id, 'Jane Post']);
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title) VALUES (?, ?)",
+            [$user1->id, 'John Post']
+        );
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title) VALUES (?, ?)",
+            [$user2->id, 'Jane Post']
+        );
 
         // Each relation should query correct user's posts
         $relation1 = $user1->postsRelation();
@@ -332,10 +345,14 @@ class RelationBaseTest extends DatabaseTestCase
         $user->save();
 
         // Create posts
-        $this->executeQuery("INSERT INTO posts (user_id, title) VALUES (?, ?)",
-            [$user->id, 'Post 1']);
-        $this->executeQuery("INSERT INTO posts (user_id, title) VALUES (?, ?)",
-            [$user->id, 'Post 2']);
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title) VALUES (?, ?)",
+            [$user->id, 'Post 1']
+        );
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title) VALUES (?, ?)",
+            [$user->id, 'Post 2']
+        );
 
         $relation = $user->postsRelation();
 
@@ -379,10 +396,14 @@ class RelationBaseTest extends DatabaseTestCase
         $user2->save();
 
         // Create posts
-        $this->executeQuery("INSERT INTO posts (user_id, title) VALUES (?, ?)",
-            [$user1->id, 'John Post']);
-        $this->executeQuery("INSERT INTO posts (user_id, title) VALUES (?, ?)",
-            [$user2->id, 'Jane Post']);
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title) VALUES (?, ?)",
+            [$user1->id, 'John Post']
+        );
+        $this->executeQuery(
+            "INSERT INTO posts (user_id, title) VALUES (?, ?)",
+            [$user2->id, 'Jane Post']
+        );
 
         $relation1 = $user1->postsRelation();
         $relation2 = $user2->postsRelation();
@@ -415,7 +436,6 @@ class RelationBaseTest extends DatabaseTestCase
 
         // Query should not find anything (no WHERE clause added)
         $results = $query->get();
-use Toporia\Framework\Database\ORM\ModelQueryBuilder;
         $this->assertEmpty($results);
     }
 }
@@ -440,7 +460,11 @@ class TestUserRelationModel extends Model
     public function save(): bool
     {
         if (!$this->exists) {
-            $attributes = $reflection = new \ReflectionClass($this); $property = $reflection->getProperty("attributes"); $property->setAccessible(true); $attributes = $property->getValue($this); $attributes = array_filter($attributes, fn($v) => $v !== null);
+            $attributes = $reflection = new \ReflectionClass($this);
+            $property = $reflection->getProperty("attributes");
+            $property->setAccessible(true);
+            $attributes = $property->getValue($this);
+            $attributes = array_filter($attributes, fn($v) => $v !== null);
             $columns = "`" . implode("`, `", array_keys($attributes)) . "`";
             $placeholders = ':' . implode(', :', array_keys($attributes));
 
@@ -525,5 +549,3 @@ class TestRelation extends Relation
         return $models;
     }
 }
-
-

@@ -151,6 +151,20 @@ trait HasGlobalScopes
     }
 
     /**
+     * Remove a specific global scope from the model.
+     *
+     * @param string $name Scope name
+     * @return void
+     */
+    public static function removeGlobalScope(string $name): void
+    {
+        $class = static::class;
+        if (isset(static::$globalScopes[$class][$name])) {
+            unset(static::$globalScopes[$class][$name]);
+        }
+    }
+
+    /**
      * Remove a global scope from the current query.
      *
      * Example:

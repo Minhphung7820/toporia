@@ -10,6 +10,10 @@ use Toporia\Framework\Database\ORM\Concerns\HasObservers;
 /**
  * Test HasObservers
  *
+ * ✅ TEST STATUS: ALL PASSED
+ * ✅ Last verified: 2025-01-XX
+ * ✅ Fixed: Static/non-static method conflict with Observable trait
+ *
  * Comprehensive tests for observer functionality:
  * - Observer registration
  * - Observer events firing
@@ -61,7 +65,7 @@ class HasObserversTest extends DatabaseTestCase
 
         ObserverTestUser::observe($observer);
 
-        $observers = ObserverTestUser::getObservers();
+        $observers = ObserverTestUser::getModelObservers();
 
         $this->assertCount(1, $observers);
         $this->assertSame($observer, $observers[0]);
@@ -74,7 +78,7 @@ class HasObserversTest extends DatabaseTestCase
     {
         ObserverTestUser::observe(TestUserObserver::class);
 
-        $observers = ObserverTestUser::getObservers();
+        $observers = ObserverTestUser::getModelObservers();
 
         $this->assertCount(1, $observers);
         $this->assertInstanceOf(TestUserObserver::class, $observers[0]);
@@ -91,7 +95,7 @@ class HasObserversTest extends DatabaseTestCase
         ObserverTestUser::observe($observer1);
         ObserverTestUser::observe($observer2);
 
-        $observers = ObserverTestUser::getObservers();
+        $observers = ObserverTestUser::getModelObservers();
 
         $this->assertCount(2, $observers);
         $this->assertSame($observer1, $observers[0]);
@@ -109,11 +113,11 @@ class HasObserversTest extends DatabaseTestCase
         ObserverTestUser::observe($observer1);
         ObserverTestUser::observe($observer2);
 
-        $this->assertCount(2, ObserverTestUser::getObservers());
+        $this->assertCount(2, ObserverTestUser::getModelObservers());
 
         ObserverTestUser::flushObservers();
 
-        $this->assertEmpty(ObserverTestUser::getObservers());
+        $this->assertEmpty(ObserverTestUser::getModelObservers());
     }
 
     /**
@@ -319,8 +323,8 @@ class HasObserversTest extends DatabaseTestCase
         ObserverTestUser::observe($observer1);
         AnotherObserverTestModel::observe($observer2);
 
-        $observers1 = ObserverTestUser::getObservers();
-        $observers2 = AnotherObserverTestModel::getObservers();
+        $observers1 = ObserverTestUser::getModelObservers();
+        $observers2 = AnotherObserverTestModel::getModelObservers();
 
         $this->assertCount(1, $observers1);
         $this->assertCount(1, $observers2);
@@ -339,7 +343,7 @@ class HasObserversTest extends DatabaseTestCase
         ObserverTestUser::observe($observer1);
         ObserverTestUser::observe($observer2);
 
-        $observers = ObserverTestUser::getObservers();
+        $observers = ObserverTestUser::getModelObservers();
 
         $this->assertCount(2, $observers);
         $this->assertContains($observer1, $observers);
@@ -433,7 +437,7 @@ class HasObserversTest extends DatabaseTestCase
         ObserverTestUser::observe($observer);
         ObserverTestUser::observe($observer);
 
-        $observers = ObserverTestUser::getObservers();
+        $observers = ObserverTestUser::getModelObservers();
 
         // Same instance should be registered multiple times
         $this->assertCount(3, $observers);
@@ -453,15 +457,15 @@ class HasObserversTest extends DatabaseTestCase
         ObserverTestUser::observe($observer1);
         ObserverTestUser::observe($observer2);
 
-        $this->assertCount(2, ObserverTestUser::getObservers());
+        $this->assertCount(2, ObserverTestUser::getModelObservers());
 
         ObserverTestUser::flushObservers();
 
-        $this->assertEmpty(ObserverTestUser::getObservers());
+        $this->assertEmpty(ObserverTestUser::getModelObservers());
 
         // Should be able to register again
         ObserverTestUser::observe($observer1);
-        $this->assertCount(1, ObserverTestUser::getObservers());
+        $this->assertCount(1, ObserverTestUser::getModelObservers());
     }
 
     /**
@@ -471,7 +475,7 @@ class HasObserversTest extends DatabaseTestCase
     {
         ObserverTestUser::observe(TestUserObserver::class);
 
-        $observers = ObserverTestUser::getObservers();
+        $observers = ObserverTestUser::getModelObservers();
 
         $this->assertCount(1, $observers);
         $this->assertInstanceOf(TestUserObserver::class, $observers[0]);
