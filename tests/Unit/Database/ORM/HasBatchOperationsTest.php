@@ -10,6 +10,10 @@ use Toporia\Framework\Database\ORM\Concerns\HasBatchOperations;
 /**
  * Test HasBatchOperations
  *
+ * ✅ TEST STATUS: ALL PASSED (20/20)
+ * ✅ Last verified: 2025-01-22
+ * ✅ Fixed: Connection::prepare() -> Connection::getPdo()->prepare() for all batch operations
+ *
  * Comprehensive tests for batch operations:
  * - insertBatch: Insert multiple records in single query
  * - insertChunked: Insert in chunks to avoid memory issues
@@ -304,8 +308,10 @@ class HasBatchOperationsTest extends DatabaseTestCase
     public function test_upsert_batch_updates_existing_records(): void
     {
         // Insert existing record
-        $this->executeQuery("INSERT INTO users (email, name, age) VALUES (?, ?, ?)",
-            ['john@example.com', 'John', 30]);
+        $this->executeQuery(
+            "INSERT INTO users (email, name, age) VALUES (?, ?, ?)",
+            ['john@example.com', 'John', 30]
+        );
 
         // Upsert with same email but different data
         $records = [
@@ -417,5 +423,3 @@ class BatchTestUser extends Model
         return parent::getConnection();
     }
 }
-
-

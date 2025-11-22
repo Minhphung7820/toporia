@@ -78,7 +78,7 @@ trait HasBatchOperations
 
         // Execute
         $connection = static::getConnection();
-        $stmt = $connection->prepare($sql);
+        $stmt = $connection->getPdo()->prepare($sql);
         $stmt->execute($bindings);
 
         return $stmt->rowCount();
@@ -180,7 +180,7 @@ trait HasBatchOperations
         $sql = "UPDATE `{$table}` SET {$casesClause} WHERE `{$primaryKey}` IN ({$idsPlaceholders})";
 
         $connection = static::getConnection();
-        $stmt = $connection->prepare($sql);
+        $stmt = $connection->getPdo()->prepare($sql);
         $stmt->execute($bindings);
 
         return $stmt->rowCount();
@@ -212,7 +212,7 @@ trait HasBatchOperations
         $sql = "DELETE FROM `{$table}` WHERE `{$primaryKey}` IN ({$placeholders})";
 
         $connection = static::getConnection();
-        $stmt = $connection->prepare($sql);
+        $stmt = $connection->getPdo()->prepare($sql);
         $stmt->execute($ids);
 
         return $stmt->rowCount();
@@ -275,7 +275,7 @@ trait HasBatchOperations
         $sql = "INSERT INTO `{$table}` ({$columnsClause}) VALUES {$valuesClause} ON DUPLICATE KEY UPDATE {$updateClause}";
 
         $connection = static::getConnection();
-        $stmt = $connection->prepare($sql);
+        $stmt = $connection->getPdo()->prepare($sql);
         $stmt->execute($bindings);
 
         return $stmt->rowCount();

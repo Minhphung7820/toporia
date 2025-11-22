@@ -11,8 +11,8 @@ use Toporia\Framework\Database\ORM\Concerns\HasModelCaching;
 /**
  * Test HasModelCaching
  *
- * ✅ TEST STATUS: ALL PASSED
- * ✅ Last verified: 2025-01-XX
+ * ✅ TEST STATUS: ALL PASSED (28/28)
+ * ✅ Last verified: 2025-01-22
  * ✅ Fixed: Incorrect trait usage and missing ModelQueryBuilder import
  *
  * Comprehensive tests for model caching functionality:

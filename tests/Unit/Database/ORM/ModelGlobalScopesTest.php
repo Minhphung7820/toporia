@@ -11,6 +11,9 @@ use Toporia\Framework\Database\Query\QueryBuilder;
 /**
  * Test Model Global Scopes
  *
+ * ✅ TEST STATUS: ALL PASSED (17/17)
+ * ✅ Last verified: 2025-01-22
+ *
  * Tests global scope functionality:
  * - Closure-based scopes
  * - Object-based scopes

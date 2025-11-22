@@ -196,10 +196,104 @@ abstract class Model implements ModelInterface, ObservableInterface
     private array $relations = [];
 
     /**
+     * Track which model classes have been booted.
+     *
+     * @var array<string, bool>
+     */
+    private static array $booted = [];
+
+    /**
+     * Boot the model and all its traits.
+     *
+     * Automatically calls boot{TraitName} methods for all used traits.
+     * This follows Laravel's convention for trait booting.
+     *
+     * Performance: O(T) where T = number of traits (typically 1-3)
+     * Called once per model class, cached by static flag.
+     *
+     * @return void
+     */
+    protected static function boot(): void
+    {
+        $class = static::class;
+
+        // Only boot once per class
+        if (isset(self::$booted[$class])) {
+            return;
+        }
+
+        // Get all traits used by this class
+        $traits = static::classUsesRecursive($class);
+
+        // Call boot{TraitName} for each trait
+        foreach ($traits as $trait) {
+            $traitName = static::classBasename($trait);
+            $method = 'boot' . $traitName;
+
+            if (method_exists($class, $method)) {
+                static::$method();
+            }
+        }
+
+        // Mark as booted
+        self::$booted[$class] = true;
+    }
+
+    /**
+     * Get all traits used by a class, including parent traits.
+     *
+     * @param string|object $class
+     * @return array<string>
+     */
+    protected static function classUsesRecursive(string|object $class): array
+    {
+        $results = [];
+        $class = is_object($class) ? get_class($class) : $class;
+
+        foreach (array_reverse(class_parents($class) ?: []) + [$class => $class] as $class) {
+            $results += static::traitUsesRecursive($class);
+        }
+
+        return array_unique($results);
+    }
+
+    /**
+     * Get all traits used by a trait.
+     *
+     * @param string $trait
+     * @return array<string>
+     */
+    protected static function traitUsesRecursive(string $trait): array
+    {
+        $traits = class_uses($trait) ?: [];
+
+        foreach ($traits as $trait) {
+            $traits += static::traitUsesRecursive($trait);
+        }
+
+        return $traits;
+    }
+
+    /**
+     * Get the base class name of a class.
+     *
+     * @param string|object $class
+     * @return string
+     */
+    protected static function classBasename(string|object $class): string
+    {
+        $class = is_object($class) ? get_class($class) : $class;
+        return basename(str_replace('\\', '/', $class));
+    }
+
+    /**
      * @param array<string,mixed> $attributes Initial attributes.
      */
     public function __construct(array $attributes = [])
     {
+        // Boot traits on first instantiation of this class
+        static::boot();
+
         $this->fill($attributes);
         $this->syncOriginal();
     }
@@ -277,6 +371,9 @@ abstract class Model implements ModelInterface, ObservableInterface
      */
     public static function query(): ModelQueryBuilder
     {
+        // Boot traits before creating query builder
+        static::boot();
+
         return (new ModelQueryBuilder(static::getConnection(), static::class))->table(static::getTableName());
     }
 
@@ -628,9 +725,14 @@ abstract class Model implements ModelInterface, ObservableInterface
             $this->updateTimestamps();
         }
 
+        // For UUID models, the key should already be set by creating event
+        // For auto-incrementing models, insert() returns the lastInsertId
         $id = static::query()->insert($this->attributes);
 
-        $this->setAttribute(static::$primaryKey, $id);
+        // Only set ID from insert if it's auto-incrementing and key is not already set
+        if (!isset($this->attributes[static::$primaryKey]) || empty($this->attributes[static::$primaryKey])) {
+            $this->setAttribute(static::$primaryKey, $id);
+        }
         $this->exists = true;
         $this->syncOriginal();
 
@@ -1003,7 +1105,7 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Replace the original snapshot with current attributes.
      */
-    private function syncOriginal(): void
+    protected function syncOriginal(): void
     {
         $this->original = $this->attributes;
     }
@@ -1198,10 +1300,15 @@ abstract class Model implements ModelInterface, ObservableInterface
     }
 
     /**
-     * Magic getter: proxies to getAttribute().
+     * Magic getter: checks relations first, then proxies to getAttribute().
      */
     public function __get(string $key): mixed
     {
+        // Check if it's a loaded relationship first
+        if (array_key_exists($key, $this->relations)) {
+            return $this->relations[$key];
+        }
+
         return $this->getAttribute($key);
     }
 

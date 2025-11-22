@@ -91,9 +91,8 @@ class MorphToMany extends Relation
      */
     protected function getMorphClass(): string
     {
-        $class = get_class($this->parent);
-        $parts = explode('\\', $class);
-        return end($parts);
+        // Use full class name to match database storage
+        return get_class($this->parent);
     }
 
     /**
@@ -137,12 +136,34 @@ class MorphToMany extends Relation
      */
     public function getResults(): ModelCollection
     {
-        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        // Ensure constraints are applied if parent exists now but didn't at construction
+        if ($this->parent->exists()) {
+            // Create fresh query to avoid conflicts with query modifications
+            $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+            $freshQuery = $this->query->newQuery();
+            $freshQuery->table($relatedTable);
 
-        // Select related table columns + pivot columns
-        $this->query->select("{$relatedTable}.*");
+            // Re-add join
+            $freshQuery->join(
+                $this->pivotTable,
+                "{$relatedTable}.{$this->relatedKey}",
+                '=',
+                "{$this->pivotTable}.{$this->relatedPivotKey}"
+            );
 
-        $rowCollection = $this->query->get();
+            // Apply morph constraints
+            $freshQuery->where("{$this->pivotTable}.{$this->morphType}", $this->getMorphClass());
+            $freshQuery->where("{$this->pivotTable}.{$this->foreignKey}", $this->parent->getAttribute($this->localKey));
+
+            // Select related table columns
+            $freshQuery->select("{$relatedTable}.*");
+
+            $rowCollection = $freshQuery->get();
+        } else {
+            $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+            $this->query->select("{$relatedTable}.*");
+            $rowCollection = $this->query->get();
+        }
 
         $rows = $rowCollection instanceof \Toporia\Framework\Database\Query\RowCollection
             ? $rowCollection->all()
@@ -170,12 +191,10 @@ class MorphToMany extends Relation
     {
         $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
 
-        // Group models by type
+        // Group models by type (full class name)
         $types = [];
         foreach ($models as $model) {
-            $class = get_class($model);
-            $parts = explode('\\', $class);
-            $type = end($parts);
+            $type = get_class($model);
 
             if (!isset($types[$type])) {
                 $types[$type] = [];
@@ -250,9 +269,7 @@ class MorphToMany extends Relation
 
         // Match to parents
         foreach ($models as $model) {
-            $class = get_class($model);
-            $parts = explode('\\', $class);
-            $type = end($parts);
+            $type = get_class($model);
             $id = $model->getAttribute($this->localKey);
             $key = "{$type}:{$id}";
 
@@ -275,9 +292,9 @@ class MorphToMany extends Relation
      * Attach models to the relationship.
      *
      * @param mixed $ids Model IDs or models to attach
-     * @return void
+     * @return bool
      */
-    public function attach(mixed $ids): void
+    public function attach(mixed $ids): bool
     {
         $ids = is_array($ids) ? $ids : [$ids];
 
@@ -291,15 +308,17 @@ class MorphToMany extends Relation
                 $this->morphType => $this->getMorphClass()
             ]);
         }
+
+        return true;
     }
 
     /**
      * Detach models from the relationship.
      *
      * @param mixed $ids Model IDs to detach (null = detach all)
-     * @return void
+     * @return int Number of rows deleted
      */
-    public function detach(mixed $ids = null): void
+    public function detach(mixed $ids = null): int
     {
         $connection = $this->parent::getConnection();
         $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
@@ -313,7 +332,24 @@ class MorphToMany extends Relation
             $query->whereIn($this->relatedPivotKey, $ids);
         }
 
-        $query->delete();
+        return $query->delete();
+    }
+
+    /**
+     * Sync the relationship with the given IDs.
+     *
+     * @param mixed $ids Model IDs to sync
+     * @return void
+     */
+    public function sync(mixed $ids): void
+    {
+        $ids = is_array($ids) ? $ids : [$ids];
+
+        // Detach all existing
+        $this->detach();
+
+        // Attach new ones
+        $this->attach($ids);
     }
 
     /**

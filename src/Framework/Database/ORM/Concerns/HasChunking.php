@@ -36,7 +36,7 @@ trait HasChunking
      *
      * @param int $chunkSize Number of records per chunk
      * @param callable|null $callback Optional callback to process each chunk
-     * @return Generator<ModelCollection<static>> Generator of chunks
+     * @return Generator<ModelCollection<static>>|void Generator of chunks (if no callback), void (if callback provided)
      *
      * @example
      * ```php
@@ -53,25 +53,69 @@ trait HasChunking
      * });
      * ```
      */
-    public static function chunk(int $chunkSize, ?callable $callback = null): Generator
+    public static function chunk(int $chunkSize, ?callable $callback = null): ?Generator
+    {
+        // If callback provided, execute synchronously and return void
+        if ($callback !== null) {
+            $offset = 0;
+
+            while (true) {
+                /** @var \Toporia\Framework\Database\ORM\ModelQueryBuilder $query */
+                $query = static::query();
+                $chunk = $query
+                    ->limit($chunkSize)
+                    ->offset($offset)
+                    ->getModels(); // Use getModels() to return ModelCollection
+
+                if ($chunk->isEmpty()) {
+                    break;
+                }
+
+                $callback($chunk);
+
+                // If chunk is smaller than chunkSize, we're done
+                if ($chunk->count() < $chunkSize) {
+                    break;
+                }
+
+                $offset += $chunkSize;
+
+                // Force garbage collection to free memory
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+            }
+
+            return null;
+        }
+
+        // Otherwise, return generator for lazy iteration
+        return static::chunkGenerator($chunkSize);
+    }
+
+    /**
+     * Internal generator for chunking.
+     *
+     * @param int $chunkSize
+     * @return Generator<ModelCollection<static>>
+     */
+    private static function chunkGenerator(int $chunkSize): Generator
     {
         $offset = 0;
 
         while (true) {
-            $chunk = static::query()
+            /** @var \Toporia\Framework\Database\ORM\ModelQueryBuilder $query */
+            $query = static::query();
+            $chunk = $query
                 ->limit($chunkSize)
                 ->offset($offset)
-                ->get();
+                ->getModels(); // Use getModels() to return ModelCollection
 
             if ($chunk->isEmpty()) {
                 break;
             }
 
-            if ($callback !== null) {
-                $callback($chunk);
-            } else {
-                yield $chunk;
-            }
+            yield $chunk;
 
             // If chunk is smaller than chunkSize, we're done
             if ($chunk->count() < $chunkSize) {
@@ -98,7 +142,7 @@ trait HasChunking
      *
      * @param int $chunkSize Number of records per chunk
      * @param callable|null $callback Optional callback to process each chunk
-     * @return Generator<ModelCollection<static>> Generator of chunks
+     * @return Generator<ModelCollection<static>>|void Generator of chunks (if no callback), void (if callback provided)
      *
      * @example
      * ```php
@@ -110,29 +154,79 @@ trait HasChunking
      * }
      * ```
      */
-    public static function chunkById(int $chunkSize, ?callable $callback = null): Generator
+    public static function chunkById(int $chunkSize, ?callable $callback = null): ?Generator
+    {
+        // If callback provided, execute synchronously and return void
+        if ($callback !== null) {
+            $primaryKey = static::getPrimaryKey();
+            $lastId = 0;
+
+            while (true) {
+                /** @var \Toporia\Framework\Database\ORM\ModelQueryBuilder $query */
+                $query = static::query();
+                $chunk = $query
+                    ->where($primaryKey, '>', $lastId)
+                    ->orderBy($primaryKey, 'ASC')
+                    ->limit($chunkSize)
+                    ->getModels(); // Use getModels() to return ModelCollection
+
+                if ($chunk->isEmpty()) {
+                    break;
+                }
+
+                $callback($chunk);
+
+                // Get last ID from chunk
+                /** @var static $lastModel */
+                $lastModel = $chunk->last();
+                $lastId = $lastModel->getKey();
+
+                // If chunk is smaller than chunkSize, we're done
+                if ($chunk->count() < $chunkSize) {
+                    break;
+                }
+
+                // Force garbage collection to free memory
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+            }
+
+            return null;
+        }
+
+        // Otherwise, return generator for lazy iteration
+        return static::chunkByIdGenerator($chunkSize);
+    }
+
+    /**
+     * Internal generator for cursor-based chunking.
+     *
+     * @param int $chunkSize
+     * @return Generator<ModelCollection<static>>
+     */
+    private static function chunkByIdGenerator(int $chunkSize): Generator
     {
         $primaryKey = static::getPrimaryKey();
         $lastId = 0;
 
         while (true) {
-            $chunk = static::query()
+            /** @var \Toporia\Framework\Database\ORM\ModelQueryBuilder $query */
+            $query = static::query();
+            $chunk = $query
                 ->where($primaryKey, '>', $lastId)
                 ->orderBy($primaryKey, 'ASC')
                 ->limit($chunkSize)
-                ->get();
+                ->getModels(); // Use getModels() to return ModelCollection
 
             if ($chunk->isEmpty()) {
                 break;
             }
 
-            if ($callback !== null) {
-                $callback($chunk);
-            } else {
-                yield $chunk;
-            }
+            yield $chunk;
 
             // Get last ID from chunk
+            /** @var static $lastModel */
             $lastModel = $chunk->last();
             $lastId = $lastModel->getKey();
 
@@ -194,6 +288,76 @@ trait HasChunking
                 yield $model;
             }
         }
+    }
+
+    /**
+     * Execute a callback over each item while chunking.
+     *
+     * Processes records in chunks and yields one model at a time to callback.
+     * If callback returns false, stops processing early.
+     *
+     * Performance: O(n/chunkSize) queries
+     * Memory: O(chunkSize) - Only one chunk in memory at a time
+     *
+     * @param int $chunkSize Number of records per chunk (default: 1000)
+     * @param callable $callback Callback function, receives each model
+     * @return bool False if callback returned false to stop early, true otherwise
+     *
+     * @example
+     * ```php
+     * UserModel::each(100, function ($user) {
+     *     // Process user
+     *     if ($user->id > 100) {
+     *         return false; // Stop processing
+     *     }
+     * });
+     * ```
+     */
+    public static function each(int $chunkSize, callable $callback): bool
+    {
+        foreach (static::chunk($chunkSize) as $chunk) {
+            foreach ($chunk as $model) {
+                if ($callback($model) === false) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Execute a callback over each item while chunking by ID.
+     *
+     * More efficient than each() for large datasets with ordered primary keys.
+     * Uses cursor-based pagination for better performance.
+     *
+     * Performance: O(n/chunkSize) queries, but faster than OFFSET-based
+     * Memory: O(chunkSize) - Only one chunk in memory at a time
+     *
+     * @param int $chunkSize Number of records per chunk (default: 1000)
+     * @param callable $callback Callback function, receives each model
+     * @return bool False if callback returned false to stop early, true otherwise
+     *
+     * @example
+     * ```php
+     * UserModel::eachById(500, function ($user) {
+     *     // Process user
+     *     return true; // Continue processing
+     * });
+     * ```
+     */
+    public static function eachById(int $chunkSize, callable $callback): bool
+    {
+        foreach (static::chunkById($chunkSize) as $chunk) {
+            foreach ($chunk as $model) {
+                if ($callback($model) === false) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     /**

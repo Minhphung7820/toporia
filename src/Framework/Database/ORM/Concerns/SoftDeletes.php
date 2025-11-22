@@ -113,8 +113,17 @@ trait SoftDeletes
         }
 
         // Soft delete: set deleted_at timestamp
-        $this->setAttribute(static::$deletedAtColumn, date('Y-m-d H:i:s'));
-        return $this->save();
+        $deletedAt = date('Y-m-d H:i:s');
+        $this->setAttribute(static::$deletedAtColumn, $deletedAt);
+
+        $result = $this->save();
+
+        // Refresh the model to ensure deleted_at is loaded from database
+        if ($result && $this->exists) {
+            $this->refresh();
+        }
+
+        return $result;
     }
 
     /**
@@ -152,8 +161,24 @@ trait SoftDeletes
             return false;
         }
 
-        $this->setAttribute(static::$deletedAtColumn, null);
-        return $this->save();
+        // Use withTrashed() to update soft deleted record
+        // Regular save() uses query() which excludes soft deleted records
+        $deletedAt = null;
+        $this->setAttribute(static::$deletedAtColumn, $deletedAt);
+
+        // Update directly using withTrashed() to bypass soft delete scope
+        $updated = static::withTrashed()
+            ->where(static::getPrimaryKey(), $this->getKey())
+            ->update([static::$deletedAtColumn => $deletedAt]);
+
+        if ($updated > 0) {
+            // Sync attributes after successful update
+            $this->setAttribute(static::$deletedAtColumn, $deletedAt);
+            $this->syncOriginal();
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -183,16 +208,11 @@ trait SoftDeletes
      *
      * Performance: O(1) - Scope removal
      *
-     * @return QueryBuilder
+     * @return \Toporia\Framework\Database\ORM\ModelQueryBuilder
      */
-    public static function withTrashed(): QueryBuilder
+    public static function withTrashed(): \Toporia\Framework\Database\ORM\ModelQueryBuilder
     {
-        // Remove soft delete scope if HasQueryScopes is available
-        if (method_exists(static::class, 'withoutGlobalScope')) {
-            return static::withoutGlobalScope('softDeletes');
-        }
-
-        // Fallback: Create query without soft delete scope
+        // Always use queryWithoutSoftDeleteScope to avoid static method call issues
         return static::queryWithoutSoftDeleteScope();
     }
 
@@ -201,9 +221,9 @@ trait SoftDeletes
      *
      * Internal method used by withTrashed().
      *
-     * @return QueryBuilder
+     * @return \Toporia\Framework\Database\ORM\ModelQueryBuilder
      */
-    protected static function queryWithoutSoftDeleteScope(): QueryBuilder
+    protected static function queryWithoutSoftDeleteScope(): \Toporia\Framework\Database\ORM\ModelQueryBuilder
     {
         // Create ModelQueryBuilder with skipGlobalScopes flag
         $connection = static::getConnection();
@@ -222,9 +242,9 @@ trait SoftDeletes
      *
      * Performance: O(1) - Single WHERE clause
      *
-     * @return QueryBuilder
+     * @return \Toporia\Framework\Database\ORM\ModelQueryBuilder
      */
-    public static function onlyTrashed(): QueryBuilder
+    public static function onlyTrashed(): \Toporia\Framework\Database\ORM\ModelQueryBuilder
     {
         return static::withTrashed()->whereNotNull(static::$deletedAtColumn);
     }
@@ -282,7 +302,8 @@ trait SoftDeletes
 
         $primaryKey = static::getPrimaryKey();
 
-        return static::query()
+        // Use withTrashed() to include soft deleted records
+        return static::withTrashed()
             ->whereIn($primaryKey, $ids)
             ->whereNotNull(static::$deletedAtColumn)
             ->update([static::$deletedAtColumn => null]);

@@ -26,8 +26,10 @@ use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 class BelongsTo extends Relation
 {
     /**
-     * @param class-string<Model> $relatedClass Related model class name
+     * @var bool Whether constraints have been applied
      */
+    private bool $constraintsApplied = false;
+
     public function __construct(
         \Toporia\Framework\Database\Query\QueryBuilder $query,
         Model $parent,
@@ -36,7 +38,9 @@ class BelongsTo extends Relation
         string $ownerKey
     ) {
         parent::__construct($query, $parent, $foreignKey, $ownerKey);
-        $this->addConstraints();
+        if ($this->addConstraints()->constraintsApplied) {
+            $this->constraintsApplied = true;
+        }
     }
 
     /**
@@ -52,6 +56,7 @@ class BelongsTo extends Relation
             if ($foreignKeyValue !== null) {
                 // For BelongsTo, we query owner table WHERE owner_key = parent's foreign_key
                 $this->query->where($this->localKey, $foreignKeyValue);
+                $this->constraintsApplied = true;
             }
         }
 
@@ -65,6 +70,31 @@ class BelongsTo extends Relation
      */
     public function getResults(): ?Model
     {
+        // Check if parent exists and has foreign key value
+        if (!$this->parent->exists()) {
+            return null;
+        }
+
+        $foreignKeyValue = $this->parent->getAttribute($this->foreignKey);
+        if ($foreignKeyValue === null) {
+            return null;
+        }
+
+        // Re-apply constraints if they weren't applied in constructor
+        // or if parent didn't exist at construction time
+        if (!$this->constraintsApplied) {
+            $this->addConstraints();
+        }
+
+        // Use getModels() if query is ModelQueryBuilder, otherwise use first()
+        if ($this->query instanceof \Toporia\Framework\Database\ORM\ModelQueryBuilder) {
+            $collection = $this->query->getModels();
+            if ($collection->isEmpty()) {
+                return null;
+            }
+            return $collection->first();
+        }
+
         $data = $this->query->first();
 
         if ($data === null) {
@@ -73,7 +103,10 @@ class BelongsTo extends Relation
 
         /** @var Model $model */
         $model = new $this->relatedClass($data);
-        $model->setAttribute('exists', true);
+
+        // Set exists and sync original attributes
+        $model->setExists(true);
+        $model->syncOriginal();
 
         return $model;
     }

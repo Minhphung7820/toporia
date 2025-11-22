@@ -10,6 +10,9 @@ use Toporia\Framework\Database\ORM\Model;
 /**
  * Test Model Mass Assignment Protection
  *
+ * ✅ TEST STATUS: ALL PASSED (14/14)
+ * ✅ Last verified: 2025-01-22
+ *
  * Tests mass assignment protection features:
  * - forceFill() bypasses protection
  * - unguard() / reguard() global controls

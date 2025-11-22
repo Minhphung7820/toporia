@@ -91,18 +91,47 @@ class MorphTo extends Relation
     public function getResults(): mixed
     {
         // Get type and ID from parent
+        // Use getAttribute() to get the value, but also check raw attributes
         $type = $this->parent->getAttribute($this->morphType);
         $id = $this->parent->getAttribute($this->foreignKey);
+
+        // If attributes are not set, try to get from raw attributes
+        if (!$type) {
+            $reflection = new \ReflectionClass($this->parent);
+            $property = $reflection->getProperty('attributes');
+            $property->setAccessible(true);
+            $attributes = $property->getValue($this->parent);
+            $type = $attributes[$this->morphType] ?? null;
+        }
+
+        if (!$id) {
+            $reflection = new \ReflectionClass($this->parent);
+            $property = $reflection->getProperty('attributes');
+            $property->setAccessible(true);
+            $attributes = $property->getValue($this->parent);
+            $id = $attributes[$this->foreignKey] ?? null;
+        }
 
         if (!$type || !$id) {
             return null;
         }
 
-        // Get model class
+        // Get model class - type should be full class name
         $modelClass = $this->getModelClass($type);
 
-        // Query the related model
-        return $modelClass::find($id);
+        // Ensure class exists
+        if (!class_exists($modelClass)) {
+            return null;
+        }
+
+        // Query the related model using ModelQueryBuilder
+        $collection = $modelClass::query()->where($this->localKey, $id)->getModels();
+
+        if ($collection->isEmpty()) {
+            return null;
+        }
+
+        return $collection->first();
     }
 
     /**

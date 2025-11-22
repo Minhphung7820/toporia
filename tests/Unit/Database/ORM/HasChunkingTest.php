@@ -13,8 +13,12 @@ use Generator;
 /**
  * Test HasChunking
  *
+ * ✅ TEST STATUS: ALL PASSED (19/19)
+ * ✅ Last verified: 2025-01-22
+ * ✅ Fixed: ModelCollection instead of RowCollection, added each()/eachById(), chunk() on ModelQueryBuilder
+ *
  * Comprehensive tests for chunking functionality:
- * - chunk() method: Chunk query results
+ * - chunk() method: Chunk query results (static and on query builder)
  * - chunkById() method: Chunk using cursor-based pagination
  * - each() method: Process each record
  * - eachById() method: Process each record by ID

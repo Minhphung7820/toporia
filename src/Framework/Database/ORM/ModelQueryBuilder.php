@@ -586,4 +586,194 @@ class ModelQueryBuilder extends QueryBuilder
 
         return $this;
     }
+
+    /**
+     * Chunk the query results into smaller batches.
+     *
+     * Allows chunking with query constraints applied.
+     * More flexible than Model::chunk() for complex queries.
+     *
+     * Performance: O(n/chunkSize) queries
+     * Memory: O(chunkSize) - Only one chunk in memory at a time
+     *
+     * @param int $chunkSize Number of records per chunk
+     * @param callable|null $callback Optional callback to process each chunk
+     * @return \Generator<ModelCollection>|void Generator of chunks (if no callback), void (if callback provided)
+     *
+     * @example
+     * ```php
+     * // Chunk with WHERE clause
+     * foreach (User::query()->where('age', '>=', 25)->chunk(100) as $chunk) {
+     *     // Process chunk
+     * }
+     *
+     * // With callback
+     * User::query()->where('active', 1)->chunk(100, function ($chunk) {
+     *     // Process chunk
+     * });
+     * ```
+     */
+    public function chunk(int $chunkSize, ?callable $callback = null): ?\Generator
+    {
+        // If callback provided, execute synchronously and return void
+        if ($callback !== null) {
+            $offset = 0;
+
+            while (true) {
+                // Clone query to preserve original state
+                $query = clone $this;
+                $chunk = $query
+                    ->limit($chunkSize)
+                    ->offset($offset)
+                    ->getModels();
+
+                if ($chunk->isEmpty()) {
+                    break;
+                }
+
+                $callback($chunk);
+
+                // If chunk is smaller than chunkSize, we're done
+                if ($chunk->count() < $chunkSize) {
+                    break;
+                }
+
+                $offset += $chunkSize;
+
+                // Force garbage collection to free memory
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+            }
+
+            return null;
+        }
+
+        // Otherwise, return generator for lazy iteration
+        $offset = 0;
+
+        while (true) {
+            // Clone query to preserve original state
+            $query = clone $this;
+            $chunk = $query
+                ->limit($chunkSize)
+                ->offset($offset)
+                ->getModels();
+
+            if ($chunk->isEmpty()) {
+                break;
+            }
+
+            yield $chunk;
+
+            // If chunk is smaller than chunkSize, we're done
+            if ($chunk->count() < $chunkSize) {
+                break;
+            }
+
+            $offset += $chunkSize;
+
+            // Force garbage collection to free memory
+            if (function_exists('gc_collect_cycles')) {
+                gc_collect_cycles();
+            }
+        }
+    }
+
+    /**
+     * Chunk the query results using cursor-based pagination.
+     *
+     * More efficient than offset-based chunking for large datasets.
+     * Uses WHERE id > lastId instead of OFFSET.
+     *
+     * Performance: O(n/chunkSize) queries, faster than OFFSET-based
+     * Memory: O(chunkSize) - Only one chunk in memory at a time
+     *
+     * @param int $chunkSize Number of records per chunk
+     * @param callable|null $callback Optional callback to process each chunk
+     * @return \Generator<ModelCollection>|void
+     *
+     * @example
+     * ```php
+     * // More efficient for large datasets
+     * foreach (User::query()->where('active', 1)->chunkById(1000) as $chunk) {
+     *     // Process chunk
+     * }
+     * ```
+     */
+    public function chunkById(int $chunkSize, ?callable $callback = null): ?\Generator
+    {
+        /** @var callable $getPrimaryKey */
+        $getPrimaryKey = [$this->modelClass, 'getPrimaryKey'];
+        $primaryKey = $getPrimaryKey();
+        $lastId = 0;
+
+        // If callback provided, execute synchronously and return void
+        if ($callback !== null) {
+            while (true) {
+                // Clone query to preserve original state
+                $query = clone $this;
+                $chunk = $query
+                    ->where($primaryKey, '>', $lastId)
+                    ->orderBy($primaryKey, 'ASC')
+                    ->limit($chunkSize)
+                    ->getModels();
+
+                if ($chunk->isEmpty()) {
+                    break;
+                }
+
+                $callback($chunk);
+
+                // Get last ID from chunk
+                /** @var \Toporia\Framework\Database\ORM\Model $lastModel */
+                $lastModel = $chunk->last();
+                $lastId = $lastModel->getKey();
+
+                // If chunk is smaller than chunkSize, we're done
+                if ($chunk->count() < $chunkSize) {
+                    break;
+                }
+
+                // Force garbage collection to free memory
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
+            }
+
+            return null;
+        }
+
+        // Otherwise, return generator for lazy iteration
+        while (true) {
+            // Clone query to preserve original state
+            $query = clone $this;
+            $chunk = $query
+                ->where($primaryKey, '>', $lastId)
+                ->orderBy($primaryKey, 'ASC')
+                ->limit($chunkSize)
+                ->getModels();
+
+            if ($chunk->isEmpty()) {
+                break;
+            }
+
+            yield $chunk;
+
+            // Get last ID from chunk
+            /** @var \Toporia\Framework\Database\ORM\Model $lastModel */
+            $lastModel = $chunk->last();
+            $lastId = $lastModel->getKey();
+
+            // If chunk is smaller than chunkSize, we're done
+            if ($chunk->count() < $chunkSize) {
+                break;
+            }
+
+            // Force garbage collection to free memory
+            if (function_exists('gc_collect_cycles')) {
+                gc_collect_cycles();
+            }
+        }
+    }
 }

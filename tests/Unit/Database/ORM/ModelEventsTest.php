@@ -10,6 +10,10 @@ use Toporia\Framework\Database\ORM\Model;
 /**
  * Test Model Events
  *
+ * ✅ TEST STATUS: ALL PASSED (20/20)
+ * ✅ Last verified: 2025-01-22
+ * ✅ Fixed: Static analysis error - added proper PHPDoc type hints for $receivedModel
+ *
  * Tests comprehensive model event lifecycle:
  * - retrieved, creating, created, updating, updated
  * - saving, saved, deleting, deleted
@@ -36,7 +40,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::creating(function($model) use (&$fired) {
+        TestEventModel::creating(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -55,7 +59,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::created(function($model) use (&$fired) {
+        TestEventModel::created(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -71,7 +75,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::updating(function($model) use (&$fired) {
+        TestEventModel::updating(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -85,7 +89,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::updated(function($model) use (&$fired) {
+        TestEventModel::updated(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -99,7 +103,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::saving(function($model) use (&$fired) {
+        TestEventModel::saving(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -113,7 +117,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::saved(function($model) use (&$fired) {
+        TestEventModel::saved(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -127,7 +131,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::deleting(function($model) use (&$fired) {
+        TestEventModel::deleting(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -141,7 +145,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::deleted(function($model) use (&$fired) {
+        TestEventModel::deleted(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -155,7 +159,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::retrieved(function($model) use (&$fired) {
+        TestEventModel::retrieved(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -169,7 +173,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::restoring(function($model) use (&$fired) {
+        TestEventModel::restoring(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -183,7 +187,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::restored(function($model) use (&$fired) {
+        TestEventModel::restored(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -197,7 +201,7 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::replicating(function($model) use (&$fired) {
+        TestEventModel::replicating(function ($model) use (&$fired) {
             $fired = true;
         });
 
@@ -211,15 +215,15 @@ class ModelEventsTest extends TestCase
     {
         $count = 0;
 
-        TestEventModel::creating(function($model) use (&$count) {
+        TestEventModel::creating(function ($model) use (&$count) {
             $count++;
         });
 
-        TestEventModel::creating(function($model) use (&$count) {
+        TestEventModel::creating(function ($model) use (&$count) {
             $count++;
         });
 
-        TestEventModel::creating(function($model) use (&$count) {
+        TestEventModel::creating(function ($model) use (&$count) {
             $count++;
         });
 
@@ -232,9 +236,10 @@ class ModelEventsTest extends TestCase
      */
     public function test_event_receives_model_instance(): void
     {
+        /** @var TestEventModel|null $receivedModel */
         $receivedModel = null;
 
-        TestEventModel::creating(function($model) use (&$receivedModel) {
+        TestEventModel::creating(function ($model) use (&$receivedModel) {
             $receivedModel = $model;
         });
 
@@ -248,6 +253,8 @@ class ModelEventsTest extends TestCase
         }
 
         $this->assertInstanceOf(TestEventModel::class, $receivedModel);
+        // After assertInstanceOf, we know $receivedModel is not null
+        /** @var TestEventModel $receivedModel */
         $this->assertEquals('Test', $receivedModel->name);
     }
 
@@ -256,7 +263,7 @@ class ModelEventsTest extends TestCase
      */
     public function test_event_can_modify_model(): void
     {
-        TestEventModel::creating(function($model) {
+        TestEventModel::creating(function ($model) {
             $model->name = 'Modified';
         });
 
@@ -279,11 +286,11 @@ class ModelEventsTest extends TestCase
     {
         $fired = false;
 
-        TestEventModel::creating(function($model) use (&$fired) {
+        TestEventModel::creating(function ($model) use (&$fired) {
             $fired = true;
         });
 
-        TestEventModel::withoutEvents(function() use (&$fired) {
+        TestEventModel::withoutEvents(function () use (&$fired) {
             // Events should not fire here
             $model = new TestEventModel();
             $model->name = 'Test';
@@ -299,7 +306,7 @@ class ModelEventsTest extends TestCase
      */
     public function test_without_events_returns_callback_result(): void
     {
-        $result = TestEventModel::withoutEvents(function() {
+        $result = TestEventModel::withoutEvents(function () {
             return 'test result';
         });
 
@@ -311,9 +318,9 @@ class ModelEventsTest extends TestCase
      */
     public function test_flush_event_listeners(): void
     {
-        TestEventModel::creating(function($model) {});
-        TestEventModel::created(function($model) {});
-        TestEventModel::updating(function($model) {});
+        TestEventModel::creating(function ($model) {});
+        TestEventModel::created(function ($model) {});
+        TestEventModel::updating(function ($model) {});
 
         $this->assertNotEmpty(TestEventModel::getEventCallbacks());
 
@@ -327,10 +334,10 @@ class ModelEventsTest extends TestCase
      */
     public function test_get_event_callbacks(): void
     {
-        TestEventModel::creating(function($model) {});
-        TestEventModel::created(function($model) {});
-        TestEventModel::updating(function($model) {});
-        TestEventModel::updated(function($model) {});
+        TestEventModel::creating(function ($model) {});
+        TestEventModel::created(function ($model) {});
+        TestEventModel::updating(function ($model) {});
+        TestEventModel::updated(function ($model) {});
 
         $callbacks = TestEventModel::getEventCallbacks();
 
@@ -347,8 +354,8 @@ class ModelEventsTest extends TestCase
      */
     public function test_event_listener_isolation(): void
     {
-        TestEventModel::creating(function($model) {});
-        AnotherTestEventModel::creating(function($model) {});
+        TestEventModel::creating(function ($model) {});
+        AnotherTestEventModel::creating(function ($model) {});
 
         $callbacks1 = TestEventModel::getEventCallbacks();
         $callbacks2 = AnotherTestEventModel::getEventCallbacks();

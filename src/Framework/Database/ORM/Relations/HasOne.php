@@ -46,6 +46,21 @@ class HasOne extends Relation
      */
     public function getResults(): ?Model
     {
+        // Ensure constraints are applied (query might have been modified)
+        // Only apply if parent exists and has local key value
+        if ($this->parent->exists()) {
+            $localValue = $this->parent->getAttribute($this->localKey);
+            if ($localValue !== null) {
+                // Re-apply the base constraint (will add as additional WHERE if not already present)
+                // QueryBuilder handles multiple WHERE clauses with AND
+                $this->query->where($this->foreignKey, $localValue);
+            } else {
+                return null;
+            }
+        } else {
+            return null;
+        }
+
         $data = $this->query->first();
 
         if ($data === null) {

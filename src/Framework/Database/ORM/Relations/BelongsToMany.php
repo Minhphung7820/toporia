@@ -199,6 +199,6 @@ class BelongsToMany extends Relation
      */
     public function getForeignKeyName(): string
     {
-        return $this->relatedKey;
+        return $this->relatedPivotKey;
     }
 }

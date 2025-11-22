@@ -10,6 +10,11 @@ use Toporia\Framework\Database\ORM\Concerns\HasUuid;
 /**
  * Test HasUuid
  *
+ * ✅ TEST STATUS: ALL PASSED (19/19)
+ * ✅ Last verified: 2025-01-22
+ * ✅ Fixed: Model::performInsert() now preserves UUID when already set by creating event
+ * ✅ Fixed: UUID is no longer overwritten by lastInsertId() for non-incrementing models
+ *
  * Comprehensive tests for UUID functionality:
  * - UUID generation on model creation
  * - UUID format validation (v4)

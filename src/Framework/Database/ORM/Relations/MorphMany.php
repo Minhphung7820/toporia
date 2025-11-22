@@ -55,9 +55,9 @@ class MorphMany extends Relation
     /**
      * Add constraints for morph relationship.
      *
-     * @return void
+     * @return static
      */
-    protected function addConstraints(): void
+    public function addConstraints(): static
     {
         if ($this->parent->exists()) {
             // WHERE commentable_type = 'Post'
@@ -69,6 +69,7 @@ class MorphMany extends Relation
                 $this->parent->getAttribute($this->localKey)
             );
         }
+        return $this;
     }
 
     /**
@@ -78,11 +79,9 @@ class MorphMany extends Relation
      */
     protected function getMorphClass(): string
     {
-        // Use short class name by default
-        // Example: App\Domain\Post\Post -> Post
-        $class = get_class($this->parent);
-        $parts = explode('\\', $class);
-        return end($parts);
+        // Use full class name to match database storage
+        // Can be customized via getMorphClass() method on model
+        return get_class($this->parent);
     }
 
     /**
@@ -92,7 +91,21 @@ class MorphMany extends Relation
      */
     public function getResults(): ModelCollection
     {
-        $rowCollection = $this->query->get();
+        // Ensure constraints are applied if parent exists now but didn't at construction
+        if ($this->parent->exists()) {
+            // Create fresh query to avoid conflicts with query modifications
+            $freshQuery = $this->query->newQuery();
+            $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+            $freshQuery->table($relatedTable);
+
+            // Apply morph constraints
+            $freshQuery->where($this->morphType, $this->getMorphClass());
+            $freshQuery->where($this->foreignKey, $this->parent->getAttribute($this->localKey));
+
+            $rowCollection = $freshQuery->get();
+        } else {
+            $rowCollection = $this->query->get();
+        }
 
         $rows = $rowCollection instanceof \Toporia\Framework\Database\Query\RowCollection
             ? $rowCollection->all()
@@ -119,12 +132,10 @@ class MorphMany extends Relation
      */
     public function addEagerConstraints(array $models): void
     {
-        // Group models by type for efficient loading
+        // Group models by type (full class name) for efficient loading
         $types = [];
         foreach ($models as $model) {
-            $class = get_class($model);
-            $parts = explode('\\', $class);
-            $type = end($parts);
+            $type = get_class($model);
 
             if (!isset($types[$type])) {
                 $types[$type] = [];
@@ -177,9 +188,7 @@ class MorphMany extends Relation
 
         // Match to parents
         foreach ($models as $model) {
-            $class = get_class($model);
-            $parts = explode('\\', $class);
-            $type = end($parts);
+            $type = get_class($model);
             $id = $model->getAttribute($this->localKey);
             $key = "{$type}:{$id}";
 

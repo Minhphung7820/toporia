@@ -13,7 +13,21 @@ use PDO;
 /**
  * Base TestCase for ORM tests with database setup
  *
+ * ✅ STATUS: Base class for all ORM tests - provides database connection and helper methods
+ * ✅ Last verified: 2025-01-22
+ * ✅ Features:
+ *    - Automatic database connection setup (MySQL)
+ *    - Transaction-based test isolation (rollback after each test)
+ *    - Helper methods for table creation, queries, and assertions
+ *    - Support for test database configuration via environment variables
+ *
  * Provides database connection setup and helper methods for ORM testing.
+ * All ORM test classes should extend this class to get database functionality.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
  */
 abstract class DatabaseTestCase extends TestCase
 {
@@ -184,5 +198,22 @@ abstract class DatabaseTestCase extends TestCase
     {
         $actual = $this->getTableCount($table, $where);
         $this->assertEquals($expected, $actual, $message ?: "Expected {$expected} records in table `{$table}`, found {$actual}");
+    }
+
+    /**
+     * Helper to set eagerLoaded on a model using reflection
+     */
+    protected function setEagerLoaded(Model $model, string $relation, bool $loaded = true): void
+    {
+        $reflection = new \ReflectionClass($model);
+        $property = $reflection->getProperty('eagerLoaded');
+        $property->setAccessible(true);
+        $eagerLoaded = $property->getValue($model);
+        if ($loaded) {
+            $eagerLoaded[$relation] = true;
+        } else {
+            unset($eagerLoaded[$relation]);
+        }
+        $property->setValue($model, $eagerLoaded);
     }
 }

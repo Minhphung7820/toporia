@@ -45,11 +45,13 @@ class HasManyThrough extends Relation
         string $localKey,            // countries.id
         protected string $secondLocalKey
     ) {
-        // Store keys for eager loading
-        $this->foreignKey = $secondKey; // posts.user_id
-        $this->localKey = $localKey;     // countries.id
-
+        // Call parent constructor first (will set $this->foreignKey and $this->localKey)
         parent::__construct($query, $parent, $firstKey, $localKey);
+
+        // Override foreignKey to use secondKey (posts.user_id instead of users.country_id)
+        // This is the actual foreign key on the related table
+        $this->foreignKey = $secondKey; // posts.user_id
+        // localKey stays as countries.id (correct)
 
         // Set up the join
         $this->performJoin();
@@ -82,6 +84,19 @@ class HasManyThrough extends Relation
                 $this->parent->getAttribute($this->localKey)
             );
         }
+    }
+
+    /**
+     * Override addConstraints to prevent base class from adding wrong constraints.
+     * HasManyThrough uses performJoin() instead.
+     *
+     * @return $this
+     */
+    public function addConstraints(): static
+    {
+        // Constraints are already added in performJoin()
+        // Don't call parent::addConstraints() as it would use wrong foreign key
+        return $this;
     }
 
     /**
