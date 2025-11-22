@@ -32,7 +32,7 @@ final class WelcomeEmail extends Mailable
         $this->from(config('mail.from.address'), config('mail.from.name'))
             ->to($this->userEmail)
             ->subject('Welcome to ' . config('app.name', 'Our Platform') . '!')
-            ->view('welcome', [
+            ->view('emails/welcome', [
                 'name' => $this->userName,
             ]);
     }
