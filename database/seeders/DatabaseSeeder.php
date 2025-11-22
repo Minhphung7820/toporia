@@ -56,4 +56,3 @@ final class DatabaseSeeder extends Seeder
         return true;
     }
 }
-

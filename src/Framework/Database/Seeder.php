@@ -374,4 +374,3 @@ abstract class Seeder implements SeederInterface
         return new DatabaseManager($config);
     }
 }
-

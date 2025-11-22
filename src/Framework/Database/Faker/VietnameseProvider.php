@@ -29,8 +29,26 @@ class VietnameseProvider implements FakerProviderInterface
      * @var array<int, string>
      */
     private array $firstNames = [
-        'An', 'Bình', 'Cường', 'Dũng', 'Đức', 'Hùng', 'Minh', 'Nam', 'Quang', 'Tuấn',
-        'Anh', 'Hà', 'Lan', 'Linh', 'Mai', 'Ngọc', 'Phương', 'Thảo', 'Thu', 'Vy'
+        'An',
+        'Bình',
+        'Cường',
+        'Dũng',
+        'Đức',
+        'Hùng',
+        'Minh',
+        'Nam',
+        'Quang',
+        'Tuấn',
+        'Anh',
+        'Hà',
+        'Lan',
+        'Linh',
+        'Mai',
+        'Ngọc',
+        'Phương',
+        'Thảo',
+        'Thu',
+        'Vy'
     ];
 
     /**
@@ -39,8 +57,26 @@ class VietnameseProvider implements FakerProviderInterface
      * @var array<int, string>
      */
     private array $lastNames = [
-        'Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Huỳnh', 'Phan', 'Vũ', 'Võ', 'Đặng',
-        'Bùi', 'Đỗ', 'Hồ', 'Ngô', 'Dương', 'Lý', 'Đinh', 'Đào', 'Tô', 'Tôn'
+        'Nguyễn',
+        'Trần',
+        'Lê',
+        'Phạm',
+        'Hoàng',
+        'Huỳnh',
+        'Phan',
+        'Vũ',
+        'Võ',
+        'Đặng',
+        'Bùi',
+        'Đỗ',
+        'Hồ',
+        'Ngô',
+        'Dương',
+        'Lý',
+        'Đinh',
+        'Đào',
+        'Tô',
+        'Tôn'
     ];
 
     /**
@@ -49,7 +85,16 @@ class VietnameseProvider implements FakerProviderInterface
      * @var array<int, string>
      */
     private array $middleNames = [
-        'Văn', 'Thị', 'Đức', 'Minh', 'Quang', 'Hữu', 'Công', 'Duy', 'Tuấn', 'Mạnh'
+        'Văn',
+        'Thị',
+        'Đức',
+        'Minh',
+        'Quang',
+        'Hữu',
+        'Công',
+        'Duy',
+        'Tuấn',
+        'Mạnh'
     ];
 
     /**
@@ -58,8 +103,16 @@ class VietnameseProvider implements FakerProviderInterface
      * @var array<int, string>
      */
     private array $cities = [
-        'Hà Nội', 'Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ',
-        'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu'
+        'Hà Nội',
+        'Hồ Chí Minh',
+        'Đà Nẵng',
+        'Hải Phòng',
+        'Cần Thơ',
+        'An Giang',
+        'Bà Rịa - Vũng Tàu',
+        'Bắc Giang',
+        'Bắc Kạn',
+        'Bạc Liêu'
     ];
 
     /**
@@ -68,8 +121,15 @@ class VietnameseProvider implements FakerProviderInterface
      * @var array<int, string>
      */
     private array $districts = [
-        'Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5',
-        'Huyện Bình Chánh', 'Huyện Cần Giờ', 'Huyện Củ Chi', 'Huyện Hóc Môn'
+        'Quận 1',
+        'Quận 2',
+        'Quận 3',
+        'Quận 4',
+        'Quận 5',
+        'Huyện Bình Chánh',
+        'Huyện Cần Giờ',
+        'Huyện Củ Chi',
+        'Huyện Hóc Môn'
     ];
 
     /**
@@ -131,8 +191,14 @@ class VietnameseProvider implements FakerProviderInterface
     public function streetName(): string
     {
         $streets = [
-            'Nguyễn Trãi', 'Lê Lợi', 'Trần Hưng Đạo', 'Hai Bà Trưng',
-            'Lý Thường Kiệt', 'Võ Văn Tần', 'Điện Biên Phủ', 'Hoàng Diệu'
+            'Nguyễn Trãi',
+            'Lê Lợi',
+            'Trần Hưng Đạo',
+            'Hai Bà Trưng',
+            'Lý Thường Kiệt',
+            'Võ Văn Tần',
+            'Điện Biên Phủ',
+            'Hoàng Diệu'
         ];
 
         $prefixes = ['Đường', 'Phố'];
@@ -142,4 +208,3 @@ class VietnameseProvider implements FakerProviderInterface
         return "{$prefix} {$street}";
     }
 }
-
