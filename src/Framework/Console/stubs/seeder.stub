@@ -5,14 +5,55 @@ declare(strict_types=1);
 namespace {{ namespace }};
 
 use Toporia\Framework\Database\Seeder;
+{{ factoryUse }}
 
+/**
+ * {{ class }}
+ *
+ * Seeds {{ tableName }} table with data.
+ */
 final class {{ class }} extends Seeder
 {
     /**
-     * Run the database seeds.
+     * Get seeder dependencies (other seeders that must run first).
+     *
+     * @return array<string> Array of seeder class names
      */
-    public function run(): void
+    public function dependencies(): array
     {
-        //
+        return [
+            // Add dependent seeders here
+            // Example: RoleSeeder::class,
+        ];
+    }
+
+    /**
+     * Run the database seeds.
+     *
+     * @return void
+     */
+    protected function seed(): void
+    {
+        // Example: Using factory
+        // $this->factory({{ factoryName }}::new(), 10);
+
+        // Example: Using factory with states
+        // $this->factory({{ factoryName }}::new()->state('admin'), 5);
+
+        // Example: Raw insert (for large datasets)
+        // $this->insert('{{ tableName }}', [
+        //     ['column1' => 'value1', 'column2' => 'value2'],
+        //     ['column1' => 'value3', 'column2' => 'value4'],
+        // ]);
+    }
+
+    /**
+     * Whether to use transaction for this seeder.
+     *
+     * @return bool
+     */
+    public function useTransaction(): bool
+    {
+        return true; // Wrap in transaction for safety
     }
 }

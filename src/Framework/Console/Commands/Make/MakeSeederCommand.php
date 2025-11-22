@@ -22,6 +22,7 @@ final class MakeSeederCommand extends Command
         }
 
         // Ensure it ends with Seeder
+        $baseName = $name;
         if (!str_ends_with($name, 'Seeder')) {
             $name .= 'Seeder';
         }
@@ -35,10 +36,30 @@ final class MakeSeederCommand extends Command
 
         $stubContent = file_get_contents($stubPath);
 
+        // Guess factory and table name from seeder name
+        $factoryName = $this->guessFactoryName($baseName);
+        $tableName = $this->guessTableName($baseName);
+        $factoryUse = $this->generateFactoryUse($factoryName);
+
         // Replace placeholders
         $namespace = 'Database\\Seeders';
-        $stubContent = str_replace(['{{ namespace }}', '{{namespace}}'], $namespace, $stubContent);
-        $stubContent = str_replace(['{{ class }}', '{{class}}'], $name, $stubContent);
+
+        $replacements = [
+            '{{ namespace }}' => $namespace,
+            '{{namespace}}' => $namespace,
+            '{{ class }}' => $name,
+            '{{class}}' => $name,
+            '{{ factoryName }}' => $factoryName,
+            '{{factoryName}}' => $factoryName,
+            '{{ tableName }}' => $tableName,
+            '{{tableName}}' => $tableName,
+            '{{ factoryUse }}' => $factoryUse,
+            '{{factoryUse}}' => $factoryUse,
+        ];
+
+        foreach ($replacements as $placeholder => $replacement) {
+            $stubContent = str_replace($placeholder, $replacement, $stubContent);
+        }
 
         // Generate path
         $path = $this->getBasePath() . '/database/seeders';
@@ -63,6 +84,68 @@ final class MakeSeederCommand extends Command
         $this->success("Seeder [{$relativePath}] created successfully.");
 
         return 0;
+    }
+
+    /**
+     * Guess factory name from seeder name.
+     *
+     * @param string $seederName
+     * @return string
+     */
+    private function guessFactoryName(string $seederName): string
+    {
+        // Remove 'Seeder' suffix if present
+        $baseName = preg_replace('/Seeder$/', '', $seederName);
+
+        // Try to find factory
+        $factoryClass = "Database\\Factories\\{$baseName}Factory";
+        if (class_exists($factoryClass)) {
+            return $factoryClass;
+        }
+
+        // Return pattern for user to fill
+        return "{$baseName}Factory::new()";
+    }
+
+    /**
+     * Guess table name from seeder name.
+     *
+     * @param string $seederName
+     * @return string
+     */
+    private function guessTableName(string $seederName): string
+    {
+        // Remove 'Seeder' suffix if present
+        $baseName = preg_replace('/Seeder$/', '', $seederName);
+
+        // Convert PascalCase to snake_case and pluralize
+        $tableName = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $baseName));
+
+        // Pluralize (simple version)
+        if (!str_ends_with($tableName, 's')) {
+            $tableName .= 's';
+        }
+
+        return $tableName;
+    }
+
+    /**
+     * Generate factory use statement.
+     *
+     * @param string $factoryName
+     * @return string
+     */
+    private function generateFactoryUse(string $factoryName): string
+    {
+        // If it's a full class name, generate use statement
+        if (str_contains($factoryName, '\\')) {
+            $factoryClass = preg_replace('/::new\(\)$/', '', $factoryName);
+            if (class_exists($factoryClass)) {
+                return "use {$factoryClass};";
+            }
+        }
+
+        return '';
     }
 
     private function getBasePath(): string

@@ -70,13 +70,77 @@ final class MakeModelCommand extends GeneratorCommand
     private function createFactory(string $modelName): void
     {
         $factoryName = $modelName . 'Factory';
-        $this->info("Factory [{$factoryName}] should be created.");
+
+        // Get full model class name
+        $modelClass = $this->getDefaultNamespace() . '\\' . $modelName;
+
+        // Create factory command instance
+        $factoryCommand = new MakeFactoryCommand();
+
+        // Set application if available
+        if ($this->getApplication() !== null) {
+            $factoryCommand->setApplication($this->getApplication());
+        }
+
+        // Manually set arguments and options by directly calling handle with internal methods
+        // We'll use reflection to set protected properties or create a helper method
+        try {
+            // Use reflection to set name and model
+            $reflection = new \ReflectionClass($factoryCommand);
+
+            // Set name property
+            $nameProperty = $reflection->getProperty('arguments');
+            $nameProperty->setAccessible(true);
+            $nameProperty->setValue($factoryCommand, ['name' => $factoryName]);
+
+            // Set model option
+            $optionProperty = $reflection->getProperty('options');
+            $optionProperty->setAccessible(true);
+            $currentOptions = $optionProperty->getValue($factoryCommand) ?? [];
+            $currentOptions['model'] = $modelClass;
+            $optionProperty->setValue($factoryCommand, $currentOptions);
+
+            // Set output
+            $factoryCommand->setOutput($this->output);
+
+            // Execute command
+            $factoryCommand->handle();
+        } catch (\Exception $e) {
+            // Fallback: just show info message
+            $this->info("Factory [{$factoryName}] should be created manually with: php console make:factory {$factoryName} --model={$modelClass}");
+        }
     }
 
     private function createSeeder(string $modelName): void
     {
         $seederName = $modelName . 'Seeder';
-        $this->info("Seeder [{$seederName}] should be created.");
+
+        // Create seeder command instance
+        $seederCommand = new MakeSeederCommand();
+
+        // Set application if available
+        if ($this->getApplication() !== null) {
+            $seederCommand->setApplication($this->getApplication());
+        }
+
+        try {
+            // Use reflection to set name
+            $reflection = new \ReflectionClass($seederCommand);
+
+            // Set name property
+            $nameProperty = $reflection->getProperty('arguments');
+            $nameProperty->setAccessible(true);
+            $nameProperty->setValue($seederCommand, ['name' => $seederName]);
+
+            // Set output
+            $seederCommand->setOutput($this->output);
+
+            // Execute command
+            $seederCommand->handle();
+        } catch (\Exception $e) {
+            // Fallback: just show info message
+            $this->info("Seeder [{$seederName}] should be created manually with: php console make:seeder {$seederName}");
+        }
     }
 
     private function tableize(string $className): string

@@ -22,9 +22,19 @@ final class MakeFactoryCommand extends Command
         }
 
         // Ensure it ends with Factory
+        $baseName = $name;
         if (!str_ends_with($name, 'Factory')) {
             $name .= 'Factory';
         }
+
+        // Get model name from option or guess from factory name
+        $modelClass = $this->option('model');
+        if (empty($modelClass)) {
+            $modelClass = $this->guessModelName($baseName);
+        }
+
+        // Normalize model class (ensure full namespace)
+        $modelClass = $this->normalizeModelClass($modelClass);
 
         $stubPath = $this->resolveStubPath('factory.stub');
 
@@ -37,8 +47,25 @@ final class MakeFactoryCommand extends Command
 
         // Replace placeholders
         $namespace = 'Database\\Factories';
-        $stubContent = str_replace(['{{ namespace }}', '{{namespace}}'], $namespace, $stubContent);
-        $stubContent = str_replace(['{{ class }}', '{{class}}'], $name, $stubContent);
+        $modelName = $this->class_basename($modelClass);
+        $stateName = $this->extractStateName($baseName);
+
+        $replacements = [
+            '{{ namespace }}' => $namespace,
+            '{{namespace}}' => $namespace,
+            '{{ class }}' => $name,
+            '{{class}}' => $name,
+            '{{ model }}' => "'{$modelClass}'",
+            '{{model}}' => "'{$modelClass}'",
+            '{{ modelName }}' => $modelName,
+            '{{modelName}}' => $modelName,
+            '{{ stateName }}' => $stateName,
+            '{{stateName}}' => $stateName,
+        ];
+
+        foreach ($replacements as $placeholder => $replacement) {
+            $stubContent = str_replace($placeholder, $replacement, $stubContent);
+        }
 
         // Generate path
         $path = $this->getBasePath() . '/database/factories';
@@ -61,8 +88,95 @@ final class MakeFactoryCommand extends Command
 
         $relativePath = str_replace($this->getBasePath() . '/', '', $filePath);
         $this->success("Factory [{$relativePath}] created successfully.");
+        $this->info("Model: {$modelClass}");
 
         return 0;
+    }
+
+    /**
+     * Guess model name from factory name.
+     *
+     * @param string $factoryName
+     * @return string
+     */
+    private function guessModelName(string $factoryName): string
+    {
+        // Remove 'Factory' suffix if present
+        $baseName = preg_replace('/Factory$/', '', $factoryName);
+
+        // Try common patterns
+        $patterns = [
+            "App\\Domain\\{$baseName}\\{$baseName}Model",
+            "App\\Domain\\{$baseName}\\{$baseName}",
+            "App\\Infrastructure\\Database\\Models\\{$baseName}Model",
+            "App\\Infrastructure\\Database\\Models\\{$baseName}",
+            "App\\Models\\{$baseName}",
+        ];
+
+        // Check if any pattern exists
+        foreach ($patterns as $pattern) {
+            if (class_exists($pattern)) {
+                return $pattern;
+            }
+        }
+
+        // Default pattern
+        return "App\\Domain\\{$baseName}\\{$baseName}Model";
+    }
+
+    /**
+     * Normalize model class name.
+     *
+     * @param string $modelClass
+     * @return string
+     */
+    private function normalizeModelClass(string $modelClass): string
+    {
+        // If already fully qualified, return as is
+        if (str_contains($modelClass, '\\')) {
+            if (class_exists($modelClass)) {
+                return $modelClass;
+            }
+        } else {
+            // Try common namespaces
+            $patterns = [
+                "App\\Domain\\{$modelClass}\\{$modelClass}Model",
+                "App\\Domain\\{$modelClass}\\{$modelClass}",
+                "App\\Infrastructure\\Database\\Models\\{$modelClass}Model",
+                "App\\Models\\{$modelClass}",
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (class_exists($pattern)) {
+                    return $pattern;
+                }
+            }
+        }
+
+        return $modelClass;
+    }
+
+    /**
+     * Extract state name from factory name.
+     *
+     * @param string $factoryName
+     * @return string
+     */
+    private function extractStateName(string $factoryName): string
+    {
+        // Convert PascalCase to camelCase
+        return lcfirst($factoryName);
+    }
+
+    /**
+     * Get class basename helper.
+     *
+     * @param string $class
+     * @return string
+     */
+    private function class_basename(string $class): string
+    {
+        return basename(str_replace('\\', '/', $class));
     }
 
     private function getBasePath(): string

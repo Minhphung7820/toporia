@@ -52,6 +52,67 @@ if (!function_exists('tap')) {
     }
 }
 
+if (!function_exists('factory')) {
+    /**
+     * Create a factory instance for model creation.
+     *
+     * @param class-string<\Toporia\Framework\Database\Contracts\FactoryInterface> $factoryClass
+     * @return \Toporia\Framework\Database\Contracts\FactoryInterface
+     */
+    function factory(string $factoryClass): \Toporia\Framework\Database\Contracts\FactoryInterface
+    {
+        return \Toporia\Framework\Database\Helper::factory($factoryClass);
+    }
+}
+
+if (!function_exists('bcrypt')) {
+    /**
+     * Hash the given value using bcrypt algorithm.
+     *
+     * Convenience wrapper for Hash::make().
+     *
+     * @param string $value Value to hash
+     * @param array $options Hashing options (cost, memory, time, etc.)
+     * @return string Hashed value
+     */
+    function bcrypt(string $value, array $options = []): string
+    {
+        if (function_exists('app') && app()->has('hash')) {
+            return app('hash')->make($value, $options);
+        }
+
+        // Fallback: use Hash facade directly
+        return \Toporia\Framework\Support\Accessors\Hash::make($value, $options);
+    }
+}
+
+if (!function_exists('info')) {
+    /**
+     * Log an informational message or write to output.
+     *
+     * @param string $message Message to log/output
+     * @param array $context Additional context
+     * @return void
+     */
+    function info(string $message, array $context = []): void
+    {
+        // Try to use logger if available
+        if (function_exists('logger')) {
+            logger()->info($message, $context);
+            return;
+        }
+
+        // Try to use Log facade if available
+        if (function_exists('app') && app()->has('log')) {
+            app('log')->info($message, $context);
+            return;
+        }
+
+        // Fallback: echo to output
+        echo $message . PHP_EOL;
+    }
+}
+
 if (!function_exists('with')) {
     /**
      * Return the given value, optionally passed through a callback.
@@ -238,7 +299,7 @@ if (!function_exists('resource')) {
         // Fallback: No transformer manager available
         throw new \RuntimeException(
             'TransformerManager not found in container. ' .
-            'Register it in a service provider to use resource() helper.'
+                'Register it in a service provider to use resource() helper.'
         );
     }
 }
@@ -274,7 +335,7 @@ if (!function_exists('resource_collection')) {
         // Fallback: No transformer manager available
         throw new \RuntimeException(
             'TransformerManager not found in container. ' .
-            'Register it in a service provider to use resource_collection() helper.'
+                'Register it in a service provider to use resource_collection() helper.'
         );
     }
 }
