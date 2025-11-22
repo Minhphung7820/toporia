@@ -11,22 +11,23 @@ use Toporia\Framework\Observer\Traits\Observable;
 use Toporia\Framework\Observer\Contracts\ObservableInterface;
 use Toporia\Framework\Database\ORM\Concerns\HasObservers;
 
+
 /**
- * Base Active Record model.
+ * Abstract Class Model
  *
- * Responsibilities:
- * - Persistence (save / delete / refresh)
- * - QueryBuilder integration (`static::query()`)
- * - Timestamp management (created_at, updated_at)
- * - Attribute casting and mass-assignment protection
- * - Dirty checking via original snapshot
- * - Simple lifecycle hooks (creating, created, updating, updated, deleting, deleted)
+ * Base ORM model class implementing Active Record pattern with
+ * relationships, scopes, eager loading, query builder integration, and
+ * event hooks.
  *
- * Notes:
- * - This class intentionally follows an Eloquent-like API surface while remaining framework-agnostic.
- * - Collections returned by `all()` / `get()` are `ModelCollection<static>`.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  ORM
+ * @since       2025-01-10
  *
- * @property mixed $id Primary key (dynamic attribute)
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Model implements ModelInterface, ObservableInterface
 {

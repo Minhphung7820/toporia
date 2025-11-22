@@ -4,13 +4,23 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Contracts;
 
+
 /**
- * Realtime Manager Interface
+ * Interface RealtimeManagerInterface
  *
- * Central manager for realtime communication system.
- * Coordinates transports, brokers, channels, and connections.
+ * Contract defining the interface for RealtimeManagerInterface
+ * implementations in the Real-time broadcasting layer of the Toporia
+ * Framework.
  *
- * @package Toporia\Framework\Realtime\Contracts
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface RealtimeManagerInterface
 {

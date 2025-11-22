@@ -4,35 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Notification\Contracts;
 
+
 /**
- * Notifiable Interface
+ * Interface NotifiableInterface
  *
- * Marks entities that can receive notifications (Users, Admins, Teams, etc.)
- * Provides routing information for each notification channel.
+ * Contract defining the interface for NotifiableInterface implementations
+ * in the Multi-channel notifications layer of the Toporia Framework.
  *
- * Usage:
- * ```php
- * class User implements NotifiableInterface
- * {
- *     public function routeNotificationFor(string $channel): mixed
- *     {
- *         return match($channel) {
- *             'mail' => $this->email,
- *             'sms' => $this->phone,
- *             'slack' => $this->slackWebhookUrl,
- *             'database' => $this->id,
- *             default => null
- *         };
- *     }
- * }
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) routing resolution via match expression
- * - Lazy loading of routing data
- * - No database queries during routing
- *
- * @package Toporia\Framework\Notification\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface NotifiableInterface
 {

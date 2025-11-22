@@ -6,6 +6,23 @@ namespace Toporia\Framework\Search;
 
 use Toporia\Framework\Search\Contracts\{SearchIndexerInterface, SearchableModelInterface};
 
+
+/**
+ * Trait Searchable
+ *
+ * Trait providing reusable functionality for Searchable in the
+ * Elasticsearch integration layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Search
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 trait Searchable
 {
     /**

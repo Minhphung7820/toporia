@@ -4,21 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM\Concerns;
 
+
 /**
- * HasObservers Trait
+ * Trait HasObservers
  *
- * Provides Laravel-style model observer support.
- * Observers can hook into model lifecycle events with the actual model instance.
+ * Trait providing reusable functionality for HasObservers in the Concerns
+ * layer of the Toporia Framework.
  *
- * Performance Optimizations:
- * - Observer instances are cached per class
- * - Event methods are checked via method_exists (no reflection)
- * - Observers are resolved lazily
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles observer registration and dispatch
- * - Open/Closed: Extensible via new observer classes
- * - Dependency Inversion: Uses container for observer resolution
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasObservers
 {

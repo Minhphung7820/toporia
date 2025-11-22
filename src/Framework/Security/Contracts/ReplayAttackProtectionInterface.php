@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Security\Contracts;
 
+
 /**
- * Replay Attack Protection Interface
+ * Interface ReplayAttackProtectionInterface
  *
- * Provides methods to prevent replay attacks by:
- * - Generating unique nonces (Number Used Once)
- * - Validating nonces with timestamp
- * - Tracking used nonces to prevent reuse
+ * Contract defining the interface for ReplayAttackProtectionInterface
+ * implementations in the Security features layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Interface-based design for testability
- * - Dependency Inversion: Depend on abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Security\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ReplayAttackProtectionInterface
 {

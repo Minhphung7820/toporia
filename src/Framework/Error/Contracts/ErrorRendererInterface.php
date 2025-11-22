@@ -6,17 +6,22 @@ namespace Toporia\Framework\Error\Contracts;
 
 use Throwable;
 
+
 /**
- * Error Renderer Interface
+ * Interface ErrorRendererInterface
  *
- * Defines contract for rendering exceptions as HTTP responses.
+ * Contract defining the interface for ErrorRendererInterface
+ * implementations in the Error handling layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Only renders errors
- * - Open/Closed: Multiple implementations (HTML, JSON, CLI)
- * - Dependency Inversion: ErrorHandler depends on this abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Error\Contracts
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Error
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ErrorRendererInterface
 {

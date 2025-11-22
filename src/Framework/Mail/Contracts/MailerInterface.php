@@ -6,17 +6,22 @@ namespace Toporia\Framework\Mail\Contracts;
 
 use Toporia\Framework\Mail\Mailable;
 
+
 /**
- * Mailer Interface
+ * Interface MailerInterface
  *
- * Contract for email sending implementations.
+ * Contract defining the interface for MailerInterface implementations in
+ * the Email sending and queuing layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Defines contract for mail sending (Dependency Inversion Principle)
- * - Allows multiple implementations (SMTP, Log, Array, etc.)
- * - Framework-agnostic abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail\Contracts
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Mail
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface MailerInterface
 {

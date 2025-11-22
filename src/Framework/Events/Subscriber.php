@@ -6,26 +6,26 @@ namespace Toporia\Framework\Events;
 
 use Toporia\Framework\Events\Contracts\{EventDispatcherInterface, SubscriberInterface};
 
+
 /**
- * Base Subscriber Class
+ * Abstract Class Subscriber
  *
- * Base class for event subscribers.
- * Provides convenient subscription methods.
+ * Abstract base class for Subscriber implementations in the Event
+ * dispatching and listening layer providing common functionality and
+ * contracts.
  *
- * Performance:
- * - Bulk registration reduces dispatcher calls
- * - Efficient event-listener mapping
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Events
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles event subscription
- * - Dependency Inversion: Implements SubscriberInterface
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * SOLID Principles:
- * - S: Only handles subscription
- * - O: Extensible via inheritance
- * - L: Implements interface correctly
- * - I: Focused interface
- * - D: Depends on EventDispatcherInterface abstraction
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 abstract class Subscriber implements SubscriberInterface
 {

@@ -6,11 +6,22 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 
+
 /**
- * Belongs To Relationship
+ * Class BelongsTo
  *
- * Represents the inverse of a one-to-one or one-to-many relationship.
- * Example: Post belongsTo User
+ * Core class for the Relations layer providing essential functionality for
+ * the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class BelongsTo extends Relation
 {

@@ -8,23 +8,22 @@ use Toporia\Framework\Database\Factory;
 use Toporia\Framework\Database\ORM\Model;
 use Closure;
 
+
 /**
- * Has Relations Trait
+ * Trait HasRelations
  *
- * Provides convenient methods for creating related models in factories.
+ * Trait providing reusable functionality for HasRelations in the Concerns
+ * layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles relationship creation
- * - Open/Closed: Extend factory functionality without modifying base
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * UserFactory::new()
- *     ->has(Post::factory()->count(3))
- *     ->create();
- * ```
- *
- * @mixin Factory
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasRelations
 {

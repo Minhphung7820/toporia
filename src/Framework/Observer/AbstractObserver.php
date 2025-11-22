@@ -6,43 +6,22 @@ namespace Toporia\Framework\Observer;
 
 use Toporia\Framework\Observer\Contracts\{ObservableInterface, ObserverInterface};
 
+
 /**
- * Abstract Observer
+ * Abstract Class AbstractObserver
  *
- * Base class for observers with common functionality.
- * Provides default implementations and helper methods.
+ * Abstract base class for AbstractObserver implementations in the Observer
+ * layer providing common functionality and contracts.
  *
- * Performance:
- * - Lightweight base class
- * - No overhead if not used
- * - Efficient method dispatch
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Observer
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Base observer functionality only
- * - Open/Closed: Extensible via inheritance
- * - Liskov Substitution: Implements ObserverInterface correctly
- *
- * Usage:
- * ```php
- * class MyObserver extends AbstractObserver
- * {
- *     public function update(ObservableInterface $observable, string $event, array $data = []): void
- *     {
- *         match($event) {
- *             'created' => $this->handleCreated($observable, $data),
- *             'updated' => $this->handleUpdated($observable, $data),
- *             default => null,
- *         };
- *     }
- *
- *     private function handleCreated(ObservableInterface $observable, array $data): void
- *     {
- *         // Handle created event
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Observer
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractObserver implements ObserverInterface
 {

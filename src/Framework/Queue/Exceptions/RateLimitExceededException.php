@@ -4,13 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Queue\Exceptions;
 
+
 /**
- * Rate Limit Exceeded Exception
+ * Class RateLimitExceededException
  *
- * Thrown when job execution rate limit is exceeded.
- * Contains retry delay information.
+ * Exception class for handling RateLimitExceededException errors in the
+ * Exceptions layer of the Toporia Framework.
  *
- * @package Toporia\Framework\Queue\Exceptions
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Exceptions
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class RateLimitExceededException extends \RuntimeException
 {

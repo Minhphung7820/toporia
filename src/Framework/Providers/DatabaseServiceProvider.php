@@ -10,10 +10,23 @@ use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Foundation\ServiceProvider;
 
+
 /**
- * Database Service Provider
+ * Class DatabaseServiceProvider
  *
- * Registers database services including connections and ORM.
+ * Abstract base class for service providers responsible for registering
+ * and booting framework services following two-phase lifecycle (register
+ * then boot).
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class DatabaseServiceProvider extends ServiceProvider
 {

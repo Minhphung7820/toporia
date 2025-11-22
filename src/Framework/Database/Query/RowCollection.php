@@ -6,14 +6,22 @@ namespace Toporia\Framework\Database\Query;
 
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Typed collection representing raw database rows.
+ * Class RowCollection
  *
- * - Extends Support\Collection to reuse the fluent functional API (map, filter, reduce, ...)
- * - Each item is an associative array: array<string,mixed>
- * - Provides small helpers commonly needed for row resultsets
+ * Core class for the Query layer providing essential functionality for the
+ * Toporia Framework.
  *
- * @extends Collection<int, array<string,mixed>>
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Query
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class RowCollection extends Collection
 {

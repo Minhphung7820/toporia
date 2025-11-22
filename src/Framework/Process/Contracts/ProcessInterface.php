@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Process\Contracts;
 
+
 /**
- * Process Interface
+ * Interface ProcessInterface
  *
- * Contract for managing individual processes.
- * Supports fork-based multiprocessing with PCNTL.
+ * Contract defining the interface for ProcessInterface implementations in
+ * the Multi-process execution layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Process\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ProcessInterface
 {

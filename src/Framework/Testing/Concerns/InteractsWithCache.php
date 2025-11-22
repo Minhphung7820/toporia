@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Testing\Concerns;
 
+
 /**
- * Cache Testing Trait
+ * Trait InteractsWithCache
  *
- * Provides utilities for cache testing.
+ * Multi-driver cache implementation supporting File, Redis, and Memory
+ * drivers with PSR-16 inspired interface and tag-based invalidation.
  *
- * Performance:
- * - O(1) cache clearing
- * - Fast cache assertions
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait InteractsWithCache
 {

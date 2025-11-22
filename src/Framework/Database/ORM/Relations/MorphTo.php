@@ -6,40 +6,22 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 
+
 /**
- * Morph To Relationship
+ * Class MorphTo
  *
- * Represents inverse of polymorphic relationships (MorphOne, MorphMany).
+ * Core class for the Relations layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Example: Comment → Post/Video
- * - comments.commentable_id (polymorphic foreign key)
- * - comments.commentable_type (polymorphic type: 'Post' or 'Video')
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
  *
- * Comment::morphTo('commentable')
- *
- * SQL Generated (dynamically based on type):
- * SELECT * FROM posts WHERE id = ? (if type = 'Post')
- * SELECT * FROM videos WHERE id = ? (if type = 'Video')
- *
- * Use Case: Retrieve parent model when you only know the child (comment knows its parent).
- *
- * Performance: O(1) query for single model - optimal!
- *              Eager loading: O(N) queries where N = distinct types
- *              (Grouped by type: 1 query per type with IN clause)
- *
- * Example Eager Loading:
- * - 50 comments on Posts (type='Post')
- * - 30 comments on Videos (type='Video')
- * Total: 2 queries instead of 80!
- * Query 1: SELECT * FROM posts WHERE id IN (1,2,3,...) (50 posts)
- * Query 2: SELECT * FROM videos WHERE id IN (51,52,...) (30 videos)
- *
- * SOLID Principles:
- * - Single Responsibility: Only handles inverse polymorphic lookup
- * - Open/Closed: New morphable types work without code changes
- * - Liskov Substitution: Implements RelationInterface
- * - Interface Segregation: Minimal interface
- * - Dependency Inversion: Depends on abstractions
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class MorphTo extends Relation
 {

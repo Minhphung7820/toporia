@@ -9,46 +9,22 @@ use Toporia\Framework\Realtime\Brokers\RabbitMqBroker;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Abstract Batch RabbitMQ Consumer
+ * Abstract Class AbstractBatchRabbitMqConsumer
  *
- * Base class for RabbitMQ consumers that process messages in batches.
- * Provides high-throughput processing with configurable batch size and interval.
+ * Abstract base class for AbstractBatchRabbitMqConsumer implementations in
+ * the Base layer providing common functionality and contracts.
  *
- * Performance Benefits:
- * - Reduced processing overhead per message
- * - Better throughput (5k+ messages/sec)
- * - Atomic batch processing
- * - Lower memory overhead
- * - Prefetch control for flow control
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * Architecture:
- * - RabbitMQ uses pull-based model (consumer pulls messages)
- * - Messages are buffered until batch size or interval reached
- * - Batch processing reduces per-message overhead
- * - Supports prefetch for flow control
- *
- * SOLID Principles:
- * - Single Responsibility: Handles batch message processing
- * - Open/Closed: Extensible via inheritance
- * - Liskov Substitution: Implements BatchingMessagesHandlerInterface
- *
- * Usage:
- * ```php
- * class MyBatchConsumer extends AbstractBatchRabbitMqConsumer
- * {
- *     protected function getChannels(): array { return ['channel1', 'channel2']; }
- *     protected function getBatchSizeLimit(): int { return 100; }
- *     protected function getBatchReleaseInterval(): int { return 1500; } // 1.5s
- *
- *     public function handleMessages(Collection $messages): void
- *     {
- *         // Process batch
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Console\Commands\RabbitMq\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractBatchRabbitMqConsumer extends AbstractRabbitMqConsumer implements BatchingMessagesHandlerInterface
 {

@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Application\Contracts;
 
+
 /**
- * Command interface (CQRS pattern).
+ * Interface CommandInterface
  *
- * Commands represent write operations that change system state.
- * They are intent-revealing objects that encapsulate a user's action.
+ * Contract defining the interface for CommandInterface implementations in
+ * the Application layer of the Toporia Framework.
  *
- * Characteristics:
- * - Represents an intent to change state
- * - Should be named in imperative mood (CreateProduct, UpdateUser)
- * - Contains only data needed for the operation
- * - Immutable (readonly properties)
- * - No business logic
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Application\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface CommandInterface
 {

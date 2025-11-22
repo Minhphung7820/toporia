@@ -6,52 +6,23 @@ namespace Toporia\Framework\Notification;
 
 use Toporia\Framework\Notification\Contracts\{NotificationInterface, NotifiableInterface};
 
+
 /**
- * Abstract Notification
+ * Abstract Class Notification
  *
- * Base class for all notifications with built-in features:
- * - Unique ID generation
- * - Queue support
- * - Multi-channel delivery
- * - Delayed sending
+ * Abstract base class for Notification implementations in the
+ * Multi-channel notifications layer providing common functionality and
+ * contracts.
  *
- * Usage:
- * ```php
- * class WelcomeNotification extends Notification
- * {
- *     public function via(NotifiableInterface $notifiable): array
- *     {
- *         return ['mail', 'database'];
- *     }
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification
+ * @since       2025-01-10
  *
- *     public function toMail(NotifiableInterface $notifiable): MailMessage
- *     {
- *         return (new MailMessage)
- *             ->subject('Welcome!')
- *             ->line('Thanks for signing up!')
- *             ->action('Get Started', url('/dashboard'));
- *     }
- *
- *     public function toDatabase(NotifiableInterface $notifiable): array
- *     {
- *         return [
- *             'title' => 'Welcome!',
- *             'message' => 'Thanks for signing up!',
- *             'action_url' => url('/dashboard')
- *         ];
- *     }
- * }
- *
- * // Send notification
- * $user->notify(new WelcomeNotification());
- * ```
- *
- * Performance Optimizations:
- * - Lazy channel resolution (only builds data for used channels)
- * - Supports queueing for async delivery
- * - Minimal memory footprint (< 1KB per instance)
- *
- * @package Toporia\Framework\Notification
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Notification implements NotificationInterface
 {

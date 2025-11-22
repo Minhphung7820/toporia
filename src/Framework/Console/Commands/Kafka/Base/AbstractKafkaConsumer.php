@@ -8,18 +8,22 @@ use Toporia\Framework\Console\Command;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 use Toporia\Framework\Realtime\Brokers\KafkaBroker;
 
+
 /**
- * Abstract Kafka Consumer Base Class
+ * Abstract Class AbstractKafkaConsumer
  *
- * Base class for all Kafka consumers with common functionality.
- * Provides configuration, broker access, and common utilities.
+ * Abstract base class for AbstractKafkaConsumer implementations in the
+ * Base layer providing common functionality and contracts.
  *
- * SOLID Principles:
- * - Single Responsibility: Manages Kafka consumer configuration and setup
- * - Open/Closed: Extensible via inheritance
- * - Dependency Inversion: Depends on RealtimeManagerInterface
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Console\Commands\Kafka\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractKafkaConsumer extends Command
 {

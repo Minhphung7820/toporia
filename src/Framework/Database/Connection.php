@@ -10,15 +10,25 @@ use PDO;
 use PDOException;
 use Toporia\Framework\Database\Exception\{ConnectionException, QueryException};
 
+
 /**
- * Database connection implementation.
+ * Class Connection
  *
- * Manages database connections using PDO with support for:
- * - Multiple database drivers (MySQL, PostgreSQL, SQLite)
- * - Connection pooling
- * - Transaction management
- * - Query execution with parameter binding
- * - Automatic reconnection
+ * Core class for the Database query building and ORM layer providing
+ * essential functionality for the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 class Connection implements ConnectionInterface
 {

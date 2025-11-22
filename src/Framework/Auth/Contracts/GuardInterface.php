@@ -6,13 +6,25 @@ namespace Toporia\Framework\Auth\Contracts;
 
 use Toporia\Framework\Auth\Authenticatable;
 
+
 /**
- * Guard Interface - Authentication guard contract.
+ * Interface GuardInterface
  *
- * Guards are responsible for authenticating users and managing authentication state.
- * Different guards can use different mechanisms (session, token, etc.)
+ * Contract defining the interface for GuardInterface implementations in
+ * the Authentication and authorization layer of the Toporia Framework.
  *
- * Following Interface Segregation Principle - focused, minimal interface.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface GuardInterface
 {

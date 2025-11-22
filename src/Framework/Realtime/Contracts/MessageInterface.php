@@ -4,27 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Contracts;
 
+
 /**
- * Message Interface
+ * Interface MessageInterface
  *
- * Represents a realtime message sent/received over transports.
+ * Contract defining the interface for MessageInterface implementations in
+ * the Real-time broadcasting layer of the Toporia Framework.
  *
- * Message Format:
- * {
- *   "type": "event",           // event, subscribe, unsubscribe, error, ping, pong
- *   "channel": "chat.room.1",  // Target channel
- *   "event": "message.sent",   // Event name
- *   "data": {...},             // Payload data
- *   "timestamp": 1234567890,   // Unix timestamp
- *   "id": "msg_xxxxx"          // Message ID
- * }
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - JSON encoding: ~0.01ms for typical message
- * - Binary encoding (MessagePack): ~0.005ms, 30% smaller
- * - Compression (gzip): ~0.1ms, 50-70% smaller
- *
- * @package Toporia\Framework\Realtime\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface MessageInterface
 {

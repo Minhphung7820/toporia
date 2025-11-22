@@ -6,21 +6,22 @@ namespace Toporia\Framework\Auth\OAuth2\Contracts;
 
 use Toporia\Framework\Http\Request;
 
+
 /**
- * OAuth2 Grant Interface
+ * Interface GrantInterface
  *
- * Contract for OAuth2 grant type implementations.
- * Each grant type (authorization_code, client_credentials, password, refresh_token) implements this interface.
+ * Contract defining the interface for GrantInterface implementations in
+ * the OAuth2 layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Strategy Pattern: Different grant types are interchangeable strategies
- * - Open/Closed: Add new grant types without modifying server
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  OAuth2\Contracts
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - S: Each grant handles one authentication flow
- * - O: Extensible via new grant implementations
- * - L: All grants are interchangeable
- * - I: Focused interface for grant operations
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface GrantInterface
 {

@@ -4,19 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Translation\Contracts;
 
+
 /**
- * Translator Interface
+ * Interface TranslatorInterface
  *
- * Defines the contract for translation services.
- * Follows PSR-12 and SOLID principles.
+ * Contract defining the interface for TranslatorInterface implementations
+ * in the Multi-language support layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Interface in Framework layer (abstraction)
- * - Implementation can be swapped without affecting consumers
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Translation\Contracts
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Interface Segregation: Focused interface for translation only
- * - Dependency Inversion: Consumers depend on this abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface TranslatorInterface
 {

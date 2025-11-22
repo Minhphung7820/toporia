@@ -8,20 +8,23 @@ use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Contracts\RelationInterface;
 
+
 /**
- * Model Query Builder - Extends QueryBuilder with Model-aware functionality.
+ * Class ModelQueryBuilder
  *
- * Responsibilities:
- * - Convert raw database rows to Model instances
- * - Handle eager loading of relationships
- * - Return ModelCollection instead of RowCollection
+ * Fluent SQL query builder providing chainable interface for constructing
+ * SELECT, INSERT, UPDATE, DELETE queries with automatic parameter binding
+ * and join support.
  *
- * This class follows Clean Architecture by:
- * - Keeping Model logic separate from base QueryBuilder
- * - Base QueryBuilder remains framework-agnostic (works with raw arrays)
- * - ModelQueryBuilder adds ORM-specific behavior
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  ORM
+ * @since       2025-01-10
  *
- * @template TModel of Model
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ModelQueryBuilder extends QueryBuilder
 {

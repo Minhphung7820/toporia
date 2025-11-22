@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Log\Contracts;
 
+
 /**
- * Log Channel Interface
+ * Interface ChannelInterface
  *
- * Defines contract for log channel implementations.
- * Each channel handles log output differently (file, syslog, stderr, etc.).
+ * Contract defining the interface for ChannelInterface implementations in
+ * the Logging and error reporting layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Log\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ChannelInterface
 {

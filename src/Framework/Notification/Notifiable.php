@@ -6,40 +6,22 @@ namespace Toporia\Framework\Notification;
 
 use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationInterface};
 
+
 /**
- * Notifiable Trait
+ * Trait Notifiable
  *
- * Adds notification capabilities to any model (User, Admin, Team, etc.)
- * Provides convenient notify() method for sending notifications.
+ * Trait providing reusable functionality for Notifiable in the
+ * Multi-channel notifications layer of the Toporia Framework.
  *
- * Usage:
- * ```php
- * class User implements NotifiableInterface
- * {
- *     use Notifiable;
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification
+ * @since       2025-01-10
  *
- *     public function routeNotificationFor(string $channel): mixed
- *     {
- *         return match($channel) {
- *             'mail' => $this->email,
- *             'sms' => $this->phone,
- *             'slack' => $this->slackWebhookUrl,
- *             'database' => $this->id,
- *             default => null
- *         };
- *     }
- * }
- *
- * // Send notification
- * $user->notify(new WelcomeNotification());
- * ```
- *
- * Performance:
- * - O(1) method call overhead
- * - Lazy service resolution
- * - No memory overhead when not used
- *
- * @package Toporia\Framework\Notification
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait Notifiable
 {

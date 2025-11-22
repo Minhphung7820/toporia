@@ -7,47 +7,22 @@ namespace Toporia\Framework\Presentation\Action;
 use Toporia\Framework\Presentation\Contracts\ActionInterface;
 use Toporia\Framework\Http\{Request, Response};
 
+
 /**
- * Base Action for ADR (Action-Domain-Responder) pattern.
+ * Abstract Class AbstractAction
  *
- * Provides lifecycle hooks (before/after) around the main handler logic.
- * Actions should be single-purpose and handle one HTTP endpoint.
+ * Abstract base class for AbstractAction implementations in the Action
+ * layer providing common functionality and contracts.
  *
- * Lifecycle:
- * 1. before() - Setup, validation, authorization
- * 2. handle() - Main business logic
- * 3. after() - Cleanup, logging, metrics
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Action
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * class CreateProductAction extends AbstractAction
- * {
- *     public function __construct(
- *         private CreateProductHandler $handler,
- *         private ProductResponder $responder
- *     ) {}
- *
- *     protected function handle(Request $request, Response $response, ...$vars): mixed
- *     {
- *         $command = new CreateProductCommand(
- *             $request->input('title'),
- *             $request->input('price')
- *         );
- *
- *         $product = ($this->handler)($command);
- *
- *         return $this->responder->created($response, $product);
- *     }
- *
- *     protected function before(Request $request, Response $response): void
- *     {
- *         // Authorization check
- *         if (!auth()->can('create-product')) {
- *             throw new UnauthorizedException();
- *         }
- *     }
- * }
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractAction implements ActionInterface
 {

@@ -4,32 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Notification\Contracts;
 
+
 /**
- * Notification Channel Interface
+ * Interface ChannelInterface
  *
- * Defines contract for notification delivery channels.
- * Each channel handles delivery to a specific medium (email, SMS, database, etc.)
+ * Contract defining the interface for ChannelInterface implementations in
+ * the Multi-channel notifications layer of the Toporia Framework.
  *
- * Built-in Channels:
- * - MailChannel: Email delivery via MailManager
- * - DatabaseChannel: Store in database for in-app notifications
- * - SmsChannel: SMS delivery via third-party APIs
- * - SlackChannel: Slack messages via webhooks
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - Async delivery via queue support
- * - Bulk sending optimization
- * - Connection pooling for external APIs
- * - Minimal memory footprint
- *
- * SOLID Principles:
- * - Single Responsibility: Each channel handles one delivery method
- * - Open/Closed: Extensible via custom channels
- * - Liskov Substitution: All channels are interchangeable
- * - Interface Segregation: Minimal interface
- * - Dependency Inversion: Depends on abstractions
- *
- * @package Toporia\Framework\Notification\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ChannelInterface
 {

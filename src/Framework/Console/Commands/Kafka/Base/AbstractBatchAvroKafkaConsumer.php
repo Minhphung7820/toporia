@@ -8,41 +8,22 @@ use Toporia\Framework\Console\Commands\Kafka\Contracts\BatchingMessagesHandlerIn
 use Toporia\Framework\Realtime\Brokers\KafkaBroker;
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Abstract Batch Avro Kafka Consumer
+ * Abstract Class AbstractBatchAvroKafkaConsumer
  *
- * Base class for Kafka consumers that process Avro-encoded messages in batches.
- * Combines Avro deserialization with batch processing for maximum performance.
+ * Abstract base class for AbstractBatchAvroKafkaConsumer implementations
+ * in the Base layer providing common functionality and contracts.
  *
- * Performance:
- * - Avro decode: ~0.05ms per message (with caching)
- * - Batch processing: 1000+ messages/sec
- * - Schema Registry caching: Reduces network calls
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Handles Avro batch processing
- * - Open/Closed: Extensible via inheritance
- * - Liskov Substitution: Implements BatchingMessagesHandlerInterface
- *
- * Usage:
- * ```php
- * class MyBatchAvroConsumer extends AbstractBatchAvroKafkaConsumer
- * {
- *     protected function getTopic(): string { return 'my-topic'; }
- *     protected function getGroupId(): string { return 'my-group'; }
- *     protected function getOffset(): string { return 'earliest'; }
- *     protected function getSchemaName(): string { return 'com.example.UserEvent'; }
- *     protected function getBatchSizeLimit(): int { return 100; }
- *     protected function getBatchReleaseInterval(): int { return 1500; }
- *
- *     public function handleMessages(Collection $messages): void
- *     {
- *         // Process Avro batch
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Console\Commands\Kafka\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractBatchAvroKafkaConsumer extends AbstractAvroKafkaConsumer implements BatchingMessagesHandlerInterface
 {

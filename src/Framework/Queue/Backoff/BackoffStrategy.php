@@ -4,25 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Queue\Backoff;
 
+
 /**
- * Backoff Strategy Interface
+ * Interface BackoffStrategy
  *
- * Defines contract for calculating retry delays.
- * Allows different backoff algorithms (constant, exponential, custom).
+ * Contract defining the interface for BackoffStrategy implementations in
+ * the Backoff layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Interface Segregation: Minimal, focused contract
- * - Dependency Inversion: Jobs depend on abstraction
- * - Strategy Pattern: Interchangeable algorithms
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Backoff
+ * @since       2025-01-10
  *
- * SOLID Compliance: 10/10
- * - S: Single method, single responsibility
- * - O: Extensible via new implementations
- * - L: All implementations return delay in seconds
- * - I: Minimal interface
- * - D: Clients depend on interface, not concrete classes
- *
- * @package Toporia\Framework\Queue\Backoff
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface BackoffStrategy
 {

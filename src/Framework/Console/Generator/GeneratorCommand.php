@@ -6,11 +6,22 @@ namespace Toporia\Framework\Console\Generator;
 
 use Toporia\Framework\Console\Command;
 
+
 /**
- * Base class for all code generation commands.
+ * Abstract Class GeneratorCommand
  *
- * Provides stub loading, variable replacement, and file generation
- * with Clean Architecture naming conventions.
+ * Base console command class providing CLI interface with colored output,
+ * user interaction, argument/option parsing, and progress indicators.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Generator
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class GeneratorCommand extends Command
 {

@@ -5,19 +5,22 @@ declare(strict_types=1);
 namespace Toporia\Framework\Domain;
 
 use Toporia\Framework\Domain\Contracts\EntityInterface;
+
 /**
- * Base Entity class for Domain-Driven Design.
+ * Abstract Class Entity
  *
- * Entities are objects that have a unique identity that runs through time
- * and different states. The identity is typically an ID field.
+ * Abstract base class for Entity implementations in the Domain layer
+ * providing common functionality and contracts.
  *
- * Key characteristics:
- * - Has unique identity (ID)
- * - Equality based on ID, not attributes
- * - Mutable (can change state over time)
- * - Contains business logic
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Domain
+ * @since       2025-01-10
  *
- * @property-read mixed $id Entity identifier
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Entity implements EntityInterface
 {

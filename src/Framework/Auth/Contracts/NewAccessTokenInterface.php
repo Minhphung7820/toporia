@@ -4,15 +4,26 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\Contracts;
 
+
 /**
- * New Access Token Interface
+ * Interface NewAccessTokenInterface
  *
- * Contract for newly created access tokens.
- * Contains both the token model and the plain text token.
+ * Contract defining the interface for NewAccessTokenInterface
+ * implementations in the Authentication and authorization layer of the
+ * Toporia Framework.
  *
- * IMPORTANT: Plain text token is only available once at creation!
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Contracts
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Auth\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface NewAccessTokenInterface
 {

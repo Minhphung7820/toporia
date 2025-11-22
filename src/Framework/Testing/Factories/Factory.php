@@ -6,19 +6,22 @@ namespace Toporia\Framework\Testing\Factories;
 
 use Faker\Generator;
 
+
 /**
- * Factory Base Class
+ * Abstract Class Factory
  *
- * Provides factory pattern for creating test data.
+ * Abstract base class for Factory implementations in the Factories layer
+ * providing common functionality and contracts.
  *
- * Architecture:
- * - Clean Architecture: Separated from domain
- * - SOLID: Single Responsibility (data creation)
- * - High Reusability: Composable factories
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Factories
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) factory creation
- * - Efficient data generation
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Factory
 {

@@ -20,34 +20,22 @@ use Toporia\Framework\Testing\Concerns\InteractsWithBus;
 use Toporia\Framework\Testing\Concerns\InteractsWithRealtime;
 use Toporia\Framework\Testing\Concerns\PerformanceAssertions;
 
+
 /**
- * Base Test Case
+ * Abstract Class TestCase
  *
- * Professional test case with comprehensive testing utilities.
+ * Abstract base class for TestCase implementations in the Testing layer
+ * providing common functionality and contracts.
  *
- * Architecture:
- * - Clean Architecture: Separated concerns via traits
- * - SOLID: Single Responsibility per trait
- * - High Reusability: Composable traits
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Testing
+ * @since       2025-01-10
  *
- * Performance:
- * - Lazy initialization of services
- * - Efficient database transactions (rollback after each test)
- * - Memory-efficient mocking
- * - Fast assertions with early termination
- *
- * @mixin InteractsWithContainer
- * @mixin InteractsWithDatabase
- * @mixin InteractsWithHttp
- * @mixin InteractsWithTime
- * @mixin InteractsWithEvents
- * @mixin InteractsWithQueue
- * @mixin InteractsWithCache
- * @mixin InteractsWithFiles
- * @mixin InteractsWithMail
- * @mixin InteractsWithBus
- * @mixin InteractsWithRealtime
- * @mixin PerformanceAssertions
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class TestCase extends PHPUnitTestCase
 {

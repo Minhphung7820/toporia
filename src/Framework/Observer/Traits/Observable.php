@@ -6,36 +6,22 @@ namespace Toporia\Framework\Observer\Traits;
 
 use Toporia\Framework\Observer\Contracts\{ObservableInterface, ObserverInterface, ObserverManagerInterface};
 
+
 /**
- * Observable Trait
+ * Trait Observable
  *
- * Provides observable functionality to any class.
- * Implements the Observer pattern for state change notifications.
+ * Trait providing reusable functionality for Observable in the Traits
+ * layer of the Toporia Framework.
  *
- * Performance Optimizations:
- * - Lazy observer loading (only when needed)
- * - Observer caching per event
- * - Efficient observer lookup (O(1) for event-specific, O(N) for all events)
- * - Priority-based observer execution
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Traits
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles observer management
- * - Open/Closed: Can be added to any class via trait
- * - Dependency Inversion: Depends on ObserverInterface abstraction
- *
- * Usage:
- * ```php
- * class MyModel {
- *     use Observable;
- *
- *     public function save() {
- *         // ... save logic ...
- *         $this->notify('saved', ['id' => $this->id]);
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Observer\Traits
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait Observable
 {

@@ -4,26 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM\Concerns;
 
+
 /**
- * Has UUID Trait
+ * Trait HasUuid
  *
- * Provides UUID primary key support for models.
- * Automatically generates UUIDs for new model instances.
+ * Trait providing reusable functionality for HasUuid in the Concerns layer
+ * of the Toporia Framework.
  *
- * Clean Architecture:
- * - Trait-based composition (Open/Closed Principle)
- * - No framework dependencies beyond ORM layer
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles UUID generation
- * - Open/Closed: Can be added to any model without modifying base class
- *
- * Performance Optimizations:
- * - UUID generation only when needed (lazy)
- * - Indexed UUID columns (fast lookups)
- * - Binary UUID storage option (more efficient than string)
- *
- * @package Toporia\Framework\Database\ORM\Concerns
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasUuid
 {

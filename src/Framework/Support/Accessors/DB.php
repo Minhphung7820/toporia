@@ -9,69 +9,22 @@ use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\DatabaseManager;
 
+
 /**
- * DB Service Accessor
+ * Class DB
  *
- * Provides static-like access to database connections following Clean Architecture and SOLID principles.
+ * Core class for the Accessors layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Clean Architecture Compliance:
- * - Presentation Layer: This facade provides clean API for controllers/services
- * - Application Layer: Delegates to DatabaseManager (infrastructure)
- * - No direct coupling to implementation details (uses interfaces)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Accessors
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only provides access to connections, doesn't manage them
- * - Open/Closed: Extensible through inheritance (not final), closed for modification
- * - Liskov Substitution: Can be substituted with subclasses
- * - Interface Segregation: Clients use only what they need via @method annotations
- * - Dependency Inversion: Depends on DatabaseManager abstraction, not concrete implementation
- *
- * High Reusability:
- * - Single entry point for all database operations
- * - Works with default connection or named connections
- * - Can be extended for custom behavior without modifying core
- *
- * @method static QueryBuilder table(string $table) Get query builder for table
- * @method static array select(string $sql, array $bindings = []) Execute SELECT query
- * @method static int insert(string $sql, array $bindings = []) Execute INSERT query
- * @method static int update(string $sql, array $bindings = []) Execute UPDATE query
- * @method static int delete(string $sql, array $bindings = []) Execute DELETE query
- * @method static void beginTransaction() Begin transaction
- * @method static void commit() Commit transaction
- * @method static void rollback() Rollback transaction
- * @method static \PDO getPdo() Get PDO instance
- *
- * @see ConnectionInterface
- * @see DatabaseManager
- *
- * @example
- * // Default connection - clean and simple
- * $users = DB::table('users')->where('active', true)->get();
- * $results = DB::select('SELECT * FROM users WHERE id = ?', [1]);
- *
- * // Named connections - switch between databases
- * $products = DB::connection('mysql')->table('products')->get();
- * $analytics = DB::connection('analytics')->table('events')->get();
- * $cache = DB::connection('redis')->table('sessions')->get();
- *
- * // Transactions on default connection
- * DB::beginTransaction();
- * try {
- *     DB::table('users')->insert(['name' => 'John']);
- *     DB::commit();
- * } catch (\Exception $e) {
- *     DB::rollback();
- * }
- *
- * // Transactions on specific connection
- * $mysql = DB::connection('mysql');
- * $mysql->beginTransaction();
- * try {
- *     $mysql->table('orders')->insert(['total' => 100]);
- *     $mysql->commit();
- * } catch (\Exception $e) {
- *     $mysql->rollback();
- * }
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class DB extends ServiceAccessor
 {

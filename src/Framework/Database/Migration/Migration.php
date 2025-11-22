@@ -6,10 +6,22 @@ namespace Toporia\Framework\Database\Migration;
 
 use Toporia\Framework\Database\Schema\SchemaBuilder;
 
+
 /**
- * Base Migration class.
+ * Abstract Class Migration
  *
- * Extend this class to create database migrations.
+ * Base class for database migrations providing up/down methods for
+ * versioned schema changes and database structure evolution.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Migration
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Migration
 {

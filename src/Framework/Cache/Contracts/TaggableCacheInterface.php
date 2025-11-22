@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Cache\Contracts;
 
+
 /**
- * Taggable Cache Interface
+ * Interface TaggableCacheInterface
  *
- * Extends CacheInterface with tag support for cache organization.
- * Allows grouping related cache entries and clearing by tag.
+ * Contract defining the interface for TaggableCacheInterface
+ * implementations in the Multi-driver caching system layer of the Toporia
+ * Framework.
  *
- * Performance:
- * - Tag operations: O(N) where N = keys in tag
- * - Tag clearing: O(N*M) where N = tags, M = keys per tag
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Cache\Contracts
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Interface Segregation: Separate interface for tag support
- * - Dependency Inversion: Framework depends on abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface TaggableCacheInterface extends CacheInterface
 {

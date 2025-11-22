@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Testing\Concerns;
 
+
 /**
- * Queue Testing Trait
+ * Trait InteractsWithQueue
  *
- * Provides utilities for queue testing.
+ * Queue manager supporting multiple drivers (Database, Redis, Sync) for
+ * asynchronous job processing with delayed execution, job retries, and
+ * failure tracking.
  *
- * Performance:
- * - O(1) queue faking
- * - Fast job assertions
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait InteractsWithQueue
 {

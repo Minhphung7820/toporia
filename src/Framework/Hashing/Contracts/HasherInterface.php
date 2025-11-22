@@ -4,29 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Hashing\Contracts;
 
+
 /**
- * Hasher Interface
+ * Interface HasherInterface
  *
- * Contract for password hashing implementations.
- * All hashers must implement secure one-way hashing with automatic salting.
+ * Contract defining the interface for HasherInterface implementations in
+ * the Password hashing layer of the Toporia Framework.
  *
- * Security Requirements:
- * - One-way hashing (irreversible)
- * - Automatic salt generation
- * - Timing-safe comparison
- * - Configurable work factor (cost)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Hashing\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - make(): O(1) but slow by design (security > speed)
- * - check(): O(1) but slow by design (prevents timing attacks)
- * - needsRehash(): O(1) - fast string comparison
- *
- * SOLID Principles:
- * - Interface Segregation: Minimal, focused interface
- * - Liskov Substitution: All implementations interchangeable
- * - Dependency Inversion: Depend on abstraction, not concretion
- *
- * @package Toporia\Framework\Hashing\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface HasherInterface
 {

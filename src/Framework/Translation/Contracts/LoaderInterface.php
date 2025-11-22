@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Translation\Contracts;
 
+
 /**
- * Translation Loader Interface
+ * Interface LoaderInterface
  *
- * Defines the contract for loading translation files.
- * Supports multiple file formats (JSON, PHP arrays).
+ * Contract defining the interface for LoaderInterface implementations in
+ * the Multi-language support layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Interface in Framework layer
- * - Implementation in Infrastructure (if needed) or Framework
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Translation\Contracts
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only loads translation data
- * - Open/Closed: Extensible via new loader implementations
- * - Dependency Inversion: Translator depends on this abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface LoaderInterface
 {

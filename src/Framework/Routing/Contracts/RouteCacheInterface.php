@@ -4,22 +4,25 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Routing\Contracts;
 
+
 /**
- * Route Cache Interface
+ * Interface RouteCacheInterface
  *
- * Contract for caching compiled routes for performance optimization.
+ * Contract defining the interface for RouteCacheInterface implementations
+ * in the HTTP routing and URL generation layer of the Toporia Framework.
  *
- * Performance Benefits:
- * - O(1) route lookup after compilation
- * - Zero overhead route parsing on cached routes
- * - Reduces startup time by 80-90%
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Routing\Contracts
+ * @since       2025-01-10
  *
- * Architecture:
- * - Interface Segregation Principle
- * - Dependency Inversion Principle
- * - Single Responsibility: Route caching only
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * @package Toporia\Framework\Routing\Contracts
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface RouteCacheInterface
 {

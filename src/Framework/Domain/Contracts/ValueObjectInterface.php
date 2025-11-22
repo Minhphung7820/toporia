@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Domain\Contracts;
 
+
 /**
- * Value Object interface.
+ * Interface ValueObjectInterface
  *
- * Value Objects are immutable objects that are defined by their attributes,
- * not by a unique identity. Two value objects with the same attributes
- * are considered equal.
+ * Contract defining the interface for ValueObjectInterface implementations
+ * in the Domain layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Domain\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ValueObjectInterface
 {

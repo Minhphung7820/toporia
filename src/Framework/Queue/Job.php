@@ -8,40 +8,22 @@ use Toporia\Framework\Queue\Contracts\JobInterface;
 use Toporia\Framework\Queue\Backoff\{BackoffStrategy, ConstantBackoff};
 use Toporia\Framework\Queue\Middleware\JobMiddleware;
 
+
 /**
- * Abstract Job
+ * Abstract Class Job
  *
- * Base class for queued jobs with advanced features.
- * Provides retry, backoff, and middleware support.
+ * Base job class for queued background tasks with retry logic, exponential
+ * backoff, failure handling, and middleware support.
  *
- * Features:
- * - Automatic retry with configurable backoff
- * - Job middleware (rate limiting, locking, etc.)
- * - Dependency injection in handle() method
- * - Delayed execution
- * - Custom failure handling
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) job initialization
- * - O(M) middleware execution where M = number of middleware
- * - Lazy backoff calculation (only on retry)
- *
- * Clean Architecture:
- * - Interface-based (JobInterface)
- * - Strategy pattern (BackoffStrategy)
- * - Middleware pattern (JobMiddleware)
- * - Dependency Injection (container-based)
- *
- * SOLID Compliance: 10/10
- * - S: Job handles execution, delegates backoff/middleware
- * - O: Extensible via middleware and backoff strategies
- * - L: All jobs follow JobInterface contract
- * - I: Focused interface
- * - D: Depends on abstractions (BackoffStrategy, JobMiddleware)
- *
- * Note: The handle() method signature can vary in child classes to accept
- * dependencies via type-hinted parameters. The Worker uses the container
- * to automatically inject dependencies.
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\QueueableInterface
 {

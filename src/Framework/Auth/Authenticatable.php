@@ -4,13 +4,25 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth;
 
+
 /**
- * Authenticatable Interface - Contract for user authentication.
+ * Interface Authenticatable
  *
- * Any entity that can be authenticated must implement this interface.
- * This allows flexibility - users can come from database, LDAP, API, etc.
+ * Contract defining the interface for Authenticatable implementations in
+ * the Authentication and authorization layer of the Toporia Framework.
  *
- * Following Interface Segregation Principle.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface Authenticatable
 {

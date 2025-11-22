@@ -8,43 +8,26 @@ use Toporia\Framework\Validation\Validator;
 use Toporia\Framework\Validation\Contracts\ValidatorInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
+
 /**
- * Form Request
+ * Abstract Class FormRequest
  *
- * Professional form validation request class.
+ * HTTP request abstraction providing access to request data, headers,
+ * files, cookies, and server variables with built-in security features and
+ * validation support.
  *
- * Features:
- * - Auto-validation before controller method
- * - Custom validation rules per request
- * - Custom error messages and attributes
- * - Authorization support
- * - Validated data access
- * - Prepare for validation hook
- * - Custom validator configuration
- * - Route parameter access
- * - Conditional validation rules
- * - Performance optimized (lazy validation, cached rules)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http
+ * @since       2025-01-10
  *
- * Performance Optimizations:
- * - O(N*R) where N = fields, R = rules per field
- * - Lazy validation (only when needed)
- * - Cached rules and messages
- * - Early authorization check
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * Clean Architecture:
- * - Single Responsibility: Only validates request data
- * - Open/Closed: Extend for custom validation
- * - Liskov Substitution: All FormRequests are interchangeable
- * - Dependency Inversion: Uses ValidatorInterface
- *
- * SOLID Principles:
- * - S: Single responsibility - validation only
- * - O: Open/Closed - extensible via hooks
- * - L: Liskov Substitution - all FormRequests work the same
- * - I: Interface Segregation - focused interface
- * - D: Dependency Inversion - depends on ValidatorInterface
- *
- * @package Toporia\Framework\Http
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 abstract class FormRequest
 {

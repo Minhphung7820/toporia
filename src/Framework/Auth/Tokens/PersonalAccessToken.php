@@ -7,25 +7,22 @@ namespace Toporia\Framework\Auth\Tokens;
 use Toporia\Framework\Auth\Contracts\PersonalAccessTokenInterface;
 use Toporia\Framework\Database\ORM\Model;
 
+
 /**
- * Personal Access Token Model
+ * Class PersonalAccessToken
  *
- * ORM model for personal access tokens.
+ * Core class for the Tokens layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Clean Architecture:
- * - Uses Framework ORM Model (Active Record)
- * - Implements domain contract (PersonalAccessTokenInterface)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Tokens
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Token entity with abilities/scopes
- * - Liskov Substitution: Implements interface contract
- *
- * Performance:
- * - Indexed token column for O(1) lookup
- * - Lazy loading of tokenable relationship
- * - JSON abilities stored as TEXT
- *
- * @package Toporia\Framework\Auth\Tokens
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class PersonalAccessToken extends Model implements PersonalAccessTokenInterface
 {

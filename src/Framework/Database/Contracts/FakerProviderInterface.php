@@ -6,16 +6,26 @@ namespace Toporia\Framework\Database\Contracts;
 
 use Faker\Generator;
 
+
 /**
- * Faker Provider Interface
+ * Interface FakerProviderInterface
  *
- * Defines contract for custom Faker providers.
+ * Contract defining the interface for FakerProviderInterface
+ * implementations in the Database query building and ORM layer of the
+ * Toporia Framework.
  *
- * SOLID Principles:
- * - Open/Closed: Extend Faker functionality without modifying core
- * - Dependency Inversion: Depend on abstraction (Generator interface)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database\Contracts
+ * @since       2025-01-10
  *
- * @see https://fakerphp.github.io/
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface FakerProviderInterface
 {

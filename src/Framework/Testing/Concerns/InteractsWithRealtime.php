@@ -9,15 +9,22 @@ use Toporia\Framework\Realtime\Contracts\TransportInterface;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 use Toporia\Framework\Realtime\Message;
 
+
 /**
- * Realtime Testing Trait
+ * Trait InteractsWithRealtime
  *
- * Provides utilities for testing realtime broker and transport systems.
+ * Trait providing reusable functionality for InteractsWithRealtime in the
+ * Concerns layer of the Toporia Framework.
  *
- * Performance:
- * - O(1) fake broker/transport setup
- * - Fast message assertions
- * - Memory-efficient message tracking
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait InteractsWithRealtime
 {

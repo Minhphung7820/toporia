@@ -7,12 +7,25 @@ namespace Toporia\Framework\Database;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Schema\SchemaBuilder;
 
+
 /**
- * Database Manager.
+ * Class DatabaseManager
  *
- * Centralized manager for database connections and operations.
- * Supports multiple named connections and provides convenient access
- * to schema builder and query builder.
+ * Core class for the Database query building and ORM layer providing
+ * essential functionality for the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 class DatabaseManager
 {

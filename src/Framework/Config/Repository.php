@@ -4,10 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Config;
 
+
 /**
- * Configuration Repository
+ * Class Repository
  *
- * Manages application configuration with dot notation access.
+ * Core class for the Config layer providing essential functionality for
+ * the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Config
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Repository
 {

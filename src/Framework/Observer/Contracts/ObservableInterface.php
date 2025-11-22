@@ -4,23 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Observer\Contracts;
 
+
 /**
- * Observable Interface (Subject)
+ * Interface ObservableInterface
  *
- * Defines the contract for objects that can be observed.
- * Observables notify observers when their state changes.
+ * Contract defining the interface for ObservableInterface implementations
+ * in the Observer layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Only defines contract for being observed
- * - Interface Segregation: Focused interface for observables
- * - Dependency Inversion: Observers depend on this abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Observer\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - Lightweight interface (no overhead)
- * - Enables efficient observer management
- * - Supports lazy observer initialization
- *
- * @package Toporia\Framework\Observer\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ObservableInterface
 {

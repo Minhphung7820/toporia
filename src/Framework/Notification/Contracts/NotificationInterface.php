@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Notification\Contracts;
 
+
 /**
- * Notification Interface
+ * Interface NotificationInterface
  *
- * Defines contract for notification messages.
- * Notifications are sent through multiple channels (mail, database, SMS, Slack, etc.)
+ * Contract defining the interface for NotificationInterface
+ * implementations in the Multi-channel notifications layer of the Toporia
+ * Framework.
  *
- * Performance:
- * - Lazy channel resolution (only loads channels that are used)
- * - Supports queueing for async delivery
- * - Minimal object creation overhead
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Contracts
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Interface Segregation: Focused on notification behavior
- * - Dependency Inversion: Channels depend on abstractions
- * - Open/Closed: Extensible via custom channels
- *
- * @package Toporia\Framework\Notification\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface NotificationInterface
 {

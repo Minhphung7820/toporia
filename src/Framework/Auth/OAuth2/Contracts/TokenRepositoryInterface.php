@@ -4,10 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\OAuth2\Contracts;
 
+
 /**
- * OAuth2 Token Repository Interface
+ * Interface TokenRepositoryInterface
  *
- * Contract for managing OAuth2 access and refresh tokens.
+ * Contract defining the interface for TokenRepositoryInterface
+ * implementations in the OAuth2 layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  OAuth2\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface TokenRepositoryInterface
 {

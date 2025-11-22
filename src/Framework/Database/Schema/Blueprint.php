@@ -4,25 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Schema;
 
+
 /**
- * Schema Blueprint for defining table structure.
+ * Class Blueprint
  *
- * Provides fluent interface for creating and modifying database tables.
- * Laravel-compatible API with additional performance optimizations.
+ * Core class for the Schema layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Performance:
- * - O(1) column/index addition (array append)
- * - Efficient SQL compilation (single pass)
- * - Minimal memory overhead
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Schema
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Framework layer (database schema abstraction)
- * - No dependencies on outer layers
- *
- * SOLID Principles:
- * - Single Responsibility: Table structure definition only
- * - Open/Closed: Extensible via new column types
- * - Liskov Substitution: Consistent API across all operations
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Blueprint
 {

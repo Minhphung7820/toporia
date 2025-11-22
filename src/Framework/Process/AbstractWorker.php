@@ -6,26 +6,23 @@ namespace Toporia\Framework\Process;
 
 use Toporia\Framework\Process\Contracts\WorkerInterface;
 
+
 /**
- * Abstract Worker
+ * Abstract Class AbstractWorker
  *
- * Base class for implementing workers that process jobs in parallel.
- * Provides default implementations for lifecycle hooks.
+ * Abstract base class for AbstractWorker implementations in the
+ * Multi-process execution layer providing common functionality and
+ * contracts.
  *
- * Example:
- * ```php
- * class ImageProcessor extends AbstractWorker
- * {
- *     public function process(mixed $job): mixed
- *     {
- *         // Process image file
- *         return $this->resizeImage($job['path']);
- *     }
- * }
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Process
+ * @since       2025-01-10
  *
- * $pool = new ProcessPool(workers: 4, worker: new ImageProcessor());
- * $results = $pool->process($images);
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractWorker implements WorkerInterface
 {

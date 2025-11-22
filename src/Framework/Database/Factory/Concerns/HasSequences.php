@@ -7,27 +7,22 @@ namespace Toporia\Framework\Database\Factory\Concerns;
 use Toporia\Framework\Database\Factory;
 use Closure;
 
+
 /**
- * Has Sequences Trait
+ * Trait HasSequences
  *
- * Provides sequence support for generating sequential or unique values.
+ * Trait providing reusable functionality for HasSequences in the Concerns
+ * layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles sequence management
- * - Open/Closed: Extend sequence behavior without modifying factory
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * UserFactory::new()
- *     ->sequence(
- *         ['role' => 'admin'],
- *         ['role' => 'user'],
- *         ['role' => 'moderator']
- *     )
- *     ->createMany(3);
- * ```
- *
- * @mixin Factory
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasSequences
 {

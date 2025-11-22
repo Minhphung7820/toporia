@@ -6,36 +6,22 @@ namespace Toporia\Framework\Application\UseCase;
 
 use Toporia\Framework\Application\Contracts\CommandInterface;
 
+
 /**
- * Abstract Command
+ * Abstract Class AbstractCommand
  *
- * Base class for all commands (CQRS write operations).
- * Commands represent intent to change system state.
+ * Base console command class providing CLI interface with colored output,
+ * user interaction, argument/option parsing, and progress indicators.
  *
- * Architecture:
- * - Application layer DTO
- * - Immutable data transfer object
- * - No business logic
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  UseCase
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * final class CreateProductCommand extends AbstractCommand
- * {
- *     public function __construct(
- *         public readonly string $title,
- *         public readonly float $price
- *     ) {}
- *
- *     public function validate(): void
- *     {
- *         if (empty($this->title)) {
- *             throw new \InvalidArgumentException('Title is required');
- *         }
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Application\UseCase
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractCommand implements CommandInterface
 {

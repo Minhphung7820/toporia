@@ -7,11 +7,22 @@ namespace Toporia\Framework\Database\ORM\Relations;
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 use Toporia\Framework\Database\Query\QueryBuilder;
 
+
 /**
- * Belongs To Many Relationship (Many-to-Many)
+ * Class BelongsToMany
  *
- * Represents a many-to-many relationship using a pivot table.
- * Example: User belongsToMany Roles (via user_roles pivot table)
+ * Core class for the Relations layer providing essential functionality for
+ * the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class BelongsToMany extends Relation
 {

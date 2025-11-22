@@ -4,25 +4,25 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Events\Contracts;
 
+
 /**
- * Event Subscriber Interface
+ * Interface SubscriberInterface
  *
- * Contract for event subscribers that listen to multiple events.
- * Subscribers can register multiple event-listener mappings.
+ * Contract defining the interface for SubscriberInterface implementations
+ * in the Event dispatching and listening layer of the Toporia Framework.
  *
- * Performance:
- * - Allows bulk registration of listeners
- * - Reduces individual listen() calls
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Events\Contracts
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles event subscription
- * - Dependency Inversion: Framework depends on abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * SOLID Principles:
- * - S: Only handles subscription logic
- * - O: Extensible via implementations
- * - I: Focused interface
- * - D: Depends on EventDispatcherInterface abstraction
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface SubscriberInterface
 {

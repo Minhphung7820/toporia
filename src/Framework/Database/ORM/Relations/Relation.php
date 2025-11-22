@@ -8,11 +8,22 @@ use Toporia\Framework\Database\Contracts\RelationInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\ORM\Model;
 
+
 /**
- * Abstract Relation Base Class
+ * Abstract Class Relation
  *
- * Provides common functionality for all relationship types.
- * Follows DRY principle and Template Method pattern.
+ * Abstract base class for Relation implementations in the Relations layer
+ * providing common functionality and contracts.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Relation implements RelationInterface
 {

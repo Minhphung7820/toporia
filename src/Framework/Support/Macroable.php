@@ -9,44 +9,22 @@ use Toporia\Framework\Macro\SimpleMacroRegistry;
 use Toporia\Framework\Container\Container;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
+
 /**
- * Macroable Trait
+ * Trait Macroable
  *
- * Provides dynamic method extension capability via macros.
- * Allows adding methods to classes without modifying their source code.
+ * Trait providing reusable functionality for Macroable in the Support
+ * layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Framework layer provides implementation
- * - Uses Domain MacroRegistryInterface via DI
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Open/Closed: Classes can be extended without modification
- * - Single Responsibility: Provides macro functionality
- * - Dependency Inversion: Depends on MacroRegistryInterface abstraction
- *
- * Performance:
- * - O(1) macro lookup via registry
- * - Cached macros for fast access
- * - Lazy evaluation
- *
- * Usage:
- * ```php
- * use Toporia\Framework\Support\Macroable;
- *
- * class MyClass
- * {
- *     use Macroable;
- * }
- *
- * // Register macro
- * MyClass::macro('customMethod', function($arg) {
- *     return $this->doSomething($arg);
- * });
- *
- * // Use macro
- * $instance = new MyClass();
- * $result = $instance->customMethod('value');
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait Macroable
 {

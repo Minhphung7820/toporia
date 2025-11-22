@@ -7,15 +7,22 @@ namespace Toporia\Framework\Testing\Concerns;
 use PDO;
 use PDOException;
 
+
 /**
- * Database Testing Trait
+ * Trait InteractsWithDatabase
  *
- * Provides utilities for database testing with transactions.
+ * Trait providing reusable functionality for InteractsWithDatabase in the
+ * Concerns layer of the Toporia Framework.
  *
- * Performance:
- * - Fast transaction rollback (O(1))
- * - In-memory SQLite for unit tests
- * - Efficient migration running
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait InteractsWithDatabase
 {

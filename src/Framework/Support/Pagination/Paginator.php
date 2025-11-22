@@ -6,30 +6,22 @@ namespace Toporia\Framework\Support\Pagination;
 
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Paginator - Immutable value object representing a paginated result set.
+ * Class Paginator
  *
- * This class follows Clean Architecture and SOLID principles:
+ * Core class for the Pagination layer providing essential functionality
+ * for the Toporia Framework.
  *
- * Clean Architecture:
- * - Value Object pattern from Domain layer
- * - No dependencies on infrastructure (framework-agnostic)
- * - Immutable state ensures data integrity
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Pagination
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles pagination data representation
- * - Open/Closed: Extensible through inheritance, immutable core
- * - Liskov Substitution: Can be substituted in any context expecting pagination
- * - Interface Segregation: Provides only pagination-specific methods
- * - Dependency Inversion: Accepts generic Collection, not specific implementation
- *
- * High Reusability:
- * - Works with any Collection type (RowCollection, ModelCollection, etc.)
- * - JSON serializable for API responses
- * - Array accessible for template rendering
- * - Immutable for thread safety
- *
- * @template TValue
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Paginator implements \JsonSerializable
 {

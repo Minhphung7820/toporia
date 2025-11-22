@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Contracts;
 
+
 /**
- * Seeder Interface
+ * Interface SeederInterface
  *
- * Defines contract for database seeders.
+ * Contract defining the interface for SeederInterface implementations in
+ * the Database query building and ORM layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Interface Segregation: Specific interface for seeder operations
- * - Single Responsibility: Each seeder has one responsibility (seeding specific data)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database\Contracts
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Application Layer: Defines contract for infrastructure seeders
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface SeederInterface
 {

@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Console\Contracts;
 
+
 /**
- * Input Interface
+ * Interface InputInterface
  *
- * Abstraction for command input (arguments, options, interactive input).
- * Follows Interface Segregation Principle.
+ * Contract defining the interface for InputInterface implementations in
+ * the CLI command framework layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface InputInterface
 {

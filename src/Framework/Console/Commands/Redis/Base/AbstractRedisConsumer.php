@@ -8,24 +8,22 @@ use Toporia\Framework\Console\Command;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 use Toporia\Framework\Realtime\Brokers\RedisBroker;
 
+
 /**
- * Abstract Redis Consumer Base Class
+ * Abstract Class AbstractRedisConsumer
  *
- * Base class for all Redis consumers with common functionality.
- * Provides configuration, broker access, and common utilities.
+ * Abstract base class for AbstractRedisConsumer implementations in the
+ * Base layer providing common functionality and contracts.
  *
- * Performance Optimizations:
- * - Event-driven message processing (push model)
- * - Low latency (~0.1ms per message)
- * - High throughput (100k+ messages/sec)
- * - Memory-efficient processing
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Manages Redis consumer configuration and setup
- * - Open/Closed: Extensible via inheritance
- * - Dependency Inversion: Depends on RealtimeManagerInterface
- *
- * @package Toporia\Framework\Console\Commands\Redis\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractRedisConsumer extends Command
 {

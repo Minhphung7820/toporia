@@ -8,13 +8,22 @@ use Countable;
 use IteratorAggregate;
 use Traversable;
 
+
 /**
- * @template TKey of array-key
- * @template TValue
+ * Interface CollectionInterface
  *
- * A common enumerable contract (lazy or eager) for functional collection pipelines.
- * Both eager Collection and LazyCollection should implement this interface
- * to enable polymorphism across application layers (Clean Architecture).
+ * Contract defining the interface for CollectionInterface implementations
+ * in the Support layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface CollectionInterface extends IteratorAggregate, Countable
 {

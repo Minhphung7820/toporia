@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Schema;
 
+
 /**
- * Column Definition Helper
+ * Class ColumnDefinition
  *
- * Provides fluent interface for column modifiers.
+ * Core class for the Schema layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Performance:
- * - O(1) operations (direct array reference modification)
- * - No overhead (fluent interface pattern)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Schema
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only modifies column definitions
- * - Open/Closed: Extensible via new modifier methods
- *
- * SOLID Principles:
- * - Single Responsibility: Column definition modifiers only
- * - Open/Closed: Add new modifiers without modifying existing code
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ColumnDefinition
 {

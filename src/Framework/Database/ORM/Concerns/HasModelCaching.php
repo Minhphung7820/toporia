@@ -6,29 +6,22 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 
 use Toporia\Framework\Database\ORM\Model;
 
+
 /**
- * Has Model Caching Trait
+ * Trait HasModelCaching
  *
- * Provides intelligent caching for model queries and instances.
- * Reduces database queries by caching frequently accessed data.
+ * Trait providing reusable functionality for HasModelCaching in the
+ * Concerns layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Trait-based composition (Open/Closed Principle)
- * - No framework dependencies beyond ORM layer
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles caching
- * - Open/Closed: Can be added to any model without modifying base class
- * - Dependency Inversion: Works with any cache implementation
- *
- * Performance Optimizations:
- * - Query result caching (TTL-based)
- * - Model instance caching (by primary key)
- * - Automatic cache invalidation on updates/deletes
- * - Cache tags for bulk invalidation
- * - Memory-efficient (LRU eviction for large caches)
- *
- * @package Toporia\Framework\Database\ORM\Concerns
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasModelCaching
 {

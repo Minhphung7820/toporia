@@ -6,24 +6,22 @@ namespace Toporia\Framework\Console\Commands\Kafka\Contracts;
 
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Batching Messages Handler Interface
+ * Interface BatchingMessagesHandlerInterface
  *
- * Interface for handling batches of Kafka messages.
- * Used by consumers that process messages in batches for better performance.
+ * Contract defining the interface for BatchingMessagesHandlerInterface
+ * implementations in the Kafka layer of the Toporia Framework.
  *
- * Performance Benefits:
- * - Reduced network round-trips
- * - Better throughput (1000+ messages/sec)
- * - Atomic batch processing
- * - Lower overhead per message
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Kafka\Contracts
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only defines contract for batch message handling
- * - Interface Segregation: Separate from single message handling
- * - Dependency Inversion: Consumers depend on this abstraction
- *
- * @package Toporia\Framework\Console\Commands\Kafka\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface BatchingMessagesHandlerInterface
 {

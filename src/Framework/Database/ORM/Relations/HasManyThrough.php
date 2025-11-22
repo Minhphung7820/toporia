@@ -6,35 +6,22 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 
+
 /**
- * Has Many Through Relationship
+ * Class HasManyThrough
  *
- * Represents a one-to-many relationship through an intermediate model.
+ * Core class for the Relations layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Example: Country → Users → Posts
- * - countries.id
- * - users.country_id (foreign key to countries)
- * - posts.user_id (foreign key to users)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
  *
- * Country::hasManyThrough(Post::class, User::class)
- *
- * SQL Generated:
- * SELECT posts.*
- * FROM posts
- * INNER JOIN users ON users.id = posts.user_id
- * WHERE users.country_id = ?
- *
- * Use Case: Get all posts from a country without directly relating countries to posts.
- *
- * Performance: O(1) query with JOIN for single parent
- *              O(1) query with IN clause for eager loading - optimal!
- *
- * SOLID Principles:
- * - Single Responsibility: Only handles one-to-many through relationships
- * - Open/Closed: Extensible via query callbacks
- * - Liskov Substitution: Implements RelationInterface
- * - Interface Segregation: Minimal interface
- * - Dependency Inversion: Depends on QueryBuilder abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class HasManyThrough extends Relation
 {

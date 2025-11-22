@@ -8,13 +8,26 @@ use Toporia\Framework\Foundation\Contracts\ServiceProviderInterface;
 use Toporia\Framework\Container\Container;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
+
 /**
- * Application Bootstrap
+ * Class Application
  *
- * This class bootstraps the framework by:
- * 1. Creating the container
- * 2. Registering service providers
- * 3. Booting service providers
+ * The central application bootstrapper managing dependency injection
+ * container, service provider registration, and application boot process
+ * following Clean Architecture principles.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Foundation
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 class Application
 {

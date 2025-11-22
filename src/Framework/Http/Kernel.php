@@ -8,11 +8,25 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Http\Contracts\RequestInterface;
 use Toporia\Framework\Routing\Contracts\RouterInterface;
 
+
 /**
- * HTTP Kernel
+ * Class Kernel
  *
- * The HTTP Kernel handles incoming HTTP requests.
- * It manages global middleware and delegates routing to the router.
+ * Core class for the HTTP request and response handling layer providing
+ * essential functionality for the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 class Kernel
 {

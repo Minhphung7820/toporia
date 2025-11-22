@@ -9,34 +9,25 @@ use Toporia\Framework\Database\Contracts\FactoryInterface;
 use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\ORM\Model;
 
+
 /**
- * Base Seeder Class
+ * Abstract Class Seeder
  *
- * Provides foundation for database seeding with transaction support,
- * dependency management, and batch processing.
+ * Abstract base class for Seeder implementations in the Database query
+ * building and ORM layer providing common functionality and contracts.
  *
- * Features:
- * - Transaction support for atomic seeding
- * - Dependency management (seeders run in order)
- * - Batch processing for performance
- * - Factory integration for data generation
- * - Progress tracking and logging
- * - Memory-efficient for large datasets
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Each seeder seeds specific data
- * - Open/Closed: Extend via child classes without modifying base
- * - Dependency Inversion: Depends on FactoryInterface, not concrete factories
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * Clean Architecture:
- * - Infrastructure Layer: Handles data persistence
- * - Application Layer: Defines seeding contracts
- *
- * Performance Optimizations:
- * - Batch inserts for bulk data
- * - Transaction batching to prevent memory issues
- * - Lazy evaluation of seed data
- * - Memory management for large datasets
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 abstract class Seeder implements SeederInterface
 {

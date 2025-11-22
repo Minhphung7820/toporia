@@ -4,40 +4,25 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\Contracts;
 
+
 /**
- * Policy Interface
+ * Interface PolicyInterface
  *
- * Base contract for all authorization policies.
+ * Contract defining the interface for PolicyInterface implementations in
+ * the Authentication and authorization layer of the Toporia Framework.
  *
- * Policies encapsulate authorization logic for a specific resource type.
- * Each method represents an action that can be performed on the resource.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Contracts
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Domain layer interface
- * - Resource-specific authorization logic
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * SOLID Principles:
- * - Single Responsibility: One policy per resource type
- * - Open/Closed: Extend via subclassing, closed to modification
- *
- * Example:
- * ```php
- * class PostPolicy implements PolicyInterface {
- *     public function view($user, $post): bool {
- *         return $post->published || $user->id === $post->author_id;
- *     }
- *
- *     public function update($user, $post): bool {
- *         return $user->id === $post->author_id;
- *     }
- *
- *     public function delete($user, $post): bool {
- *         return $user->isAdmin() || $user->id === $post->author_id;
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Auth\Contracts
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface PolicyInterface
 {

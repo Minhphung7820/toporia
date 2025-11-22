@@ -7,12 +7,22 @@ namespace Toporia\Framework\Console;
 use Toporia\Framework\Console\Contracts\InputInterface;
 use Toporia\Framework\Console\Contracts\OutputInterface;
 
+
 /**
- * Abstract Console Command
+ * Abstract Class Command
  *
- * Base class for all console commands.
- * Follows Single Responsibility Principle - each command does one thing.
- * Uses Dependency Injection for Input/Output (testable).
+ * Base console command class providing CLI interface with colored output,
+ * user interaction, argument/option parsing, and progress indicators.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Command
 {

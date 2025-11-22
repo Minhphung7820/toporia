@@ -6,16 +6,26 @@ namespace Toporia\Framework\Auth\Contracts;
 
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Has API Tokens Interface
+ * Interface HasApiTokensInterface
  *
- * Contract for models that can issue API tokens.
+ * Contract defining the interface for HasApiTokensInterface
+ * implementations in the Authentication and authorization layer of the
+ * Toporia Framework.
  *
- * SOLID Principles:
- * - Interface Segregation: Focused on token management only
- * - Dependency Inversion: Domain contract for infrastructure
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Contracts
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Auth\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface HasApiTokensInterface
 {

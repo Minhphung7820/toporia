@@ -14,7 +14,11 @@ use ReflectionNamedType;
 use ReflectionParameter;
 
 /**
- * Dependency Injection Container
+ * Class Container
+ *
+ * The central Dependency Injection container for the Toporia Framework.
+ * Responsible for resolving class dependencies, managing bindings,
+ * singletons, contextual bindings, and autowiring via reflection.
  *
  * Professional DI container with advanced features:
  * - Auto-wiring with reflection
@@ -35,6 +39,28 @@ use ReflectionParameter;
  * - Single Responsibility: Dependency injection only
  * - Dependency Inversion: Depends on ContainerInterface
  * - Open/Closed: Extensible via bindings
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Container
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
+ *
+ * @see         ContainerInterface
+ *
+ * @method void bind(string $abstract, mixed $concrete = null, bool $shared = false) Register a binding
+ * @method void singleton(string $abstract, mixed $concrete = null) Register a singleton binding
+ * @method mixed get(string $id) Resolve a service from the container
+ * @method bool has(string $id) Check if a service exists
+ * @method mixed make(string $abstract, array $parameters = []) Resolve an instance
+ * @method mixed call(callable|string|array $callback, array $parameters = []) Call a method with dependency injection
  */
 final class Container implements ContainerInterface
 {

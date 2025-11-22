@@ -6,18 +6,22 @@ namespace Toporia\Framework\Console\Commands\Kafka\Contracts;
 
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 
+
 /**
- * Single Message Handler Interface
+ * Interface SingleMessageHandlerInterface
  *
- * Interface for handling single Kafka messages.
- * Used by consumers that process messages one at a time.
+ * Contract defining the interface for SingleMessageHandlerInterface
+ * implementations in the Kafka layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Only defines contract for single message handling
- * - Interface Segregation: Small, focused interface
- * - Dependency Inversion: Consumers depend on this abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Kafka\Contracts
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Console\Commands\Kafka\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface SingleMessageHandlerInterface
 {

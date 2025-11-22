@@ -6,36 +6,22 @@ namespace Toporia\Framework\Application\UseCase;
 
 use Toporia\Framework\Application\Contracts\QueryInterface;
 
+
 /**
- * Abstract Query
+ * Abstract Class AbstractQuery
  *
- * Base class for all queries (CQRS read operations).
- * Queries represent read-only data fetching operations.
+ * Abstract base class for AbstractQuery implementations in the UseCase
+ * layer providing common functionality and contracts.
  *
- * Architecture:
- * - Application layer DTO
- * - Immutable data transfer object
- * - No business logic
- * - No side effects
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  UseCase
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * final class GetProductQuery extends AbstractQuery
- * {
- *     public function __construct(
- *         public readonly string $id
- *     ) {}
- *
- *     public function validate(): void
- *     {
- *         if (empty($this->id)) {
- *             throw new \InvalidArgumentException('ID is required');
- *         }
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Application\UseCase
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractQuery implements QueryInterface
 {

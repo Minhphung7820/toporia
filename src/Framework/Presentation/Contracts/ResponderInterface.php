@@ -6,22 +6,22 @@ namespace Toporia\Framework\Presentation\Contracts;
 
 use Toporia\Framework\Http\Response;
 
+
 /**
- * Responder interface for ADR pattern.
+ * Interface ResponderInterface
  *
- * Responders are responsible for formatting and sending HTTP responses.
- * They separate presentation logic from business logic in Actions.
+ * Contract defining the interface for ResponderInterface implementations
+ * in the Presentation layer (ADR pattern) layer of the Toporia Framework.
  *
- * Benefits:
- * - Actions focus on business logic
- * - Responders focus on response formatting
- * - Easier to test and maintain
- * - Response formats can be changed independently
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Presentation\Contracts
+ * @since       2025-01-10
  *
- * Common implementations:
- * - JsonResponder (API responses)
- * - HtmlResponder (Web pages)
- * - XmlResponder (XML APIs)
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ResponderInterface
 {

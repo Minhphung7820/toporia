@@ -6,10 +6,22 @@ namespace Toporia\Framework\Support;
 
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Stringable - Fluent string builder.
+ * Class Stringable
  *
- * Provides chainable string operations.
+ * Core class for the Support layer providing essential functionality for
+ * the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Stringable implements \Stringable
 {

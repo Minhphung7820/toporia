@@ -4,13 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Log\Contracts;
 
+
 /**
- * Logger Interface (PSR-3 compliant)
+ * Interface LoggerInterface
  *
- * Defines contract for logging operations.
- * Follows PSR-3 Logger Interface standard.
+ * Contract defining the interface for LoggerInterface implementations in
+ * the Logging and error reporting layer of the Toporia Framework.
  *
- * @see https://www.php-fig.org/psr/psr-3/
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Log\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface LoggerInterface
 {

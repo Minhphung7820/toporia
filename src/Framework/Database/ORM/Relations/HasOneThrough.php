@@ -7,32 +7,22 @@ namespace Toporia\Framework\Database\ORM\Relations;
 use Toporia\Framework\Database\Contracts\RelationInterface;
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 
+
 /**
- * Has One Through Relationship
+ * Class HasOneThrough
  *
- * Represents a one-to-one relationship through an intermediate model.
+ * Core class for the Relations layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Example: Country → User → Phone
- * - countries.id
- * - users.country_id (foreign key to countries)
- * - phones.user_id (foreign key to users)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
  *
- * Country::hasOneThrough(Phone::class, User::class)
- *
- * SQL Generated:
- * SELECT phones.*
- * FROM phones
- * INNER JOIN users ON users.id = phones.user_id
- * WHERE users.country_id = ?
- *
- * Performance: O(1) query with JOIN - optimal!
- *
- * SOLID Principles:
- * - Single Responsibility: Only handles one-to-one through relationships
- * - Open/Closed: Extensible via callbacks
- * - Liskov Substitution: Implements RelationInterface
- * - Interface Segregation: RelationInterface is minimal
- * - Dependency Inversion: Depends on abstractions
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class HasOneThrough extends Relation
 {

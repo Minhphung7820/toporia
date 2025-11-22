@@ -7,18 +7,23 @@ namespace Toporia\Framework\Database\Query;
 use Toporia\Framework\Database\Contracts\{ConnectionInterface, QueryBuilderInterface};
 use Toporia\Framework\Database\Query\RowCollection;
 
+
 /**
- * SQL Query Builder with a fluent interface.
+ * Class QueryBuilder
  *
- * Responsibilities:
- * - Compose SQL SELECT statements with WHERE / JOIN / ORDER / LIMIT / OFFSET
- * - Bind parameters to prevent SQL injection
- * - Provide helpers for aggregate queries (count) and existence checks
- * - Execute and return typed RowCollection or single row
+ * Fluent SQL query builder providing chainable interface for constructing
+ * SELECT, INSERT, UPDATE, DELETE queries with automatic parameter binding
+ * and join support.
  *
- * Design notes:
- * - This builder is stateless with respect to the connection; state only holds the
- *   query parts (table/columns/wheres/joins/etc.). Call newQuery() for a clean builder.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Query
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class QueryBuilder implements QueryBuilderInterface
 {

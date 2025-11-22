@@ -6,24 +6,22 @@ namespace Toporia\Framework\Database\Factory\Concerns;
 
 use Toporia\Framework\Database\Factory;
 
+
 /**
- * Has States Trait
+ * Trait HasStates
  *
- * Provides convenient methods for defining and applying state transformations.
+ * Trait providing reusable functionality for HasStates in the Concerns
+ * layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles state management
- * - Open/Closed: States can be extended without modifying factory
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * UserFactory::new()
- *     ->admin()
- *     ->verified()
- *     ->create();
- * ```
- *
- * @mixin Factory
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasStates
 {

@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Storage\Contracts;
 
+
 /**
- * Filesystem Interface
+ * Interface FilesystemInterface
  *
- * Contract for file storage operations.
- * Standard filesystem API for maximum portability.
+ * Contract defining the interface for FilesystemInterface implementations
+ * in the File storage and management layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Interface Segregation: Focused contract for file operations
- * - Dependency Inversion: Depend on abstraction, not concrete implementation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Storage\Contracts
+ * @since       2025-01-10
  *
- * Performance: O(1) for most operations
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface FilesystemInterface
 {

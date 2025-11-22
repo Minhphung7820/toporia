@@ -7,20 +7,22 @@ namespace Toporia\Framework\Support\Collection;
 use Toporia\Framework\Support\Contracts\CollectionInterface;
 use Toporia\Framework\Support\Macroable;
 
+
 /**
- * Collection - Advanced immutable collection with functional operations.
+ * Class Collection
  *
- * Enhanced collection implementation with advanced features:
- * - Truly immutable by default (all operations return new instances)
- * - Advanced functional methods (window, sliding, transpose)
- * - Better performance with lazy evaluation
- * - Type-safe operations with generics support
- * - Pipe and composition patterns
- * - Statistical functions
- * - Set operations
+ * Core class for the Collection layer providing essential functionality
+ * for the Toporia Framework.
  *
- * @template TKey of array-key
- * @template TValue
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Collection
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Collection implements CollectionInterface, \JsonSerializable
 {

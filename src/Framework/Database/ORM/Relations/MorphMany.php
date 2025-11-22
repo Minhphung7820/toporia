@@ -6,41 +6,22 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 
+
 /**
- * Morph Many Relationship
+ * Class MorphMany
  *
- * Represents a polymorphic one-to-many relationship.
+ * Core class for the Relations layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Example: Post/Video → Comments
- * - posts.id
- * - videos.id
- * - comments.commentable_id (polymorphic foreign key)
- * - comments.commentable_type (polymorphic type: 'Post' or 'Video')
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
  *
- * Post::morphMany(Comment::class, 'commentable')
- *
- * SQL Generated:
- * SELECT *
- * FROM comments
- * WHERE commentable_type = 'Post'
- * AND commentable_id = ?
- *
- * Use Case: Multiple models can have many related models (flexible schema).
- * Real examples:
- * - Posts, Videos, Articles → Comments
- * - Users, Teams, Projects → Activities
- * - Products, Orders, Invoices → Attachments
- *
- * Performance: O(1) query for single parent - optimal!
- *              Eager loading: O(N) where N = distinct polymorphic types
- *              (Grouped by type for efficiency)
- *
- * SOLID Principles:
- * - Single Responsibility: Only handles polymorphic one-to-many
- * - Open/Closed: Extensible to new morphable types without modification
- * - Liskov Substitution: Implements RelationInterface
- * - Interface Segregation: Minimal interface contract
- * - Dependency Inversion: Depends on QueryBuilder abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class MorphMany extends Relation
 {

@@ -12,11 +12,22 @@ use InvalidArgumentException;
 use IteratorAggregate;
 use Traversable;
 
+
 /**
- * LazyCollection - Memory-efficient collection using generators.
+ * Class LazyCollection
  *
- * Multi-pass safe: mỗi lần iterate sẽ tạo Generator mới.
- * Vẫn giữ style hiện tại: chunk()/zip() yield Collection eager.
+ * Core class for the Collection layer providing essential functionality
+ * for the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Collection
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class LazyCollection implements IteratorAggregate, Countable, CollectionInterface
 {

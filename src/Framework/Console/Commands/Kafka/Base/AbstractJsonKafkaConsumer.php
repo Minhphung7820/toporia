@@ -9,39 +9,22 @@ use Toporia\Framework\Realtime\Brokers\KafkaBroker;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 use Toporia\Framework\Realtime\Message;
 
+
 /**
- * Abstract JSON Kafka Consumer
+ * Abstract Class AbstractJsonKafkaConsumer
  *
- * Base class for Kafka consumers that process JSON messages.
- * Handles JSON deserialization and single message processing.
+ * Abstract base class for AbstractJsonKafkaConsumer implementations in the
+ * Base layer providing common functionality and contracts.
  *
- * Performance:
- * - JSON decode: ~0.01ms per message
- * - Memory efficient: streams large messages
- * - Error handling with DLQ support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Handles JSON deserialization and message routing
- * - Open/Closed: Extensible via inheritance
- * - Liskov Substitution: Implements SingleMessageHandlerInterface
- * - Dependency Inversion: Depends on KafkaBroker abstraction
- *
- * Usage:
- * ```php
- * class MyJsonConsumer extends AbstractJsonKafkaConsumer
- * {
- *     protected function getTopic(): string { return 'my-topic'; }
- *     protected function getGroupId(): string { return 'my-group'; }
- *     protected function getOffset(): string { return 'earliest'; }
- *
- *     public function handleMessage(MessageInterface $message, array $metadata = []): void
- *     {
- *         // Process message
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Console\Commands\Kafka\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractJsonKafkaConsumer extends AbstractKafkaConsumer implements SingleMessageHandlerInterface
 {

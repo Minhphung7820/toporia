@@ -7,27 +7,22 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 use Toporia\Framework\Database\ORM\ModelCollection;
 use Generator;
 
+
 /**
- * Has Chunking Trait
+ * Trait HasChunking
  *
- * Provides memory-efficient chunking for large datasets.
- * Processes records in chunks to avoid memory exhaustion.
+ * Trait providing reusable functionality for HasChunking in the Concerns
+ * layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Trait-based composition (Open/Closed Principle)
- * - No framework dependencies beyond ORM layer
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles chunking
- * - Open/Closed: Can be added to any model without modifying base class
- *
- * Performance Optimizations:
- * - Memory efficient (processes chunks one at a time)
- * - Generator-based (lazy evaluation)
- * - Cursor-based pagination (no OFFSET for better performance)
- * - Automatic memory cleanup between chunks
- *
- * @package Toporia\Framework\Database\ORM\Concerns
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasChunking
 {

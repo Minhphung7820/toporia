@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support;
 
+
 /**
- * Str - Advanced string manipulation utilities.
+ * Class Str
  *
- * Enhanced string operations with advanced features:
- * - Fluent string builder pattern
- * - Advanced parsing (markdown, templates, etc)
- * - Better Unicode support
- * - String analysis and metrics
- * - Fuzzy matching
- * - String compression
+ * Core class for the Support layer providing essential functionality for
+ * the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Str
 {

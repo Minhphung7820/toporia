@@ -6,11 +6,25 @@ namespace Toporia\Framework\Container\Contracts;
 
 use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException};
 
+
 /**
- * Dependency Injection Container interface.
+ * Interface ContainerInterface
  *
- * Provides service location and dependency injection capabilities
- * following PSR-11 Container Interface pattern.
+ * Contract defining the interface for ContainerInterface implementations
+ * in the Dependency Injection container layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Container\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface ContainerInterface
 {

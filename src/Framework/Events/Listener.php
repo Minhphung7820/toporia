@@ -6,26 +6,26 @@ namespace Toporia\Framework\Events;
 
 use Toporia\Framework\Events\Contracts\{EventInterface, ListenerInterface};
 
+
 /**
- * Base Listener Class
+ * Abstract Class Listener
  *
- * Base class for class-based event listeners.
- * Provides convenient handle() method implementation.
+ * Abstract base class for Listener implementations in the Event
+ * dispatching and listening layer providing common functionality and
+ * contracts.
  *
- * Performance:
- * - O(1) method resolution
- * - No reflection overhead for simple listeners
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Events
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles event listening
- * - Dependency Inversion: Implements ListenerInterface
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * SOLID Principles:
- * - S: Only handles event listening
- * - O: Extensible via inheritance
- * - L: Implements interface correctly
- * - I: Focused interface
- * - D: Depends on EventInterface abstraction
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 abstract class Listener implements ListenerInterface
 {

@@ -6,32 +6,22 @@ namespace Toporia\Framework\Queue\Middleware;
 
 use Toporia\Framework\Queue\Contracts\JobInterface;
 
+
 /**
- * Job Middleware Interface
+ * Interface JobMiddleware
  *
- * Allows wrapping job execution with before/after logic.
- * Similar to HTTP middleware but for queued jobs.
+ * Base middleware class for processing HTTP requests in a pipeline pattern
+ * with before/after hooks and request/response modification.
  *
- * Use Cases:
- * - Rate limiting job execution
- * - Preventing overlapping jobs
- * - Job execution logging/metrics
- * - Transaction wrapping
- * - Resource locking
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Middleware
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Interface Segregation: Single focused method
- * - Open/Closed: Extensible via new middleware
- * - Dependency Inversion: Jobs depend on abstraction
- *
- * SOLID Compliance: 10/10
- * - S: Single responsibility - wrap job execution
- * - O: Extensible without modification
- * - L: All middleware follow same contract
- * - I: Minimal, focused interface
- * - D: Depends on abstraction (JobInterface)
- *
- * @package Toporia\Framework\Queue\Middleware
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface JobMiddleware
 {

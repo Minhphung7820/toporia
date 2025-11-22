@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Session\Contracts;
 
+
 /**
- * Session Store Interface
+ * Interface SessionStoreInterface
  *
- * Contract for session storage implementations.
- * Supports multiple drivers: file, database, redis, cookie.
+ * Contract defining the interface for SessionStoreInterface
+ * implementations in the Session management layer of the Toporia
+ * Framework.
  *
- * Clean Architecture:
- * - Dependency Inversion: Framework depends on abstraction
- * - Open/Closed: Extensible via new implementations
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session\Contracts
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - I: Interface Segregation - focused interface
- * - D: Dependency Inversion - depends on abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface SessionStoreInterface
 {

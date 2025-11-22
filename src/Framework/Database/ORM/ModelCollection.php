@@ -6,14 +6,22 @@ namespace Toporia\Framework\Database\ORM;
 
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Typed collection for Model instances.
+ * Class ModelCollection
  *
- * - Extends the base Support\Collection, preserving the fluent functional API (map, filter, reduce, ...).
- * - Adds convenience helpers specific to Model semantics (keys, in-memory find, batch save).
+ * Core class for the ORM layer providing essential functionality for the
+ * Toporia Framework.
  *
- * @template T of Model
- * @extends Collection<int, T>
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  ORM
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ModelCollection extends Collection
 {

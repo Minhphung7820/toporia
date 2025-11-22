@@ -4,19 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Testing\Builders;
 
+
 /**
- * Test Builder
+ * Class TestBuilder
  *
- * Fluent builder pattern for building test scenarios.
+ * Core class for the Builders layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Architecture:
- * - Clean Architecture: Separated concerns
- * - SOLID: Builder pattern
- * - High Reusability: Composable builders
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Builders
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) method chaining
- * - Efficient state management
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class TestBuilder
 {

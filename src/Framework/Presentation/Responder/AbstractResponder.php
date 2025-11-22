@@ -7,31 +7,22 @@ namespace Toporia\Framework\Presentation\Responder;
 use Toporia\Framework\Presentation\Contracts\ResponderInterface;
 use Toporia\Framework\Http\Response;
 
+
 /**
- * Base Responder for ADR pattern.
+ * Abstract Class AbstractResponder
  *
- * Provides common response formatting methods.
- * Child classes can override methods for custom formatting.
+ * Abstract base class for AbstractResponder implementations in the
+ * Responder layer providing common functionality and contracts.
  *
- * Usage:
- * ```php
- * class ProductResponder extends AbstractResponder
- * {
- *     public function created(Response $response, Product $product): void
- *     {
- *         $this->json($response, [
- *             'id' => $product->id,
- *             'title' => $product->title,
- *             'price' => $product->price
- *         ], 201);
- *     }
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Responder
+ * @since       2025-01-10
  *
- *     public function list(Response $response, array $products): void
- *     {
- *         $this->json($response, resource_collection($products)->toArray());
- *     }
- * }
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractResponder implements ResponderInterface
 {

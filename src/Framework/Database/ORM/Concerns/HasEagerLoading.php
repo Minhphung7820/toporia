@@ -8,28 +8,22 @@ use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Database\ORM\ModelCollection;
 use Toporia\Framework\Database\Contracts\RelationInterface;
 
+
 /**
- * Has Eager Loading Trait
+ * Trait HasEagerLoading
  *
- * Provides optimized eager loading for relationships.
- * Prevents N+1 query problems by loading relationships in batches.
+ * Trait providing reusable functionality for HasEagerLoading in the
+ * Concerns layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Trait-based composition (Open/Closed Principle)
- * - No framework dependencies beyond ORM layer
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles eager loading
- * - Open/Closed: Can be added to any model without modifying base class
- * - Dependency Inversion: Works with any RelationInterface
- *
- * Performance Optimizations:
- * - Batch loading (loads all relationships in minimal queries)
- * - Query deduplication (avoids loading same relationship twice)
- * - Lazy eager loading (only loads when accessed)
- * - Memory-efficient (streams large datasets)
- *
- * @package Toporia\Framework\Database\ORM\Concerns
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasEagerLoading
 {

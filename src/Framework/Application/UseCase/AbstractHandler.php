@@ -6,38 +6,22 @@ namespace Toporia\Framework\Application\UseCase;
 
 use Toporia\Framework\Application\Contracts\HandlerInterface;
 
+
 /**
- * Abstract Handler
+ * Abstract Class AbstractHandler
  *
- * Base class for all command and query handlers.
- * Handlers contain the business logic for executing use cases.
+ * Abstract base class for AbstractHandler implementations in the UseCase
+ * layer providing common functionality and contracts.
  *
- * Architecture:
- * - Application layer service
- * - Orchestrates domain objects and infrastructure services
- * - Single use case per handler
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  UseCase
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * final class CreateProductHandler extends AbstractHandler
- * {
- *     public function __construct(
- *         private readonly ProductRepository $repository
- *     ) {}
- *
- *     public function __invoke(CreateProductCommand $command): Product
- *     {
- *         $product = new Product(
- *             $command->title,
- *             $command->price
- *         );
- *
- *         return $this->repository->save($product);
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Application\UseCase
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractHandler implements HandlerInterface
 {

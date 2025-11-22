@@ -6,37 +6,22 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 
+
 /**
- * Morph One Relationship
+ * Class MorphOne
  *
- * Represents a polymorphic one-to-one relationship.
+ * Core class for the Relations layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Example: Post/Video → Image
- * - posts.id
- * - videos.id
- * - images.imageable_id (polymorphic foreign key)
- * - images.imageable_type (polymorphic type: 'Post' or 'Video')
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
  *
- * Post::morphOne(Image::class, 'imageable')
- *
- * SQL Generated:
- * SELECT *
- * FROM images
- * WHERE imageable_type = 'Post'
- * AND imageable_id = ?
- *
- * Use Case: Multiple models can have one related model (flexible schema).
- *
- * Performance: O(1) query - optimal!
- *              Eager loading: O(N) queries where N = number of morphable types
- *              (Grouped by type: 1 query per type)
- *
- * SOLID Principles:
- * - Single Responsibility: Only handles polymorphic one-to-one
- * - Open/Closed: New morphable types can be added without modifying this class
- * - Liskov Substitution: Implements RelationInterface
- * - Interface Segregation: Minimal interface
- * - Dependency Inversion: Depends on abstractions
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class MorphOne extends Relation
 {

@@ -6,44 +6,22 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 
+
 /**
- * Morph To Many Relationship
+ * Class MorphToMany
  *
- * Represents a polymorphic many-to-many relationship.
+ * Core class for the Relations layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Example: Post/Video ↔ Tags
- * - posts.id
- * - videos.id
- * - tags.id
- * - taggables.tag_id (foreign key to tags)
- * - taggables.taggable_id (polymorphic foreign key)
- * - taggables.taggable_type (polymorphic type: 'Post' or 'Video')
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Relations
+ * @since       2025-01-10
  *
- * Post::morphToMany(Tag::class, 'taggable')
- *
- * SQL Generated:
- * SELECT tags.*, taggables.*
- * FROM tags
- * INNER JOIN taggables ON tags.id = taggables.tag_id
- * WHERE taggables.taggable_type = 'Post'
- * AND taggables.taggable_id = ?
- *
- * Use Case: Multiple models share many-to-many relationship with same related model.
- * Real examples:
- * - Posts, Videos, Articles ↔ Tags
- * - Users, Teams, Projects ↔ Permissions
- * - Products, Services, Bundles ↔ Categories
- *
- * Performance: O(1) query with JOIN for single parent - optimal!
- *              Eager loading: O(N) where N = distinct polymorphic types
- *              (Grouped by type for efficiency)
- *
- * SOLID Principles:
- * - Single Responsibility: Only handles polymorphic many-to-many
- * - Open/Closed: New morphable types work without modification
- * - Liskov Substitution: Implements RelationInterface
- * - Interface Segregation: Minimal interface
- * - Dependency Inversion: Depends on QueryBuilder abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class MorphToMany extends Relation
 {

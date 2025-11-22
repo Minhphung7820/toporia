@@ -9,39 +9,22 @@ use Toporia\Framework\Realtime\Brokers\KafkaBroker;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 use Toporia\Framework\Realtime\Message;
 
+
 /**
- * Abstract Single Avro Kafka Consumer
+ * Abstract Class AbstractSingleAvroKafkaConsumer
  *
- * Base class for Kafka consumers that process single Avro-encoded messages.
- * Extends AbstractAvroKafkaConsumer with single message processing.
+ * Abstract base class for AbstractSingleAvroKafkaConsumer implementations
+ * in the Base layer providing common functionality and contracts.
  *
- * Performance:
- * - Avro decode: ~0.05ms per message
- * - Schema Registry caching: Reduces network calls
- * - Error handling with DLQ support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Handles Avro deserialization and single message routing
- * - Open/Closed: Extensible via inheritance
- * - Liskov Substitution: Implements SingleMessageHandlerInterface
- *
- * Usage:
- * ```php
- * class MyAvroConsumer extends AbstractSingleAvroKafkaConsumer
- * {
- *     protected function getTopic(): string { return 'my-topic'; }
- *     protected function getGroupId(): string { return 'my-group'; }
- *     protected function getOffset(): string { return 'earliest'; }
- *     protected function getSchemaName(): string { return 'com.example.UserEvent'; }
- *
- *     public function handleMessage(MessageInterface $message, array $metadata = []): void
- *     {
- *         // Process Avro message
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Console\Commands\Kafka\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractSingleAvroKafkaConsumer extends AbstractAvroKafkaConsumer implements SingleMessageHandlerInterface
 {

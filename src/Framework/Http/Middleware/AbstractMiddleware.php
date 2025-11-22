@@ -7,36 +7,22 @@ namespace Toporia\Framework\Http\Middleware;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Http\{Request, Response};
 
+
 /**
- * Abstract base middleware with before/after hooks.
+ * Abstract Class AbstractMiddleware
  *
- * Provides a convenient base class for middleware that need to execute
- * logic both before and after the next handler in the pipeline.
+ * Base middleware class for processing HTTP requests in a pipeline pattern
+ * with before/after hooks and request/response modification.
  *
- * The before/after hooks are automatically called when handle() is executed.
- * Child classes only need to override process() for validation/logic.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Middleware
+ * @since       2025-01-10
  *
- * Example:
- * ```php
- * class LoggingMiddleware extends AbstractMiddleware
- * {
- *     protected function before(Request $request, Response $response): void
- *     {
- *         $this->logger->info('Request started', ['path' => $request->path()]);
- *     }
- *
- *     protected function process(Request $request, Response $response): ?Response
- *     {
- *         // Optional: add headers, validate, etc.
- *         return null; // Continue to next middleware
- *     }
- *
- *     protected function after(Request $request, Response $response, mixed $result): void
- *     {
- *         $this->logger->info('Request completed', ['status' => $response->getStatus()]);
- *     }
- * }
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractMiddleware implements MiddlewareInterface
 {

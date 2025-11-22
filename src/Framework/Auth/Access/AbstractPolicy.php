@@ -6,45 +6,22 @@ namespace Toporia\Framework\Auth\Access;
 
 use Toporia\Framework\Auth\Contracts\PolicyInterface;
 
+
 /**
- * Abstract Policy Base Class
+ * Abstract Class AbstractPolicy
  *
- * Base class for all authorization policies with common patterns.
+ * Authorization policy class for resource-specific permission logic
+ * following convention-based method naming (view, create, update, delete).
  *
- * Clean Architecture:
- * - Framework layer base class
- * - Implements domain contract (PolicyInterface)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Access
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Common policy functionality
- * - Open/Closed: Extensible via inheritance
- * - Template Method pattern
- *
- * Usage:
- * ```php
- * class PostPolicy extends AbstractPolicy {
- *     // Override before() to grant admin full access
- *     public function before($user, string $ability): ?bool {
- *         if ($user->isAdmin()) {
- *             return true; // Admin can do everything
- *         }
- *         return null; // Continue to specific ability check
- *     }
- *
- *     public function view($user, $post): bool {
- *         return $post->published || $user->id === $post->author_id;
- *     }
- *
- *     public function update($user, $post): bool|Response {
- *         if ($user->id !== $post->author_id) {
- *             return Response::deny('Only the author can update this post.');
- *         }
- *         return true;
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Auth\Access
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractPolicy implements PolicyInterface
 {

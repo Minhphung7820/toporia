@@ -7,29 +7,22 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Database\Query\QueryBuilder;
 
+
 /**
- * Soft Deletes Trait
+ * Trait SoftDeletes
  *
- * Provides soft delete functionality for models.
- * Records are not physically deleted but marked as deleted with a timestamp.
+ * Trait providing reusable functionality for SoftDeletes in the Concerns
+ * layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Trait-based composition (Open/Closed Principle)
- * - No framework dependencies beyond ORM layer
- * - Works independently without HasQueryScopes trait
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles soft delete logic
- * - Open/Closed: Can be added to any model without modifying base class
- * - Interface Segregation: Optional feature via trait
- *
- * Performance Optimizations:
- * - Automatic query scoping (excludes deleted records by default)
- * - Indexed deleted_at column (fast filtering)
- * - Batch soft delete support
- * - Query caching for soft delete checks
- *
- * @package Toporia\Framework\Database\ORM\Concerns
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait SoftDeletes
 {

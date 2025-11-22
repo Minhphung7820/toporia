@@ -8,41 +8,25 @@ use Toporia\Framework\Validation\Validator;
 use Toporia\Framework\Validation\Contracts\ValidatorInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
+
 /**
- * Validates Requests Trait
+ * Trait ValidatesRequests
  *
- * Provides validation methods for controllers.
- * Allows manual validation when FormRequest is not used.
+ * Trait providing reusable functionality for ValidatesRequests in the HTTP
+ * request and response handling layer of the Toporia Framework.
  *
- * Performance: O(N*R) where N = fields, R = rules
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only provides validation helpers
- * - Open/Closed: Extensible via custom rules
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * SOLID Principles:
- * - S: Single responsibility - validation helpers only
- * - O: Open/Closed - works with any validation rules
- *
- * Usage:
- * ```php
- * class ProductController extends BaseController
- * {
- *     use ValidatesRequests;
- *
- *     public function store(Request $request)
- *     {
- *         $validated = $this->validate($request, [
- *             'title' => 'required|string|max:255',
- *             'price' => 'required|numeric|min:0',
- *         ]);
- *
- *         // Use validated data
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Http
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 trait ValidatesRequests
 {

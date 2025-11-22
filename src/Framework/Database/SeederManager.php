@@ -7,26 +7,25 @@ namespace Toporia\Framework\Database;
 use Toporia\Framework\Database\Contracts\SeederInterface;
 use Toporia\Framework\Support\Accessors\Log;
 
+
 /**
- * Seeder Manager
+ * Class SeederManager
  *
- * Manages seeder execution with dependency resolution,
- * transaction management, and progress tracking.
+ * Core class for the Database query building and ORM layer providing
+ * essential functionality for the Toporia Framework.
  *
- * Features:
- * - Dependency resolution: Runs seeders in correct order
- * - Transaction management: Optional transactions per seeder
- * - Progress tracking: Track seeding progress
- * - Error handling: Rollback on failure
- * - Performance: Batch processing for large datasets
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only manages seeder execution
- * - Open/Closed: Extensible without modifying core
- * - Dependency Inversion: Depends on SeederInterface
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * Clean Architecture:
- * - Application Layer: Orchestrates seeding operations
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 class SeederManager
 {

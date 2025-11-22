@@ -4,19 +4,26 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Events\Contracts;
 
+
 /**
- * Event Dispatcher Interface
+ * Interface EventDispatcherInterface
  *
- * Contract for event dispatching and listener management.
- * Supports multiple listener types, wildcards, and queued execution.
+ * Contract defining the interface for EventDispatcherInterface
+ * implementations in the Event dispatching and listening layer of the
+ * Toporia Framework.
  *
- * Clean Architecture:
- * - Dependency Inversion: Framework depends on abstraction
- * - Open/Closed: Extensible via implementations
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Events\Contracts
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - I: Interface Segregation - focused interface
- * - D: Dependency Inversion - depends on abstraction
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface EventDispatcherInterface
 {

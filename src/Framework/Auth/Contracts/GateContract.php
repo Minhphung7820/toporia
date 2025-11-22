@@ -6,20 +6,25 @@ namespace Toporia\Framework\Auth\Contracts;
 
 use Toporia\Framework\Auth\Access\Response;
 
+
 /**
- * Gate Contract
+ * Interface GateContract
  *
- * Professional authorization gate interface.
+ * Contract defining the interface for GateContract implementations in the
+ * Authentication and authorization layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Domain layer contract
- * - Framework-agnostic interface
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Contracts
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Interface Segregation: Focused on authorization
- * - Dependency Inversion: Applications depend on this abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * @package Toporia\Framework\Auth\Contracts
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface GateContract
 {

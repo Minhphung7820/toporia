@@ -6,21 +6,23 @@ namespace Toporia\Framework\Validation\Contracts;
 
 use Toporia\Framework\Validation\ValidationData;
 
+
 /**
- * Data Aware Rule Interface
+ * Interface DataAwareRuleInterface
  *
- * Rules implementing this interface receive access to all validation data.
- * This is useful for rules that need to compare with other fields (e.g., "same", "different").
+ * Contract defining the interface for DataAwareRuleInterface
+ * implementations in the Form and data validation layer of the Toporia
+ * Framework.
  *
- * SOLID Principles:
- * - Interface Segregation: Separate interface for data-aware rules
- * - Dependency Inversion: Depends on ValidationData abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - ValidationData is passed by reference (no copying)
- * - Rules can cache computed values from data
- *
- * @package Toporia\Framework\Validation\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface DataAwareRuleInterface extends RuleInterface
 {

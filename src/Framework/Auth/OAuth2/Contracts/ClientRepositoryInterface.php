@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\OAuth2\Contracts;
 
+
 /**
- * OAuth2 Client Repository Interface
+ * Interface ClientRepositoryInterface
  *
- * Contract for managing OAuth2 clients (applications).
+ * Contract defining the interface for ClientRepositoryInterface
+ * implementations in the OAuth2 layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Dependency Inversion: High-level modules depend on this abstraction
- * - Interface Segregation: Focused interface for client operations
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  OAuth2\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ClientRepositoryInterface
 {

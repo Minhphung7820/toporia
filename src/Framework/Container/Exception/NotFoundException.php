@@ -4,8 +4,25 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Container\Exception;
 
+
 /**
- * Exception thrown when a service is not found in the container.
+ * Class NotFoundException
+ *
+ * Exception class for handling NotFoundException errors in the Dependency
+ * Injection container layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Container\Exception
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 class NotFoundException extends ContainerException
 {

@@ -4,28 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Console\Commands\Kafka\Base;
 
+
 /**
- * Abstract Avro Kafka Consumer Base Class
+ * Abstract Class AbstractAvroKafkaConsumer
  *
- * Base class for Kafka consumers that process Avro-encoded messages.
- * Provides Avro deserialization with Schema Registry support.
+ * Abstract base class for AbstractAvroKafkaConsumer implementations in the
+ * Base layer providing common functionality and contracts.
  *
- * Performance:
- * - Avro decode: ~0.05ms per message (with caching)
- * - Schema Registry caching: Reduces network calls
- * - Binary format: 30-50% smaller than JSON
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Manages Avro deserialization setup
- * - Open/Closed: Extensible via inheritance
- * - Dependency Inversion: Can work with different Avro libraries
- *
- * Requirements:
- * - Schema Registry URL configured
- * - Avro schema name
- * - Avro deserializer library (optional, can be added later)
- *
- * @package Toporia\Framework\Console\Commands\Kafka\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractAvroKafkaConsumer extends AbstractKafkaConsumer
 {

@@ -7,11 +7,22 @@ namespace Toporia\Framework\DateTime\Contracts;
 use DateTimeInterface;
 use DateTimeZone;
 
+
 /**
- * Chronos Interface
+ * Interface ChronosInterface
  *
- * Contract for date/time manipulation and formatting.
- * Provides immutable date/time operations following value object pattern.
+ * Contract defining the interface for ChronosInterface implementations in
+ * the DateTime layer of the Toporia Framework.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DateTime\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ChronosInterface extends DateTimeInterface
 {

@@ -5,11 +5,22 @@ declare(strict_types=1);
 namespace Toporia\Framework\Mail;
 
 use Toporia\Framework\Mail\Contracts\MessageInterface;
+
 /**
- * Mailable Abstract Class
+ * Abstract Class Mailable
  *
- * Base class for email templates.
- * Follows Template Method pattern - subclasses define content.
+ * Abstract base class for Mailable implementations in the Email sending
+ * and queuing layer providing common functionality and contracts.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Mailable
 {

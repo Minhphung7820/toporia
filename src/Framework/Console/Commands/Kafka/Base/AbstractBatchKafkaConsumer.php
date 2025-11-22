@@ -9,41 +9,22 @@ use Toporia\Framework\Realtime\Brokers\KafkaBroker;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Abstract Batch Kafka Consumer
+ * Abstract Class AbstractBatchKafkaConsumer
  *
- * Base class for Kafka consumers that process messages in batches.
- * Provides high-throughput processing with configurable batch size and interval.
+ * Abstract base class for AbstractBatchKafkaConsumer implementations in
+ * the Base layer providing common functionality and contracts.
  *
- * Performance Benefits:
- * - Reduced network round-trips
- * - Better throughput (1000+ messages/sec)
- * - Atomic batch processing
- * - Lower overhead per message
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Handles batch message processing
- * - Open/Closed: Extensible via inheritance
- * - Liskov Substitution: Implements BatchingMessagesHandlerInterface
- *
- * Usage:
- * ```php
- * class MyBatchConsumer extends AbstractBatchKafkaConsumer
- * {
- *     protected function getTopic(): string { return 'my-topic'; }
- *     protected function getGroupId(): string { return 'my-group'; }
- *     protected function getOffset(): string { return 'earliest'; }
- *     protected function getBatchSizeLimit(): int { return 100; }
- *     protected function getBatchReleaseInterval(): int { return 1500; } // 1.5s
- *
- *     public function handleMessages(Collection $messages): void
- *     {
- *         // Process batch
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\Console\Commands\Kafka\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractBatchKafkaConsumer extends AbstractKafkaConsumer implements BatchingMessagesHandlerInterface
 {

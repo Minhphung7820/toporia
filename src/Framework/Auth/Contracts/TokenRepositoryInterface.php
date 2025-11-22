@@ -6,20 +6,26 @@ namespace Toporia\Framework\Auth\Contracts;
 
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Token Repository Interface
+ * Interface TokenRepositoryInterface
  *
- * Contract for managing personal access tokens.
+ * Contract defining the interface for TokenRepositoryInterface
+ * implementations in the Authentication and authorization layer of the
+ * Toporia Framework.
  *
- * Clean Architecture:
- * - Domain layer defines contract
- * - Infrastructure layer implements
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - Batch operations support
- * - Caching strategy
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * @package Toporia\Framework\Auth\Contracts
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface TokenRepositoryInterface
 {

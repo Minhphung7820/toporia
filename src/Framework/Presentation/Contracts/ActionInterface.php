@@ -6,21 +6,22 @@ namespace Toporia\Framework\Presentation\Contracts;
 
 use Toporia\Framework\Http\{Request, Response};
 
+
 /**
- * Action interface for ADR (Action-Domain-Responder) pattern.
+ * Interface ActionInterface
  *
- * Actions are single-purpose request handlers that:
- * - Accept a Request and Response
- * - Execute domain logic (via Use Cases)
- * - Return a Response
+ * Contract defining the interface for ActionInterface implementations in
+ * the Presentation layer (ADR pattern) layer of the Toporia Framework.
  *
- * Unlike MVC Controllers, Actions handle only ONE HTTP endpoint.
- * This promotes Single Responsibility Principle.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Presentation\Contracts
+ * @since       2025-01-10
  *
- * Example:
- * - CreateProductAction handles POST /products
- * - GetProductAction handles GET /products/{id}
- * - UpdateProductAction handles PUT /products/{id}
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ActionInterface
 {

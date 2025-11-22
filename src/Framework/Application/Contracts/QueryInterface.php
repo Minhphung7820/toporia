@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Application\Contracts;
 
+
 /**
- * Query interface (CQRS pattern).
+ * Interface QueryInterface
  *
- * Queries represent read operations that don't change system state.
- * They fetch data from the system without side effects.
+ * Contract defining the interface for QueryInterface implementations in
+ * the Application layer of the Toporia Framework.
  *
- * Characteristics:
- * - Read-only operation
- * - No side effects
- * - Should be named as questions (GetProductById, FindActiveUsers)
- * - Contains criteria/filters for the query
- * - Immutable (readonly properties)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Application\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface QueryInterface
 {

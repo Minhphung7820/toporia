@@ -6,10 +6,23 @@ namespace Toporia\Framework\Database\Schema;
 
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 
+
 /**
- * Schema Builder for creating/modifying database tables.
+ * Class SchemaBuilder
  *
- * Compiles Blueprint definitions into SQL DDL statements.
+ * Database schema builder for creating and modifying database tables,
+ * columns, indexes, and foreign keys with support for multiple database
+ * drivers (MySQL, PostgreSQL, SQLite).
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Schema
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class SchemaBuilder
 {

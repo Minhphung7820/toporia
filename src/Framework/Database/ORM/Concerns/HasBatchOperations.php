@@ -6,28 +6,22 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 
 use Toporia\Framework\Database\Query\QueryBuilder;
 
+
 /**
- * Has Batch Operations Trait
+ * Trait HasBatchOperations
  *
- * Provides optimized batch operations for models.
- * Allows inserting, updating, and deleting multiple records efficiently.
+ * Trait providing reusable functionality for HasBatchOperations in the
+ * Concerns layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Trait-based composition (Open/Closed Principle)
- * - No framework dependencies beyond ORM layer
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles batch operations
- * - Open/Closed: Can be added to any model without modifying base class
- *
- * Performance Optimizations:
- * - Bulk inserts (single INSERT with multiple values)
- * - Bulk updates (single UPDATE with CASE statements)
- * - Bulk deletes (single DELETE with IN clause)
- * - Transaction wrapping (all-or-nothing)
- * - Chunked processing for large datasets (memory efficient)
- *
- * @package Toporia\Framework\Database\ORM\Concerns
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasBatchOperations
 {

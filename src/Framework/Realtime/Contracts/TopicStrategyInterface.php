@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Contracts;
 
+
 /**
- * Topic Strategy Interface
+ * Interface TopicStrategyInterface
  *
- * Strategy for mapping channels to Kafka topics and partitions.
- * Allows different strategies: one-topic-per-channel, grouped-topics, etc.
+ * Contract defining the interface for TopicStrategyInterface
+ * implementations in the Real-time broadcasting layer of the Toporia
+ * Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Only maps channels to topics/partitions
- * - Open/Closed: Extensible via different strategy implementations
- * - Dependency Inversion: Depends on abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Contracts
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface TopicStrategyInterface
 {

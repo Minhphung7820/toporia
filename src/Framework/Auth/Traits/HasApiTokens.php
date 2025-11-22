@@ -7,34 +7,22 @@ namespace Toporia\Framework\Auth\Traits;
 use Toporia\Framework\Auth\Contracts\{HasApiTokensInterface, NewAccessTokenInterface, PersonalAccessTokenInterface, TokenRepositoryInterface};
 use Toporia\Framework\Support\Collection\Collection;
 
+
 /**
- * Has API Tokens Trait
+ * Trait HasApiTokens
  *
- * Adds API token functionality to User models.
+ * Trait providing reusable functionality for HasApiTokens in the Traits
+ * layer of the Toporia Framework.
  *
- * Usage:
- * ```php
- * class User extends Model implements HasApiTokensInterface {
- *     use HasApiTokens;
- * }
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Traits
+ * @since       2025-01-10
  *
- * $token = $user->createToken('mobile-app', ['posts:read', 'posts:write']);
- * echo $token->plainTextToken; // Show to user ONCE!
- * ```
- *
- * Clean Architecture:
- * - Depends on domain contracts (interfaces)
- * - No framework coupling
- *
- * SOLID Principles:
- * - Single Responsibility: Token management for user
- * - Dependency Inversion: Depends on TokenRepositoryInterface
- *
- * Performance:
- * - Lazy loading of tokens (only when accessed)
- * - Caching of current access token
- *
- * @package Toporia\Framework\Auth\Traits
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasApiTokens
 {

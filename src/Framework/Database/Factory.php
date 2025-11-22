@@ -11,37 +11,25 @@ use Toporia\Framework\Database\ORM\Model;
 use Faker\Generator;
 use Faker\Factory as FakerFactory;
 
+
 /**
- * Base Factory Class
+ * Abstract Class Factory
  *
- * Provides factory pattern for creating model instances with fake data.
+ * Abstract base class for Factory implementations in the Database query
+ * building and ORM layer providing common functionality and contracts.
  *
- * Features:
- * - Faker integration for generating realistic fake data
- * - Lazy loading of model instances
- * - Batch processing for performance
- * - State management for different model variations
- * - Relationship support (afterCreating callbacks)
- * - Memory-efficient bulk operations
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Factory only creates model instances
- * - Open/Closed: Extend via child classes without modifying base
- * - Liskov Substitution: All factories can be used interchangeably
- * - Interface Segregation: Implements specific FactoryInterface
- * - Dependency Inversion: Depends on Model interface, not concrete classes
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * Performance Optimizations:
- * - Lazy evaluation: Attributes generated only when needed
- * - Batch inserts: createMany() uses batch insert for performance
- * - Memory management: Generator-based makeMany() for large datasets
- * - Caching: Faker instance cached per factory
- *
- * Clean Architecture:
- * - Infrastructure Layer: Handles data generation and persistence
- *
- * @template T of Model
- * @implements FactoryInterface<T>
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 abstract class Factory implements FactoryInterface
 {

@@ -4,28 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Contracts;
 
+
 /**
- * Channel Interface
+ * Interface ChannelInterface
  *
- * Represents a realtime communication channel.
- * Channels organize connections and messages by topic/room.
+ * Contract defining the interface for ChannelInterface implementations in
+ * the Real-time broadcasting layer of the Toporia Framework.
  *
- * Channel Types:
- * - Public: Anyone can subscribe (e.g., "news", "announcements")
- * - Private: Requires authentication (e.g., "user.123", "chat.room.456")
- * - Presence: Tracks who's online (e.g., "presence.room.1")
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Contracts
+ * @since       2025-01-10
  *
- * Channel Naming Convention:
- * - Public: "public.{name}" or just "{name}"
- * - Private: "private.{name}" or "user.{id}"
- * - Presence: "presence.{name}"
- *
- * Performance:
- * - O(1) subscription/unsubscription
- * - O(N) broadcast where N = subscribers
- * - Memory: ~100 bytes per subscriber
- *
- * @package Toporia\Framework\Realtime\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ChannelInterface
 {

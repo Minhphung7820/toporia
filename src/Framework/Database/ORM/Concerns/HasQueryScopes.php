@@ -6,27 +6,22 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 
 use Toporia\Framework\Database\Query\QueryBuilder;
 
+
 /**
- * Has Query Scopes Trait
+ * Trait HasQueryScopes
  *
- * Provides local and global query scopes for models.
- * Scopes allow reusable query constraints to be defined on models.
+ * Trait providing reusable functionality for HasQueryScopes in the
+ * Concerns layer of the Toporia Framework.
  *
- * Clean Architecture:
- * - Trait-based composition (Open/Closed Principle)
- * - No framework dependencies beyond ORM layer
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles query scoping
- * - Open/Closed: Can add scopes without modifying base class
- * - Interface Segregation: Optional feature via trait
- *
- * Performance Optimizations:
- * - Scope caching (compiled scopes are cached)
- * - Lazy scope application (only when needed)
- * - Query builder reuse (no unnecessary cloning)
- *
- * @package Toporia\Framework\Database\ORM\Concerns
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait HasQueryScopes
 {

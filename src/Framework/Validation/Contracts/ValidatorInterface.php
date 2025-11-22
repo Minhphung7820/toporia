@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Validation\Contracts;
 
+
 /**
- * Validator Interface
+ * Interface ValidatorInterface
  *
- * Defines contract for data validation.
+ * Contract defining the interface for ValidatorInterface implementations
+ * in the Form and data validation layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Interface Segregation: Focused interface for validation
- * - Dependency Inversion: Depend on abstraction, not concrete validator
- * - Open/Closed: Extensible via custom rules
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation\Contracts
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Validation
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ValidatorInterface
 {

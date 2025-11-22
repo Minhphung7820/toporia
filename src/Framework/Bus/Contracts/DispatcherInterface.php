@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Bus\Contracts;
 
+
 /**
- * Command/Query/Job Dispatcher Interface
+ * Interface DispatcherInterface
  *
- * Central bus for dispatching commands, queries, and jobs to their handlers.
- * Supports sync/async execution, middleware pipeline, and batching.
+ * Contract defining the interface for DispatcherInterface implementations
+ * in the Command/Query/Job dispatching layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Interface Segregation: Focused contract for dispatching
- * - Dependency Inversion: Depend on abstraction, not concrete implementation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Bus\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface DispatcherInterface
 {

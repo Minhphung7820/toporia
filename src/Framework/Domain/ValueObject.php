@@ -5,20 +5,22 @@ declare(strict_types=1);
 namespace Toporia\Framework\Domain;
 
 use Toporia\Framework\Domain\Contracts\ValueObjectInterface;
+
 /**
- * Base Value Object class for Domain-Driven Design.
+ * Abstract Class ValueObject
  *
- * Value Objects are immutable objects defined by their attributes.
- * They have no unique identity - equality is based on attribute values.
+ * Abstract base class for ValueObject implementations in the Domain layer
+ * providing common functionality and contracts.
  *
- * Key characteristics:
- * - Immutable (cannot change after creation)
- * - No unique identity
- * - Equality based on all attributes
- * - Side-effect free behavior
- * - Validates itself on construction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Domain
+ * @since       2025-01-10
  *
- * Examples: Email, Money, DateRange, Address, Coordinate
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class ValueObject implements ValueObjectInterface
 {

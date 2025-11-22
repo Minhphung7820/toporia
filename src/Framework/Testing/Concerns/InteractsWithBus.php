@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Testing\Concerns;
 
+
 /**
- * Bus Testing Trait
+ * Trait InteractsWithBus
  *
- * Provides utilities for command/query bus testing.
+ * Trait providing reusable functionality for InteractsWithBus in the
+ * Concerns layer of the Toporia Framework.
  *
- * Performance:
- * - O(1) bus faking
- * - Fast command assertions
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Concerns
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait InteractsWithBus
 {

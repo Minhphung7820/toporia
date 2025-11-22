@@ -7,19 +7,22 @@ namespace Toporia\Framework\Auth\OAuth2\Grants;
 use Toporia\Framework\Auth\OAuth2\Contracts\{GrantInterface, TokenRepositoryInterface, UserProviderInterface};
 use Toporia\Framework\Http\Request;
 
+
 /**
- * Abstract OAuth2 Grant
+ * Abstract Class AbstractGrant
  *
- * Base class for OAuth2 grant type implementations.
- * Provides common functionality for all grant types.
+ * Abstract base class for AbstractGrant implementations in the Grants
+ * layer providing common functionality and contracts.
  *
- * Clean Architecture:
- * - Template Method Pattern: Defines skeleton of grant flow
- * - Open/Closed: Extensible via inheritance
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Grants
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - S: Base grant functionality only
- * - O: Extensible via child classes
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractGrant implements GrantInterface
 {

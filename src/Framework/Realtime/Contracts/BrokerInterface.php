@@ -4,33 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Contracts;
 
+
 /**
- * Broker Interface
+ * Interface BrokerInterface
  *
- * Defines contract for message broker systems.
- * Brokers enable fan-out, multi-server scaling, and persistence.
+ * Contract defining the interface for BrokerInterface implementations in
+ * the Real-time broadcasting layer of the Toporia Framework.
  *
- * Available Brokers:
- * - Redis Pub/Sub: Fast, simple, ephemeral messages
- * - RabbitMQ (AMQP): Durable, routing, message persistence
- * - NATS: Ultra-fast, wildcard subjects, clustering
- * - Kafka: High-throughput, replay, message history
- * - PostgreSQL LISTEN/NOTIFY: DB-based, simple setup
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Contracts
+ * @since       2025-01-10
  *
- * Performance Characteristics:
- * - Redis: ~0.1ms latency, 100k+ msg/sec
- * - RabbitMQ: ~1ms latency, 50k+ msg/sec, durable
- * - NATS: ~0.05ms latency, 1M+ msg/sec, clustering
- * - Kafka: ~5ms latency, 1M+ msg/sec, persistence
- * - PostgreSQL: ~10ms latency, 10k+ msg/sec
- *
- * Use Cases:
- * - Single server: No broker needed (in-memory)
- * - Multi-server: Redis Pub/Sub (simple, fast)
- * - Enterprise: RabbitMQ (durable, routing)
- * - High-throughput: NATS or Kafka
- *
- * @package Toporia\Framework\Realtime\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface BrokerInterface
 {

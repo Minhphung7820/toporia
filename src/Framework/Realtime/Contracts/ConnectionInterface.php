@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Contracts;
 
+
 /**
- * Connection Interface
+ * Interface ConnectionInterface
  *
- * Represents a realtime client connection.
- * Encapsulates connection state, metadata, and channel subscriptions.
+ * Contract defining the interface for ConnectionInterface implementations
+ * in the Real-time broadcasting layer of the Toporia Framework.
  *
- * Performance:
- * - O(1) property access
- * - O(1) channel subscription/unsubscription (hash table)
- * - Minimal memory footprint (~1KB per connection)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Contracts
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Realtime\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ConnectionInterface
 {

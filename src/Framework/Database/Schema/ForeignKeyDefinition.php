@@ -4,21 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Schema;
 
+
 /**
- * Foreign Key Definition Helper
+ * Class ForeignKeyDefinition
  *
- * Provides fluent interface for foreign key constraints.
- * Supports onDelete and onUpdate actions.
+ * Core class for the Schema layer providing essential functionality for
+ * the Toporia Framework.
  *
- * Performance:
- * - O(1) operations (direct array reference modification)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Schema
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Foreign key definition modifiers only
- *
- * SOLID Principles:
- * - Single Responsibility: Foreign key modifiers only
- * - Open/Closed: Extensible via new modifier methods
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ForeignKeyDefinition
 {

@@ -7,23 +7,22 @@ namespace Toporia\Framework\Console\Commands\Base;
 use Toporia\Framework\Console\Command;
 use Toporia\Framework\Realtime\Contracts\{BrokerInterface, RealtimeManagerInterface};
 
+
 /**
- * Abstract Broker Consumer Command
+ * Abstract Class AbstractBrokerConsumerCommand
  *
- * Base class for all broker consumer commands (Redis, Kafka, RabbitMQ, etc.).
- * Provides common functionality for consuming messages from brokers.
+ * Base console command class providing CLI interface with colored output,
+ * user interaction, argument/option parsing, and progress indicators.
  *
- * Architecture:
- * - All realtime brokers MUST have CLI consumer commands
- * - Consumers run as long-lived processes (daemons)
- * - Consumers receive messages from broker and broadcast locally
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Base
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Base consumer functionality only
- * - Open/Closed: Extensible via abstract methods
- * - Dependency Inversion: Depends on BrokerInterface
- *
- * @package Toporia\Framework\Console\Commands\Base
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractBrokerConsumerCommand extends Command
 {

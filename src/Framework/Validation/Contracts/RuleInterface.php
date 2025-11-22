@@ -4,23 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Validation\Contracts;
 
+
 /**
- * Rule Interface
+ * Interface RuleInterface
  *
- * Base contract for all validation rules.
+ * Contract defining the interface for RuleInterface implementations in the
+ * Form and data validation layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Each rule validates one specific condition
- * - Open/Closed: Open for extension via new rule classes
- * - Interface Segregation: Focused interface for rule validation
- * - Dependency Inversion: Validator depends on RuleInterface abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - Rules are stateless by default (can be cached/reused)
- * - No side effects in passes() method
- * - Fast validation with O(1) complexity where possible
- *
- * @package Toporia\Framework\Validation\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface RuleInterface
 {

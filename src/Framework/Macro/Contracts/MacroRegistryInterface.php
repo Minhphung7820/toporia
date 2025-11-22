@@ -4,25 +4,23 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Macro\Contracts;
 
+
 /**
- * Macro Registry Interface
+ * Interface MacroRegistryInterface
  *
- * Contract for macro registration and retrieval.
- * Provides centralized macro management with caching.
+ * Contract defining the interface for MacroRegistryInterface
+ * implementations in the Macro functionality layer of the Toporia
+ * Framework.
  *
- * Clean Architecture:
- * - Framework layer defines the contract (core functionality)
- * - Application layer provides implementation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Macro\Contracts
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Manages macro registration
- * - Open/Closed: Extensible via implementations
- * - Dependency Inversion: Framework depends on this abstraction
- *
- * Performance:
- * - O(1) registration and lookup
- * - Cached macros for fast access
- * - Lazy evaluation support
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface MacroRegistryInterface
 {

@@ -6,13 +6,26 @@ namespace Toporia\Framework\Auth\Contracts;
 
 use Toporia\Framework\Auth\Authenticatable;
 
+
 /**
- * User Provider Interface - User retrieval contract.
+ * Interface UserProviderInterface
  *
- * User providers are responsible for retrieving users from storage.
- * This abstraction allows authentication to work with any storage mechanism.
+ * Contract defining the interface for UserProviderInterface
+ * implementations in the Authentication and authorization layer of the
+ * Toporia Framework.
  *
- * Following Dependency Inversion Principle - guards depend on this abstraction.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface UserProviderInterface
 {

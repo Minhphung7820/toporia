@@ -6,16 +6,25 @@ namespace Toporia\Framework\Database\Contracts;
 
 use Toporia\Framework\Database\ORM\Model;
 
+
 /**
- * Factory Interface
+ * Interface FactoryInterface
  *
- * Defines contract for model factories.
+ * Contract defining the interface for FactoryInterface implementations in
+ * the Database query building and ORM layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Interface Segregation: Specific interface for factory operations
- * - Dependency Inversion: Depend on abstraction, not concrete implementations
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database\Contracts
+ * @since       2025-01-10
  *
- * @template T of Model
+ * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 interface FactoryInterface
 {

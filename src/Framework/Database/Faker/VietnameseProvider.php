@@ -7,19 +7,22 @@ namespace Toporia\Framework\Database\Faker;
 use Toporia\Framework\Database\Contracts\FakerProviderInterface;
 use Faker\Generator;
 
+
 /**
- * Vietnamese Faker Provider
+ * Class VietnameseProvider
  *
- * Provides Vietnamese-specific data generators.
+ * Service provider for registering and bootstrapping Faker services in the
+ * Toporia Framework application.
  *
- * SOLID Principles:
- * - Single Responsibility: Only provides Vietnamese locale data
- * - Open/Closed: Extend Faker without modifying core
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Faker
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * $factory->locale('vi_VN')->faker()->vietnameseName();
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class VietnameseProvider implements FakerProviderInterface
 {

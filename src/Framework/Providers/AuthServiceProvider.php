@@ -12,15 +12,23 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Http\Request;
 
+
 /**
- * Authentication Service Provider
+ * Class AuthServiceProvider
  *
- * Registers authentication services including:
- * - Auth Manager with multiple guards
- * - User providers
- * - Guard configurations
+ * Abstract base class for service providers responsible for registering
+ * and booting framework services following two-phase lifecycle (register
+ * then boot).
  *
- * Following Single Responsibility Principle - only handles auth services.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class AuthServiceProvider extends ServiceProvider
 {

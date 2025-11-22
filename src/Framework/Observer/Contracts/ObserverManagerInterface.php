@@ -4,23 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Observer\Contracts;
 
+
 /**
- * Observer Manager Interface
+ * Interface ObserverManagerInterface
  *
- * Central manager for registering and managing observers.
- * Provides a global registry for observers with performance optimizations.
+ * Contract defining the interface for ObserverManagerInterface
+ * implementations in the Observer layer of the Toporia Framework.
  *
- * SOLID Principles:
- * - Single Responsibility: Manages observer registration and lookup
- * - Dependency Inversion: Depends on ObserverInterface abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Observer\Contracts
+ * @since       2025-01-10
  *
- * Performance Optimizations:
- * - Observer caching for fast lookup
- * - Lazy observer instantiation
- * - Event-specific observer indexing
- * - Observer priority support
- *
- * @package Toporia\Framework\Observer\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface ObserverManagerInterface
 {

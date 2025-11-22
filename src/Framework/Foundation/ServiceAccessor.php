@@ -7,59 +7,26 @@ namespace Toporia\Framework\Foundation;
 use RuntimeException;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
+
 /**
- * Service Accessor - Facade Pattern for IoC Container Services
+ * Abstract Class ServiceAccessor
  *
- * Provides a convenient static-like interface to access services from the IoC container.
- * This is NOT a true static class - it forwards calls to actual instances in the container.
+ * Abstract base class for ServiceAccessor implementations in the
+ * Application foundation and bootstrapping layer providing common
+ * functionality and contracts.
  *
- * Performance Characteristics:
- * - O(1) instance lookup after first resolution (cached per accessor)
- * - Zero overhead method forwarding via __callStatic
- * - No reflection after initial resolution
- * - Minimal memory footprint (one instance per accessor class)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Foundation
+ * @since       2025-01-10
  *
- * Benefits:
- * - Clean, expressive syntax: Cache::get('key') vs app('cache')->get('key')
- * - IDE autocomplete support via concrete accessor classes
- * - Type safety through concrete accessor methods
- * - Fully testable (swap implementations via swap())
- * - No global state (all state in container)
- * - Hot path optimization (cached instances)
+ * @link        https://github.com/Minhphung7820/toporia
  *
- * SOLID Principles Applied:
- * - Single Responsibility: Only forwards calls to container services
- * - Open/Closed: Extend via new accessor classes, don't modify base
- * - Liskov Substitution: All accessors behave consistently
- * - Interface Segregation: Each accessor provides specific service interface
- * - Dependency Inversion: Depends on ContainerInterface abstraction
- *
- * Architecture Pattern: Facade + Service Locator hybrid
- * - Facade: Provides simplified interface to complex subsystem
- * - Service Locator: Resolves dependencies from container
- * - Lazy Loading: Services resolved only when first accessed
- *
- * @example Basic Usage
- * // Instead of:
- * $cache = app('cache');
- * $cache->get('key');
- *
- * // Use accessor:
- * Cache::get('key');
- *
- * @example Testing
- * $mock = new MemoryCacheMock();
- * Cache::swap($mock);
- * Cache::set('key', 'value'); // Uses mock
- * Cache::clearResolved(); // Cleanup
- *
- * @example Performance Monitoring
- * echo ServiceAccessor::getResolvedCount(); // Check memory usage
- *
- * @internal Flow:
- * Cache::get('key') → __callStatic('get', ['key'])
- *                   → resolveService() [cached after first call]
- *                   → $instance->get('key')
+ * @internal    This class is a core component and should not be extended
+ *              directly unless you know what you're doing.
  */
 abstract class ServiceAccessor
 {

@@ -4,30 +4,22 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Contracts;
 
+
 /**
- * Transport Interface
+ * Interface TransportInterface
  *
- * Defines contract for realtime transport layers.
- * Transports handle client-server communication (WebSocket, SSE, Long-polling).
+ * Contract defining the interface for TransportInterface implementations
+ * in the Real-time broadcasting layer of the Toporia Framework.
  *
- * Available Transports:
- * - WebSocket (WS/WSS): Full-duplex, low latency, best performance
- * - Server-Sent Events (SSE): One-way (server→client), HTTP/2, simple
- * - Long-polling: Fallback, works everywhere, higher latency
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Contracts
+ * @since       2025-01-10
  *
- * Performance Characteristics:
- * - WebSocket: ~1-5ms latency, 1000+ concurrent connections
- * - SSE: ~10-50ms latency, 100+ concurrent connections
- * - Long-polling: ~100-500ms latency, 50+ concurrent connections
- *
- * SOLID Principles:
- * - Single Responsibility: Each transport handles one protocol
- * - Open/Closed: Extensible via custom transports
- * - Liskov Substitution: All transports are interchangeable
- * - Interface Segregation: Minimal interface
- * - Dependency Inversion: Depends on abstractions
- *
- * @package Toporia\Framework\Realtime\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface TransportInterface
 {
