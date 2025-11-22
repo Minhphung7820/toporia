@@ -52,6 +52,7 @@ public/build/
 
 # Testing
 .phpunit.result.cache
+.phpunit.cache
 /coverage/
 
 # Deployment
