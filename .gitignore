@@ -69,11 +69,18 @@ pnpm-debug.log*
 # ==========================================
 # Testing
 # ==========================================
+# PHPUnit cache and results
 .phpunit.cache/
 .phpunit.result.cache
-/coverage/
 *.phpunit.result.cache
+test-results
+
+# Coverage reports
+/coverage/
 /clover.xml
+
+# Test logs
+/tests/*.log
 
 # ==========================================
 # IDE & Editor Files
