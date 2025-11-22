@@ -30,6 +30,8 @@ use Faker\Factory as FakerFactory;
  *
  * @internal    This class is a core component and should not be extended
  *              directly unless you know what you're doing.
+ *
+ * @template T of Model
  */
 abstract class Factory implements FactoryInterface
 {
@@ -158,7 +160,8 @@ abstract class Factory implements FactoryInterface
      * Create a new model instance (not persisted).
      *
      * @param array<string, mixed> $attributes
-     * @return T
+     * @return Model
+     * @phpstan-return T
      */
     public function make(array $attributes = []): Model
     {
@@ -177,7 +180,8 @@ abstract class Factory implements FactoryInterface
      * Create a model instance and persist it to database.
      *
      * @param array<string, mixed> $attributes
-     * @return T
+     * @return Model
+     * @phpstan-return T
      */
     public function create(array $attributes = []): Model
     {
@@ -221,7 +225,8 @@ abstract class Factory implements FactoryInterface
      *
      * @param int $count
      * @param array<string, mixed> $attributes
-     * @return array<int, T>
+     * @return array<int, Model>
+     * @phpstan-return array<int, T>
      */
     public function makeMany(int $count, array $attributes = []): array
     {
@@ -249,7 +254,8 @@ abstract class Factory implements FactoryInterface
      *
      * @param int $count
      * @param array<string, mixed> $attributes
-     * @return \Generator<int, T>
+     * @return \Generator<int, Model>
+     * @phpstan-return \Generator<int, T>
      */
     protected function makeManyLazy(int $count, array $attributes = []): \Generator
     {
@@ -265,7 +271,8 @@ abstract class Factory implements FactoryInterface
      *
      * @param int|null $count If null, uses count() value
      * @param array<string, mixed> $attributes
-     * @return array<int, T>|T If count is 1, returns single model; otherwise array
+     * @return array<int, Model>|Model If count is 1, returns single model; otherwise array
+     * @phpstan-return array<int, T>|T
      */
     public function createMany(?int $count = null, array $attributes = []): array|Model
     {
@@ -300,7 +307,8 @@ abstract class Factory implements FactoryInterface
      *
      * @param int $count
      * @param array<string, mixed> $attributes
-     * @return array<int, T>
+     * @return array<int, Model>
+     * @phpstan-return array<int, T>
      */
     protected function createManyBatch(int $count, array $attributes = []): array
     {
@@ -312,10 +320,22 @@ abstract class Factory implements FactoryInterface
             $modelAttributes = $this->resolveAttributes($attributes);
 
             // Apply timestamps if model uses them
-            if (property_exists($modelClass, 'timestamps') && $modelClass::$timestamps) {
+            if (method_exists($modelClass, 'usesTimestamps') && $modelClass::usesTimestamps()) {
                 $now = date('Y-m-d H:i:s');
                 $modelAttributes['created_at'] = $modelAttributes['created_at'] ?? $now;
                 $modelAttributes['updated_at'] = $modelAttributes['updated_at'] ?? $now;
+            } elseif (property_exists($modelClass, 'timestamps')) {
+                // Fallback: try to access static property safely
+                try {
+                    $reflection = new \ReflectionProperty($modelClass, 'timestamps');
+                    if ($reflection->isStatic() && $reflection->getValue()) {
+                        $now = date('Y-m-d H:i:s');
+                        $modelAttributes['created_at'] = $modelAttributes['created_at'] ?? $now;
+                        $modelAttributes['updated_at'] = $modelAttributes['updated_at'] ?? $now;
+                    }
+                } catch (\ReflectionException) {
+                    // Ignore if property is not accessible
+                }
             }
 
             $batch[] = $modelAttributes;
@@ -532,7 +552,7 @@ abstract class Factory implements FactoryInterface
         $resolved = $this->definition();
 
         // Apply sequence if defined (HasSequences trait)
-        if (trait_exists('Toporia\Framework\Database\Factory\Concerns\HasSequences') && !empty($this->sequences)) {
+        if (method_exists($this, 'getNextSequence') && property_exists($this, 'sequences') && !empty($this->sequences)) {
             $resolved = array_merge($resolved, $this->getNextSequence());
         }
 
@@ -561,7 +581,8 @@ abstract class Factory implements FactoryInterface
      * Create a new model instance with given attributes.
      *
      * @param array<string, mixed> $attributes
-     * @return T
+     * @return Model
+     * @phpstan-return T
      */
     protected function newModel(array $attributes): Model
     {
