@@ -6,7 +6,7 @@
     </div>
 
     <div class="header">
-      <div class="container">
+    <div class="container">
         <div class="version-badge">Version {{ version }}</div>
         <h1 class="logo">{{ frameworkName }}</h1>
         <p class="version">A Professional PHP Framework Built on Clean Architecture Principles</p>
@@ -36,9 +36,9 @@
 
         <section class="features">
           <h3 class="features-title">Key Features</h3>
-          <div class="features-grid">
+        <div class="features-grid">
             <div class="feature-item">
-              <div class="feature-icon">🏗️</div>
+            <div class="feature-icon">🏗️</div>
               <div class="feature-text">Clean Architecture with strict layer separation</div>
             </div>
             <div class="feature-item">
@@ -340,7 +340,7 @@ export default {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
   margin-bottom: 60px;
-}
+  }
 
 .info-card {
   background: #f9fafb;
@@ -348,12 +348,12 @@ export default {
   border-radius: 12px;
   padding: 24px;
   transition: all 0.2s;
-}
+  }
 
 .info-card:hover {
   border-color: #d1d5db;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-}
+  }
 
 .info-card-title {
   font-size: 20px;
@@ -365,8 +365,8 @@ export default {
 .info-card-description {
   color: #6b7280;
   font-size: 14px;
-  line-height: 1.5;
-}
+    line-height: 1.5;
+  }
 
 /* Footer */
 .footer {
@@ -376,7 +376,7 @@ export default {
   border-top: 1px solid #e5e7eb;
   position: relative;
   z-index: 1;
-}
+  }
 
 .footer-links {
   display: flex;
@@ -384,7 +384,7 @@ export default {
   gap: 24px;
   flex-wrap: wrap;
   margin-bottom: 20px;
-}
+  }
 
 .footer-link {
   color: #6b7280;
@@ -395,7 +395,7 @@ export default {
 
 .footer-link:hover {
   color: #111827;
-}
+  }
 
 /* Responsive */
 @media (max-width: 768px) {
