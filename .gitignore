@@ -82,6 +82,11 @@ test-results
 # Test logs
 /tests/*.log
 
+# DocBlock generation scripts (temporary)
+/add-docblock*.php
+/docblock-*.log
+/DOCBLOCK_SUMMARY.md
+
 # ==========================================
 # IDE & Editor Files
 # ==========================================
