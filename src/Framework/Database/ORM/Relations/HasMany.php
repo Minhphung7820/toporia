@@ -96,4 +96,154 @@ class HasMany extends Relation
     {
         return $this->foreignKey;
     }
+
+    /**
+     * Save multiple related models.
+     *
+     * Creates and saves multiple related models in a single operation.
+     * Optimized for performance using bulk insert when possible.
+     *
+     * Architecture:
+     * - SOLID: Single Responsibility (bulk save only)
+     * - Performance: Uses single bulk INSERT query (O(1) queries instead of O(N))
+     * - Clean Architecture: Uses QueryBuilder for database operations
+     *
+     * @param array<int, array<string, mixed>> $models Array of model attributes
+     * @return ModelCollection Collection of saved models
+     *
+     * @example
+     * $user->posts()->saveMany([
+     *     ['title' => 'Post 1', 'content' => 'Content 1'],
+     *     ['title' => 'Post 2', 'content' => 'Content 2'],
+     * ]);
+     */
+    public function saveMany(array $models): ModelCollection
+    {
+        if (empty($models)) {
+            return new ModelCollection([]);
+        }
+
+        $parentKey = $this->parent->getAttribute($this->localKey);
+
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot save related models: parent model does not have a key');
+        }
+
+        // Create temporary model instance to get table name and handle timestamps
+        $tempModel = new $this->relatedClass([]);
+        $table = $tempModel->getTableName();
+
+        // Check if model uses timestamps (via reflection to access static property)
+        $reflection = new \ReflectionClass($this->relatedClass);
+        $timestampsProperty = $reflection->getStaticPropertyValue('timestamps', true);
+        $hasTimestamps = $timestampsProperty ?? true;
+
+        // Prepare data with foreign key and timestamps
+        $preparedModels = [];
+        $now = $hasTimestamps ? date('Y-m-d H:i:s') : null;
+
+        foreach ($models as $attributes) {
+            // Set foreign key
+            $attributes[$this->foreignKey] = $parentKey;
+
+            // Add timestamps if enabled
+            if ($hasTimestamps) {
+                $attributes['created_at'] = $attributes['created_at'] ?? $now;
+                $attributes['updated_at'] = $attributes['updated_at'] ?? $now;
+            }
+
+            $preparedModels[] = $attributes;
+        }
+
+        // Get all unique columns from all models
+        $allColumns = [];
+        foreach ($preparedModels as $attributes) {
+            $allColumns = array_merge($allColumns, array_keys($attributes));
+        }
+        $columns = array_unique($allColumns);
+        sort($columns); // Consistent column order
+
+        // Prepare bulk insert
+        $values = [];
+        $placeholders = [];
+
+        foreach ($preparedModels as $attributes) {
+            $rowValues = [];
+            foreach ($columns as $column) {
+                $rowValues[] = $attributes[$column] ?? null;
+            }
+            $placeholders[] = '(' . implode(', ', array_fill(0, count($columns), '?')) . ')';
+            $values = array_merge($values, $rowValues);
+        }
+
+        // Bulk insert
+        $sql = "INSERT INTO `{$table}` (`" . implode('`, `', $columns) . "`) VALUES " . implode(', ', $placeholders);
+        $connection = $this->query->getConnection();
+        $connection->execute($sql, $values);
+
+        // Get inserted IDs (MySQL returns first inserted ID, subsequent IDs are sequential)
+        $lastInsertId = $connection->lastInsertId();
+        $firstId = (int) $lastInsertId;
+
+        // Validate that we got a valid ID
+        if ($firstId <= 0) {
+            // If lastInsertId failed, try to query the database for the inserted records
+            // This can happen in some edge cases
+            throw new \RuntimeException(
+                "Failed to get inserted ID from database. LastInsertId returned: {$lastInsertId}. " .
+                    "This might indicate the bulk insert failed or the table doesn't have an auto-increment column."
+            );
+        }
+
+        $insertedIds = range($firstId, $firstId + count($preparedModels) - 1);
+
+        // Hydrate models with IDs
+        $savedModels = [];
+        $modelReflection = new \ReflectionClass($this->relatedClass);
+
+        // Check if exists property exists (it's private in Model base class)
+        $hasExistsProperty = $modelReflection->hasProperty('exists');
+        $existsProperty = null;
+        if ($hasExistsProperty) {
+            $existsProperty = $modelReflection->getProperty('exists');
+            $existsProperty->setAccessible(true);
+        }
+
+        // Get syncOriginal method
+        $syncMethod = $modelReflection->getMethod('syncOriginal');
+        $syncMethod->setAccessible(true);
+
+        foreach ($insertedIds as $index => $id) {
+            $attributes = $preparedModels[$index];
+            $model = new $this->relatedClass($attributes);
+
+            // Set ID directly using setAttribute (bypasses mass assignment protection)
+            $model->setAttribute('id', $id);
+
+            // Set exists flag using reflection if property exists
+            if ($hasExistsProperty && $existsProperty !== null) {
+                $existsProperty->setValue($model, true);
+            }
+
+            // Sync original attributes (includes the ID we just set)
+            $syncMethod->invoke($model);
+
+            $savedModels[] = $model;
+        }
+
+        return new ModelCollection($savedModels);
+    }
+
+    /**
+     * Create multiple related models.
+     *
+     * Alias for saveMany() for Laravel compatibility.
+     *
+     * @param array<int, array<string, mixed>> $models Array of model attributes
+     * @return ModelCollection Collection of created models
+     */
+    public function createMany(array $models): ModelCollection
+    {
+        return $this->saveMany($models);
+    }
 }

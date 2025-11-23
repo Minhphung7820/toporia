@@ -86,12 +86,15 @@ class BelongsTo extends Relation
             $this->addConstraints();
         }
 
-        // Use getModels() if query is ModelQueryBuilder, otherwise use first()
+        // Use getModels() if query is ModelQueryBuilder
+        // For eager loading, we need to return the collection, not just first()
         if ($this->query instanceof \Toporia\Framework\Database\ORM\ModelQueryBuilder) {
             $collection = $this->query->getModels();
             if ($collection->isEmpty()) {
                 return null;
             }
+            // For single parent (non-eager), return first model
+            // For eager loading, the match() method will handle the collection
             return $collection->first();
         }
 
@@ -104,9 +107,19 @@ class BelongsTo extends Relation
         /** @var Model $model */
         $model = new $this->relatedClass($data);
 
-        // Set exists and sync original attributes
-        $model->setExists(true);
-        $model->syncOriginal();
+        // Set exists and sync original attributes using reflection
+        // (setExists() and syncOriginal() are protected methods)
+        $reflection = new \ReflectionClass($model);
+
+        // Set exists flag
+        $setExistsMethod = $reflection->getMethod('setExists');
+        $setExistsMethod->setAccessible(true);
+        $setExistsMethod->invoke($model, true);
+
+        // Sync original attributes
+        $syncMethod = $reflection->getMethod('syncOriginal');
+        $syncMethod->setAccessible(true);
+        $syncMethod->invoke($model);
 
         return $model;
     }

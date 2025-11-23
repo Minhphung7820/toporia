@@ -16,6 +16,7 @@ use Toporia\Framework\Database\ORM\ModelCollection;
  * ✅ Fixed: Added setEagerLoaded() helper method to DatabaseTestCase for proper eagerLoaded property access
  * ✅ Fixed: Replaced direct property access with getRelation() method calls
  * ✅ Fixed: All tests now use reflection helper to set eagerLoaded property correctly
+ * ✅ Fixed: Added setUp() method to reset static $eagerLoadDefaults property for test isolation
  *
  * Comprehensive tests for eager loading functionality:
  * - relationLoaded() method
@@ -35,6 +36,15 @@ use Toporia\Framework\Database\ORM\ModelCollection;
  */
 class HasEagerLoadingTest extends DatabaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Reset static eager load defaults before each test to ensure isolation
+        EagerLoadingTestUser::setEagerLoadDefaults([]);
+        AnotherEagerLoadingTestModel::setEagerLoadDefaults([]);
+    }
+
     protected function createTables(): void
     {
         // Create users table

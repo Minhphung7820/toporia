@@ -164,6 +164,69 @@ class ModelQueryBuilder extends QueryBuilder
         return new self($this->getConnection(), $this->modelClass);
     }
 
+    /**
+     * Get the first model from the query results.
+     *
+     * Laravel-style: When called from Model::with()->first(), delegates to Model::find()
+     * to ensure proper Model hydration and eager loading.
+     *
+     * @return array|null Array data or null (parent implementation)
+     */
+    public function first(): ?array
+    {
+        // Use parent implementation (returns array)
+        // Model::find() will handle eager loading via getModels()
+        return parent::first();
+    }
+
+    /**
+     * Find a model by its primary key.
+     *
+     * Laravel-style: When called from Model::with()->find(), uses getModels() to return Model.
+     * However, due to PHP strict types, we can't override with different return type.
+     * So we check for eager loading and use getModels() if needed, but return array for type compatibility.
+     * Model::find() will handle the conversion back to Model.
+     *
+     * @param int|string $id Primary key value
+     * @param string $column Column name (default: 'id')
+     * @return array|null Array data or null
+     * @phpstan-return TModel|array|null
+     */
+    public function find(int|string $id, string $column = 'id'): ?array
+    {
+        $eagerLoad = $this->getEagerLoad();
+
+        // Check if aggregates are configured (withCount, withSum, etc.)
+        // by checking if columns contain aggregate patterns
+        $hasAggregates = false;
+        $columns = $this->getColumns();
+        if (!empty($columns)) {
+            $columnsStr = implode(' ', $columns);
+            // Check for aggregate patterns: _count, _sum_, _avg_, _min_, _max_
+            $hasAggregates = preg_match('/_(count|sum_|avg_|min_|max_)/i', $columnsStr) === 1;
+        }
+
+        // If eager loading or aggregates are configured, use getModels() to return Model
+        if (!empty($eagerLoad) || $hasAggregates) {
+            $collection = $this->where($column, $id)->getModels();
+            $model = $collection->first();
+
+            if ($model === null) {
+                return null;
+            }
+
+            // Return Model instance wrapped in array-like structure
+            // Model::find() will detect this and return the Model directly
+            // We use a special marker to indicate this is a Model, not a plain array
+            return ['_model_instance' => $model];
+        }
+
+        // Otherwise, use parent implementation (returns array)
+        return parent::find($id, $column);
+    }
+
+
+
     // =========================================================================
     // RELATIONSHIP QUERY METHODS
     // =========================================================================

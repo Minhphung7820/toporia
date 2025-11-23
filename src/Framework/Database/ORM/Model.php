@@ -487,19 +487,61 @@ abstract class Model implements ModelInterface, ObservableInterface
      * @param int|string $id Primary key value.
      * @return static|null The hydrated model or null if not found.
      */
+    /**
+     * Find a model by its primary key.
+     *
+     * Laravel-style implementation:
+     * - When called directly: Model::find($id) - uses standard query
+     * - When called via query builder: Model::with()->find($id) - uses ModelQueryBuilder which returns Model
+     *
+     * @param int|string $id Primary key value
+     * @return static|null Model instance or null
+     */
     public static function find(int|string $id): ?static
     {
-        $data = static::query()->find($id, static::$primaryKey);
+        $query = static::query();
+        $eagerLoad = $query->getEagerLoad();
+
+        // If there's eager loading configured (e.g., from with(), withCount()), use getModels()
+        if (!empty($eagerLoad)) {
+            $collection = $query->where(static::$primaryKey, $id)->getModels();
+            $model = $collection->first();
+
+            if ($model === null) {
+                return null;
+            }
+
+            /** @var static $model */
+            return $model;
+        }
+
+        // Standard find() without eager loading
+        $data = $query->where(static::$primaryKey, $id)->first();
 
         if ($data === null) {
             return null;
         }
 
-        $model = new static($data);
-        $model->exists = true;
-        $model->syncOriginal();
+        // Check if data is a Model wrapped in array (from ModelQueryBuilder::find() with eager loading)
+        if (is_array($data) && isset($data['_model_instance']) && $data['_model_instance'] instanceof static) {
+            return $data['_model_instance'];
+        }
 
-        return $model;
+        // If data is already a Model (shouldn't happen, but handle it), return it directly
+        if ($data instanceof static) {
+            return $data;
+        }
+
+        // Otherwise, hydrate from array (standard case: Model::find())
+        if (is_array($data)) {
+            $model = new static($data);
+            $model->exists = true;
+            $model->syncOriginal();
+            return $model;
+        }
+
+        // Fallback: should not happen, but handle it
+        return null;
     }
 
     /**
@@ -1842,6 +1884,69 @@ abstract class Model implements ModelInterface, ObservableInterface
     }
 
     /**
+     * Add a subselect count of a relationship to the query.
+     *
+     * @param string|array $relations Relationship name(s) or associative array with callbacks
+     * @return ModelQueryBuilder
+     */
+    public static function withCount(string|array $relations): ModelQueryBuilder
+    {
+        return static::query()->withCount($relations);
+    }
+
+    /**
+     * Add a subselect sum of a relationship column to the query.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to sum
+     * @param callable|null $callback Optional callback to constrain the sum
+     * @return ModelQueryBuilder
+     */
+    public static function withSum(string $relation, string $column, ?callable $callback = null): ModelQueryBuilder
+    {
+        return static::query()->withSum($relation, $column, $callback);
+    }
+
+    /**
+     * Add a subselect average of a relationship column to the query.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to average
+     * @param callable|null $callback Optional callback to constrain the average
+     * @return ModelQueryBuilder
+     */
+    public static function withAvg(string $relation, string $column, ?callable $callback = null): ModelQueryBuilder
+    {
+        return static::query()->withAvg($relation, $column, $callback);
+    }
+
+    /**
+     * Add a subselect minimum of a relationship column to the query.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to find minimum
+     * @param callable|null $callback Optional callback to constrain
+     * @return ModelQueryBuilder
+     */
+    public static function withMin(string $relation, string $column, ?callable $callback = null): ModelQueryBuilder
+    {
+        return static::query()->withMin($relation, $column, $callback);
+    }
+
+    /**
+     * Add a subselect maximum of a relationship column to the query.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to find maximum
+     * @param callable|null $callback Optional callback to constrain
+     * @return ModelQueryBuilder
+     */
+    public static function withMax(string $relation, string $column, ?callable $callback = null): ModelQueryBuilder
+    {
+        return static::query()->withMax($relation, $column, $callback);
+    }
+
+    /**
      * Normalize eager load relations into consistent format.
      *
      * Converts all input formats into: ['relation' => callback|null, ...]
@@ -1903,6 +2008,10 @@ abstract class Model implements ModelInterface, ObservableInterface
      */
     public static function eagerLoadRelations(ModelCollection $models, array $relations): void
     {
+        if ($models->isEmpty()) {
+            return;
+        }
+
         foreach ($relations as $relationSpec => $constraint) {
             // Determine relation name and constraint type
             if (is_callable($constraint)) {
@@ -1910,11 +2019,21 @@ abstract class Model implements ModelInterface, ObservableInterface
                 $name = $relationSpec;
                 $callback = $constraint;
                 $columns = null;
+                $nested = null;
             } else {
-                // Format: 'childrens' or 'childrens:id,title'
+                // Format: 'childrens' or 'childrens:id,title' or 'childrens.comments'
                 $name = is_string($relationSpec) ? $relationSpec : $constraint;
-                [$name, $columns] = static::parseRelationSpec($name);
-                $callback = null;
+
+                // Check for nested relations (e.g., 'posts.comments')
+                if (str_contains($name, '.')) {
+                    [$name, $nested] = explode('.', $name, 2);
+                    $columns = null;
+                    $callback = null;
+                } else {
+                    [$name, $columns] = static::parseRelationSpec($name);
+                    $nested = null;
+                    $callback = null;
+                }
             }
 
             // Get a model instance to build the relation
@@ -1936,24 +2055,116 @@ abstract class Model implements ModelInterface, ObservableInterface
                 continue;
             }
 
+            // For eager loading, we need a fresh query builder without parent constraints
+            // Get the related model class and create a fresh query from it
+            $relatedModelClass = static::getRelatedModelClass($relation);
+
+            if ($relatedModelClass === null) {
+                continue;
+            }
+
+            // Get relation parameters using reflection
+            $reflection = new \ReflectionClass($relation);
+
+            $foreignKeyProp = $reflection->getProperty('foreignKey');
+            $foreignKeyProp->setAccessible(true);
+            $localKeyProp = $reflection->getProperty('localKey');
+            $localKeyProp->setAccessible(true);
+
+            $foreignKey = $foreignKeyProp->getValue($relation);
+            $localKey = $localKeyProp->getValue($relation);
+
+            // Create fresh query builder from related model (includes table name)
+            $freshQuery = $relatedModelClass::query();
+
+            // Create a dummy parent model (won't be used for constraints in eager loading)
+            $modelClass = get_class($model);
+            $dummyParent = new $modelClass([]);
+
+            // Create fresh relation instance with fresh query
+            // Note: Constructor will call addConstraints() which adds WHERE for single parent
+            // We'll replace the query with a completely fresh one to remove that constraint
+            $relationClass = get_class($relation);
+            $eagerRelation = new $relationClass($freshQuery, $dummyParent, $relatedModelClass, $foreignKey, $localKey);
+
+            // Create a completely fresh query (with table set) to remove all constraints from constructor
+            $completelyFreshQuery = $relatedModelClass::query();
+            $queryProp = $reflection->getProperty('query');
+            $queryProp->setAccessible(true);
+            $queryProp->setValue($eagerRelation, $completelyFreshQuery);
+
             // Apply callback constraints if provided
             if ($callback !== null) {
-                $callback($relation->getQuery());
+                $callback($eagerRelation->getQuery());
             }
 
             // Apply column selection if specified
             if ($columns !== null) {
-                static::applyColumnSelection($relation, $columns);
+                static::applyColumnSelection($eagerRelation, $columns);
             }
 
             // Load the relation for all models
             $modelsArray = $models->all();
-            $relation->addEagerConstraints($modelsArray);
-            $results = $relation->getResults();
+            $eagerRelation->addEagerConstraints($modelsArray);
+
+            // Get results - for BelongsTo, getResults() returns a single model
+            // For eager loading, we need to get all results as a collection
+            $relationQuery = $eagerRelation->getQuery();
+            if ($relationQuery instanceof ModelQueryBuilder) {
+                // Use getModels() to get collection for eager loading
+                $results = $relationQuery->getModels();
+            } else {
+                // Fallback to getResults() for non-ModelQueryBuilder queries
+                $singleResult = $eagerRelation->getResults();
+                $results = $singleResult instanceof Model
+                    ? new ModelCollection([$singleResult])
+                    : new ModelCollection([]);
+            }
 
             // Match results to parent models
-            $relation->match($modelsArray, $results, $name);
+            $eagerRelation->match($modelsArray, $results, $name);
+
+            // If nested relations exist, recursively eager load them
+            if ($nested !== null && $results instanceof ModelCollection && !$results->isEmpty()) {
+                // Get the related model class from the relation
+                $relatedModelClass = static::getRelatedModelClass($relation);
+                if ($relatedModelClass !== null) {
+                    // Recursively eager load nested relations
+                    $relatedModelClass::eagerLoadRelations($results, [$nested => null]);
+                }
+            }
         }
+    }
+
+    /**
+     * Get the related model class from a relation instance.
+     *
+     * @param RelationInterface $relation
+     * @return class-string<Model>|null
+     */
+    protected static function getRelatedModelClass(RelationInterface $relation): ?string
+    {
+        // Use reflection to get the relatedClass property
+        $reflection = new \ReflectionClass($relation);
+
+        // Try to get relatedClass property (HasMany, BelongsTo, etc.)
+        if ($reflection->hasProperty('relatedClass')) {
+            $property = $reflection->getProperty('relatedClass');
+            $property->setAccessible(true);
+            return $property->getValue($relation);
+        }
+
+        // For BelongsTo, try to get the related property
+        if ($reflection->hasProperty('related')) {
+            $property = $reflection->getProperty('related');
+            $property->setAccessible(true);
+            $related = $property->getValue($relation);
+            if (is_string($related)) {
+                return $related;
+            }
+        }
+
+        return null;
     }
 
     /**

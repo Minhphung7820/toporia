@@ -88,7 +88,25 @@ trait HasEagerLoading
     {
         $grouped = [];
 
-        foreach ($relations as $relationName) {
+        foreach ($relations as $key => $value) {
+            // Handle normalized format: ['relation' => callback|null]
+            $relationName = is_string($key) ? $key : $value;
+
+            // Skip if relationName is not a string
+            if (!is_string($relationName)) {
+                continue;
+            }
+
+            // Handle nested relations (e.g., 'posts.comments')
+            // For now, only handle first level (nested will be handled separately)
+            $parts = explode('.', $relationName, 2);
+            $relationName = $parts[0];
+
+            // Skip if already grouped
+            if (isset($grouped[$relationName])) {
+                continue;
+            }
+
             // Get relationship instance from first model
             $firstModel = $models->first();
             if (!$firstModel || !method_exists($firstModel, $relationName)) {
@@ -126,16 +144,57 @@ trait HasEagerLoading
         // Get first relation instance to determine type
         $firstRelation = $relationInstances[0];
 
-        // Batch load based on relationship type
-        $results = $firstRelation->eagerLoad($models->toArray());
+        // Create a fresh query builder for eager loading to avoid side effects
+        $originalQuery = $firstRelation->getQuery();
+        $freshQuery = $originalQuery->newQuery();
 
-        // Set results on models
-        foreach ($models as $index => $model) {
-            if (isset($results[$index])) {
-                // Use Model's setRelation method (returns self, but we ignore return value)
-                $model->setRelation($relationName, $results[$index]);
-                $model->eagerLoaded[$relationName] = true;
+        // Create a new relation instance with fresh query
+        $reflection = new \ReflectionClass($firstRelation);
+        $parentProp = $reflection->getProperty('parent');
+        $parentProp->setAccessible(true);
+        $parentModel = $parentProp->getValue($firstRelation);
+
+        $relatedClassProp = $reflection->getProperty('relatedClass');
+        $relatedClassProp->setAccessible(true);
+        $relatedModelClass = $relatedClassProp->getValue($firstRelation);
+
+        $foreignKey = $firstRelation->getForeignKey();
+        $localKey = $firstRelation->getLocalKey();
+
+        // Create new relation instance for eager loading
+        // Note: Constructor will call addConstraints() which adds WHERE for parent model
+        // We need to reset the query after construction to remove parent constraints
+        $eagerRelation = new (get_class($firstRelation))($freshQuery, $parentModel, $relatedModelClass, $foreignKey, $localKey);
+
+        // Get fresh query from relation (it may have been modified by constructor)
+        $eagerQuery = $eagerRelation->getQuery();
+
+        // Reset query to remove constraints added by constructor (parent model constraint)
+        // We only want eager constraints (WHERE IN for multiple models)
+        $resetQuery = $eagerQuery->newQuery();
+
+        // Update relation's query to use reset query
+        $queryProp = $reflection->getProperty('query');
+        $queryProp->setAccessible(true);
+        $queryProp->setValue($eagerRelation, $resetQuery);
+
+        // Add eager constraints to query (this will add WHERE IN clause for multiple models)
+        $eagerRelation->addEagerConstraints($models->toArray());
+
+        // Execute query to get all related models
+        $results = $eagerRelation->getResults();
+
+        // Match results to parent models (this already sets relations on models)
+        $matched = $eagerRelation->match($models->toArray(), $results, $relationName);
+
+        // Set eagerLoaded flag on models (match() already set the relation)
+        foreach ($models as $model) {
+            // match() already called setRelation(), so relation is loaded
+            // Set eagerLoaded flag to indicate this was eager loaded
+            if (!isset($model->eagerLoaded)) {
+                $model->eagerLoaded = [];
             }
+            $model->eagerLoaded[$relationName] = true;
         }
     }
 
