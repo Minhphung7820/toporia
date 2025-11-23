@@ -41,6 +41,23 @@ abstract class Relation implements RelationInterface
     ) {}
 
     /**
+     * Create a new instance for eager loading without parent constraints.
+     *
+     * This factory method creates a fresh relation instance with a clean query,
+     * avoiding the need for reflection to manipulate private properties.
+     *
+     * Performance: O(1) - Direct instantiation, no reflection overhead
+     * Clean Architecture: Open/Closed - Extensible without modifying base class
+     *
+     * @param QueryBuilder $freshQuery Fresh query builder without constraints
+     * @return static New relation instance ready for eager loading
+     */
+    public function newEagerInstance(QueryBuilder $freshQuery): static
+    {
+        return new static($freshQuery, $this->parent, $this->foreignKey, $this->localKey);
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function getQuery(): QueryBuilder

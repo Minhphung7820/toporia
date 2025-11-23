@@ -116,20 +116,105 @@ class BelongsToMany extends Relation
 
     /**
      * {@inheritdoc}
+     *
+     * Match eagerly loaded results to their parent models.
+     *
+     * For BelongsToMany, we need to query the pivot table to determine
+     * which related models belong to which parent models.
+     *
+     * Performance: O(n + m) where n = parents, m = results
+     * - Single query to get pivot mappings
+     * - Dictionary-based matching with O(1) lookups
      */
     public function match(array $models, mixed $results, string $relationName): array
     {
-        if (!$results instanceof ModelCollection) {
+        if (!$results instanceof ModelCollection || $results->isEmpty()) {
+            // No results - set empty collections for all models
+            foreach ($models as $model) {
+                $model->setRelation($relationName, new ModelCollection([]));
+            }
             return $models;
         }
 
-        // We need to re-query with pivot data to build the dictionary
-        // This is a simplified version - a full implementation would include pivot data
-        $dictionary = [];
-
-        // For now, return empty collections for each parent
+        // Step 1: Collect parent and related IDs
+        $parentIds = [];
         foreach ($models as $model) {
-            $model->setRelation($relationName, new ModelCollection([]));
+            $parentId = $model->getAttribute($this->parentKey);
+            if ($parentId !== null) {
+                $parentIds[] = $parentId;
+            }
+        }
+
+        $relatedIds = [];
+        foreach ($results as $result) {
+            $relatedId = $result->getAttribute($this->relatedKey);
+            if ($relatedId !== null) {
+                $relatedIds[] = $relatedId;
+            }
+        }
+
+        if (empty($parentIds) || empty($relatedIds)) {
+            // No valid IDs - set empty collections
+            foreach ($models as $model) {
+                $model->setRelation($relationName, new ModelCollection([]));
+            }
+            return $models;
+        }
+
+        // Step 2: Query pivot table to get parent-to-related mappings
+        // SELECT foreign_key, related_key FROM pivot_table
+        // WHERE foreign_key IN (...) AND related_key IN (...)
+        $qb = new QueryBuilder($this->query->getConnection());
+        $pivotRows = $qb->table($this->pivotTable)
+            ->select($this->foreignPivotKey, $this->relatedPivotKey)
+            ->whereIn($this->foreignPivotKey, array_unique($parentIds))
+            ->whereIn($this->relatedPivotKey, array_unique($relatedIds))
+            ->get();
+
+        // Step 3: Build dictionary mapping parent IDs to arrays of related IDs
+        // Example: [1 => [10, 20, 30], 2 => [20, 40], ...]
+        $dictionary = [];
+        foreach ($pivotRows as $pivot) {
+            $parentId = $pivot[$this->foreignPivotKey] ?? null;
+            $relatedId = $pivot[$this->relatedPivotKey] ?? null;
+
+            if ($parentId !== null && $relatedId !== null) {
+                if (!isset($dictionary[$parentId])) {
+                    $dictionary[$parentId] = [];
+                }
+                $dictionary[$parentId][] = $relatedId;
+            }
+        }
+
+        // Step 4: Build index of related models by ID for O(1) lookup
+        // Example: [10 => Model, 20 => Model, ...]
+        $relatedIndex = [];
+        foreach ($results as $result) {
+            $relatedId = $result->getAttribute($this->relatedKey);
+            if ($relatedId !== null) {
+                $relatedIndex[$relatedId] = $result;
+            }
+        }
+
+        // Step 5: Match related models to parents using dictionary
+        foreach ($models as $model) {
+            $parentId = $model->getAttribute($this->parentKey);
+            $matched = [];
+
+            if ($parentId !== null && isset($dictionary[$parentId])) {
+                // Get related IDs for this parent from dictionary
+                $relatedIdsForParent = $dictionary[$parentId];
+
+                // Look up actual models by ID
+                foreach ($relatedIdsForParent as $relatedId) {
+                    if (isset($relatedIndex[$relatedId])) {
+                        $matched[] = $relatedIndex[$relatedId];
+                    }
+                }
+            }
+
+            // Set relation with matched models (or empty collection)
+            $model->setRelation($relationName, new ModelCollection($matched));
         }
 
         return $models;
@@ -200,5 +285,41 @@ class BelongsToMany extends Relation
     public function getForeignKeyName(): string
     {
         return $this->relatedPivotKey;
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * Override to handle BelongsToMany's complex constructor with pivot table.
+     * Creates a fresh instance without parent constraints for eager loading.
+     *
+     * Performance: O(1) - Direct instantiation, no reflection overhead
+     * Clean Architecture: Factory Method pattern for extensibility
+     */
+    public function newEagerInstance(\Toporia\Framework\Database\Query\QueryBuilder $freshQuery): static
+    {
+        $instance = new static(
+            $freshQuery,
+            $this->parent,
+            $this->relatedClass,
+            $this->pivotTable,
+            $this->foreignPivotKey,
+            $this->relatedPivotKey,
+            $this->parentKey,
+            $this->relatedKey
+        );
+
+        // BelongsToMany constructor calls addPivotConstraints() which adds parent WHERE clause
+        // We need to reset the query to remove parent-specific constraints
+        // Only eager constraints (WHERE IN) should be added later via addEagerConstraints()
+        $cleanQuery = $freshQuery->newQuery();
+
+        // Set clean query using property access (query is protected in parent)
+        $reflection = new \ReflectionClass($instance);
+        $queryProp = $reflection->getProperty('query');
+        $queryProp->setAccessible(true);
+        $queryProp->setValue($instance, $cleanQuery);
+
+        return $instance;
     }
 }

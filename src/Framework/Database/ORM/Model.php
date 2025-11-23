@@ -203,6 +203,27 @@ abstract class Model implements ModelInterface, ObservableInterface
     private static array $booted = [];
 
     /**
+     * Prevent lazy loading of relationships (throws exception on N+1 queries).
+     *
+     * When enabled, accessing a relationship that wasn't eager loaded will throw
+     * an exception instead of silently executing a query.
+     *
+     * This helps detect N+1 query problems during development.
+     *
+     * Usage:
+     * - Enable globally: Model::preventLazyLoading(true);
+     * - Disable: Model::preventLazyLoading(false);
+     * - Check status: Model::preventsLazyLoading();
+     *
+     * Performance Impact:
+     * - DEVELOPMENT: Enable to catch N+1 queries early
+     * - PRODUCTION: Disable for graceful degradation
+     *
+     * @var bool
+     */
+    private static bool $preventLazyLoading = false;
+
+    /**
      * Boot the model and all its traits.
      *
      * Automatically calls boot{TraitName} methods for all used traits.
@@ -309,6 +330,38 @@ abstract class Model implements ModelInterface, ObservableInterface
     public static function setConnection(ConnectionInterface $connection): void
     {
         self::$defaultConnection = $connection;
+    }
+
+    /**
+     * Enable or disable lazy loading prevention globally.
+     *
+     * When enabled, accessing a relationship that wasn't eager loaded will throw
+     * an exception instead of silently executing a query, helping detect N+1 queries.
+     *
+     * Best Practice:
+     * - Enable in development/testing: Model::preventLazyLoading(env('APP_ENV') !== 'production');
+     * - Disable in production for graceful degradation
+     *
+     * Performance:
+     * - No runtime overhead when disabled (static flag check is O(1))
+     * - Helps catch expensive N+1 queries during development
+     *
+     * @param bool $prevent Whether to prevent lazy loading
+     * @return void
+     */
+    public static function preventLazyLoading(bool $prevent = true): void
+    {
+        self::$preventLazyLoading = $prevent;
+    }
+
+    /**
+     * Check if lazy loading prevention is enabled.
+     *
+     * @return bool True if lazy loading is prevented
+     */
+    public static function preventsLazyLoading(): bool
+    {
+        return self::$preventLazyLoading;
     }
 
     /**
@@ -1343,12 +1396,43 @@ abstract class Model implements ModelInterface, ObservableInterface
 
     /**
      * Magic getter: checks relations first, then proxies to getAttribute().
+     *
+     * Lazy Loading Prevention:
+     * If preventLazyLoading is enabled and a relationship method exists but
+     * wasn't eager loaded, throws an exception to prevent N+1 queries.
+     *
+     * @throws \RuntimeException When lazy loading is prevented
      */
     public function __get(string $key): mixed
     {
         // Check if it's a loaded relationship first
         if (array_key_exists($key, $this->relations)) {
             return $this->relations[$key];
+        }
+
+        // Check if accessing an unloaded relationship when lazy loading is prevented
+        if (static::$preventLazyLoading && method_exists($this, $key)) {
+            // Check if it's a relationship method by calling it
+            try {
+                $relation = $this->$key();
+                if ($relation instanceof RelationInterface) {
+                    throw new \RuntimeException(
+                        sprintf(
+                            'Attempted to lazy load [%s] on model [%s] but lazy loading is disabled. ' .
+                            'Use eager loading instead: %s::with(\'%s\')->get()',
+                            $key,
+                            static::class,
+                            static::class,
+                            $key
+                        )
+                    );
+                }
+            } catch (\RuntimeException $e) {
+                // Re-throw lazy loading exceptions
+                throw $e;
+            } catch (\Throwable $e) {
+                // Not a relationship method, continue normally
+            }
         }
 
         return $this->getAttribute($key);
