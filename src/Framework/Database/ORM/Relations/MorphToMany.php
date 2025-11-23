@@ -299,7 +299,7 @@ class MorphToMany extends Relation
         $ids = is_array($ids) ? $ids : [$ids];
 
         foreach ($ids as $id) {
-            $connection = $this->parent::getConnection();
+            $connection = $this->query->getConnection();
             $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
 
             $query->table($this->pivotTable)->insert([
@@ -320,7 +320,7 @@ class MorphToMany extends Relation
      */
     public function detach(mixed $ids = null): int
     {
-        $connection = $this->parent::getConnection();
+        $connection = $this->query->getConnection();
         $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
 
         $query->table($this->pivotTable)

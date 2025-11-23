@@ -39,12 +39,14 @@ class ModelCollection extends Collection
    * Find the first model with a matching primary key.
    *
    * @param int|string $key
-   * @return T|null
+   * @return Model|null
    */
   public function find(int|string $key): ?Model
   {
     foreach ($this->all() as $m) {
-      if ($m->getKey() === $key) return $m;
+      if ($m instanceof Model && $m->getKey() === $key) {
+        return $m;
+      }
     }
     return null;
   }

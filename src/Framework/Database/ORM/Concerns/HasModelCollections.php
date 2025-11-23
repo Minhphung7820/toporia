@@ -32,6 +32,9 @@ namespace Toporia\Framework\Database\ORM\Concerns;
  * @since       2025-01-22
  *
  * @link        https://github.com/Minhphung7820/toporia
+ *
+ * @property-read bool $timestamps
+ * @property-read string $table
  */
 trait HasModelCollections
 {
@@ -255,6 +258,7 @@ trait HasModelCollections
      */
     public function touch(): bool
     {
+        // @phpstan-ignore-next-line - Property exists in Model class
         if (!static::$timestamps) {
             return false;
         }
@@ -317,7 +321,7 @@ trait HasModelCollections
      */
     public function getTable(): string
     {
-        return static::$table;
+        return static::getTableName();
     }
 
     /**
