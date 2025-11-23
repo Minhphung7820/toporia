@@ -7,6 +7,7 @@ namespace Tests\Unit\Database\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Grammar\MySQLGrammar;
 use PDO;
 
 /**
@@ -31,7 +32,7 @@ use PDO;
  * - Mocked PDO (no real database)
  * - O(1) test execution
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @author `Phungtruong7820` <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     1.0.0
@@ -58,6 +59,10 @@ class MutationQueryTest extends TestCase
         $this->pdo->method('quote')
             ->willReturnCallback(fn($value) => "'" . addslashes((string)$value) . "'");
 
+        // Add Grammar mock for SQL compilation
+        $grammar = new \Toporia\Framework\Database\Grammar\MySQLGrammar();
+        $connection->method('getGrammar')->willReturn($grammar);
+
         $connection->method('getPdo')->willReturn($this->pdo);
 
         return $connection;
@@ -78,7 +83,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('execute')
             ->with(
-                $this->stringContains('INSERT INTO users'),
+                $this->stringContains('INSERT INTO `users`'),
                 $this->equalTo(['John Doe', 'john@example.com', 30])
             );
 
@@ -106,7 +111,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('execute')
             ->with(
-                $this->stringContains('INSERT INTO users (name, email, status) VALUES (?, ?, ?)'),
+                $this->stringContains('INSERT INTO `users` (`name`, `email`, `status`) VALUES (?, ?, ?)'),
                 $this->equalTo(array_values($data))
             );
 
@@ -153,7 +158,7 @@ class MutationQueryTest extends TestCase
         $this->query->insert($data);
     }
 
-    // ==================== UPDATE Tests ====================
+    // ==================== UPDATE `Tests` ====================
 
     public function test_update_all_rows(): void
     {
@@ -163,7 +168,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('UPDATE users SET status = ?'),
+                $this->stringContains('UPDATE `users` SET `status` = ?'),
                 $this->equalTo(['inactive'])
             )
             ->willReturn(10);
@@ -181,7 +186,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('UPDATE users SET status = ? WHERE id = ?'),
+                $this->stringContains('UPDATE `users` SET `status` = ? WHERE `id` = ?'),
                 $this->equalTo(['active', 1])
             )
             ->willReturn(1);
@@ -203,7 +208,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('UPDATE users SET name = ?, email = ?, status = ?'),
+                $this->stringContains('UPDATE `users` SET `name` = ?, `email` = ?, `status` = ?'),
                 $this->callback(function ($bindings) {
                     return $bindings[0] === 'Updated Name'
                         && $bindings[1] === 'updated@example.com'
@@ -226,7 +231,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('WHERE status = ? AND age > ?'),
+                $this->stringContains('WHERE `status` = ? AND `age` > ?'),
                 $this->callback(function ($bindings) {
                     return $bindings[0] === true
                         && $bindings[1] === 'active'
@@ -379,7 +384,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->equalTo('DELETE FROM users'),
+                $this->equalTo('DELETE FROM `users`'),
                 $this->equalTo([])
             )
             ->willReturn(100);
@@ -395,7 +400,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('DELETE FROM users WHERE id = ?'),
+                $this->stringContains('DELETE FROM `users` WHERE `id` = ?'),
                 $this->equalTo([1])
             )
             ->willReturn(1);
@@ -411,7 +416,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('WHERE status = ? AND created_at < ?'),
+                $this->stringContains('WHERE `status` = ? AND `created_at` < ?'),
                 $this->equalTo(['inactive', '2025-01-01'])
             )
             ->willReturn(50);
@@ -430,7 +435,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('WHERE id IN (?, ?, ?, ?, ?)'),
+                $this->stringContains('WHERE `id` IN (?, ?, ?, ?, ?)'),
                 $this->equalTo([1, 2, 3, 4, 5])
             )
             ->willReturn(5);
@@ -446,7 +451,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('WHERE deleted_at IS NOT NULL'),
+                $this->stringContains('WHERE `deleted_at` IS NOT NULL'),
                 $this->equalTo([])
             )
             ->willReturn(10);
@@ -464,8 +469,8 @@ class MutationQueryTest extends TestCase
         $this->assertTrue(method_exists($this->query, 'updateOrInsert'));
     }
 
-    // Note: Full integration tests for updateOrInsert are in Integration tests
-    // as they require actual database connection to properly test SELECT + INSERT/UPDATE flow
+    // Note: Full integration tests for `updateOr` Insert are in Integration tests
+    // as they require actual database connection to properly test SELECT + INSERT/UPDATE `flow`
 
     // ==================== Edge Cases ====================
 
@@ -475,7 +480,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->never())
             ->method('affectingStatement');
 
-        // Empty update should not execute
+        // Empty update `should` not execute
         // This depends on implementation - some frameworks throw exception,
         // others return 0
     }
@@ -556,7 +561,7 @@ class MutationQueryTest extends TestCase
 
     public function test_increment_is_atomic(): void
     {
-        // Increment should generate single UPDATE with column = column + ?
+        // Increment should generate single UPDATE `with` column = column + ?
         $this->connection
             ->expects($this->once())
             ->method('affectingStatement')
@@ -571,7 +576,7 @@ class MutationQueryTest extends TestCase
 
     public function test_decrement_is_atomic(): void
     {
-        // Decrement should generate single UPDATE with column = column - ?
+        // Decrement should generate single UPDATE `with` column = column - ?
         $this->connection
             ->expects($this->once())
             ->method('affectingStatement')
@@ -597,7 +602,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('execute')
             ->with(
-                $this->stringContains('INSERT INTO users (name, email) VALUES (?, ?)'),
+                $this->stringContains('INSERT INTO `users` (`name`, `email`) VALUES (?, ?)'),
                 $this->equalTo(["'; DROP TABLE users; --", 'malicious@example.com'])
             );
 
@@ -617,7 +622,7 @@ class MutationQueryTest extends TestCase
             ->expects($this->once())
             ->method('affectingStatement')
             ->with(
-                $this->stringContains('UPDATE users SET name = ? WHERE id = ?'),
+                $this->stringContains('UPDATE `users` SET `name` = ? WHERE `id` = ?'),
                 $this->equalTo(["' OR '1'='1", 1])
             )
             ->willReturn(1);

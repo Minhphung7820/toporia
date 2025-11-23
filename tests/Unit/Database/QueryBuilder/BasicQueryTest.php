@@ -7,6 +7,7 @@ namespace Tests\Unit\Database\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Grammar\MySQLGrammar;
 use PDO;
 
 /**
@@ -32,7 +33,7 @@ use PDO;
  * - Mock PDO for fast tests (no real DB)
  * - O(1) test execution time
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @author `Phungtruong7820` <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     1.0.0
@@ -64,6 +65,10 @@ class BasicQueryTest extends TestCase
         $pdo->method('quote')
             ->willReturnCallback(fn($value) => "'" . addslashes((string)$value) . "'");
 
+        // Add Grammar mock for SQL compilation
+        $grammar = new \Toporia\Framework\Database\Grammar\MySQLGrammar();
+        $connection->method('getGrammar')->willReturn($grammar);
+
         $connection->method('getPdo')->willReturn($pdo);
 
         return $connection;
@@ -76,14 +81,14 @@ class BasicQueryTest extends TestCase
         $sql = $this->query->toSql();
 
         $this->assertStringContainsString('SELECT *', $sql);
-        $this->assertStringContainsString('FROM users', $sql);
+        $this->assertStringContainsString('FROM `users`', $sql);
     }
 
     public function test_select_single_column(): void
     {
         $sql = $this->query->select('id')->toSql();
 
-        $this->assertStringContainsString('SELECT id', $sql);
+        $this->assertStringContainsString('SELECT `id`', $sql);
         $this->assertStringNotContainsString('*', $sql);
     }
 
@@ -91,21 +96,21 @@ class BasicQueryTest extends TestCase
     {
         $sql = $this->query->select(['id', 'name', 'email'])->toSql();
 
-        $this->assertStringContainsString('SELECT id, name, email', $sql);
+        $this->assertStringContainsString('SELECT `id`, `name`, `email`', $sql);
     }
 
     public function test_select_multiple_columns_varargs(): void
     {
         $sql = $this->query->select('id', 'name', 'email')->toSql();
 
-        $this->assertStringContainsString('SELECT id, name, email', $sql);
+        $this->assertStringContainsString('SELECT `id`, `name`, `email`', $sql);
     }
 
     public function test_select_distinct(): void
     {
         $sql = $this->query->distinct()->select('status')->toSql();
 
-        $this->assertStringContainsString('SELECT DISTINCT status', $sql);
+        $this->assertStringContainsString('SELECT DISTINCT `status`', $sql);
     }
 
     public function test_select_raw_expression(): void
@@ -125,13 +130,13 @@ class BasicQueryTest extends TestCase
         $this->assertContains('Mr. ', $bindings);
     }
 
-    // ==================== WHERE Tests ====================
+    // ==================== WHERE `Tests` ====================
 
     public function test_where_basic_equals(): void
     {
         $sql = $this->query->where('status', 'active')->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
         $this->assertEquals(['active'], $this->query->getBindings());
     }
 
@@ -139,7 +144,7 @@ class BasicQueryTest extends TestCase
     {
         $sql = $this->query->where('age', '>', 18)->toSql();
 
-        $this->assertStringContainsString('WHERE age > ?', $sql);
+        $this->assertStringContainsString('WHERE `age` > ?', $sql);
         $this->assertEquals([18], $this->query->getBindings());
     }
 
@@ -151,9 +156,9 @@ class BasicQueryTest extends TestCase
             ->where('country', 'US')
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
-        $this->assertStringContainsString('AND age >= ?', $sql);
-        $this->assertStringContainsString('AND country = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
+        $this->assertStringContainsString('AND `age` >= ?', $sql);
+        $this->assertStringContainsString('AND `country` = ?', $sql);
         $this->assertEquals(['active', 18, 'US'], $this->query->getBindings());
     }
 
@@ -164,8 +169,8 @@ class BasicQueryTest extends TestCase
             ->orWhere('role', 'admin')
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
-        $this->assertStringContainsString('OR role = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
+        $this->assertStringContainsString('OR `role` = ?', $sql);
         $this->assertEquals(['active', 'admin'], $this->query->getBindings());
     }
 
@@ -173,7 +178,7 @@ class BasicQueryTest extends TestCase
     {
         $sql = $this->query->whereIn('id', [1, 2, 3, 4, 5])->toSql();
 
-        $this->assertStringContainsString('WHERE id IN (?, ?, ?, ?, ?)', $sql);
+        $this->assertStringContainsString('WHERE `id` IN (?, ?, ?, ?, ?)', $sql);
         $this->assertEquals([1, 2, 3, 4, 5], $this->query->getBindings());
     }
 
@@ -190,7 +195,7 @@ class BasicQueryTest extends TestCase
     {
         $sql = $this->query->whereNull('deleted_at')->toSql();
 
-        $this->assertStringContainsString('WHERE deleted_at IS NULL', $sql);
+        $this->assertStringContainsString('WHERE `deleted_at` IS NULL', $sql);
         $this->assertEmpty($this->query->getBindings());
     }
 
@@ -198,7 +203,7 @@ class BasicQueryTest extends TestCase
     {
         $sql = $this->query->whereNotNull('email_verified_at')->toSql();
 
-        $this->assertStringContainsString('WHERE email_verified_at IS NOT NULL', $sql);
+        $this->assertStringContainsString('WHERE `email_verified_at` IS NOT NULL', $sql);
         $this->assertEmpty($this->query->getBindings());
     }
 
@@ -222,8 +227,8 @@ class BasicQueryTest extends TestCase
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
-        $this->assertStringContainsString('AND (age > ? OR verified = ?)', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
+        $this->assertStringContainsString('AND (`age` > ? OR `verified` = ?)', $sql);
         $this->assertEquals(['active', 18, true], $this->query->getBindings());
     }
 
@@ -237,8 +242,8 @@ class BasicQueryTest extends TestCase
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
-        $this->assertStringContainsString('OR (role = ? AND super_admin = ?)', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
+        $this->assertStringContainsString('OR (`role` = ? AND `super_admin` = ?)', $sql);
     }
 
     public function test_where_with_various_operators(): void
@@ -249,24 +254,24 @@ class BasicQueryTest extends TestCase
             $query = new QueryBuilder($this->connection);
             $sql = $query->table('users')->where('column', $operator, 'value')->toSql();
 
-            $this->assertStringContainsString("column $operator ?", $sql);
+            $this->assertStringContainsString("`column` $operator ?", $sql);
         }
     }
 
-    // ==================== ORDER BY Tests ====================
+    // ==================== ORDER BY `Tests` ====================
 
     public function test_order_by_single_column_asc(): void
     {
         $sql = $this->query->orderBy('created_at')->toSql();
 
-        $this->assertStringContainsString('ORDER BY created_at ASC', $sql);
+        $this->assertStringContainsString('ORDER BY `created_at` ASC', $sql);
     }
 
     public function test_order_by_single_column_desc(): void
     {
         $sql = $this->query->orderBy('created_at', 'DESC')->toSql();
 
-        $this->assertStringContainsString('ORDER BY created_at DESC', $sql);
+        $this->assertStringContainsString('ORDER BY `created_at` DESC', $sql);
     }
 
     public function test_order_by_multiple_columns(): void
@@ -277,7 +282,7 @@ class BasicQueryTest extends TestCase
             ->orderBy('name', 'ASC')
             ->toSql();
 
-        $this->assertStringContainsString('ORDER BY status ASC, created_at DESC, name ASC', $sql);
+        $this->assertStringContainsString('ORDER BY `status` ASC, `created_at` DESC, `name` ASC', $sql);
     }
 
     public function test_order_by_case_insensitive_direction(): void
@@ -288,7 +293,7 @@ class BasicQueryTest extends TestCase
             ->toSql();
 
         // Should normalize to uppercase
-        $this->assertStringContainsString('ORDER BY name ASC, age DESC', $sql);
+        $this->assertStringContainsString('ORDER BY `name` ASC, `age` DESC', $sql);
     }
 
     // ==================== LIMIT and OFFSET Tests ====================
@@ -339,12 +344,12 @@ class BasicQueryTest extends TestCase
             ->toSql();
 
         // Verify all parts are present
-        $this->assertStringContainsString('SELECT id, name, email, status', $sql);
-        $this->assertStringContainsString('WHERE status = ?', $sql);
-        $this->assertStringContainsString('AND age >= ?', $sql);
-        $this->assertStringContainsString('AND country IN (?, ?, ?)', $sql);
-        $this->assertStringContainsString('AND email_verified_at IS NOT NULL', $sql);
-        $this->assertStringContainsString('ORDER BY created_at DESC, name ASC', $sql);
+        $this->assertStringContainsString('SELECT `id`, `name`, `email`, `status`', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
+        $this->assertStringContainsString('AND `age` >= ?', $sql);
+        $this->assertStringContainsString('AND `country` IN (?, ?, ?)', $sql);
+        $this->assertStringContainsString('AND `email_verified_at` IS NOT NULL', $sql);
+        $this->assertStringContainsString('ORDER BY `created_at` DESC, `name` ASC', $sql);
         $this->assertStringContainsString('LIMIT 50', $sql);
         $this->assertStringContainsString('OFFSET 100', $sql);
 
@@ -395,7 +400,7 @@ class BasicQueryTest extends TestCase
     {
         $sql = $this->query->where('column', null)->toSql();
 
-        $this->assertStringContainsString('WHERE column = ?', $sql);
+        $this->assertStringContainsString('WHERE `column` = ?', $sql);
         $this->assertEquals([null], $this->query->getBindings());
     }
 
@@ -475,7 +480,7 @@ class BasicQueryTest extends TestCase
             ->toSql();
 
         // Should handle 3 levels of nesting
-        $this->assertStringContainsString('WHERE (status = ?', $sql);
+        $this->assertStringContainsString('WHERE (`status` = ?', $sql);
         $this->assertGreaterThan(0, substr_count($sql, '('));
         $this->assertEquals(
             substr_count($sql, '('),

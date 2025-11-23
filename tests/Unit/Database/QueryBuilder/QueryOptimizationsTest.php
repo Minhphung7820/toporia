@@ -7,6 +7,7 @@ namespace Tests\Unit\Database\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Grammar\MySQLGrammar;
 use PDO;
 
 /**
@@ -61,6 +62,10 @@ class QueryOptimizationsTest extends TestCase
         $pdo->method('quote')->willReturnCallback(fn($str) => "'" . addslashes($str) . "'");
 
         $connection = $this->createMock(ConnectionInterface::class);
+        // Add Grammar mock for SQL compilation
+        $grammar = new \Toporia\Framework\Database\Grammar\MySQLGrammar();
+        $connection->method('getGrammar')->willReturn($grammar);
+
         $connection->method('getPdo')->willReturn($pdo);
         $connection->method('select')->willReturn([]);
         $connection->method('execute')->willReturn($this->createMock(\PDOStatement::class));

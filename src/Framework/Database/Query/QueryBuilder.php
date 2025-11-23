@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\Query;
 
 use Toporia\Framework\Database\Contracts\{ConnectionInterface, QueryBuilderInterface};
-use Toporia\Framework\Database\Query\RowCollection;
+use Toporia\Framework\Database\Query\{Expression, RowCollection};
 
 
 /**
@@ -210,7 +210,8 @@ class QueryBuilder implements QueryBuilderInterface
      */
     public function selectRaw(string $expression, array $bindings = []): self
     {
-        $this->columns[] = $expression;
+        // Wrap in Expression to mark as raw SQL (should not be quoted)
+        $this->columns[] = new Expression($expression);
 
         foreach ($bindings as $binding) {
             $this->bindings[] = $binding;
@@ -839,19 +840,15 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Insert a single row and return the last inserted id.
      *
+     * Uses Grammar pattern for database-specific SQL compilation.
+     *
      * @param array<string,mixed> $data
      */
     public function insert(array $data): int
     {
-        $columns = array_keys($data);
-        $placeholders = array_fill(0, count($columns), '?');
-
-        $sql = sprintf(
-            'INSERT INTO %s (%s) VALUES (%s)',
-            $this->table,
-            implode(', ', $columns),
-            implode(', ', $placeholders)
-        );
+        // Use Grammar for INSERT compilation
+        $grammar = $this->connection->getGrammar();
+        $sql = $grammar->compileInsert($this, $data);
 
         $this->connection->execute($sql, array_values($data));
 
@@ -861,28 +858,19 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Update rows matching the WHERE clauses.
      *
+     * Uses Grammar pattern for database-specific SQL compilation.
+     *
      * @param array<string,mixed> $data
      * @return int Number of affected rows.
      */
     public function update(array $data): int
     {
-        $sets = [];
-        $bindings = [];
+        // Use Grammar for UPDATE compilation
+        $grammar = $this->connection->getGrammar();
+        $sql = $grammar->compileUpdate($this, $data);
 
-        foreach ($data as $column => $value) {
-            $sets[] = "{$column} = ?";
-            $bindings[] = $value;
-        }
-
-        // Add WHERE bindings
-        $bindings = array_merge($bindings, $this->bindings);
-
-        $sql = sprintf(
-            'UPDATE %s SET %s%s',
-            $this->table,
-            implode(', ', $sets),
-            $this->compileWheres()
-        );
+        // Merge SET values and WHERE bindings
+        $bindings = array_merge(array_values($data), $this->bindings);
 
         return $this->connection->affectingStatement($sql, $bindings);
     }
@@ -890,15 +878,15 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Delete rows matching the WHERE clauses.
      *
+     * Uses Grammar pattern for database-specific SQL compilation.
+     *
      * @return int Number of affected rows.
      */
     public function delete(): int
     {
-        $sql = sprintf(
-            'DELETE FROM %s%s',
-            $this->table,
-            $this->compileWheres()
-        );
+        // Use Grammar for DELETE compilation
+        $grammar = $this->connection->getGrammar();
+        $sql = $grammar->compileDelete($this);
 
         return $this->connection->affectingStatement($sql, $this->bindings);
     }
@@ -1299,6 +1287,8 @@ class QueryBuilder implements QueryBuilderInterface
      * Performance optimization: Caches compiled SQL to avoid recompilation
      * on subsequent calls. Cache is invalidated when query is modified.
      *
+     * Uses Grammar pattern for database-specific SQL compilation.
+     *
      * @return string Compiled SQL query
      */
     public function toSql(): string
@@ -1308,25 +1298,13 @@ class QueryBuilder implements QueryBuilderInterface
             return $this->cachedSql;
         }
 
-        $distinct = $this->distinct ? 'DISTINCT ' : '';
+        // Use Grammar for compilation (supports MySQL, PostgreSQL, SQLite)
+        $grammar = $this->connection->getGrammar();
+        $compiledSql = $grammar->compileSelect($this);
 
-        $sql = sprintf(
-            'SELECT %s%s FROM %s%s%s%s%s%s%s%s%s',
-            $distinct,
-            implode(', ', $this->columns),
-            $this->table,
-            $this->compileJoins(),
-            $this->compileWheres(),
-            $this->compileGroups(),
-            $this->compileHavings(),
-            $this->compileOrders(),
-            $this->compileLimit(),
-            $this->compileOffset(),
-            $this->compileLock()
-        );
-
-        // Add unions if present
-        $compiledSql = $sql . $this->compileUnions();
+        // Add unions and lock clauses (not yet in Grammar)
+        $compiledSql .= $this->compileUnions();
+        $compiledSql .= $this->compileLock();
 
         // Cache if enabled
         if (self::$cachingEnabled) {
@@ -1868,5 +1846,166 @@ class QueryBuilder implements QueryBuilderInterface
             currentPage: $page,
             path: $path
         );
+    }
+
+    // =========================================================================
+    // GETTER METHODS FOR GRAMMAR ACCESS
+    // =========================================================================
+    // Note: getTable() and getColumns() already exist above (lines 227, 237)
+
+    /**
+     * Get WHERE clauses.
+     *
+     * @return array<array>
+     */
+    public function getWheres(): array
+    {
+        return $this->wheres;
+    }
+
+    /**
+     * Get JOIN clauses.
+     *
+     * @return array<array>
+     */
+    public function getJoins(): array
+    {
+        return $this->joins;
+    }
+
+    /**
+     * Get ORDER BY clauses.
+     *
+     * @return array<array>
+     */
+    public function getOrders(): array
+    {
+        return $this->orders;
+    }
+
+    /**
+     * Get GROUP BY columns.
+     *
+     * @return array<string>
+     */
+    public function getGroups(): array
+    {
+        return $this->groups;
+    }
+
+    /**
+     * Get HAVING clauses.
+     *
+     * @return array<array>
+     */
+    public function getHavings(): array
+    {
+        return $this->havings;
+    }
+
+    /**
+     * Get LIMIT value (already exists as protected, adding public).
+     *
+     * @return int|null
+     */
+    public function getLimit(): ?int
+    {
+        return $this->limit;
+    }
+
+    /**
+     * Get OFFSET value (already exists as protected, adding public).
+     *
+     * @return int|null
+     */
+    public function getOffset(): ?int
+    {
+        return $this->offset;
+    }
+
+    /**
+     * Check if DISTINCT is enabled.
+     *
+     * @return bool
+     */
+    public function isDistinct(): bool
+    {
+        return $this->distinct;
+    }
+
+    /**
+     * Check if LIMIT is set.
+     *
+     * @return bool
+     */
+    public function hasLimit(): bool
+    {
+        return $this->limit !== null;
+    }
+
+    /**
+     * Check if OFFSET is set.
+     *
+     * @return bool
+     */
+    public function hasOffset(): bool
+    {
+        return $this->offset !== null;
+    }
+
+    /**
+     * Switch to a different database connection.
+     *
+     * Creates a new QueryBuilder instance with the specified connection
+     * while preserving current query state (table, columns, wheres, etc.).
+     *
+     * Performance: Connection is cached per name (O(1) lookup after first call)
+     * Grammar is automatically selected based on connection driver
+     *
+     * Usage:
+     * ```php
+     * $query = DB::connection('mysql')->table('users')->where('status', 'active');
+     * $mongoQuery = $query->onConnection('mongodb')->table('messages')->where('user_id', 123);
+     * ```
+     *
+     * SOLID Principles:
+     * - Single Responsibility: Only changes connection, preserves query state
+     * - Open/Closed: Extensible for new connection types
+     * - Dependency Inversion: Depends on ConnectionInterface abstraction
+     *
+     * @param string $connectionName Connection name from config/database.php
+     * @return self New QueryBuilder instance with specified connection
+     * @throws \RuntimeException If connection not found
+     */
+    public function onConnection(string $connectionName): self
+    {
+        // Get DatabaseManager from container
+        $manager = container(\Toporia\Framework\Database\DatabaseManager::class);
+        $proxy = $manager->connection($connectionName);
+        $newConnection = $proxy->getConnection();
+
+        // Create new QueryBuilder with new connection
+        $newQuery = new self($newConnection);
+
+        // Copy current query state to new QueryBuilder
+        $newQuery->table = $this->table;
+        $newQuery->columns = $this->columns;
+        $newQuery->wheres = $this->wheres;
+        $newQuery->joins = $this->joins;
+        $newQuery->orders = $this->orders;
+        $newQuery->groups = $this->groups;
+        $newQuery->havings = $this->havings;
+        $newQuery->limit = $this->limit;
+        $newQuery->offset = $this->offset;
+        $newQuery->distinct = $this->distinct;
+        $newQuery->bindings = $this->bindings;
+        $newQuery->eagerLoad = $this->eagerLoad;
+        $newQuery->unions = $this->unions;
+        $newQuery->lock = $this->lock;
+
+        // Invalidate cache (connection changed)
+        $newQuery->invalidateCache();
+
+        return $newQuery;
     }
 }

@@ -43,9 +43,35 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Database table name (override in child class).
      *
+     * For SQL databases (MySQL, PostgreSQL, SQLite), this specifies the table name.
+     * For MongoDB, use $collection instead.
+     *
      * @var string
      */
     protected static string $table = '';
+
+    /**
+     * MongoDB collection name (override in child class).
+     *
+     * Only used when connection driver is 'mongodb'.
+     * If not set, falls back to $table property.
+     *
+     * Example:
+     * ```php
+     * class LogModel extends Model
+     * {
+     *     protected static ?string $connection = 'mongodb';
+     *     protected static string $collection = 'application_logs';
+     * }
+     * ```
+     *
+     * SOLID Principles:
+     * - Single Responsibility: Model specifies its data source
+     * - Open/Closed: Can override per model without modifying base class
+     *
+     * @var string
+     */
+    protected static string $collection = '';
 
     /**
      * Primary key column name.
@@ -188,6 +214,17 @@ abstract class Model implements ModelInterface, ObservableInterface
      * @var ConnectionInterface|null
      */
     private static ?ConnectionInterface $defaultConnection = null;
+
+    /**
+     * Cached connections per model class for performance optimization.
+     * Key: model class name, Value: ConnectionInterface instance
+     *
+     * Performance: O(1) lookup after first resolution
+     * Reduces DatabaseManager calls and connection creation overhead
+     *
+     * @var array<string, ConnectionInterface>
+     */
+    private static array $connectionCache = [];
 
     /**
      * Loaded relationships.
@@ -381,21 +418,64 @@ abstract class Model implements ModelInterface, ObservableInterface
      * @return ConnectionInterface
      * @throws \RuntimeException If no connection available.
      */
+    /**
+     * Get the database connection for this model.
+     *
+     * Resolution order:
+     * 1. Check connection cache (performance optimization)
+     * 2. Check if model specifies a connection name (static::$connection)
+     * 3. If yes, resolve it from DatabaseManager and cache it
+     * 4. If no, use global default connection
+     *
+     * Performance Optimizations:
+     * - Connection caching per model class (O(1) lookup after first call)
+     * - Lazy connection resolution (only when needed)
+     * - Grammar auto-detection from connection driver
+     *
+     * SOLID Principles:
+     * - Open/Closed: Each model can specify its connection without modifying base class
+     * - Single Responsibility: Connection resolution logic in one place
+     * - Dependency Inversion: Depends on ConnectionInterface abstraction
+     *
+     * Grammar Integration:
+     * - Connection automatically provides appropriate Grammar based on driver
+     * - MySQL → MySQLGrammar
+     * - PostgreSQL → PostgreSQLGrammar
+     * - SQLite → SQLiteGrammar
+     * - MongoDB → MongoDBGrammar
+     * - Grammar is cached per connection for optimal performance
+     *
+     * @return ConnectionInterface
+     * @throws \RuntimeException If no connection available.
+     */
     protected static function getConnection(): ConnectionInterface
     {
+        $modelClass = static::class;
+
+        // Check cache first for performance (O(1) lookup)
+        if (isset(self::$connectionCache[$modelClass])) {
+            return self::$connectionCache[$modelClass];
+        }
+
+        $connection = null;
+
         // If model specifies a connection name, resolve it from DatabaseManager
         if (static::$connection !== null) {
-            return static::resolveConnection(static::$connection);
+            $connection = static::resolveConnection(static::$connection);
+        } else {
+            // Otherwise use global default connection
+            if (self::$defaultConnection === null) {
+                throw new \RuntimeException(
+                    'Database connection not set. Call Model::setConnection() first or specify connection name in model.'
+                );
+            }
+            $connection = self::$defaultConnection;
         }
 
-        // Otherwise use global default connection
-        if (self::$defaultConnection === null) {
-            throw new \RuntimeException(
-                'Database connection not set. Call Model::setConnection() first or specify connection name in model.'
-            );
-        }
+        // Cache connection for this model class (performance optimization)
+        self::$connectionCache[$modelClass] = $connection;
 
-        return self::$defaultConnection;
+        return $connection;
     }
 
     /**
@@ -410,7 +490,8 @@ abstract class Model implements ModelInterface, ObservableInterface
     {
         // Get DatabaseManager from container
         $manager = container(\Toporia\Framework\Database\DatabaseManager::class);
-        return $manager->connection($name);
+        $proxy = $manager->connection($name);
+        return $proxy->getConnection();
     }
 
     /**
@@ -432,28 +513,56 @@ abstract class Model implements ModelInterface, ObservableInterface
     }
 
     /**
-     * Get the table name.
+     * Get the table/collection name.
      *
-     * Auto-infers table name from class name if not explicitly set:
+     * For MongoDB connections, uses $collection property if set.
+     * For SQL databases, uses $table property.
+     *
+     * Auto-infers name from class name if not explicitly set:
      * - ProductModel -> products
      * - UserModel -> users
      * - OrderItem -> order_items
      *
+     * MongoDB-specific behavior:
+     * - If connection is 'mongodb' and $collection is set, uses $collection
+     * - If connection is 'mongodb' and $collection is empty, falls back to $table
+     * - If connection is 'mongodb' and both are empty, auto-infers from class name
+     *
+     * SQL databases:
+     * - Always uses $table property
+     * - If $table is empty, auto-infers from class name
+     *
+     * Performance: Connection driver is checked once and cached
+     *
      * SOLID Principles:
      * - Convention over Configuration: Reduces boilerplate code
-     * - Open/Closed: Can override $table in child classes
-     * - Single Responsibility: Only handles table name resolution
+     * - Open/Closed: Can override $table or $collection in child classes
+     * - Single Responsibility: Only handles table/collection name resolution
      *
-     * @return string Table name
+     * @return string Table or collection name
      */
     public static function getTableName(): string
     {
-        // If explicitly set, use it
-        if (isset(static::$table) && static::$table !== '') {
-            return static::$table;
+        // Check if connection is MongoDB
+        $isMongoDB = static::isMongoDBConnection();
+
+        // For MongoDB: Prefer $collection over $table
+        if ($isMongoDB) {
+            if (isset(static::$collection) && static::$collection !== '') {
+                return static::$collection;
+            }
+            // Fallback to $table if $collection is not set
+            if (isset(static::$table) && static::$table !== '') {
+                return static::$table;
+            }
+        } else {
+            // For SQL databases: Use $table
+            if (isset(static::$table) && static::$table !== '') {
+                return static::$table;
+            }
         }
 
-        // Auto-infer from class name
+        // Auto-infer from class name (works for both SQL and MongoDB)
         // Extract class name without namespace
         $className = (new \ReflectionClass(static::class))->getShortName();
 
@@ -465,6 +574,38 @@ abstract class Model implements ModelInterface, ObservableInterface
         // Product -> product -> products
         // OrderItem -> order_item -> order_items
         return static::pluralize(static::toSnakeCase($baseName));
+    }
+
+    /**
+     * Check if the model's connection is MongoDB.
+     *
+     * Caches the result per model class for performance.
+     *
+     * @return bool True if connection driver is 'mongodb'
+     */
+    protected static function isMongoDBConnection(): bool
+    {
+        static $cache = [];
+
+        $modelClass = static::class;
+
+        if (isset($cache[$modelClass])) {
+            return $cache[$modelClass];
+        }
+
+        try {
+            $connection = static::getConnection();
+            $driver = $connection->getDriverName();
+            $isMongoDB = $driver === 'mongodb';
+
+            // Cache result
+            $cache[$modelClass] = $isMongoDB;
+
+            return $isMongoDB;
+        } catch (\Throwable $e) {
+            // If connection not available yet, return false (default to SQL behavior)
+            return false;
+        }
     }
 
     /**

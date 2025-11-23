@@ -1225,3 +1225,38 @@ if (!function_exists('trans_has')) {
         return app('translation')->has($key, $locale);
     }
 }
+
+if (!function_exists('DB')) {
+    /**
+     * Get DatabaseManager instance with fluent API for connection selection.
+     *
+     * Usage:
+     * ```php
+     * // Get DatabaseManager
+     * $manager = DB();
+     *
+     * // Create QueryBuilder with specific connection (fluent API)
+     * $query = DB()->onConnection('mysql')->table('users')->where('status', 'active');
+     * $mongoQuery = DB()->onConnection('mongodb')->table('messages')->where('user_id', 123);
+     *
+     * // Or use connection() method (returns ConnectionProxy for fluent API)
+     * $query = DB()->connection('mysql')->table('users');
+     * ```
+     *
+     * Performance: Connections are cached per name (O(1) lookup after first call)
+     * Grammar is automatically selected based on connection driver
+     *
+     * @return \Toporia\Framework\Database\DatabaseManager
+     */
+    function DB(): \Toporia\Framework\Database\DatabaseManager
+    {
+        static $manager = null;
+
+        if ($manager === null) {
+            $config = config('database.connections', []);
+            $manager = new \Toporia\Framework\Database\DatabaseManager($config);
+        }
+
+        return $manager;
+    }
+}

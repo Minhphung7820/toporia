@@ -6,6 +6,8 @@ namespace Toporia\Framework\Database;
 
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Schema\SchemaBuilder;
+use Toporia\Framework\Database\Query\QueryBuilder;
+use Toporia\Framework\Database\ConnectionProxy;
 
 
 /**
@@ -54,12 +56,12 @@ class DatabaseManager
     }
 
     /**
-     * Get a database connection.
+     * Get a database connection (for direct access).
      *
      * @param string|null $name Connection name (null for default).
      * @return ConnectionInterface
      */
-    public function connection(?string $name = null): ConnectionInterface
+    public function getConnection(?string $name = null): ConnectionInterface
     {
         $name = $name ?? $this->defaultConnection;
 
@@ -68,6 +70,31 @@ class DatabaseManager
         }
 
         return $this->connections[$name];
+    }
+
+    /**
+     * Get a connection proxy for fluent API.
+     *
+     * Returns ConnectionProxy which provides table() method for QueryBuilder creation.
+     * Enables syntax: DB()->connection('mysql')->table('users')
+     *
+     * Grammar is automatically selected based on connection driver.
+     *
+     * Usage:
+     * ```php
+     * DB()->connection('mysql')->table('users')->where('status', 'active')->get();
+     * DB()->connection('mongodb')->table('messages')->where('user_id', 123)->get();
+     * ```
+     *
+     * Performance: Connection is cached per name (O(1) lookup after first call)
+     *
+     * @param string|null $name Connection name (null for default)
+     * @return ConnectionProxy Proxy object with table() method
+     */
+    public function connection(?string $name = null): ConnectionProxy
+    {
+        $connection = $this->getConnection($name);
+        return new ConnectionProxy($connection);
     }
 
     /**
@@ -93,7 +120,8 @@ class DatabaseManager
      */
     public function schema(?string $name = null): SchemaBuilder
     {
-        return new SchemaBuilder($this->connection($name));
+        $connection = $this->getConnection($name);
+        return new SchemaBuilder($connection);
     }
 
     /**

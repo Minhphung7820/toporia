@@ -7,6 +7,7 @@ namespace Tests\Unit\Database\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Grammar\MySQLGrammar;
 use PDO;
 
 /**
@@ -32,7 +33,7 @@ use PDO;
  * - Mocked connections (O(1) execution)
  * - Tests verify SQL generation efficiency
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @author `Phungtruong7820` <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     1.0.0
@@ -57,6 +58,10 @@ class AggregateQueryTest extends TestCase
         $pdo = $this->createMock(PDO::class);
         $pdo->method('quote')
             ->willReturnCallback(fn($value) => "'" . addslashes((string)$value) . "'");
+
+        // Add Grammar mock for SQL compilation
+        $grammar = new \Toporia\Framework\Database\Grammar\MySQLGrammar();
+        $connection->method('getGrammar')->willReturn($grammar);
 
         $connection->method('getPdo')->willReturn($pdo);
 
@@ -103,7 +108,7 @@ class AggregateQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('COUNT(*) as total', $sql);
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
     }
 
     public function test_count_with_group_by(): void
@@ -115,7 +120,7 @@ class AggregateQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('COUNT(*) as order_count', $sql);
-        $this->assertStringContainsString('GROUP BY user_id', $sql);
+        $this->assertStringContainsString('GROUP BY `user_id`', $sql);
     }
 
     // ==================== SUM Tests ====================
@@ -137,7 +142,7 @@ class AggregateQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('SUM(total) as completed_total', $sql);
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
     }
 
     public function test_sum_with_expression(): void
@@ -158,7 +163,7 @@ class AggregateQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('SUM(total) as category_total', $sql);
-        $this->assertStringContainsString('GROUP BY category', $sql);
+        $this->assertStringContainsString('GROUP BY `category`', $sql);
     }
 
     // ==================== AVG Tests ====================
@@ -181,8 +186,8 @@ class AggregateQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('AVG(total) as avg_total', $sql);
-        $this->assertStringContainsString('WHERE status = ?', $sql);
-        $this->assertStringContainsString('AND YEAR(created_at) = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
+        $this->assertStringContainsString('AND YEAR(`created_at`) = ?', $sql);
     }
 
     public function test_avg_with_group_by(): void
@@ -194,7 +199,7 @@ class AggregateQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('AVG(total) as avg_order_value', $sql);
-        $this->assertStringContainsString('GROUP BY user_id', $sql);
+        $this->assertStringContainsString('GROUP BY `user_id`', $sql);
     }
 
     public function test_avg_with_having(): void
@@ -207,7 +212,7 @@ class AggregateQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('AVG(total) as avg_total', $sql);
-        $this->assertStringContainsString('HAVING avg_total > ?', $sql);
+        $this->assertStringContainsString('HAVING `avg_total` > ?', $sql);
     }
 
     // ==================== MIN/MAX Tests ====================
@@ -254,7 +259,7 @@ class AggregateQueryTest extends TestCase
 
         $this->assertStringContainsString('MIN(price) as min_price', $sql);
         $this->assertStringContainsString('MAX(price) as max_price', $sql);
-        $this->assertStringContainsString('GROUP BY category', $sql);
+        $this->assertStringContainsString('GROUP BY `category`', $sql);
     }
 
     // ==================== Combined Aggregates ====================
@@ -276,7 +281,7 @@ class AggregateQueryTest extends TestCase
         $this->assertStringContainsString('AVG(total) as avg_order', $sql);
         $this->assertStringContainsString('MIN(total) as min_order', $sql);
         $this->assertStringContainsString('MAX(total) as max_order', $sql);
-        $this->assertStringContainsString('GROUP BY category', $sql);
+        $this->assertStringContainsString('GROUP BY `category`', $sql);
     }
 
     public function test_nested_aggregates_with_subquery(): void
@@ -294,8 +299,8 @@ class AggregateQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('COUNT(*) as order_count', $sql);
-        $this->assertStringContainsString(') AS user_name', $sql);
-        $this->assertStringContainsString('HAVING order_count > ?', $sql);
+        $this->assertStringContainsString(') AS `user_name`', $sql);
+        $this->assertStringContainsString('HAVING `order_count` > ?', $sql);
     }
 
     // ==================== Real-World Scenarios ====================
@@ -303,7 +308,7 @@ class AggregateQueryTest extends TestCase
     public function test_monthly_sales_report(): void
     {
         $sql = $this->query
-            ->selectRaw('YEAR(created_at) as year')
+            ->selectRaw('YEAR(`created_at`) as year')
             ->selectRaw('MONTH(created_at) as month')
             ->selectRaw('COUNT(*) as total_orders')
             ->selectRaw('SUM(total) as revenue')
@@ -315,7 +320,7 @@ class AggregateQueryTest extends TestCase
             ->orderBy('month', 'DESC')
             ->toSql();
 
-        $this->assertStringContainsString('YEAR(created_at) as year', $sql);
+        $this->assertStringContainsString('YEAR(`created_at`) as year', $sql);
         $this->assertStringContainsString('MONTH(created_at) as month', $sql);
         $this->assertStringContainsString('COUNT(*) as total_orders', $sql);
         $this->assertStringContainsString('SUM(total) as revenue', $sql);
@@ -342,7 +347,7 @@ class AggregateQueryTest extends TestCase
         $this->assertStringContainsString('SUM(total) as lifetime_value', $sql);
         $this->assertStringContainsString('MIN(created_at) as first_order_date', $sql);
         $this->assertStringContainsString('MAX(created_at) as last_order_date', $sql);
-        $this->assertStringContainsString('HAVING lifetime_value > ?', $sql);
+        $this->assertStringContainsString('HAVING `lifetime_value` > ?', $sql);
     }
 
     public function test_product_performance_metrics(): void
@@ -364,13 +369,13 @@ class AggregateQueryTest extends TestCase
         $this->assertStringContainsString('COUNT(*) as times_ordered', $sql);
         $this->assertStringContainsString('SUM(quantity) as total_quantity_sold', $sql);
         $this->assertStringContainsString('SUM(quantity * price) as total_revenue', $sql);
-        $this->assertStringContainsString('HAVING times_ordered > ?', $sql);
+        $this->assertStringContainsString('HAVING `times_ordered` > ?', $sql);
     }
 
     public function test_daily_statistics_with_comparison(): void
     {
         $sql = $this->query
-            ->selectRaw('DATE(created_at) as date')
+            ->selectRaw('DATE(`created_at`) as date')
             ->selectRaw('COUNT(*) as order_count')
             ->selectRaw('SUM(total) as daily_revenue')
             ->selectRaw('AVG(total) as avg_order_value')
@@ -382,7 +387,7 @@ class AggregateQueryTest extends TestCase
             ->orderBy('date', 'DESC')
             ->toSql();
 
-        $this->assertStringContainsString('DATE(created_at) as date', $sql);
+        $this->assertStringContainsString('DATE(`created_at`) as date', $sql);
         $this->assertStringContainsString('SUM(total) / COUNT(*) as revenue_per_order', $sql);
     }
 
@@ -407,11 +412,11 @@ class AggregateQueryTest extends TestCase
     {
         $sql = $this->query
             ->selectRaw('COUNT(DISTINCT user_id) as unique_users')
-            ->selectRaw('COUNT(DISTINCT DATE(created_at)) as active_days')
+            ->selectRaw('COUNT(DISTINCT DATE(`created_at`)) as active_days')
             ->toSql();
 
         $this->assertStringContainsString('COUNT(DISTINCT user_id)', $sql);
-        $this->assertStringContainsString('COUNT(DISTINCT DATE(created_at))', $sql);
+        $this->assertStringContainsString('COUNT(DISTINCT DATE(`created_at`))', $sql);
     }
 
     public function test_aggregate_with_index_friendly_conditions(): void
@@ -425,8 +430,8 @@ class AggregateQueryTest extends TestCase
             ->where('status', 'completed') // Status index
             ->toSql();
 
-        $this->assertStringContainsString('WHERE user_id = ?', $sql);
-        $this->assertStringContainsString('DATE(created_at) >= ?', $sql);
+        $this->assertStringContainsString('WHERE `user_id` = ?', $sql);
+        $this->assertStringContainsString('DATE(`created_at`) >= ?', $sql);
     }
 
     // ==================== Edge Cases ====================
@@ -460,25 +465,25 @@ class AggregateQueryTest extends TestCase
         $sql = $this->query
             ->select('category')
             ->selectRaw('COUNT(*) as count')
-            ->selectRaw('COUNT(*) * 100.0 / (SELECT COUNT(*) FROM orders) as percentage')
+            ->selectRaw('COUNT(*) * 100.0 / (SELECT COUNT(*) FROM `orders`) as percentage')
             ->groupBy('category')
             ->toSql();
 
         $this->assertStringContainsString('COUNT(*) * 100.0', $sql);
-        $this->assertStringContainsString('(SELECT COUNT(*) FROM orders)', $sql);
+        $this->assertStringContainsString('(SELECT COUNT(*) FROM `orders`)', $sql);
     }
 
     public function test_running_totals_pattern(): void
     {
-        // Pattern for running totals (would typically use window functions)
+        // Pattern for `runn` ing totals (would typically use window functions)
         $sql = $this->query
-            ->selectRaw('DATE(created_at) as date')
+            ->selectRaw('DATE(`created_at`) as date')
             ->selectRaw('SUM(total) as daily_total')
             ->groupBy('date')
             ->orderBy('date', 'ASC')
             ->toSql();
 
         $this->assertStringContainsString('SUM(total) as daily_total', $sql);
-        $this->assertStringContainsString('ORDER BY date ASC', $sql);
+        $this->assertStringContainsString('ORDER BY `date` ASC', $sql);
     }
 }

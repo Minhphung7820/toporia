@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database;
 
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\GrammarInterface;
+use Toporia\Framework\Database\Grammar\{MySQLGrammar, PostgreSQLGrammar, SQLiteGrammar, MongoDBGrammar};
 use Toporia\Framework\Database\Query\QueryBuilder;
 use PDO;
 use PDOException;
@@ -41,6 +43,11 @@ class Connection implements ConnectionInterface
      * @var array<string, mixed> Connection configuration.
      */
     private array $config;
+
+    /**
+     * @var GrammarInterface|null SQL Grammar instance.
+     */
+    private ?GrammarInterface $grammar = null;
 
     /**
      * @param array $config Connection configuration.
@@ -244,6 +251,41 @@ class Connection implements ConnectionInterface
     public function getDriverName(): string
     {
         return $this->config['driver'] ?? 'mysql';
+    }
+
+    /**
+     * Get SQL Grammar instance for the connection.
+     *
+     * Lazily creates Grammar based on driver type.
+     * Grammar instance is cached for performance.
+     *
+     * @return GrammarInterface
+     */
+    public function getGrammar(): GrammarInterface
+    {
+        return $this->grammar ??= $this->createGrammar();
+    }
+
+    /**
+     * Create SQL Grammar instance based on driver.
+     *
+     * Factory method that instantiates the appropriate Grammar
+     * implementation based on the configured database driver.
+     *
+     * @return GrammarInterface
+     * @throws ConnectionException If driver is not supported
+     */
+    protected function createGrammar(): GrammarInterface
+    {
+        $driver = $this->getDriverName();
+
+        return match ($driver) {
+            'mysql' => new MySQLGrammar(),
+            'pgsql' => new PostgreSQLGrammar(),
+            'sqlite' => new SQLiteGrammar(),
+            'mongodb' => new MongoDBGrammar(),
+            default => throw new ConnectionException("Unsupported driver for Grammar: {$driver}")
+        };
     }
 
     /**

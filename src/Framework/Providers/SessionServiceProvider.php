@@ -24,7 +24,12 @@ final class SessionServiceProvider extends ServiceProvider
                 ? $c->get('config')->get('session', [])
                 : [];
 
-            $connection = $c->has('db') ? $c->get('db') : null;
+            // Unwrap ConnectionProxy to get actual ConnectionInterface
+            $db = $c->has('db') ? $c->get('db') : null;
+            $connection = $db && method_exists($db, 'getConnection')
+                ? $db->getConnection()
+                : $db;
+
             $redis = $c->has('redis') ? $c->get('redis') : null;
             $cookieJar = $c->has('cookie') ? $c->get('cookie') : null;
 

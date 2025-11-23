@@ -7,6 +7,7 @@ namespace Tests\Unit\Database\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Grammar\MySQLGrammar;
 use PDO;
 
 /**
@@ -33,7 +34,7 @@ use PDO;
  * - Mock PDO (no real DB, O(1) execution)
  * - Optimized for fast test runs
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @author `Phungtruong7820` <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     1.0.0
@@ -59,6 +60,10 @@ class JoinQueryTest extends TestCase
         $pdo->method('quote')
             ->willReturnCallback(fn($value) => "'" . addslashes((string)$value) . "'");
 
+        // Add Grammar mock for SQL compilation
+        $grammar = new \Toporia\Framework\Database\Grammar\MySQLGrammar();
+        $connection->method('getGrammar')->willReturn($grammar);
+
         $connection->method('getPdo')->willReturn($pdo);
 
         return $connection;
@@ -72,7 +77,7 @@ class JoinQueryTest extends TestCase
             ->join('orders', 'users.id', '=', 'orders.user_id')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN orders ON users.id = orders.user_id', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $sql);
     }
 
     public function test_inner_join_explicit_type(): void
@@ -81,7 +86,7 @@ class JoinQueryTest extends TestCase
             ->join('orders', 'users.id', '=', 'orders.user_id', 'INNER')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN orders', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders`', $sql);
     }
 
     public function test_inner_join_with_where(): void
@@ -92,9 +97,9 @@ class JoinQueryTest extends TestCase
             ->where('orders.status', 'completed')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN orders ON users.id = orders.user_id', $sql);
-        $this->assertStringContainsString('WHERE users.status = ?', $sql);
-        $this->assertStringContainsString('AND orders.status = ?', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $sql);
+        $this->assertStringContainsString('WHERE `users`.`status` = ?', $sql);
+        $this->assertStringContainsString('AND `orders`.`status` = ?', $sql);
         $this->assertEquals(['active', 'completed'], $this->query->getBindings());
     }
 
@@ -105,8 +110,8 @@ class JoinQueryTest extends TestCase
             ->join('orders', 'users.id', '=', 'orders.user_id')
             ->toSql();
 
-        $this->assertStringContainsString('SELECT users.id, users.name, orders.total, orders.status', $sql);
-        $this->assertStringContainsString('INNER JOIN orders', $sql);
+        $this->assertStringContainsString('SELECT `users`.`id`, `users`.`name`, `orders`.`total`, `orders`.`status`', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders`', $sql);
     }
 
     // ==================== LEFT JOIN Tests ====================
@@ -117,7 +122,7 @@ class JoinQueryTest extends TestCase
             ->leftJoin('orders', 'users.id', '=', 'orders.user_id')
             ->toSql();
 
-        $this->assertStringContainsString('LEFT JOIN orders ON users.id = orders.user_id', $sql);
+        $this->assertStringContainsString('LEFT JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $sql);
     }
 
     public function test_left_join_with_null_check(): void
@@ -128,8 +133,8 @@ class JoinQueryTest extends TestCase
             ->toSql();
 
         // Find users with no orders
-        $this->assertStringContainsString('LEFT JOIN orders', $sql);
-        $this->assertStringContainsString('WHERE orders.id IS NULL', $sql);
+        $this->assertStringContainsString('LEFT JOIN `orders`', $sql);
+        $this->assertStringContainsString('WHERE `orders`.`id` IS NULL', $sql);
     }
 
     public function test_left_join_with_aggregates(): void
@@ -141,9 +146,9 @@ class JoinQueryTest extends TestCase
             ->groupBy('users.id', 'users.name')
             ->toSql();
 
-        $this->assertStringContainsString('LEFT JOIN orders', $sql);
+        $this->assertStringContainsString('LEFT JOIN `orders`', $sql);
         $this->assertStringContainsString('COUNT(orders.id) as order_count', $sql);
-        $this->assertStringContainsString('GROUP BY users.id, users.name', $sql);
+        $this->assertStringContainsString('GROUP BY `users`.`id`, `users`.`name`', $sql);
     }
 
     // ==================== RIGHT JOIN Tests ====================
@@ -154,7 +159,7 @@ class JoinQueryTest extends TestCase
             ->rightJoin('orders', 'users.id', '=', 'orders.user_id')
             ->toSql();
 
-        $this->assertStringContainsString('RIGHT JOIN orders ON users.id = orders.user_id', $sql);
+        $this->assertStringContainsString('RIGHT JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $sql);
     }
 
     public function test_right_join_with_where(): void
@@ -164,8 +169,8 @@ class JoinQueryTest extends TestCase
             ->where('orders.total', '>', 1000)
             ->toSql();
 
-        $this->assertStringContainsString('RIGHT JOIN orders', $sql);
-        $this->assertStringContainsString('WHERE orders.total > ?', $sql);
+        $this->assertStringContainsString('RIGHT JOIN `orders`', $sql);
+        $this->assertStringContainsString('WHERE `orders`.`total` > ?', $sql);
     }
 
     // ==================== Multiple JOINs Tests ====================
@@ -178,9 +183,9 @@ class JoinQueryTest extends TestCase
             ->join('products', 'order_items.product_id', '=', 'products.id')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN orders ON users.id = orders.user_id', $sql);
-        $this->assertStringContainsString('INNER JOIN order_items ON orders.id = order_items.order_id', $sql);
-        $this->assertStringContainsString('INNER JOIN products ON order_items.product_id = products.id', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders` ON `users`.`id` = `orders`.`user_id`', $sql);
+        $this->assertStringContainsString('INNER JOIN `order_items` ON `orders`.`id` = `order_items`.`order_id`', $sql);
+        $this->assertStringContainsString('INNER JOIN `products` ON `order_items`.`product_id` = `products`.`id`', $sql);
     }
 
     public function test_mixed_join_types(): void
@@ -191,9 +196,9 @@ class JoinQueryTest extends TestCase
             ->rightJoin('payments', 'orders.id', '=', 'payments.order_id')
             ->toSql();
 
-        $this->assertStringContainsString('LEFT JOIN profiles', $sql);
-        $this->assertStringContainsString('INNER JOIN orders', $sql);
-        $this->assertStringContainsString('RIGHT JOIN payments', $sql);
+        $this->assertStringContainsString('LEFT JOIN `profiles`', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders`', $sql);
+        $this->assertStringContainsString('RIGHT JOIN `payments`', $sql);
     }
 
     public function test_multiple_joins_with_complex_where(): void
@@ -209,11 +214,11 @@ class JoinQueryTest extends TestCase
             ->whereIn('products.category_id', [1, 2, 3])
             ->toSql();
 
-        $this->assertStringContainsString('SELECT users.name, orders.total, products.title', $sql);
-        $this->assertStringContainsString('WHERE users.status = ?', $sql);
-        $this->assertStringContainsString('AND orders.status = ?', $sql);
-        $this->assertStringContainsString('AND products.price > ?', $sql);
-        $this->assertStringContainsString('AND products.category_id IN (?, ?, ?)', $sql);
+        $this->assertStringContainsString('SELECT `users`.`name`, `orders`.`total`, `products`.`title`', $sql);
+        $this->assertStringContainsString('WHERE `users`.`status` = ?', $sql);
+        $this->assertStringContainsString('AND `orders`.`status` = ?', $sql);
+        $this->assertStringContainsString('AND `products`.`price` > ?', $sql);
+        $this->assertStringContainsString('AND `products`.`category_id` IN (?, ?, ?)', $sql);
     }
 
     // ==================== Self JOIN Tests ====================
@@ -226,8 +231,8 @@ class JoinQueryTest extends TestCase
             ->join('users as u2', 'u1.manager_id', '=', 'u2.id')
             ->toSql();
 
-        $this->assertStringContainsString('FROM users as u1', $sql);
-        $this->assertStringContainsString('INNER JOIN users as u2 ON u1.manager_id = u2.id', $sql);
+        $this->assertStringContainsString('FROM `users` AS `u1`', $sql);
+        $this->assertStringContainsString('INNER JOIN `users` AS `u2` ON `u1`.`manager_id` = `u2`.`id`', $sql);
     }
 
     public function test_self_join_left(): void
@@ -238,7 +243,7 @@ class JoinQueryTest extends TestCase
             ->leftJoin('users as u2', 'u1.manager_id', '=', 'u2.id')
             ->toSql();
 
-        $this->assertStringContainsString('LEFT JOIN users as u2', $sql);
+        $this->assertStringContainsString('LEFT JOIN `users` AS `u2`', $sql);
     }
 
     // ==================== JOIN with Operators Tests ====================
@@ -249,7 +254,7 @@ class JoinQueryTest extends TestCase
             ->join('sales', 'users.id', '>', 'sales.min_user_id')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN sales ON users.id > sales.min_user_id', $sql);
+        $this->assertStringContainsString('INNER JOIN `sales` ON `users`.`id` > `sales`.`min_user_id`', $sql);
     }
 
     public function test_join_with_less_than(): void
@@ -258,7 +263,7 @@ class JoinQueryTest extends TestCase
             ->join('limits', 'users.score', '<', 'limits.max_score')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN limits ON users.score < limits.max_score', $sql);
+        $this->assertStringContainsString('INNER JOIN `limits` ON `users`.`score` < `limits`.`max_score`', $sql);
     }
 
     public function test_join_with_not_equal(): void
@@ -267,7 +272,7 @@ class JoinQueryTest extends TestCase
             ->join('excluded', 'users.id', '!=', 'excluded.user_id')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN excluded ON users.id != excluded.user_id', $sql);
+        $this->assertStringContainsString('INNER JOIN `excluded` ON `users`.`id` != `excluded`.`user_id`', $sql);
     }
 
     // ==================== Complex JOIN Scenarios ====================
@@ -285,8 +290,8 @@ class JoinQueryTest extends TestCase
             })
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN orders', $sql);
-        $this->assertStringContainsString('WHERE orders.total > ?', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders`', $sql);
+        $this->assertStringContainsString('WHERE `orders`.`total` > ?', $sql);
         $this->assertStringContainsString('AND EXISTS', $sql);
     }
 
@@ -302,10 +307,10 @@ class JoinQueryTest extends TestCase
             ->having('total_spent', '>', 10000)
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN orders', $sql);
-        $this->assertStringContainsString('GROUP BY users.id, users.name', $sql);
-        $this->assertStringContainsString('HAVING order_count > ?', $sql);
-        $this->assertStringContainsString('AND total_spent > ?', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders`', $sql);
+        $this->assertStringContainsString('GROUP BY `users`.`id`, `users`.`name`', $sql);
+        $this->assertStringContainsString('HAVING `order_count` > ?', $sql);
+        $this->assertStringContainsString('AND `total_spent` > ?', $sql);
     }
 
     public function test_join_with_order_by(): void
@@ -317,8 +322,8 @@ class JoinQueryTest extends TestCase
             ->orderBy('orders.total', 'DESC')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN orders', $sql);
-        $this->assertStringContainsString('ORDER BY orders.created_at DESC, orders.total DESC', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders`', $sql);
+        $this->assertStringContainsString('ORDER BY `orders`.`created_at` DESC, `orders`.`total` DESC', $sql);
     }
 
     public function test_join_with_limit_and_offset(): void
@@ -332,7 +337,7 @@ class JoinQueryTest extends TestCase
             ->offset(20)
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN orders', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders`', $sql);
         $this->assertStringContainsString('LIMIT 10', $sql);
         $this->assertStringContainsString('OFFSET 20', $sql);
     }
@@ -351,8 +356,8 @@ class JoinQueryTest extends TestCase
             ->toSql();
 
         // Subquery to count orders per user
-        $this->assertStringContainsString('(SELECT COUNT(*) as cnt FROM orders', $sql);
-        $this->assertStringContainsString(') AS order_count', $sql);
+        $this->assertStringContainsString('(SELECT COUNT(*) as `cnt` FROM `orders`', $sql);
+        $this->assertStringContainsString(') AS `order_count`', $sql);
     }
 
     public function test_users_with_high_value_orders(): void
@@ -371,10 +376,10 @@ class JoinQueryTest extends TestCase
 
         $this->assertStringContainsString('COUNT(DISTINCT orders.id) as order_count', $sql);
         $this->assertStringContainsString('SUM(orders.total) as lifetime_value', $sql);
-        $this->assertStringContainsString('INNER JOIN orders', $sql);
+        $this->assertStringContainsString('INNER JOIN `orders`', $sql);
         $this->assertStringContainsString('GROUP BY', $sql);
-        $this->assertStringContainsString('HAVING lifetime_value > ?', $sql);
-        $this->assertStringContainsString('ORDER BY lifetime_value DESC', $sql);
+        $this->assertStringContainsString('HAVING `lifetime_value` > ?', $sql);
+        $this->assertStringContainsString('ORDER BY `lifetime_value` DESC', $sql);
         $this->assertStringContainsString('LIMIT 100', $sql);
     }
 
@@ -386,9 +391,9 @@ class JoinQueryTest extends TestCase
             ->whereNull('order_items.id')
             ->toSql();
 
-        $this->assertStringContainsString('FROM products', $sql);
-        $this->assertStringContainsString('LEFT JOIN order_items', $sql);
-        $this->assertStringContainsString('WHERE order_items.id IS NULL', $sql);
+        $this->assertStringContainsString('FROM `products`', $sql);
+        $this->assertStringContainsString('LEFT JOIN `order_items`', $sql);
+        $this->assertStringContainsString('WHERE `order_items`.`id` IS NULL', $sql);
     }
 
     public function test_three_way_join_with_aggregates(): void
@@ -405,10 +410,10 @@ class JoinQueryTest extends TestCase
             ->orderBy('total_quantity', 'DESC')
             ->toSql();
 
-        $this->assertStringContainsString('FROM categories', $sql);
-        $this->assertStringContainsString('LEFT JOIN products', $sql);
-        $this->assertStringContainsString('LEFT JOIN order_items', $sql);
-        $this->assertStringContainsString('GROUP BY categories.id, categories.name', $sql);
+        $this->assertStringContainsString('FROM `categories`', $sql);
+        $this->assertStringContainsString('LEFT JOIN `products`', $sql);
+        $this->assertStringContainsString('LEFT JOIN `order_items`', $sql);
+        $this->assertStringContainsString('GROUP BY `categories`.`id`, `categories`.`name`', $sql);
     }
 
     // ==================== Edge Cases ====================
@@ -419,7 +424,7 @@ class JoinQueryTest extends TestCase
             ->join('profiles', 'users.id', '=', 'profiles.id')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN profiles ON users.id = profiles.id', $sql);
+        $this->assertStringContainsString('INNER JOIN `profiles` ON `users`.`id` = `profiles`.`id`', $sql);
     }
 
     public function test_multiple_joins_to_same_table(): void
@@ -429,8 +434,8 @@ class JoinQueryTest extends TestCase
             ->join('addresses as shipping', 'users.shipping_address_id', '=', 'shipping.id')
             ->toSql();
 
-        $this->assertStringContainsString('INNER JOIN addresses as billing', $sql);
-        $this->assertStringContainsString('INNER JOIN addresses as shipping', $sql);
+        $this->assertStringContainsString('INNER JOIN `addresses` AS `billing`', $sql);
+        $this->assertStringContainsString('INNER JOIN `addresses` AS `shipping`', $sql);
     }
 
     public function test_join_with_table_prefixes(): void
@@ -441,8 +446,8 @@ class JoinQueryTest extends TestCase
             ->join('app_orders', 'app_users.id', '=', 'app_orders.user_id')
             ->toSql();
 
-        $this->assertStringContainsString('FROM app_users', $sql);
-        $this->assertStringContainsString('INNER JOIN app_orders', $sql);
+        $this->assertStringContainsString('FROM `app_users`', $sql);
+        $this->assertStringContainsString('INNER JOIN `app_orders`', $sql);
     }
 
     // ==================== Performance Tests ====================

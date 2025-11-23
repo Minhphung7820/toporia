@@ -89,6 +89,15 @@ interface ConnectionInterface
     public function getDriverName(): string;
 
     /**
+     * Get the SQL Grammar instance for this connection.
+     *
+     * Grammar provides database-specific SQL compilation.
+     *
+     * @return GrammarInterface
+     */
+    public function getGrammar(): GrammarInterface;
+
+    /**
      * Disconnect from the database.
      *
      * @return void

@@ -18,11 +18,13 @@
     "mockery/mockery": "^1.6",
     "fakerphp/faker": "^1.24"
   },
-  "suggest": {
-    "ext-redis": "Required for Redis Pub/Sub broker and cache driver (native C performance)",
-    "ext-rdkafka": "Required for high-performance Kafka broker (10-50x faster than pure PHP, requires librdkafka C library)",
-    "ext-pdo_mysql": "Required for MySQL database support",
-    "ext-pdo_pgsql": "Required for PostgreSQL database support",
+    "suggest": {
+        "ext-redis": "Required for Redis Pub/Sub broker and cache driver (native C performance)",
+        "ext-rdkafka": "Required for high-performance Kafka broker (10-50x faster than pure PHP, requires librdkafka C library)",
+        "ext-pdo_mysql": "Required for MySQL database support",
+        "ext-pdo_pgsql": "Required for PostgreSQL database support",
+        "ext-mongodb": "Required for MongoDB database support (native C driver)",
+        "mongodb/mongodb": "MongoDB PHP library (pure PHP fallback if ext-mongodb unavailable)",
     "ext-amqp": "Optional for RabbitMQ performance boost (php-amqplib pure PHP works well)",
     "ext-zip": "Required for Excel import/export (openspout/phpspreadsheet)",
     "openspout/openspout": "High-performance Excel library for streaming (recommended for large files)",

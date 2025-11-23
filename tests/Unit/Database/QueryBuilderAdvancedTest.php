@@ -7,6 +7,7 @@ namespace Tests\Unit\Database;
 use PHPUnit\Framework\TestCase;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Grammar\MySQLGrammar;
 use PDO;
 
 /**
@@ -43,6 +44,10 @@ class QueryBuilderAdvancedTest extends TestCase
 
         $this->connection->method('getPdo')->willReturn($pdo);
 
+        // Add Grammar mock for SQL compilation
+        $grammar = new MySQLGrammar();
+        $this->connection->method('getGrammar')->willReturn($grammar);
+
         $this->query = new QueryBuilder($this->connection);
         $this->query->table('users');
     }
@@ -56,7 +61,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->whereDate('created_at', '2025-01-22')
             ->toSql();
 
-        $this->assertStringContainsString('DATE(created_at) = ?', $sql);
+        $this->assertStringContainsString('DATE(`created_at`) = ?', $sql);
         $this->assertEquals(['2025-01-22'], $this->query->getBindings());
     }
 
@@ -69,7 +74,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->whereMonth('created_at', 12)
             ->toSql();
 
-        $this->assertStringContainsString('MONTH(created_at) = ?', $sql);
+        $this->assertStringContainsString('MONTH(`created_at`) = ?', $sql);
         $this->assertEquals([12], $this->query->getBindings());
     }
 
@@ -82,7 +87,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->whereDay('created_at', 25)
             ->toSql();
 
-        $this->assertStringContainsString('DAY(created_at) = ?', $sql);
+        $this->assertStringContainsString('DAY(`created_at`) = ?', $sql);
         $this->assertEquals([25], $this->query->getBindings());
     }
 
@@ -95,7 +100,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->whereYear('created_at', 2025)
             ->toSql();
 
-        $this->assertStringContainsString('YEAR(created_at) = ?', $sql);
+        $this->assertStringContainsString('YEAR(`created_at`) = ?', $sql);
         $this->assertEquals([2025], $this->query->getBindings());
     }
 
@@ -108,7 +113,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->whereTime('created_at', '>=', '10:30:00')
             ->toSql();
 
-        $this->assertStringContainsString('TIME(created_at) >= ?', $sql);
+        $this->assertStringContainsString('TIME(`created_at`) >= ?', $sql);
         $this->assertEquals(['10:30:00'], $this->query->getBindings());
     }
 
@@ -121,7 +126,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->whereColumn('first_name', 'last_name')
             ->toSql();
 
-        $this->assertStringContainsString('first_name = last_name', $sql);
+        $this->assertStringContainsString('`first_name` = `last_name`', $sql);
         $this->assertEmpty($this->query->getBindings()); // No bindings for column comparison
     }
 
@@ -134,7 +139,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->whereColumn('updated_at', '>', 'created_at')
             ->toSql();
 
-        $this->assertStringContainsString('updated_at > created_at', $sql);
+        $this->assertStringContainsString('`updated_at` > `created_at`', $sql);
     }
 
     /**
@@ -147,8 +152,8 @@ class QueryBuilderAdvancedTest extends TestCase
             ->orWhereNull('deleted_at')
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
-        $this->assertStringContainsString('OR deleted_at IS NULL', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
+        $this->assertStringContainsString('OR `deleted_at` IS NULL', $sql);
     }
 
     /**
@@ -161,8 +166,8 @@ class QueryBuilderAdvancedTest extends TestCase
             ->orWhereNotNull('verified_at')
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
-        $this->assertStringContainsString('OR verified_at IS NOT NULL', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
+        $this->assertStringContainsString('OR `verified_at` IS NOT NULL', $sql);
     }
 
     /**
@@ -175,7 +180,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->orWhereRaw('price > ? AND stock < ?', [100, 10])
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
         $this->assertStringContainsString('OR price > ? AND stock < ?', $sql);
         $this->assertEquals(['active', 100, 10], $this->query->getBindings());
     }
@@ -186,14 +191,14 @@ class QueryBuilderAdvancedTest extends TestCase
     public function test_where_exists(): void
     {
         $sql = $this->query
-            ->whereExists(function($query) {
+            ->whereExists(function ($query) {
                 $query->table('orders')
-                      ->whereColumn('orders.user_id', 'users.id');
+                    ->whereColumn('orders.user_id', 'users.id');
             })
             ->toSql();
 
         $this->assertStringContainsString('WHERE EXISTS (', $sql);
-        $this->assertStringContainsString('SELECT * FROM orders', $sql);
+        $this->assertStringContainsString('SELECT * FROM `orders`', $sql);
     }
 
     /**
@@ -202,9 +207,9 @@ class QueryBuilderAdvancedTest extends TestCase
     public function test_where_not_exists(): void
     {
         $sql = $this->query
-            ->whereNotExists(function($query) {
+            ->whereNotExists(function ($query) {
                 $query->table('orders')
-                      ->whereColumn('orders.user_id', 'users.id');
+                    ->whereColumn('orders.user_id', 'users.id');
             })
             ->toSql();
 
@@ -217,14 +222,14 @@ class QueryBuilderAdvancedTest extends TestCase
     public function test_where_in_sub(): void
     {
         $sql = $this->query
-            ->whereInSub('id', function($query) {
+            ->whereInSub('id', function ($query) {
                 $query->table('active_users')
-                      ->select('user_id');
+                    ->select('user_id');
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE id IN (', $sql);
-        $this->assertStringContainsString('SELECT user_id FROM active_users', $sql);
+        $this->assertStringContainsString('WHERE `id` IN (', $sql);
+        $this->assertStringContainsString('SELECT `user_id` FROM `active_users`', $sql);
     }
 
     /**
@@ -233,15 +238,15 @@ class QueryBuilderAdvancedTest extends TestCase
     public function test_select_sub(): void
     {
         $sql = $this->query
-            ->selectSub(function($query) {
+            ->selectSub(function ($query) {
                 $query->table('orders')
-                      ->select('COUNT(*) as count')  // Use select() not selectRaw()
-                      ->whereColumn('orders.user_id', 'users.id');
+                    ->select('COUNT(*) as count')  // Use select() not selectRaw()
+                    ->whereColumn('orders.user_id', 'users.id');
             }, 'orders_count')
             ->toSql();
 
-        $this->assertStringContainsString('(SELECT COUNT(*) as count FROM orders', $sql);
-        $this->assertStringContainsString(') AS orders_count', $sql);
+        $this->assertStringContainsString('(SELECT COUNT(*) as `count` FROM `orders`', $sql);
+        $this->assertStringContainsString(') AS `orders_count`', $sql);
     }
 
     /**
@@ -250,12 +255,12 @@ class QueryBuilderAdvancedTest extends TestCase
     public function test_when_truthy(): void
     {
         $sql = $this->query
-            ->when(true, function($query) {
+            ->when(true, function ($query) {
                 $query->where('status', 'active');
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
         $this->assertEquals(['active'], $this->query->getBindings());
     }
 
@@ -265,7 +270,7 @@ class QueryBuilderAdvancedTest extends TestCase
     public function test_when_falsy(): void
     {
         $sql = $this->query
-            ->when(false, function($query) {
+            ->when(false, function ($query) {
                 $query->where('status', 'active');
             })
             ->toSql();
@@ -279,14 +284,14 @@ class QueryBuilderAdvancedTest extends TestCase
     public function test_when_with_default(): void
     {
         $sql = $this->query
-            ->when(false, function($query) {
+            ->when(false, function ($query) {
                 $query->where('status', 'active');
-            }, function($query) {
+            }, function ($query) {
                 $query->where('status', 'inactive');
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
         $this->assertEquals(['inactive'], $this->query->getBindings());
     }
 
@@ -296,12 +301,12 @@ class QueryBuilderAdvancedTest extends TestCase
     public function test_unless_falsy(): void
     {
         $sql = $this->query
-            ->unless(false, function($query) {
+            ->unless(false, function ($query) {
                 $query->where('status', 'active');
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
     }
 
     /**
@@ -313,7 +318,7 @@ class QueryBuilderAdvancedTest extends TestCase
 
         $sql = $this->query
             ->where('status', 'active')
-            ->tap(function($query) use (&$tapped) {
+            ->tap(function ($query) use (&$tapped) {
                 $tapped = true;
                 $this->assertInstanceOf(QueryBuilder::class, $query);
             })
@@ -321,7 +326,7 @@ class QueryBuilderAdvancedTest extends TestCase
             ->toSql();
 
         $this->assertTrue($tapped);
-        $this->assertStringContainsString('ORDER BY', $sql);
+        $this->assertStringContainsString('ORDER BY `created_at`', $sql);
     }
 
     /**
@@ -443,20 +448,20 @@ class QueryBuilderAdvancedTest extends TestCase
             ->select('id', 'name', 'email')
             ->whereDate('created_at', '>=', '2025-01-01')
             ->whereColumn('updated_at', '>', 'created_at')
-            ->when(true, function($query) {
+            ->when(true, function ($query) {
                 $query->where('status', 'active');
             })
-            ->whereExists(function($query) {
+            ->whereExists(function ($query) {
                 $query->table('orders')
-                      ->whereColumn('orders.user_id', 'users.id');
+                    ->whereColumn('orders.user_id', 'users.id');
             })
             ->orderBy('created_at', 'DESC')
             ->toSql();
 
-        $this->assertStringContainsString('DATE(created_at) >= ?', $sql);
-        $this->assertStringContainsString('updated_at > created_at', $sql);
-        $this->assertStringContainsString('status = ?', $sql);
+        $this->assertStringContainsString('DATE(`created_at`) >= ?', $sql);
+        $this->assertStringContainsString('`updated_at` > `created_at`', $sql);
+        $this->assertStringContainsString('`status` = ?', $sql);
         $this->assertStringContainsString('EXISTS', $sql);
-        $this->assertStringContainsString('ORDER BY created_at DESC', $sql);
+        $this->assertStringContainsString('ORDER BY `created_at` DESC', $sql);
     }
 }

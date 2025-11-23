@@ -7,6 +7,7 @@ namespace Tests\Unit\Database\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Grammar\MySQLGrammar;
 use PDO;
 
 /**
@@ -33,7 +34,7 @@ use PDO;
  * - Mocked connections (O(1) execution)
  * - Fast test execution without database
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @author `Phungtruong7820` <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     1.0.0
@@ -59,12 +60,16 @@ class ComplexQueryTest extends TestCase
         $pdo->method('quote')
             ->willReturnCallback(fn($value) => "'" . addslashes((string)$value) . "'");
 
+        // Add Grammar mock for SQL compilation
+        $grammar = new \Toporia\Framework\Database\Grammar\MySQLGrammar();
+        $connection->method('getGrammar')->willReturn($grammar);
+
         $connection->method('getPdo')->willReturn($pdo);
 
         return $connection;
     }
 
-    // ==================== GROUP BY Tests ====================
+    // ==================== GROUP BY `Tests` ====================
 
     public function test_group_by_single_column(): void
     {
@@ -74,7 +79,7 @@ class ComplexQueryTest extends TestCase
             ->groupBy('status')
             ->toSql();
 
-        $this->assertStringContainsString('GROUP BY status', $sql);
+        $this->assertStringContainsString('GROUP BY `status`', $sql);
     }
 
     public function test_group_by_multiple_columns_varargs(): void
@@ -85,7 +90,7 @@ class ComplexQueryTest extends TestCase
             ->groupBy('category', 'status')
             ->toSql();
 
-        $this->assertStringContainsString('GROUP BY category, status', $sql);
+        $this->assertStringContainsString('GROUP BY `category`, `status`', $sql);
     }
 
     public function test_group_by_multiple_columns_array(): void
@@ -96,7 +101,7 @@ class ComplexQueryTest extends TestCase
             ->groupBy(['country', 'city', 'status'])
             ->toSql();
 
-        $this->assertStringContainsString('GROUP BY country, city, status', $sql);
+        $this->assertStringContainsString('GROUP BY `country`, `city`, `status`', $sql);
     }
 
     public function test_group_by_with_aggregates(): void
@@ -116,7 +121,7 @@ class ComplexQueryTest extends TestCase
         $this->assertStringContainsString('AVG(amount) as avg_amount', $sql);
         $this->assertStringContainsString('MIN(amount) as min_amount', $sql);
         $this->assertStringContainsString('MAX(amount) as max_amount', $sql);
-        $this->assertStringContainsString('GROUP BY category', $sql);
+        $this->assertStringContainsString('GROUP BY `category`', $sql);
     }
 
     // ==================== HAVING Tests ====================
@@ -130,8 +135,8 @@ class ComplexQueryTest extends TestCase
             ->having('count', '>', 10)
             ->toSql();
 
-        $this->assertStringContainsString('GROUP BY category', $sql);
-        $this->assertStringContainsString('HAVING count > ?', $sql);
+        $this->assertStringContainsString('GROUP BY `category`', $sql);
+        $this->assertStringContainsString('HAVING `count` > ?', $sql);
         $this->assertContains(10, $this->query->getBindings());
     }
 
@@ -146,8 +151,8 @@ class ComplexQueryTest extends TestCase
             ->having('total', '>=', 1000)
             ->toSql();
 
-        $this->assertStringContainsString('HAVING count > ?', $sql);
-        $this->assertStringContainsString('AND total >= ?', $sql);
+        $this->assertStringContainsString('HAVING `count` > ?', $sql);
+        $this->assertStringContainsString('AND `total` >= ?', $sql);
         $this->assertEquals([5, 1000], array_slice($this->query->getBindings(), -2));
     }
 
@@ -161,8 +166,8 @@ class ComplexQueryTest extends TestCase
             ->orHaving('count', '<', 5)
             ->toSql();
 
-        $this->assertStringContainsString('HAVING count > ?', $sql);
-        $this->assertStringContainsString('OR count < ?', $sql);
+        $this->assertStringContainsString('HAVING `count` > ?', $sql);
+        $this->assertStringContainsString('OR `count` < ?', $sql);
     }
 
     public function test_having_with_count_aggregate(): void
@@ -174,7 +179,7 @@ class ComplexQueryTest extends TestCase
             ->having('count', '>', 10)
             ->toSql();
 
-        $this->assertStringContainsString('HAVING count > ?', $sql);
+        $this->assertStringContainsString('HAVING `count` > ?', $sql);
         $this->assertContains(10, $this->query->getBindings());
     }
 
@@ -189,8 +194,8 @@ class ComplexQueryTest extends TestCase
             ->having('avg_price', '>', 100)
             ->toSql();
 
-        $this->assertStringContainsString('HAVING count > ?', $sql);
-        $this->assertStringContainsString('AND avg_price > ?', $sql);
+        $this->assertStringContainsString('HAVING `count` > ?', $sql);
+        $this->assertStringContainsString('AND `avg_price` > ?', $sql);
     }
 
     // ==================== Subquery Tests ====================
@@ -206,8 +211,8 @@ class ComplexQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('WHERE EXISTS (', $sql);
-        $this->assertStringContainsString('SELECT * FROM orders', $sql);
-        $this->assertStringContainsString('orders.user_id = users.id', $sql);
+        $this->assertStringContainsString('SELECT * FROM `orders`', $sql);
+        $this->assertStringContainsString('`orders`.`user_id` = `users`.`id`', $sql);
     }
 
     public function test_where_not_exists_subquery(): void
@@ -220,7 +225,7 @@ class ComplexQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('WHERE NOT EXISTS (', $sql);
-        $this->assertStringContainsString('SELECT * FROM orders', $sql);
+        $this->assertStringContainsString('SELECT * FROM `orders`', $sql);
     }
 
     public function test_where_in_subquery(): void
@@ -233,8 +238,8 @@ class ComplexQueryTest extends TestCase
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE id IN (', $sql);
-        $this->assertStringContainsString('SELECT user_id FROM premium_users', $sql);
+        $this->assertStringContainsString('WHERE `id` IN (', $sql);
+        $this->assertStringContainsString('SELECT `user_id` FROM `premium_users`', $sql);
     }
 
     public function test_select_subquery(): void
@@ -248,8 +253,8 @@ class ComplexQueryTest extends TestCase
             }, 'order_count')
             ->toSql();
 
-        $this->assertStringContainsString('(SELECT COUNT(*) as cnt FROM orders', $sql);
-        $this->assertStringContainsString(') AS order_count', $sql);
+        $this->assertStringContainsString('(SELECT COUNT(*) as `cnt` FROM `orders`', $sql);
+        $this->assertStringContainsString(') AS `order_count`', $sql);
     }
 
     public function test_multiple_select_subqueries(): void
@@ -268,8 +273,8 @@ class ComplexQueryTest extends TestCase
             }, 'total_spent')
             ->toSql();
 
-        $this->assertStringContainsString(') AS order_count', $sql);
-        $this->assertStringContainsString(') AS total_spent', $sql);
+        $this->assertStringContainsString(') AS `order_count`', $sql);
+        $this->assertStringContainsString(') AS `total_spent`', $sql);
     }
 
     // ==================== UNION Tests ====================
@@ -284,8 +289,8 @@ class ComplexQueryTest extends TestCase
             ->union($query2)
             ->toSql();
 
-        $this->assertStringContainsString('SELECT id, name, email FROM users', $sql);
-        $this->assertStringContainsString('UNION SELECT id, name, email FROM admins', $sql);
+        $this->assertStringContainsString('SELECT `id`, `name`, `email` FROM `users`', $sql);
+        $this->assertStringContainsString('UNION SELECT `id`, `name`, `email` FROM `admins`', $sql);
     }
 
     public function test_union_all(): void
@@ -331,7 +336,7 @@ class ComplexQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('UNION SELECT', $sql);
-        $this->assertStringContainsString('ORDER BY name ASC', $sql);
+        $this->assertStringContainsString('ORDER BY `name` ASC', $sql);
     }
 
     // ==================== Complex Real-World Scenarios ====================
@@ -354,9 +359,9 @@ class ComplexQueryTest extends TestCase
 
         $this->assertStringContainsString('COUNT(DISTINCT orders.id) as order_count', $sql);
         $this->assertStringContainsString('SUM(orders.total) as total_spent', $sql);
-        $this->assertStringContainsString('GROUP BY users.id, users.name, users.email', $sql);
-        $this->assertStringContainsString('HAVING total_spent > ?', $sql);
-        $this->assertStringContainsString('ORDER BY total_spent DESC', $sql);
+        $this->assertStringContainsString('GROUP BY `users`.`id`, `users`.`name`, `users`.`email`', $sql);
+        $this->assertStringContainsString('HAVING `total_spent` > ?', $sql);
+        $this->assertStringContainsString('ORDER BY `total_spent` DESC', $sql);
         $this->assertStringContainsString('LIMIT 100', $sql);
     }
 
@@ -377,7 +382,7 @@ class ComplexQueryTest extends TestCase
             ->toSql();
 
         $this->assertStringContainsString('WHERE NOT EXISTS', $sql);
-        $this->assertStringContainsString(') AS last_order_date', $sql);
+        $this->assertStringContainsString(') AS `last_order_date`', $sql);
     }
 
     public function test_product_sales_report(): void
@@ -394,23 +399,23 @@ class ComplexQueryTest extends TestCase
             ->orderBy('revenue', 'DESC')
             ->toSql();
 
-        $this->assertStringContainsString('LEFT JOIN order_items', $sql);
+        $this->assertStringContainsString('LEFT JOIN `order_items`', $sql);
         $this->assertStringContainsString('SUM(order_items.quantity * order_items.price) as revenue', $sql);
-        $this->assertStringContainsString('HAVING times_sold > ?', $sql);
+        $this->assertStringContainsString('HAVING `times_sold` > ?', $sql);
     }
 
     public function test_nested_subquery_with_aggregates(): void
     {
         $sql = $this->query
             ->select('id', 'name')
-            ->selectRaw('(SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) as order_count')
+            ->selectRaw('(SELECT COUNT(*) FROM `orders` WHERE orders.user_id = users.id) as order_count')
             ->where(function ($query) {
-                $query->whereRaw('(SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) > ?', [10]);
+                $query->whereRaw('(SELECT COUNT(*) FROM `orders` WHERE orders.user_id = users.id) > ?', [10]);
             })
             ->toSql();
 
-        $this->assertStringContainsString('(SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) as order_count', $sql);
-        $this->assertStringContainsString('(SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) > ?', $sql);
+        $this->assertStringContainsString('(SELECT COUNT(*) FROM `orders` WHERE orders.user_id = users.id) as order_count', $sql);
+        $this->assertStringContainsString('(SELECT COUNT(*) FROM `orders` WHERE orders.user_id = users.id) > ?', $sql);
     }
 
     public function test_complex_multi_table_aggregation(): void
@@ -433,8 +438,8 @@ class ComplexQueryTest extends TestCase
 
         $this->assertStringContainsString('COUNT(DISTINCT products.id) as product_count', $sql);
         $this->assertStringContainsString('COUNT(DISTINCT orders.id) as order_count', $sql);
-        $this->assertStringContainsString('GROUP BY categories.id, categories.name', $sql);
-        $this->assertStringContainsString('HAVING revenue > ?', $sql);
+        $this->assertStringContainsString('GROUP BY `categories`.`id`, `categories`.`name`', $sql);
+        $this->assertStringContainsString('HAVING `revenue` > ?', $sql);
     }
 
     // ==================== Advanced Date/Time Tests ====================
@@ -445,7 +450,7 @@ class ComplexQueryTest extends TestCase
             ->whereDate('created_at', '2025-01-15')
             ->toSql();
 
-        $this->assertStringContainsString('DATE(created_at) = ?', $sql);
+        $this->assertStringContainsString('DATE(`created_at`) = ?', $sql);
         $this->assertContains('2025-01-15', $this->query->getBindings());
     }
 
@@ -455,7 +460,7 @@ class ComplexQueryTest extends TestCase
             ->whereMonth('created_at', 12)
             ->toSql();
 
-        $this->assertStringContainsString('MONTH(created_at) = ?', $sql);
+        $this->assertStringContainsString('MONTH(`created_at`) = ?', $sql);
         $this->assertContains(12, $this->query->getBindings());
     }
 
@@ -465,7 +470,7 @@ class ComplexQueryTest extends TestCase
             ->whereYear('created_at', 2025)
             ->toSql();
 
-        $this->assertStringContainsString('YEAR(created_at) = ?', $sql);
+        $this->assertStringContainsString('YEAR(`created_at`) = ?', $sql);
         $this->assertContains(2025, $this->query->getBindings());
     }
 
@@ -475,7 +480,7 @@ class ComplexQueryTest extends TestCase
             ->whereDay('created_at', 15)
             ->toSql();
 
-        $this->assertStringContainsString('DAY(created_at) = ?', $sql);
+        $this->assertStringContainsString('DAY(`created_at`) = ?', $sql);
         $this->assertContains(15, $this->query->getBindings());
     }
 
@@ -485,7 +490,7 @@ class ComplexQueryTest extends TestCase
             ->whereTime('created_at', '>=', '10:30:00')
             ->toSql();
 
-        $this->assertStringContainsString('TIME(created_at) >= ?', $sql);
+        $this->assertStringContainsString('TIME(`created_at`) >= ?', $sql);
         $this->assertContains('10:30:00', $this->query->getBindings());
     }
 
@@ -495,7 +500,7 @@ class ComplexQueryTest extends TestCase
             ->whereColumn('updated_at', '>', 'created_at')
             ->toSql();
 
-        $this->assertStringContainsString('updated_at > created_at', $sql);
+        $this->assertStringContainsString('`updated_at` > `created_at`', $sql);
         $this->assertEmpty($this->query->getBindings()); // No bindings for column comparison
     }
 
@@ -509,11 +514,11 @@ class ComplexQueryTest extends TestCase
             ->whereTime('created_at', '<=', '17:00:00')
             ->toSql();
 
-        $this->assertStringContainsString('YEAR(created_at) = ?', $sql);
-        $this->assertStringContainsString('MONTH(created_at) = ?', $sql);
-        $this->assertStringContainsString('DAY(created_at) >= ?', $sql);
-        $this->assertStringContainsString('TIME(created_at) >= ?', $sql);
-        $this->assertStringContainsString('TIME(created_at) <= ?', $sql);
+        $this->assertStringContainsString('YEAR(`created_at`) = ?', $sql);
+        $this->assertStringContainsString('MONTH(`created_at`) = ?', $sql);
+        $this->assertStringContainsString('DAY(`created_at`) >= ?', $sql);
+        $this->assertStringContainsString('TIME(`created_at`) >= ?', $sql);
+        $this->assertStringContainsString('TIME(`created_at`) <= ?', $sql);
     }
 
     // ==================== Conditional Query Building Tests ====================
@@ -526,7 +531,7 @@ class ComplexQueryTest extends TestCase
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
     }
 
     public function test_when_condition_false(): void
@@ -548,7 +553,7 @@ class ComplexQueryTest extends TestCase
             })
             ->toSql();
 
-        $this->assertStringContainsString('WHERE status = ?', $sql);
+        $this->assertStringContainsString('WHERE `status` = ?', $sql);
     }
 
     public function test_tap_method(): void
@@ -589,7 +594,7 @@ class ComplexQueryTest extends TestCase
         $this->assertStringContainsString('LOCK IN SHARE MODE', $sql);
     }
 
-    // ==================== Edge Cases and Performance ====================
+    // ==================== Edge Cases and `Performance` ====================
 
     public function test_deeply_nested_subqueries(): void
     {
