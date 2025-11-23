@@ -20,7 +20,7 @@
 
 **Toporia** is a modern, professional-grade PHP framework designed with **Clean Architecture** and **SOLID principles** at its core. It provides a robust foundation for building scalable web applications while maintaining strict separation of concerns between framework and application layers.
 
-Inspired by Laravel's elegance and Symfony's architecture, Toporia offers a **zero-dependency** core framework with optional integrations, giving you full control over your application's architecture.
+Inspired by modern PHP frameworks and enterprise architecture patterns, Toporia offers a **zero-dependency** core framework with optional integrations, giving you full control over your application's architecture.
 
 ## ✨ Key Features
 
@@ -90,7 +90,7 @@ Inspired by Laravel's elegance and Symfony's architecture, Toporia offers a **ze
 - Placeholder interpolation (`{user_id}` syntax)
 - Context data as structured JSON
 - Thread-safe file locking (LOCK_EX)
-- Laravel-compatible API and helpers
+- Modern framework API and helpers
 
 #### **Authentication & Authorization**
 - Session-based authentication
@@ -144,7 +144,7 @@ Inspired by Laravel's elegance and Symfony's architecture, Toporia offers a **ze
 
 #### **File Storage**
 - Multi-driver storage system (Local, S3, DigitalOcean Spaces, MinIO)
-- Laravel-style Storage facade
+- Clean and intuitive Storage facade
 - File upload handling with validation
 - Hash-based filenames for security
 
@@ -158,7 +158,7 @@ Inspired by Laravel's elegance and Symfony's architecture, Toporia offers a **ze
 - Notifiable trait for models
 - Database notification storage
 - Real-time WebSocket/SSE broadcast notifications
-- Laravel-compatible API
+- Modern framework API
 
 #### **Collections**
 - **Collection** - Eager collection with 40+ methods (map, filter, reduce, groupBy, sortBy)
@@ -172,7 +172,7 @@ Inspired by Laravel's elegance and Symfony's architecture, Toporia offers a **ze
 - 20+ built-in rules (required, email, unique, exists, min, max, regex)
 - Database validation rules (unique, exists)
 - Custom rule support
-- Laravel-compatible API
+- Modern framework API
 
 #### **Error Handling**
 - Beautiful error pages with syntax highlighting
@@ -184,7 +184,7 @@ Inspired by Laravel's elegance and Symfony's architecture, Toporia offers a **ze
 ### 🛠️ Developer Experience
 
 - **Zero Framework Dependencies** - Core framework requires only PHP 8.1+
-- **Laravel-Compatible API** - Familiar syntax for Laravel developers
+- **Modern Fluent API** - Familiar syntax for PHP developers
 - **Comprehensive Documentation** - 15+ markdown guides in `/docs`
 - **Helper Functions** - 50+ global helpers for common tasks
 - **Static Facades** - Convenient static access via ServiceAccessor
@@ -419,7 +419,7 @@ Toporia Framework is open-source software licensed under the [MIT license](LICEN
 **Developed by TMP DEV**
 
 - Framework Architecture: Clean Architecture + SOLID Principles
-- Inspired by: Laravel, Symfony, PSR Standards
+- Inspired by: Modern PHP frameworks, PSR Standards
 - Built with: PHP 8.1+, Composer
 
 ## 🔗 Links

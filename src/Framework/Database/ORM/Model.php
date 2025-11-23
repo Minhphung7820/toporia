@@ -228,7 +228,7 @@ abstract class Model implements ModelInterface, ObservableInterface
      * Boot the model and all its traits.
      *
      * Automatically calls boot{TraitName} methods for all used traits.
-     * This follows Laravel's convention for trait booting.
+     * Standard pattern for trait initialization in Toporia ORM.
      *
      * Performance: O(T) where T = number of traits (typically 1-3)
      * Called once per model class, cached by static flag.
@@ -544,58 +544,15 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Find a model by its primary key.
      *
-     * Laravel-style implementation:
-     * - When called directly: Model::find($id) - uses standard query
-     * - When called via query builder: Model::with()->find($id) - uses ModelQueryBuilder which returns Model
+     * Convenient shortcut: Model::find($id) instead of Model::query()->where('id', $id)->first()
+     * Delegates to ModelQueryBuilder::find() which handles eager loading automatically.
      *
      * @param int|string $id Primary key value
      * @return static|null Model instance or null
      */
     public static function find(int|string $id): ?static
     {
-        $query = static::query();
-        $eagerLoad = $query->getEagerLoad();
-
-        // If there's eager loading configured (e.g., from with(), withCount()), use getModels()
-        if (!empty($eagerLoad)) {
-            $collection = $query->where(static::$primaryKey, $id)->getModels();
-            $model = $collection->first();
-
-            if ($model === null) {
-                return null;
-            }
-
-            /** @var static $model */
-            return $model;
-        }
-
-        // Standard find() without eager loading
-        $data = $query->where(static::$primaryKey, $id)->first();
-
-        if ($data === null) {
-            return null;
-        }
-
-        // Check if data is a Model wrapped in array (from ModelQueryBuilder::find() with eager loading)
-        if (is_array($data) && isset($data['_model_instance']) && $data['_model_instance'] instanceof static) {
-            return $data['_model_instance'];
-        }
-
-        // If data is already a Model (shouldn't happen, but handle it), return it directly
-        if ($data instanceof static) {
-            return $data;
-        }
-
-        // Otherwise, hydrate from array (standard case: Model::find())
-        if (is_array($data)) {
-            $model = new static($data);
-            $model->exists = true;
-            $model->syncOriginal();
-            return $model;
-        }
-
-        // Fallback: should not happen, but handle it
-        return null;
+        return static::query()->find($id);
     }
 
     /**
@@ -1529,12 +1486,19 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Execute the current query and return a typed ModelCollection.
      *
-     * This method delegates to ModelQueryBuilder::getModels() which:
-     * 1. Gets raw rows from database
-     * 2. Converts rows to model instances via hydrate()
-     * 3. Loads eager relationships if configured via with()
+     * Retrieves all records matching the current query constraints.
+     * Automatically hydrates results into Model instances and loads eager relationships.
      *
      * @return ModelCollection<static>
+     *
+     * @example
+     * ```php
+     * // Get all users
+     * $users = UserModel::get();
+     *
+     * // With query constraints
+     * $activeUsers = UserModel::query()->where('active', 1)->get();
+     * ```
      */
     public static function get(): ModelCollection
     {

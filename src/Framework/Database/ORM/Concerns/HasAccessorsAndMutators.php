@@ -7,7 +7,7 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 /**
  * Trait HasAccessorsAndMutators
  *
- * Provides Laravel-compatible accessor and mutator support for Model attributes.
+ * Provides Modern ORM accessor and mutator support for Model attributes.
  * Allows defining custom getters and setters using magic methods.
  *
  * Features:

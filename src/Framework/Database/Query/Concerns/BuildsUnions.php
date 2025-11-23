@@ -10,7 +10,7 @@ use Closure;
  * Trait BuildsUnions
  *
  * UNION query builders for Query Builder.
- * Provides Laravel-compatible UNION and UNION ALL operations.
+ * Provides Modern ORM UNION and UNION ALL operations.
  *
  * Features:
  * - UNION (distinct results)

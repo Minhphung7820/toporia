@@ -61,17 +61,8 @@ class HasOne extends Relation
             return null;
         }
 
-        $data = $this->query->first();
-
-        if ($data === null) {
-            return null;
-        }
-
-        /** @var Model $model */
-        $model = new $this->relatedClass($data);
-        $model->setAttribute('exists', true);
-
-        return $model;
+        // Since $this->query is a ModelQueryBuilder, first() returns Model|null
+        return $this->query->first();
     }
 
     /**

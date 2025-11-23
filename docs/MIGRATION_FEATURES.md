@@ -100,7 +100,7 @@
 - ✅ `onDelete()` - ON DELETE action (cascade, restrict, set null, no action)
 - ✅ `onUpdate()` - ON UPDATE action
 - ✅ `name()` - Foreign key name
-- ✅ `constrained()` - Laravel-compatible helper
+- ✅ `constrained()` - Modern framework helper
 
 ### 5. Helper Methods
 

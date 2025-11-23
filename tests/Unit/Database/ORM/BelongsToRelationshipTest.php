@@ -211,10 +211,11 @@ class BelongsToRelationshipTest extends DatabaseTestCase
         $post->save();
 
         // Query with where clause
+        /** @var UserForBelongsToModel|null $relatedUser */
         $relatedUser = $post->user()->getQuery()->where('email', 'john@example.com')->first();
 
         $this->assertNotNull($relatedUser);
-        $this->assertEquals('John Doe', $relatedUser['name']);
+        $this->assertEquals('John Doe', $relatedUser->name);
     }
 
     /**
@@ -346,13 +347,14 @@ class BelongsToRelationshipTest extends DatabaseTestCase
         $post->save();
 
         // Chain multiple query methods
+        /** @var UserForBelongsToModel|null $relatedUser */
         $relatedUser = $post->user()
             ->getQuery()
             ->where('email', 'john@example.com')
             ->first();
 
         $this->assertNotNull($relatedUser);
-        $this->assertEquals('John Doe', $relatedUser['name']);
+        $this->assertEquals('John Doe', $relatedUser->name);
     }
 
     /**
@@ -367,10 +369,11 @@ class BelongsToRelationshipTest extends DatabaseTestCase
         $post->save();
 
         // Query with where clause on user
+        /** @var UserForBelongsToModel|null $relatedUser */
         $relatedUser = $post->user()->getQuery()->where('name', 'John Doe')->first();
 
         $this->assertNotNull($relatedUser);
-        $this->assertEquals('john@example.com', $relatedUser['email']);
+        $this->assertEquals('john@example.com', $relatedUser->email);
     }
 
     /**

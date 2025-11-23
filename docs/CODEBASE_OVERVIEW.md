@@ -119,7 +119,7 @@ toporia/
 - PSR-7 inspired Request/Response abstraction
 - JSON detection and response helpers
 - File upload handling with validation
-- Cookie management with encryption (Laravel-compatible)
+- Cookie management with encryption (Modern framework)
 - Security headers middleware (CSP, HSTS, X-Frame-Options)
 - Middleware pipeline system
 
@@ -360,7 +360,7 @@ Current routes:
 
 ## 🔐 Security Features
 
-1. **CSRF Protection**: Token-based validation with Laravel-compatible cookies
+1. **CSRF Protection**: Token-based validation with Modern framework cookies
 2. **XSS Protection**: HTML escaping service
 3. **Replay Attack Protection**: Nonce-based protection
 4. **Rate Limiting**: Cache-based rate limiting for API
@@ -527,7 +527,7 @@ Comprehensive documentation available in `/docs`:
 
 - **Version**: 1.0.0
 - **Status**: Production-ready framework
-- **Welcome Page**: Laravel-style welcome page in Vue SPA (`Home.vue`)
+- **Welcome Page**: Fluent welcome page in Vue SPA (`Home.vue`)
 - **Routes**: All routes handled by Vue SPA (SPA fallback pattern)
 - **API**: Authentication API endpoints available
 - **Database**: Factory/Seeder system implemented

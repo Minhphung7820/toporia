@@ -276,7 +276,7 @@ Consumer (CLI worker) ← Queue Driver ← Queue Storage
 
 ### 8. Security Features
 
-- **CSRF Protection**: Token-based validation with Laravel-compatible cookies
+- **CSRF Protection**: Token-based validation with Modern framework cookies
 - **XSS Protection**: HTML escaping service
 - **Replay Attack Protection**: Nonce-based protection
 - **Rate Limiting**: Cache-based rate limiting for API
@@ -506,7 +506,7 @@ The Toporia Framework codebase demonstrates:
 ✅ **Enterprise-Grade Architecture**: Clean Architecture with strict layer separation
 ✅ **SOLID Principles**: Applied consistently throughout
 ✅ **Performance Optimizations**: Reflection caching, eager loading, connection pooling
-✅ **Developer Experience**: Laravel-compatible API, fluent interfaces, helpful errors
+✅ **Developer Experience**: Modern framework API, fluent interfaces, helpful errors
 ✅ **Testability**: Comprehensive testing infrastructure
 ✅ **Extensibility**: Service providers, interfaces, pluggable drivers
 ✅ **Security**: CSRF, XSS protection, rate limiting, secure headers

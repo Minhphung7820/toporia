@@ -786,9 +786,11 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Execute the built SELECT with LIMIT 1 and return the first row or null.
      *
+     * Return type is mixed to allow ModelQueryBuilder to override with Model return type.
+     *
      * @return array<string,mixed>|null
      */
-    public function first(): ?array
+    public function first(): mixed
     {
         $this->limit(1);
         $collection = $this->get();
@@ -823,11 +825,13 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Find a row by primary key column.
      *
+     * Return type is mixed to allow ModelQueryBuilder to override with Model return type.
+     *
      * @param int|string $id
      * @param string     $column Primary key column (default: 'id').
      * @return array<string,mixed>|null
      */
-    public function find(int|string $id, string $column = 'id'): ?array
+    public function find(int|string $id, string $column = 'id'): mixed
     {
         return $this->where($column, $id)->first();
     }
@@ -1270,7 +1274,11 @@ class QueryBuilder implements QueryBuilderInterface
         $originalColumns = $this->columns;
         $this->columns = ["COUNT({$column}) as aggregate"];
 
-        $result = $this->first();
+        // Execute query directly to get raw array result
+        // Don't use first() as it may be overridden in subclasses (ModelQueryBuilder)
+        $sql = $this->toSql();
+        $rows = $this->connection->select($sql, $this->bindings);
+        $result = $rows[0] ?? null;
 
         $this->columns = $originalColumns;
 

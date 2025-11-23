@@ -8,7 +8,7 @@ namespace Toporia\Framework\Database\Query\Concerns;
  * Trait BuildsLocks
  *
  * Pessimistic locking builders for Query Builder.
- * Provides Laravel-compatible row locking for concurrent access control.
+ * Provides Modern ORM row locking for concurrent access control.
  *
  * Features:
  * - FOR UPDATE (exclusive lock)

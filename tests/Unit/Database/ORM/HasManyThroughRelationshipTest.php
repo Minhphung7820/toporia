@@ -598,14 +598,8 @@ class CountryThroughModel extends Model
 
     public static function find(int|string $id): ?static
     {
-        $row = static::query()->where('id', $id)->first();
-        if (!$row) {
-            return null;
-        }
-        $model = new static($row);
-        $model->exists = true;
-        $model->syncOriginal();
-        return $model;
+        // first() now returns Model|null directly
+        return static::query()->where('id', $id)->first();
     }
 
     public function setRelation(string $name, mixed $value): Model

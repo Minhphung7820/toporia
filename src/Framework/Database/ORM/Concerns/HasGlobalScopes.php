@@ -10,7 +10,7 @@ use Toporia\Framework\Database\Query\QueryBuilder;
 /**
  * Trait HasGlobalScopes
  *
- * Provides Laravel-compatible global scope support for automatic query constraints.
+ * Provides Modern ORM global scope support for automatic query constraints.
  * Global scopes allow you to add constraints to all queries for a model.
  *
  * Common Use Cases:

@@ -148,10 +148,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Eager load posts
-        // Laravel-style: with()->find() returns Model wrapped in array structure
-        $result = EagerLoadingUserModel::with('posts')->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::with('posts')->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -185,9 +182,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Eager load multiple relations
-        $result = EagerLoadingPostModel::with(['user', 'comments'])->find($postId);
-        /** @var EagerLoadingPostModel|null $post */
-        $post = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $post = EagerLoadingPostModel::with(['user', 'comments'])->find($postId);
 
         $this->assertNotNull($post);
         $this->assertInstanceOf(EagerLoadingPostModel::class, $post);
@@ -255,9 +250,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Nested eager loading: posts.comments
-        $result = EagerLoadingUserModel::with('posts.comments')->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::with('posts.comments')->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -288,9 +281,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Get user with post count
-        $result = EagerLoadingUserModel::withCount('posts')->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::withCount('posts')->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -322,9 +313,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Get post with counts (only HasMany relationships can use withCount)
-        $result = EagerLoadingPostModel::withCount('comments')->find($postId);
-        /** @var EagerLoadingPostModel|null $post */
-        $post = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $post = EagerLoadingPostModel::withCount('comments')->find($postId);
 
         $this->assertNotNull($post);
         $this->assertInstanceOf(EagerLoadingPostModel::class, $post);
@@ -350,11 +339,9 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Count only published posts
-        $result = EagerLoadingUserModel::withCount([
+        $user = EagerLoadingUserModel::withCount([
             'posts' => fn($q) => $q->where('status', 'published')
         ])->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
 
         $this->assertNotNull($user);
         $this->assertEquals(3, $user->posts_count);
@@ -414,9 +401,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Get user with sum of views
-        $result = EagerLoadingUserModel::withSum('posts', 'views')->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::withSum('posts', 'views')->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -447,9 +432,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Sum likes only for published posts
-        $result = EagerLoadingUserModel::withSum('posts', 'likes', fn($q) => $q->where('status', 'published'))->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::withSum('posts', 'likes', fn($q) => $q->where('status', 'published'))->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -479,9 +462,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Get user with average rating
-        $result = EagerLoadingUserModel::withAvg('posts', 'rating')->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::withAvg('posts', 'rating')->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -509,9 +490,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Get user with minimum views
-        $result = EagerLoadingUserModel::withMin('posts', 'views')->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::withMin('posts', 'views')->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -539,9 +518,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Get user with maximum views
-        $result = EagerLoadingUserModel::withMax('posts', 'views')->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::withMax('posts', 'views')->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -572,15 +549,13 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Get user with all aggregates
-        $result = EagerLoadingUserModel::withCount('posts')
+        $user = EagerLoadingUserModel::withCount('posts')
             ->withSum('posts', 'views')
             ->withSum('posts', 'likes')
             ->withAvg('posts', 'rating')
             ->withMin('posts', 'views')
             ->withMax('posts', 'views')
             ->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -752,9 +727,7 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         }
 
         // Eager load: users -> posts -> comments
-        $result = EagerLoadingUserModel::with('posts.comments')->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
+        $user = EagerLoadingUserModel::with('posts.comments')->find($user->id);
 
         $this->assertNotNull($user);
         $this->assertInstanceOf(EagerLoadingUserModel::class, $user);
@@ -867,13 +840,11 @@ class ModelEagerLoadingAndRelationshipsTest extends DatabaseTestCase
         $startTime = microtime(true);
 
         // Get aggregates
-        $result = EagerLoadingUserModel::withCount('posts')
+        $user = EagerLoadingUserModel::withCount('posts')
             ->withSum('posts', 'views')
             ->withSum('posts', 'likes')
             ->withAvg('posts', 'views')
             ->find($user->id);
-        /** @var EagerLoadingUserModel|null $user */
-        $user = (is_array($result) && isset($result['_model_instance'])) ? $result['_model_instance'] : null;
 
         $endTime = microtime(true);
         $executionTime = ($endTime - $startTime) * 1000; // ms

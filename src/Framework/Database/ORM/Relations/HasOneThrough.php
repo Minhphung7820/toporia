@@ -112,13 +112,8 @@ class HasOneThrough extends Relation
         // Select only related table columns to avoid column ambiguity
         $this->query->select("{$relatedTable}.*");
 
-        $row = $this->query->first();
-
-        if (!$row) {
-            return null;
-        }
-
-        return call_user_func([$this->relatedClass, 'hydrate'], [$row])->first();
+        // Since $this->query is a ModelQueryBuilder, first() returns Model|null
+        return $this->query->first();
     }
 
     /**

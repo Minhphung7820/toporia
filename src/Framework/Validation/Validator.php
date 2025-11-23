@@ -1191,7 +1191,7 @@ final class Validator implements ValidatorInterface
     }
 
     // =========================================================================
-    // Additional Validation Rules (Laravel-compatible)
+    // Additional Validation Rules (Modern ORM)
     // =========================================================================
 
     /**

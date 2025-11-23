@@ -198,7 +198,7 @@ class HasOneThroughRelationshipTest extends DatabaseTestCase
         $history = $supplier->accountHistory()->getQuery()->where('action', 'Updated')->first();
 
         $this->assertNotNull($history);
-        $this->assertEquals('Updated', $history['action']);
+        $this->assertEquals('Updated', $history->action);
     }
 
     /**
@@ -337,7 +337,7 @@ class HasOneThroughRelationshipTest extends DatabaseTestCase
         $history = $supplier->accountHistory()->getQuery()->orderBy('action', 'ASC')->first();
 
         $this->assertNotNull($history);
-        $this->assertEquals('Action 1', $history['action']);
+        $this->assertEquals('Action 1', $history->action);
     }
 
     /**
@@ -401,7 +401,7 @@ class HasOneThroughRelationshipTest extends DatabaseTestCase
             ->first();
 
         $this->assertNotNull($history);
-        $this->assertEquals('Updated', $history['action']);
+        $this->assertEquals('Updated', $history->action);
     }
 
     /**
@@ -534,14 +534,8 @@ class SupplierThroughModel extends Model
 
     public static function find(int|string $id): ?static
     {
-        $row = static::query()->where('id', $id)->first();
-        if (!$row) {
-            return null;
-        }
-        $model = new static($row);
-        $model->exists = true;
-        $model->syncOriginal();
-        return $model;
+        // first() now returns Model|null directly
+        return static::query()->where('id', $id)->first();
     }
 
     public function setRelation(string $name, mixed $value): Model

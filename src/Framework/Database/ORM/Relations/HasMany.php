@@ -237,7 +237,7 @@ class HasMany extends Relation
     /**
      * Create multiple related models.
      *
-     * Alias for saveMany() for Laravel compatibility.
+     * Alias for saveMany() for convenience.
      *
      * @param array<int, array<string, mixed>> $models Array of model attributes
      * @return ModelCollection Collection of created models

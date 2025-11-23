@@ -114,7 +114,7 @@ final class Translator implements TranslatorInterface
     /**
      * Extract the correct choice segment based on number.
      *
-     * Supports Laravel-style pluralization:
+     * Supports fluent pluralization:
      * - "one|many" - simple pluralization
      * - "{0} No apples|{1} One apple|[2,*] Many apples" - complex pluralization
      *

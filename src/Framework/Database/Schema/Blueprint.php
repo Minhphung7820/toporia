@@ -198,7 +198,7 @@ class Blueprint
 
     /**
      * Add foreign ID column (unsigned big integer).
-     * Laravel-compatible helper.
+     * Modern ORM helper.
      *
      * @param string $name Column name (default: table name + '_id').
      * @return ColumnDefinition
@@ -210,7 +210,7 @@ class Blueprint
 
     /**
      * Add foreign ID column and create foreign key constraint.
-     * Laravel-compatible helper.
+     * Modern ORM helper.
      *
      * @param string $name Column name.
      * @param string $references Referenced column (default: 'id').

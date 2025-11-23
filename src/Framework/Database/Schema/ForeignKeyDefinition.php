@@ -81,7 +81,7 @@ class ForeignKeyDefinition
     }
 
     /**
-     * Set referenced table and column using Laravel's constrained() pattern.
+     * Set referenced table and column using standard constrained() pattern.
      *
      * Infers table name from foreign key column name.
      * Example: 'user_id' -> references 'id' on 'users' table.

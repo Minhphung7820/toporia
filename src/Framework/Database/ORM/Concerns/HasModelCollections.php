@@ -8,7 +8,7 @@ namespace Toporia\Framework\Database\ORM\Concerns;
  * Trait HasModelCollections
  *
  * Enhanced model collection methods for retrieving and manipulating models.
- * Provides Laravel-compatible convenience methods for common operations.
+ * Provides Modern ORM convenience methods for common operations.
  *
  * Features:
  * - find() with multiple IDs support

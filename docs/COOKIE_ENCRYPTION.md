@@ -334,7 +334,7 @@ Cookie Encryption trong Toporia Framework:
 - ✅ **Tự động**: Encrypt/decrypt tự động khi có APP_KEY
 - ✅ **Secure**: AES-256-CBC với random IV
 - ✅ **Performance**: O(1) key derivation, minimal overhead
-- ✅ **Laravel-compatible**: Cùng algorithm và behavior
+- ✅ **Modern framework**: Cùng algorithm và behavior
 - ✅ **Graceful**: Fallback nếu không có key
 
 **Status**: ✅ **FULLY IMPLEMENTED** - Đã có đầy đủ tính năng như Laravel!

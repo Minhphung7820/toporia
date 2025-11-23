@@ -88,7 +88,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
      */
     public function testEagerLoadingWithConstraints(): void
     {
-        $users = EagerLoadingTestUser::with([
+        $users = EagerLoadingOptimizationTestUser::with([
             'posts' => function ($q) {
                 $q->where('published', 1);
             }
@@ -97,7 +97,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
         $this->assertCount(2, $users);
 
         $john = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $john);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $john);
         $this->assertNotNull($john);
 
         // Should only load published posts
@@ -116,11 +116,11 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
     public function testLazyEagerLoading(): void
     {
         // Use getModels() to ensure we get ModelCollection
-        $users = EagerLoadingTestUser::query()->where('id', 1)->getModels();
+        $users = EagerLoadingOptimizationTestUser::query()->where('id', 1)->getModels();
         $this->assertCount(1, $users);
 
         $user = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $user);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $user);
         $this->assertNotNull($user);
 
         // Initially, relation should not be loaded
@@ -142,9 +142,9 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
      */
     public function testLazyEagerLoadingWithConstraints(): void
     {
-        $users = EagerLoadingTestUser::query()->where('id', 1)->getModels();
+        $users = EagerLoadingOptimizationTestUser::query()->where('id', 1)->getModels();
         $user = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $user);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $user);
         $this->assertNotNull($user);
 
         // Load only published posts
@@ -168,9 +168,9 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
      */
     public function testLazyEagerLoadingMultipleRelations(): void
     {
-        $users = EagerLoadingTestUser::query()->where('id', 1)->getModels();
+        $users = EagerLoadingOptimizationTestUser::query()->where('id', 1)->getModels();
         $user = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $user);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $user);
         $this->assertNotNull($user);
 
         // Load multiple relations
@@ -190,7 +190,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
     {
         // This test verifies that constraints are applied correctly
         // even when combined with nested relationship loading
-        $users = EagerLoadingTestUser::with([
+        $users = EagerLoadingOptimizationTestUser::with([
             'posts' => function ($q) {
                 $q->where('published', 1);
             }
@@ -199,7 +199,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
         $this->assertCount(2, $users);
 
         foreach ($users as $user) {
-            $this->assertInstanceOf(EagerLoadingTestUser::class, $user);
+            $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $user);
             $posts = $user->posts;
             if ($posts instanceof ModelCollection && $posts->count() > 0) {
                 foreach ($posts as $post) {
@@ -214,9 +214,9 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
      */
     public function testLoadMethodReturnsSelf(): void
     {
-        $users = EagerLoadingTestUser::query()->where('id', 1)->getModels();
+        $users = EagerLoadingOptimizationTestUser::query()->where('id', 1)->getModels();
         $user = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $user);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $user);
         $this->assertNotNull($user);
 
         $result = $user->load('posts');
@@ -229,9 +229,9 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
      */
     public function testLoadMethodCanBeCalledMultipleTimes(): void
     {
-        $users = EagerLoadingTestUser::query()->where('id', 1)->getModels();
+        $users = EagerLoadingOptimizationTestUser::query()->where('id', 1)->getModels();
         $user = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $user);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $user);
         $this->assertNotNull($user);
 
         // First load
@@ -248,12 +248,12 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
      */
     public function testEagerLoadingWithEmptyConstraints(): void
     {
-        $users = EagerLoadingTestUser::with('posts')->getModels();
+        $users = EagerLoadingOptimizationTestUser::with('posts')->getModels();
 
         $this->assertCount(2, $users);
 
         $john = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $john);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $john);
         $this->assertNotNull($john);
 
         $posts = $john->posts;
@@ -266,7 +266,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
      */
     public function testEagerLoadingConstraintsWithMultipleConditions(): void
     {
-        $users = EagerLoadingTestUser::with([
+        $users = EagerLoadingOptimizationTestUser::with([
             'posts' => function ($q) {
                 $q->where('published', 1)
                     ->where('title', 'LIKE', '%Published%');
@@ -276,7 +276,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
         $this->assertCount(2, $users);
 
         $john = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $john);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $john);
         $this->assertNotNull($john);
 
         $posts = $john->posts;
@@ -295,9 +295,9 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
     public function testLazyLoadingDoesNotAffectAlreadyLoadedRelations(): void
     {
         // Load with eager loading first
-        $users = EagerLoadingTestUser::with('posts')->getModels();
+        $users = EagerLoadingOptimizationTestUser::with('posts')->getModels();
         $user = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $user);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $user);
         $this->assertNotNull($user);
 
         $initialPosts = $user->posts;
@@ -317,7 +317,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
      */
     public function testEagerLoadingConstraintsWithWhereIn(): void
     {
-        $users = EagerLoadingTestUser::with([
+        $users = EagerLoadingOptimizationTestUser::with([
             'posts' => function ($q) {
                 $q->whereIn('id', [1, 3]);
             }
@@ -326,7 +326,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
         $this->assertCount(2, $users);
 
         $john = $users->first();
-        $this->assertInstanceOf(EagerLoadingTestUser::class, $john);
+        $this->assertInstanceOf(EagerLoadingOptimizationTestUser::class, $john);
         $this->assertNotNull($john);
 
         $posts = $john->posts;
@@ -335,7 +335,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
         // Should only load posts with id 1 or 3
         $postIds = [];
         foreach ($posts as $post) {
-            if ($post instanceof EagerLoadingTestPost) {
+            if ($post instanceof EagerLoadingOptimizationTestPost) {
                 $postIds[] = $post->id;
             }
         }
@@ -347,7 +347,7 @@ class EagerLoadingOptimizationsTest extends DatabaseTestCase
 /**
  * Test User Model for Eager Loading Tests
  */
-class EagerLoadingTestUser extends Model
+class EagerLoadingOptimizationTestUser extends Model
 {
     protected static string $table = 'test_users';
     protected static string $primaryKey = 'id';
@@ -356,14 +356,14 @@ class EagerLoadingTestUser extends Model
 
     public function posts()
     {
-        return $this->hasMany(EagerLoadingTestPost::class, 'user_id', 'id');
+        return $this->hasMany(EagerLoadingOptimizationTestPost::class, 'user_id', 'id');
     }
 }
 
 /**
  * Test Post Model for Eager Loading Tests
  */
-class EagerLoadingTestPost extends Model
+class EagerLoadingOptimizationTestPost extends Model
 {
     protected static string $table = 'test_posts';
     protected static string $primaryKey = 'id';

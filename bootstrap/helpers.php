@@ -1111,9 +1111,7 @@ if (!function_exists('chain')) {
 
 if (!function_exists('__')) {
     /**
-     * Translate the given message (Laravel-compatible).
-     *
-     * This is the primary translation helper function, compatible with Laravel's __().
+     * Translate the given message.
      *
      * Usage:
      * - __('messages.welcome') - Simple translation
@@ -1175,7 +1173,7 @@ if (!function_exists('trans_choice')) {
     /**
      * Translate the given message with pluralization.
      *
-     * Supports Laravel-style pluralization:
+     * Supports pluralization:
      * - Simple: "one|many"
      * - Complex: "{0} No apples|{1} One apple|[2,*] Many apples"
      *

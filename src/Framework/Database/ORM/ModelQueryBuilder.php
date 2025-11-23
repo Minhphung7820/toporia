@@ -87,13 +87,13 @@ class ModelQueryBuilder extends QueryBuilder
     /**
      * Execute the query and return a ModelCollection.
      *
-     * This method:
+     * @internal This is an internal implementation method.
+     *           Use get() instead for cleaner public API.
+     *
+     * Internal method used by get(), first(), find() and relationship loading.
      * 1. Gets raw rows from database
      * 2. Hydrates into model instances
      * 3. Loads eager relationships
-     *
-     * Note: Named getModels() instead of overriding get() due to PHP return type constraints.
-     * PHP doesn't support return type variance (ModelCollection is not subtype of RowCollection).
      *
      * @return ModelCollection<TModel>
      */
@@ -167,62 +167,35 @@ class ModelQueryBuilder extends QueryBuilder
     /**
      * Get the first model from the query results.
      *
-     * Laravel-style: When called from Model::with()->first(), delegates to Model::find()
-     * to ensure proper Model hydration and eager loading.
+     * Overrides parent to return Model instance instead of array.
+     * Supports fluent syntax: Model::query()->where(...)->first()
      *
-     * @return array|null Array data or null (parent implementation)
+     * @return TModel|null Model instance or null
+     * @phpstan-return TModel|null
      */
-    public function first(): ?array
+    public function first(): mixed
     {
-        // Use parent implementation (returns array)
-        // Model::find() will handle eager loading via getModels()
-        return parent::first();
+        $collection = $this->limit(1)->getModels();
+        return $collection->first();
     }
 
     /**
      * Find a model by its primary key.
      *
-     * Laravel-style: When called from Model::with()->find(), uses getModels() to return Model.
-     * However, due to PHP strict types, we can't override with different return type.
-     * So we check for eager loading and use getModels() if needed, but return array for type compatibility.
-     * Model::find() will handle the conversion back to Model.
+     * Supports both Model::find(1) and Model::query()->find(1) syntax.
+     * Preserves eager loading and other query configurations.
      *
      * @param int|string $id Primary key value
      * @param string $column Column name (default: 'id')
-     * @return array|null Array data or null
-     * @phpstan-return TModel|array|null
+     * @return TModel|null Model instance or null
+     * @phpstan-return TModel|null
      */
-    public function find(int|string $id, string $column = 'id'): ?array
+    public function find(int|string $id, string $column = 'id'): mixed
     {
-        $eagerLoad = $this->getEagerLoad();
-
-        // Check if aggregates are configured (withCount, withSum, etc.)
-        // by checking if columns contain aggregate patterns
-        $hasAggregates = false;
-        $columns = $this->getColumns();
-        if (!empty($columns)) {
-            $columnsStr = implode(' ', $columns);
-            // Check for aggregate patterns: _count, _sum_, _avg_, _min_, _max_
-            $hasAggregates = preg_match('/_(count|sum_|avg_|min_|max_)/i', $columnsStr) === 1;
-        }
-
-        // If eager loading or aggregates are configured, use getModels() to return Model
-        if (!empty($eagerLoad) || $hasAggregates) {
-            $collection = $this->where($column, $id)->getModels();
-            $model = $collection->first();
-
-            if ($model === null) {
-                return null;
-            }
-
-            // Return Model instance wrapped in array-like structure
-            // Model::find() will detect this and return the Model directly
-            // We use a special marker to indicate this is a Model, not a plain array
-            return ['_model_instance' => $model];
-        }
-
-        // Otherwise, use parent implementation (returns array)
-        return parent::find($id, $column);
+        // Apply where and limit to current query (preserves eager load config)
+        $this->where($column, $id)->limit(1);
+        $collection = $this->getModels();
+        return $collection->first();
     }
 
 
@@ -741,6 +714,31 @@ class ModelQueryBuilder extends QueryBuilder
                 gc_collect_cycles();
             }
         }
+    }
+
+    /**
+     * Magic method to enable fluent get() method.
+     *
+     * Intercepts ->get() calls and redirects to ->getModels() to return ModelCollection.
+     * This is needed because PHP doesn't support return type covariance for Collection types.
+     *
+     * @param string $method Method name
+     * @param array<mixed> $arguments Method arguments
+     * @return mixed
+     */
+    public function __call(string $method, array $arguments): mixed
+    {
+        // Intercept get() to return ModelCollection
+        if ($method === 'get') {
+            return $this->getModels();
+        }
+
+        // Forward to parent QueryBuilder for other methods
+        if (method_exists(parent::class, $method)) {
+            return parent::$method(...$arguments);
+        }
+
+        throw new \BadMethodCallException("Method {$method} does not exist on " . static::class);
     }
 
     /**

@@ -210,10 +210,11 @@ class HasOneRelationshipTest extends DatabaseTestCase
         );
 
         // Query with orderBy should return first ordered result
+        /** @var ProfileModel|null $profile */
         $profile = $user->profile()->getQuery()->orderBy('id', 'ASC')->first();
 
         $this->assertNotNull($profile);
-        $this->assertEquals('Bio 1', $profile['bio']);
+        $this->assertEquals('Bio 1', $profile->bio);
     }
 
     /**
@@ -464,14 +465,8 @@ class UserModel extends Model
 
     public static function find(int|string $id): ?static
     {
-        $row = static::query()->where('id', $id)->first();
-        if (!$row) {
-            return null;
-        }
-        $model = new static($row);
-        $model->exists = true;
-        $model->syncOriginal();
-        return $model;
+        // first() now returns Model|null directly
+        return static::query()->where('id', $id)->first();
     }
 }
 

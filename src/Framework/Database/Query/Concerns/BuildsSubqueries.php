@@ -10,7 +10,7 @@ use Closure;
  * Trait BuildsSubqueries
  *
  * Subquery builders for Query Builder.
- * Provides Laravel-compatible subquery methods with performance optimization.
+ * Provides Modern ORM subquery methods with performance optimization.
  *
  * Features:
  * - WHERE IN/NOT IN with subqueries

@@ -4,7 +4,7 @@ Hệ thống dịch (translation) chuyên nghiệp, tương thích với Laravel
 
 ## ✨ Features
 
-- ✅ **Laravel-compatible API** - Sử dụng `__()` và `trans()` giống Laravel
+- ✅ **Modern framework API** - Sử dụng `__()` và `trans()` giống Laravel
 - ✅ **High Performance** - Cache translations, lazy loading, O(1) lookups
 - ✅ **Clean Architecture** - Tách biệt rõ ràng các layers
 - ✅ **SOLID Principles** - Mỗi component tuân thủ SOLID
@@ -302,7 +302,7 @@ Xem các file translation mẫu:
 
 Hệ thống translation này cung cấp:
 
-✅ **Laravel-compatible API** - Dễ dàng migrate từ Laravel
+✅ **Modern framework API** - Dễ dàng migrate từ Laravel
 ✅ **High Performance** - Tối ưu với cache và lazy loading
 ✅ **Clean Architecture** - Dễ maintain và test
 ✅ **SOLID Principles** - Code quality cao

@@ -39,7 +39,6 @@ return [
             // '/api/auth/*'
             // Note: GET requests (like /api/csrf-cookie) are automatically safe
             // Note: /api/auth/* uses CSRF protection via XSRF-TOKEN cookie
-            // This is the recommended Laravel Sanctum approach for SPAs
         ],
     ],
 

@@ -10,7 +10,7 @@ use Closure;
  * Trait BuildsConditionalClauses
  *
  * Conditional query builders for Query Builder.
- * Provides Laravel-compatible conditional methods for clean, readable queries.
+ * Provides Modern ORM conditional methods for clean, readable queries.
  *
  * Features:
  * - Conditional query building (when, unless)

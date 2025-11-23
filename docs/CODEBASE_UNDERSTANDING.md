@@ -316,7 +316,7 @@ Consumer (CLI worker) ← Queue Driver ← Queue Storage
 
 **CSRF Protection**:
 - Token generation and validation
-- Laravel-compatible cookie encryption
+- Modern framework cookie encryption
 - SPA-friendly token endpoint
 
 **Rate Limiting**:
@@ -388,7 +388,7 @@ All routes → AppController → app.php view → Vue Router handles client-side
 - `resources/js/app.js`: Vue app entry point
 - `resources/js/App.vue`: Root component
 - `resources/js/router/index.js`: Router configuration
-- `resources/js/pages/Home.vue`: Welcome page (Laravel-style)
+- `resources/js/pages/Home.vue`: Welcome page (Fluent)
 
 ---
 
@@ -697,7 +697,7 @@ The Toporia Framework codebase demonstrates:
 - ✅ **Enterprise-Grade Architecture**: Clean Architecture with strict layer separation
 - ✅ **SOLID Principles**: Applied consistently throughout
 - ✅ **Performance Optimizations**: Reflection caching, eager loading, connection pooling
-- ✅ **Developer Experience**: Laravel-compatible API, fluent interfaces, helpful errors
+- ✅ **Developer Experience**: Modern framework API, fluent interfaces, helpful errors
 - ✅ **Testability**: Comprehensive testing infrastructure
 - ✅ **Extensibility**: Service providers, interfaces, pluggable drivers
 - ✅ **Security**: CSRF, XSS protection, rate limiting, secure headers

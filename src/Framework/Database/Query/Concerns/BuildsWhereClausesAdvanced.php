@@ -8,7 +8,7 @@ namespace Toporia\Framework\Database\Query\Concerns;
  * Trait BuildsWhereClausesAdvanced
  *
  * Advanced WHERE clause builders for Query Builder.
- * Provides Laravel-compatible advanced WHERE methods with performance optimization.
+ * Provides Modern ORM advanced WHERE methods with performance optimization.
  *
  * Features:
  * - Date/Time WHERE clauses (whereDate, whereMonth, whereDay, whereYear, whereTime)

@@ -1,6 +1,6 @@
 # Command/Query/Job Bus System
 
-Professional Command Bus implementation with Laravel-compatible API, featuring sync/async dispatch, middleware pipeline, and batch operations.
+Professional Command Bus implementation with Modern framework API, featuring sync/async dispatch, middleware pipeline, and batch operations.
 
 ## Architecture
 

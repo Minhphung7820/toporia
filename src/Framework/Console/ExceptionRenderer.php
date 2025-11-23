@@ -13,7 +13,7 @@ use Throwable;
  * - Colored output
  * - Stack trace with file highlighting
  * - Code snippets around error
- * - Readable formatting like Laravel
+ * - Clean, readable error formatting
  */
 final class ExceptionRenderer
 {

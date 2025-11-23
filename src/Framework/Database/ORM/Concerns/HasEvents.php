@@ -7,7 +7,7 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 /**
  * Trait HasEvents
  *
- * Enhanced model events support with Laravel-compatible event lifecycle.
+ * Enhanced model events support with Modern ORM event lifecycle.
  * Provides hooks at every stage of model operations.
  *
  * Event Lifecycle:

@@ -4,7 +4,7 @@ Hệ thống migration chuyên nghiệp, đầy đủ tính năng hơn Laravel, 
 
 ## ✨ Features
 
-- ✅ **Laravel-compatible API** - Tương thích với Laravel migration syntax
+- ✅ **Modern framework API** - Tương thích với Laravel migration syntax
 - ✅ **High Performance** - Tối ưu SQL compilation, batch operations
 - ✅ **Clean Architecture** - Tách biệt rõ ràng các layers
 - ✅ **SOLID Principles** - Mỗi component tuân thủ SOLID
@@ -616,7 +616,7 @@ Schema::table('users', function ($table) {
 
 Migration system này cung cấp:
 
-✅ **Laravel-compatible API** - Dễ dàng migrate từ Laravel
+✅ **Modern framework API** - Dễ dàng migrate từ Laravel
 ✅ **High Performance** - Tối ưu SQL compilation và batch operations
 ✅ **Clean Architecture** - Dễ maintain và test
 ✅ **SOLID Principles** - Code quality cao

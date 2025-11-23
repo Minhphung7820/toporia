@@ -205,7 +205,7 @@ CacheRateLimiter
 - ✅ **33% less memory** (3 → 2 keys per user)
 - ✅ **Cleaner code structure** (340 → 310 lines)
 - ✅ **Better maintainability** (extracted helpers)
-- ✅ **Laravel-style patterns** (clean, simple, performant)
+- ✅ **Fluent patterns** (clean, simple, performant)
 
 ### Code Quality:
 - ✅ **More readable** - Clear method names and structure

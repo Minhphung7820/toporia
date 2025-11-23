@@ -93,25 +93,15 @@ class MorphOne extends Relation
     {
         // Ensure constraints are applied if parent exists now but didn't at construction
         if ($this->parent->exists()) {
-            // Create fresh query to avoid conflicts with query modifications
-            $freshQuery = $this->query->newQuery();
-            $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
-            $freshQuery->table($relatedTable);
+            // Use the query builder to get model directly
+            // Since $this->query is a ModelQueryBuilder, first() returns Model|null
+            $this->query->where($this->morphType, $this->getMorphClass());
+            $this->query->where($this->foreignKey, $this->parent->getAttribute($this->localKey));
 
-            // Apply morph constraints
-            $freshQuery->where($this->morphType, $this->getMorphClass());
-            $freshQuery->where($this->foreignKey, $this->parent->getAttribute($this->localKey));
-
-            $row = $freshQuery->first();
-        } else {
-            $row = null;
+            return $this->query->first();
         }
 
-        if (!$row) {
-            return null;
-        }
-
-        return call_user_func([$this->relatedClass, 'hydrate'], [$row])->first();
+        return null;
     }
 
     /**

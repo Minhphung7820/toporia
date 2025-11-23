@@ -129,18 +129,22 @@ interface QueryBuilderInterface
     /**
      * Execute query and get first result.
      *
+     * Return type is mixed to allow ModelQueryBuilder to override with Model return type.
+     *
      * @return array|null
      */
-    public function first(): ?array;
+    public function first(): mixed;
 
     /**
      * Find a record by ID.
+     *
+     * Return type is mixed to allow ModelQueryBuilder to override with Model return type.
      *
      * @param int|string $id Primary key value.
      * @param string $column Primary key column name.
      * @return array|null
      */
-    public function find(int|string $id, string $column = 'id'): ?array;
+    public function find(int|string $id, string $column = 'id'): mixed;
 
     /**
      * Insert a new record.

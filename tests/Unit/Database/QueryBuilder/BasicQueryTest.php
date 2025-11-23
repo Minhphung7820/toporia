@@ -181,7 +181,9 @@ class BasicQueryTest extends TestCase
     {
         $sql = $this->query->whereIn('id', [])->toSql();
 
-        $this->assertStringContainsString('WHERE id IN ()', $sql);
+        // Empty array optimization: converts to "1 = 0" instead of "IN ()"
+        // This is more performant and avoids SQL syntax errors
+        $this->assertStringContainsString('WHERE 1 = 0', $sql);
     }
 
     public function test_where_null(): void
