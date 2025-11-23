@@ -39,6 +39,7 @@ abstract class Model implements ModelInterface, ObservableInterface
     use Concerns\HasGlobalScopes;
     use Concerns\HasModelCollections;
     use Concerns\HasMassAssignmentProtection;
+    use Concerns\HasEagerLoading;
     /**
      * Database table name (override in child class).
      *
@@ -1419,7 +1420,7 @@ abstract class Model implements ModelInterface, ObservableInterface
                     throw new \RuntimeException(
                         sprintf(
                             'Attempted to lazy load [%s] on model [%s] but lazy loading is disabled. ' .
-                            'Use eager loading instead: %s::with(\'%s\')->get()',
+                                'Use eager loading instead: %s::with(\'%s\')->get()',
                             $key,
                             static::class,
                             static::class,
@@ -1907,26 +1908,6 @@ abstract class Model implements ModelInterface, ObservableInterface
         );
     }
 
-    /**
-     * Eager load relationships.
-     *
-     * @param array<string> $relations Relationship names to load
-     * @return static
-     */
-    public function load(array $relations): static
-    {
-        foreach ($relations as $relation) {
-            if (!$this->relationLoaded($relation)) {
-                $result = $this->{$relation}();
-
-                if ($result instanceof RelationInterface) {
-                    $this->setRelation($relation, $result->getResults());
-                }
-            }
-        }
-
-        return $this;
-    }
 
     /**
      * Static eager loading for query results.

@@ -118,6 +118,35 @@ class QueryBuilder implements QueryBuilderInterface
     private array $eagerLoad = [];
 
     /**
+     * Cached SQL string to avoid recompilation.
+     *
+     * @var string|null
+     */
+    private ?string $cachedSql = null;
+
+    /**
+     * Whether query caching is enabled.
+     * Default: true (enabled for performance)
+     *
+     * @var bool
+     */
+    private static bool $cachingEnabled = true;
+
+    /**
+     * Whether query logging is enabled.
+     *
+     * @var bool
+     */
+    private static bool $loggingEnabled = false;
+
+    /**
+     * Query log storage.
+     *
+     * @var array<array{query: string, bindings: array, time: float}>
+     */
+    private static array $queryLog = [];
+
+    /**
      * @param ConnectionInterface $connection Database connection used to execute statements.
      */
     public function __construct(
@@ -154,6 +183,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function table(string $table): self
     {
         $this->table = $table;
+        $this->invalidateCache();
         return $this;
     }
 
@@ -167,6 +197,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function select(string|array $columns = ['*']): self
     {
         $this->columns = is_array($columns) ? $columns : func_get_args();
+        $this->invalidateCache();
         return $this;
     }
 
@@ -247,7 +278,9 @@ class QueryBuilder implements QueryBuilderInterface
     {
         // Handle closure-based WHERE (nested conditions)
         if ($column instanceof \Closure) {
-            return $this->whereNested($column, 'AND');
+            $result = $this->whereNested($column, 'AND');
+            $this->invalidateCache();
+            return $result;
         }
 
         // Handle where($column, $value) syntax
@@ -265,6 +298,7 @@ class QueryBuilder implements QueryBuilderInterface
         ];
 
         $this->bindings[] = $value;
+        $this->invalidateCache();
 
         return $this;
     }
@@ -319,11 +353,25 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Add a WHERE IN clause.
      *
+     * Performance optimization: If values array is empty, adds WHERE 1=0
+     * to return empty result set instead of SQL syntax error.
+     *
      * @param string $column
      * @param array<int,mixed> $values
      */
     public function whereIn(string $column, array $values): self
     {
+        // Optimization: Empty array returns no results instead of SQL error
+        if (empty($values)) {
+            $this->wheres[] = [
+                'type' => 'Raw',
+                'sql' => '1 = 0',
+                'boolean' => 'AND'
+            ];
+            $this->invalidateCache();
+            return $this;
+        }
+
         $this->wheres[] = [
             'type' => 'in',
             'column' => $column,
@@ -334,6 +382,7 @@ class QueryBuilder implements QueryBuilderInterface
         foreach ($values as $value) {
             $this->bindings[] = $value;
         }
+        $this->invalidateCache();
 
         return $this;
     }
@@ -442,7 +491,7 @@ class QueryBuilder implements QueryBuilderInterface
             'column' => $column,
             'direction' => strtoupper($direction)
         ];
-
+        $this->invalidateCache();
         return $this;
     }
 
@@ -452,6 +501,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function limit(int $limit): self
     {
         $this->limit = $limit;
+        $this->invalidateCache();
         return $this;
     }
 
@@ -461,6 +511,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function offset(int $offset): self
     {
         $this->offset = $offset;
+        $this->invalidateCache();
         return $this;
     }
 
@@ -714,8 +765,21 @@ class QueryBuilder implements QueryBuilderInterface
      */
     public function get(): RowCollection
     {
-        $sql  = $this->toSql();
+        $sql = $this->toSql();
+
+        // Log query if logging is enabled
+        if (self::$loggingEnabled) {
+            $startTime = microtime(true);
+        }
+
         $rows = $this->connection->select($sql, $this->bindings); // array<array>
+
+        // Log execution time
+        if (self::$loggingEnabled) {
+            $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
+            self::logQuery($sql, $this->bindings, $executionTime);
+        }
+
         return new RowCollection($rows);
     }
 
@@ -952,7 +1016,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function updateOrInsert(array $attributes, array $values = []): bool
     {
         // Try to find existing record
-        $exists = $this->where(function($query) use ($attributes) {
+        $exists = $this->where(function ($query) use ($attributes) {
             foreach ($attributes as $column => $value) {
                 $query->where($column, $value);
             }
@@ -960,7 +1024,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         if ($exists) {
             // Update existing record
-            $this->where(function($query) use ($attributes) {
+            $this->where(function ($query) use ($attributes) {
                 foreach ($attributes as $column => $value) {
                     $query->where($column, $value);
                 }
@@ -1223,9 +1287,19 @@ class QueryBuilder implements QueryBuilderInterface
 
     /**
      * Compile the SELECT statement into raw SQL.
+     *
+     * Performance optimization: Caches compiled SQL to avoid recompilation
+     * on subsequent calls. Cache is invalidated when query is modified.
+     *
+     * @return string Compiled SQL query
      */
     public function toSql(): string
     {
+        // Return cached SQL if available and caching is enabled
+        if (self::$cachingEnabled && $this->cachedSql !== null) {
+            return $this->cachedSql;
+        }
+
         $distinct = $this->distinct ? 'DISTINCT ' : '';
 
         $sql = sprintf(
@@ -1244,7 +1318,24 @@ class QueryBuilder implements QueryBuilderInterface
         );
 
         // Add unions if present
-        return $sql . $this->compileUnions();
+        $compiledSql = $sql . $this->compileUnions();
+
+        // Cache if enabled
+        if (self::$cachingEnabled) {
+            $this->cachedSql = $compiledSql;
+        }
+
+        return $compiledSql;
+    }
+
+    /**
+     * Invalidate SQL cache when query is modified.
+     *
+     * @return void
+     */
+    private function invalidateCache(): void
+    {
+        $this->cachedSql = null;
     }
 
     /**
@@ -1287,6 +1378,111 @@ class QueryBuilder implements QueryBuilderInterface
     public function getConnection(): ConnectionInterface
     {
         return $this->connection;
+    }
+
+    /**
+     * Enable query caching.
+     *
+     * When enabled, compiled SQL is cached to avoid recompilation.
+     * Default: enabled for better performance.
+     *
+     * @return void
+     */
+    public static function enableQueryCache(): void
+    {
+        self::$cachingEnabled = true;
+    }
+
+    /**
+     * Disable query caching.
+     *
+     * Useful for debugging or when query structure changes frequently.
+     *
+     * @return void
+     */
+    public static function disableQueryCache(): void
+    {
+        self::$cachingEnabled = false;
+    }
+
+    /**
+     * Check if query caching is enabled.
+     *
+     * @return bool
+     */
+    public static function isQueryCacheEnabled(): bool
+    {
+        return self::$cachingEnabled;
+    }
+
+    /**
+     * Enable query logging.
+     *
+     * When enabled, all executed queries will be logged with their SQL,
+     * bindings, and execution time.
+     *
+     * @return void
+     */
+    public static function enableQueryLog(): void
+    {
+        self::$loggingEnabled = true;
+        self::$queryLog = [];
+    }
+
+    /**
+     * Disable query logging.
+     *
+     * @return void
+     */
+    public static function disableQueryLog(): void
+    {
+        self::$loggingEnabled = false;
+    }
+
+    /**
+     * Get the query log.
+     *
+     * Returns array of executed queries with:
+     * - query: SQL query string
+     * - bindings: Parameter bindings
+     * - time: Execution time in milliseconds
+     *
+     * @return array<array{query: string, bindings: array, time: float}>
+     */
+    public static function getQueryLog(): array
+    {
+        return self::$queryLog;
+    }
+
+    /**
+     * Clear the query log.
+     *
+     * @return void
+     */
+    public static function flushQueryLog(): void
+    {
+        self::$queryLog = [];
+    }
+
+    /**
+     * Log a query execution.
+     *
+     * @param string $query SQL query
+     * @param array $bindings Parameter bindings
+     * @param float $time Execution time in milliseconds
+     * @return void
+     */
+    private static function logQuery(string $query, array $bindings, float $time): void
+    {
+        if (!self::$loggingEnabled) {
+            return;
+        }
+
+        self::$queryLog[] = [
+            'query' => $query,
+            'bindings' => $bindings,
+            'time' => $time,
+        ];
     }
 
     /**

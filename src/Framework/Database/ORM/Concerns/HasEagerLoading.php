@@ -88,8 +88,10 @@ trait HasEagerLoading
         $grouped = static::groupRelationsByType($models, $relations);
 
         // Load each group in batch
-        foreach ($grouped as $relationName => $relationInstances) {
-            static::loadRelationBatch($models, $relationName, $relationInstances);
+        foreach ($grouped as $relationName => $relationData) {
+            $relationInstances = $relationData['instances'];
+            $constraint = $relationData['constraint'] ?? null;
+            static::loadRelationBatch($models, $relationName, $relationInstances, $constraint);
         }
 
         // Clear nested relations after loading
@@ -100,19 +102,23 @@ trait HasEagerLoading
      * Group relationships by type for optimized batch loading.
      *
      * Supports nested relationships like 'posts.comments.author'.
+     * Supports eager loading constraints via closures:
+     * ['posts' => function($q) { $q->where('published', true); }]
      *
      * @param ModelCollection<Model> $models Collection of models
-     * @param array<string> $relations Relationship names
-     * @return array<string, array<RelationInterface>>
+     * @param array<string|\Closure> $relations Relationship names or ['relation' => Closure]
+     * @return array<string, array{instances: array<RelationInterface>, constraint: \Closure|null}>
      */
     protected static function groupRelationsByType(ModelCollection $models, array $relations): array
     {
         $grouped = [];
         $nested = []; // Track nested relations for later processing
+        $constraints = []; // Track constraints for each relation
 
         foreach ($relations as $key => $value) {
-            // Handle normalized format: ['relation' => callback|null]
+            // Handle format: ['relation' => Closure] or 'relation'
             $relationName = is_string($key) ? $key : $value;
+            $constraint = is_string($key) && is_callable($value) ? $value : null;
 
             // Skip if relationName is not a string
             if (!is_string($relationName)) {
@@ -147,6 +153,11 @@ trait HasEagerLoading
                 continue;
             }
 
+            // Store constraint if provided
+            if ($constraint !== null) {
+                $constraints[$firstLevelRelation] = $constraint;
+            }
+
             $grouped[$firstLevelRelation] = [];
             foreach ($models as $model) {
                 $grouped[$firstLevelRelation][] = $model->$firstLevelRelation();
@@ -158,13 +169,23 @@ trait HasEagerLoading
             static::$nestedRelations = $nested;
         }
 
-        return $grouped;
+        // Return grouped relations with constraints
+        $result = [];
+        foreach ($grouped as $relationName => $instances) {
+            $result[$relationName] = [
+                'instances' => $instances,
+                'constraint' => $constraints[$relationName] ?? null,
+            ];
+        }
+
+        return $result;
     }
 
     /**
      * Load a relationship in batch for all models.
      *
      * Optimized eager loading using factory method pattern to eliminate reflection overhead.
+     * Supports eager loading constraints via closures.
      *
      * Performance:
      * - OLD: O(1) reflection overhead per batch load
@@ -177,9 +198,10 @@ trait HasEagerLoading
      * @param ModelCollection<Model> $models Collection of models
      * @param string $relationName Relationship name
      * @param array<RelationInterface> $relationInstances Relationship instances
+     * @param \Closure|null $constraint Optional query constraint closure
      * @return void
      */
-    protected static function loadRelationBatch(ModelCollection $models, string $relationName, array $relationInstances): void
+    protected static function loadRelationBatch(ModelCollection $models, string $relationName, array $relationInstances, ?\Closure $constraint = null): void
     {
         if (empty($relationInstances)) {
             return;
@@ -195,6 +217,11 @@ trait HasEagerLoading
         // Use factory method to create eager loading instance
         // This eliminates reflection overhead and follows Open/Closed principle
         $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
+
+        // Apply constraint if provided (e.g., ->where('published', true))
+        if ($constraint !== null) {
+            $constraint($eagerRelation->getQuery());
+        }
 
         // Add eager constraints to query (this will add WHERE IN clause for multiple models)
         $eagerRelation->addEagerConstraints($models->toArray());
@@ -280,5 +307,41 @@ trait HasEagerLoading
     public static function getEagerLoadDefaults(): array
     {
         return static::$eagerLoadDefaults;
+    }
+
+    /**
+     * Lazy eager load relationships for this model instance.
+     *
+     * Loads relationships after the model has already been retrieved.
+     * Useful when you need to conditionally load relationships.
+     *
+     * Example:
+     * ```php
+     * $user = User::find(1);
+     * // Later, conditionally load posts
+     * if ($someCondition) {
+     *     $user->load('posts');
+     * }
+     * // Or with constraints
+     * $user->load(['posts' => function($q) {
+     *     $q->where('published', true);
+     * }]);
+     * ```
+     *
+     * @param string|array<string|\Closure> $relations Relationship names or ['relation' => Closure]
+     * @return $this
+     */
+    public function load(string|array $relations): static
+    {
+        // Convert single relation to array
+        $relations = is_array($relations) ? $relations : [$relations];
+
+        // Create collection with this model
+        $collection = new ModelCollection([$this]);
+
+        // Use static eager loading method
+        static::eagerLoadRelations($collection, $relations);
+
+        return $this;
     }
 }
