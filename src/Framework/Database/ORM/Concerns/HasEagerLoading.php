@@ -42,10 +42,19 @@ trait HasEagerLoading
     protected static array $eagerLoadDefaults = [];
 
     /**
+     * Nested relationships to load after first level.
+     *
+     * @var array<string, array<string>>
+     */
+    protected static array $nestedRelations = [];
+
+    /**
      * Eager load relationships for a collection of models.
      *
      * This is the main method that prevents N+1 queries.
      * It loads all relationships in batch queries.
+     *
+     * Supports nested relationships like 'posts.comments.author'.
      *
      * Performance: O(n + m) where n = models, m = relationships
      * Without eager loading: O(n * m) queries
@@ -60,6 +69,10 @@ trait HasEagerLoading
      * $products = ProductModel::all();
      * static::eagerLoadRelations($products, ['category', 'reviews']);
      * // Now $products[0]->category and $products[0]->reviews are loaded
+     *
+     * // Nested relationships
+     * static::eagerLoadRelations($users, ['posts.comments.author']);
+     * // Loads users -> posts -> comments -> author in 4 batch queries
      * ```
      */
     public static function eagerLoadRelations(ModelCollection $models, array $relations): void
@@ -68,6 +81,9 @@ trait HasEagerLoading
             return;
         }
 
+        // Clear nested relations from previous calls
+        static::$nestedRelations = [];
+
         // Group relationships by type for batch loading
         $grouped = static::groupRelationsByType($models, $relations);
 
@@ -75,10 +91,15 @@ trait HasEagerLoading
         foreach ($grouped as $relationName => $relationInstances) {
             static::loadRelationBatch($models, $relationName, $relationInstances);
         }
+
+        // Clear nested relations after loading
+        static::$nestedRelations = [];
     }
 
     /**
      * Group relationships by type for optimized batch loading.
+     *
+     * Supports nested relationships like 'posts.comments.author'.
      *
      * @param ModelCollection<Model> $models Collection of models
      * @param array<string> $relations Relationship names
@@ -87,6 +108,7 @@ trait HasEagerLoading
     protected static function groupRelationsByType(ModelCollection $models, array $relations): array
     {
         $grouped = [];
+        $nested = []; // Track nested relations for later processing
 
         foreach ($relations as $key => $value) {
             // Handle normalized format: ['relation' => callback|null]
@@ -98,30 +120,42 @@ trait HasEagerLoading
             }
 
             // Handle nested relations (e.g., 'posts.comments')
-            // For now, only handle first level (nested will be handled separately)
             $parts = explode('.', $relationName, 2);
-            $relationName = $parts[0];
+            $firstLevelRelation = $parts[0];
+
+            // Track nested relations for this first-level relation
+            if (isset($parts[1])) {
+                if (!isset($nested[$firstLevelRelation])) {
+                    $nested[$firstLevelRelation] = [];
+                }
+                $nested[$firstLevelRelation][] = $parts[1];
+            }
 
             // Skip if already grouped
-            if (isset($grouped[$relationName])) {
+            if (isset($grouped[$firstLevelRelation])) {
                 continue;
             }
 
             // Get relationship instance from first model
             $firstModel = $models->first();
-            if (!$firstModel || !method_exists($firstModel, $relationName)) {
+            if (!$firstModel || !method_exists($firstModel, $firstLevelRelation)) {
                 continue;
             }
 
-            $relationInstance = $firstModel->$relationName();
+            $relationInstance = $firstModel->$firstLevelRelation();
             if (!$relationInstance instanceof RelationInterface) {
                 continue;
             }
 
-            $grouped[$relationName] = [];
+            $grouped[$firstLevelRelation] = [];
             foreach ($models as $model) {
-                $grouped[$relationName][] = $model->$relationName();
+                $grouped[$firstLevelRelation][] = $model->$firstLevelRelation();
             }
+        }
+
+        // Store nested relations for processing after first level is loaded
+        if (!empty($nested)) {
+            static::$nestedRelations = $nested;
         }
 
         return $grouped;
@@ -179,6 +213,11 @@ trait HasEagerLoading
                 $model->eagerLoaded = [];
             }
             $model->eagerLoaded[$relationName] = true;
+        }
+
+        // Load nested relationships if any (e.g., 'posts.comments')
+        if (isset(static::$nestedRelations[$relationName]) && $results instanceof ModelCollection && !$results->isEmpty()) {
+            static::eagerLoadRelations($results, static::$nestedRelations[$relationName]);
         }
     }
 

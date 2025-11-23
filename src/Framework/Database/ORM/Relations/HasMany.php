@@ -253,8 +253,8 @@ class HasMany extends Relation
      * Override to handle HasMany's constructor which has relatedClass parameter.
      * Creates a fresh instance without parent constraints for eager loading.
      *
-     * Performance: O(1) - Direct instantiation, no reflection overhead
-     * Clean Architecture: Factory Method pattern for extensibility
+     * Performance: O(1) - Direct instantiation, zero reflection overhead
+     * Clean Architecture: Factory Method + Setter pattern for extensibility
      */
     public function newEagerInstance(\Toporia\Framework\Database\Query\QueryBuilder $freshQuery): static
     {
@@ -271,11 +271,8 @@ class HasMany extends Relation
         // Only eager constraints (WHERE IN) should be added later via addEagerConstraints()
         $cleanQuery = $freshQuery->newQuery();
 
-        // Set clean query using property access (query is protected in parent)
-        $reflection = new \ReflectionClass($instance);
-        $queryProp = $reflection->getProperty('query');
-        $queryProp->setAccessible(true);
-        $queryProp->setValue($instance, $cleanQuery);
+        // Use setter method instead of reflection (cleaner & faster)
+        $instance->setQuery($cleanQuery);
 
         return $instance;
     }

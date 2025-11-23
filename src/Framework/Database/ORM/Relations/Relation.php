@@ -82,6 +82,23 @@ abstract class Relation implements RelationInterface
     }
 
     /**
+     * Set the query builder for this relation.
+     *
+     * Allows replacing the query without reflection, following Open/Closed principle.
+     *
+     * Performance: O(1) - Direct property assignment
+     * Clean Architecture: Setter method instead of reflection manipulation
+     *
+     * @param QueryBuilder $query New query builder instance
+     * @return $this
+     */
+    public function setQuery(QueryBuilder $query): static
+    {
+        $this->query = $query;
+        return $this;
+    }
+
+    /**
      * Add basic WHERE constraint based on parent model.
      *
      * @return $this
