@@ -62,4 +62,3 @@ final class EnsureUnique implements JobMiddleware
         }
     }
 }
-
