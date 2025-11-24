@@ -155,13 +155,15 @@ final class Worker
      * Process a single job with middleware support and backoff retry.
      *
      * Execution flow:
-     * 1. Increment attempts
-     * 2. Set timeout alarm if configured
-     * 3. Execute middleware pipeline
-     * 4. Execute job handle() method
-     * 5. Clear timeout alarm
-     * 6. On success: log completion
-     * 7. On failure: retry with backoff or mark as failed
+     * 1. Check cancellation
+     * 2. Increment attempts
+     * 3. Set timeout alarm if configured
+     * 4. Execute middleware pipeline
+     * 5. Execute job handle() method
+     * 6. Clear timeout alarm
+     * 7. Record metrics
+     * 8. On success: log completion
+     * 9. On failure: retry with backoff or mark as failed
      *
      * Performance: O(M + H) where M = middleware count, H = job execution time
      *
@@ -170,6 +172,16 @@ final class Worker
      */
     private function processJob(JobInterface $job): void
     {
+        // Check if job is cancelled
+        if ($this->isJobCancelled($job)) {
+            $this->logger->warning("Job cancelled: {$job->getId()}");
+            return;
+        }
+
+        $startTime = microtime(true);
+        $startMemory = memory_get_usage(true);
+        $success = false;
+
         try {
             $attemptNumber = $job->attempts() + 1;
             $this->logger->info("Processing job: {$job->getId()} (attempt {$attemptNumber})");
@@ -195,6 +207,7 @@ final class Worker
             }
 
             $this->logger->success("Job completed: {$job->getId()}");
+            $success = true;
 
             // Dispatch JobProcessed event
             $this->dispatchEvent(new JobProcessed($job, $attemptNumber));
@@ -274,6 +287,70 @@ final class Worker
                     $this->queue->storeFailed($job, $e);
                 }
             }
+        } finally {
+            // Record metrics
+            $this->recordMetrics($job, $success, $startTime, $startMemory);
+        }
+    }
+
+    /**
+     * Check if job is cancelled.
+     *
+     * Performance: O(1)
+     *
+     * @param JobInterface $job
+     * @return bool
+     */
+    private function isJobCancelled(JobInterface $job): bool
+    {
+        if (!$this->container || !$this->container->has('cache')) {
+            return false;
+        }
+
+        try {
+            $cancellation = new \Toporia\Framework\Queue\Support\JobCancellation(
+                $this->container->get('cache')
+            );
+            return $cancellation->isCancelled($job->getId());
+        } catch (\Throwable $e) {
+            return false; // Silently ignore errors
+        }
+    }
+
+    /**
+     * Record job execution metrics.
+     *
+     * Performance: O(1)
+     *
+     * @param JobInterface $job
+     * @param bool $success
+     * @param float $startTime
+     * @param int $startMemory
+     * @return void
+     */
+    private function recordMetrics(JobInterface $job, bool $success, float $startTime, int $startMemory): void
+    {
+        if (!$this->container || !$this->container->has('cache')) {
+            return;
+        }
+
+        try {
+            $duration = microtime(true) - $startTime;
+            $memory = memory_get_usage(true) - $startMemory;
+
+            // Record job metrics
+            $jobMetrics = new \Toporia\Framework\Queue\Support\JobMetrics(
+                $this->container->get('cache')
+            );
+            $jobMetrics->record(get_class($job), $success, $duration, $memory);
+
+            // Record queue metrics
+            $queueMetrics = new \Toporia\Framework\Queue\Support\QueueMetrics(
+                $this->container->get('cache')
+            );
+            $queueMetrics->record($job->getQueue() ?? 'default', 'process', $duration);
+        } catch (\Throwable $e) {
+            // Silently ignore metrics errors
         }
     }
 

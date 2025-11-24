@@ -104,6 +104,14 @@ abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\Que
      */
     protected int $uniqueFor = 3600;
 
+    /**
+     * Track progress for this job.
+     * If true, progress can be tracked via JobProgress.
+     *
+     * @var bool
+     */
+    protected bool $trackProgress = false;
+
     public function __construct()
     {
         $this->id = uniqid('job_', true);
@@ -489,5 +497,48 @@ abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\Que
     public function getUniqueFor(): int
     {
         return $this->uniqueFor;
+    }
+
+    /**
+     * Enable progress tracking for this job.
+     *
+     * @return self
+     */
+    public function trackProgress(): self
+    {
+        $this->trackProgress = true;
+        return $this;
+    }
+
+    /**
+     * Check if progress tracking is enabled.
+     *
+     * @return bool
+     */
+    public function shouldTrackProgress(): bool
+    {
+        return $this->trackProgress;
+    }
+
+    /**
+     * Report progress (0-100).
+     *
+     * Requires progress tracking to be enabled.
+     *
+     * @param int $progress Progress percentage (0-100)
+     * @param string|null $message Optional progress message
+     * @return void
+     */
+    public function reportProgress(int $progress, ?string $message = null): void
+    {
+        if (!$this->trackProgress) {
+            return; // Silently ignore if tracking not enabled
+        }
+
+        // Try to get JobProgress from container
+        if (function_exists('app') && app()->has(\Toporia\Framework\Queue\Support\JobProgress::class)) {
+            $progressTracker = app()->get(\Toporia\Framework\Queue\Support\JobProgress::class);
+            $progressTracker->set($this->id, $progress, $message);
+        }
     }
 }

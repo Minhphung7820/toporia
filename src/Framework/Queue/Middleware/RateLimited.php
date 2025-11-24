@@ -39,17 +39,25 @@ use Toporia\Framework\Queue\Exceptions\RateLimitExceededException;
 final class RateLimited implements JobMiddleware
 {
     /**
+     * @var string|callable|null Custom rate limit key
+     * @phpstan-var string|callable(JobInterface):string|null
+     */
+    private $key = null;
+
+    /**
      * @param RateLimiterInterface $limiter Rate limiter instance
      * @param int $maxAttempts Maximum attempts allowed
      * @param int $decayMinutes Time window in minutes
-     * @param string|null $key Custom rate limit key (null = use job class name)
+     * @param string|callable|null $key Custom rate limit key (null = use job class name, callable = dynamic key)
      */
     public function __construct(
         private RateLimiterInterface $limiter,
         private int $maxAttempts = 60,
         private int $decayMinutes = 1,
-        private ?string $key = null
-    ) {}
+        string|callable|null $key = null
+    ) {
+        $this->key = $key;
+    }
 
     /**
      * {@inheritdoc}
@@ -73,13 +81,14 @@ final class RateLimited implements JobMiddleware
      *             limiter: app('limiter'),
      *             maxAttempts: 10,  // Max 10 jobs
      *             decayMinutes: 1   // Per minute
-     *         )
+     *         )->by(fn($job) => "user:{$job->userId}") // Per-user rate limiting
      *     ];
      * }
      */
     public function handle(JobInterface $job, callable $next): mixed
     {
-        $key = $this->key ?? get_class($job);
+        // Resolve key (support callable for dynamic keys)
+        $key = $this->resolveKey($job);
 
         // Check if rate limit allows execution
         if ($this->limiter->attempt($key, $this->maxAttempts, $this->decayMinutes * 60)) {
@@ -94,6 +103,25 @@ final class RateLimited implements JobMiddleware
             "Rate limit exceeded for job {$key}. Retry in {$availableIn} seconds.",
             $availableIn
         );
+    }
+
+    /**
+     * Resolve rate limit key.
+     *
+     * @param JobInterface $job
+     * @return string
+     */
+    private function resolveKey(JobInterface $job): string
+    {
+        if ($this->key === null) {
+            return get_class($job);
+        }
+
+        if (is_callable($this->key)) {
+            return (string) ($this->key)($job);
+        }
+
+        return $this->key;
     }
 
     /**
@@ -115,10 +143,13 @@ final class RateLimited implements JobMiddleware
     /**
      * Set custom rate limit key.
      *
-     * @param string $key
+     * Supports dynamic keys using job properties.
+     * Example: ->by(fn($job) => "user:{$job->userId}")
+     *
+     * @param string|callable $key Static key or callable that receives JobInterface
      * @return self
      */
-    public function by(string $key): self
+    public function by(string|callable $key): self
     {
         $this->key = $key;
         return $this;

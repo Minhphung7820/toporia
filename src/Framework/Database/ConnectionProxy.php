@@ -11,15 +11,18 @@ use Toporia\Framework\Database\Query\QueryBuilder;
  * Connection Proxy for Fluent API
  *
  * Wraps ConnectionInterface to provide fluent API for QueryBuilder creation.
+ * Implements ConnectionInterface to be a transparent proxy.
  * Enables syntax: DB()->connection('mysql')->table('users')
  *
  * Design Pattern: Proxy Pattern
  * - Provides simplified interface for QueryBuilder creation
  * - Maintains connection reference for performance
+ * - Transparent proxy: delegates all ConnectionInterface methods
  *
  * SOLID Principles:
- * - Single Responsibility: Only provides table() method for QueryBuilder
+ * - Single Responsibility: Provides fluent API while maintaining ConnectionInterface contract
  * - Dependency Inversion: Depends on ConnectionInterface abstraction
+ * - Liskov Substitution: Can be used anywhere ConnectionInterface is expected
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
@@ -31,7 +34,7 @@ use Toporia\Framework\Database\Query\QueryBuilder;
  *
  * @link        https://github.com/Minhphung7820/toporia
  */
-class ConnectionProxy
+class ConnectionProxy implements ConnectionInterface
 {
     /**
      * @param ConnectionInterface $connection Database connection
@@ -41,9 +44,132 @@ class ConnectionProxy
     ) {}
 
     /**
-     * Create a QueryBuilder instance for the connection's table.
+     * Get the underlying connection instance.
      *
-     * Grammar is automatically selected based on connection driver.
+     * @return ConnectionInterface
+     */
+    public function getConnection(): ConnectionInterface
+    {
+        return $this->connection;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPdo(): \PDO
+    {
+        return $this->connection->getPdo();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function execute(string $query, array $bindings = []): \PDOStatement
+    {
+        return $this->connection->execute($query, $bindings);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function beginTransaction(): bool
+    {
+        return $this->connection->beginTransaction();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function commit(): bool
+    {
+        return $this->connection->commit();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function rollback(): bool
+    {
+        return $this->connection->rollback();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function inTransaction(): bool
+    {
+        return $this->connection->inTransaction();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function lastInsertId(?string $name = null): string
+    {
+        return $this->connection->lastInsertId($name);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getDriverName(): string
+    {
+        return $this->connection->getDriverName();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getGrammar(): \Toporia\Framework\Database\Contracts\GrammarInterface
+    {
+        return $this->connection->getGrammar();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function disconnect(): void
+    {
+        $this->connection->disconnect();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function reconnect(): void
+    {
+        $this->connection->reconnect();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function select(string $query, array $bindings = []): array
+    {
+        return $this->connection->select($query, $bindings);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function selectOne(string $query, array $bindings = []): ?array
+    {
+        return $this->connection->selectOne($query, $bindings);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function affectingStatement(string $query, array $bindings = []): int
+    {
+        return $this->connection->affectingStatement($query, $bindings);
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * Create a QueryBuilder instance for the connection's table.
+     * This method provides the fluent API that ConnectionProxy is designed for.
      *
      * Usage:
      * ```php
@@ -52,23 +178,10 @@ class ConnectionProxy
      * ```
      *
      * Performance: Connection is cached, Grammar is cached per connection
-     *
-     * @param string $table Table/collection name
-     * @return QueryBuilder QueryBuilder instance ready for query building
      */
-    public function table(string $table): QueryBuilder
+    public function table(string $table): \Toporia\Framework\Database\Query\QueryBuilder
     {
-        $query = new QueryBuilder($this->connection);
-        return $query->table($table);
-    }
-
-    /**
-     * Get the underlying connection instance.
-     *
-     * @return ConnectionInterface
-     */
-    public function getConnection(): ConnectionInterface
-    {
-        return $this->connection;
+        // Delegate to underlying connection
+        return $this->connection->table($table);
     }
 }
