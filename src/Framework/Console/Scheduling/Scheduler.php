@@ -12,6 +12,16 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
  *
  * Manages scheduled tasks (cron-like functionality).
  * Provides fluent interface for defining task schedules.
+ *
+ * Performance:
+ * - O(N) get due tasks where N = total tasks
+ * - O(1) mutex operations
+ * - Cached cron expression evaluation
+ *
+ * Clean Architecture:
+ * - Single Responsibility: Task orchestration only
+ * - Dependency Inversion: Uses interfaces
+ * - Open/Closed: Extensible via tasks
  */
 final class Scheduler
 {
@@ -29,6 +39,11 @@ final class Scheduler
      * @var MutexInterface|null
      */
     private ?MutexInterface $mutex = null;
+
+    /**
+     * @var string|null Application base path for maintenance mode check
+     */
+    private ?string $basePath = null;
 
     /**
      * Set container for dependency injection
@@ -50,6 +65,17 @@ final class Scheduler
     public function setMutex(MutexInterface $mutex): void
     {
         $this->mutex = $mutex;
+    }
+
+    /**
+     * Set application base path for maintenance mode check
+     *
+     * @param string $basePath
+     * @return void
+     */
+    public function setBasePath(string $basePath): void
+    {
+        $this->basePath = $basePath;
     }
 
     /**
@@ -158,7 +184,7 @@ final class Scheduler
         $dueTasks = [];
 
         foreach ($this->tasks as $task) {
-            if ($task->isDue($currentTime)) {
+            if ($task->isDue($currentTime, $this->basePath)) {
                 $dueTasks[] = $task;
             }
         }
@@ -178,6 +204,20 @@ final class Scheduler
         $count = 0;
 
         foreach ($dueTasks as $task) {
+            // Check for one-server execution
+            if ($task->shouldRunOnOneServer() && $this->mutex) {
+                $oneServerMutex = $task->getOneServerMutexName();
+                if ($oneServerMutex && $this->mutex->exists($oneServerMutex)) {
+                    echo "Skipping task (running on another server): {$task->getDescription()}\n";
+                    continue;
+                }
+                if ($oneServerMutex && !$this->mutex->create($oneServerMutex, 5)) {
+                    // Lock expires in 5 minutes (should be enough for most tasks)
+                    echo "Failed to acquire one-server lock: {$task->getDescription()}\n";
+                    continue;
+                }
+            }
+
             // Check for overlap prevention
             if ($task->hasOverlapPrevention() && $this->mutex) {
                 $mutexName = $task->getMutexName();
@@ -185,12 +225,18 @@ final class Scheduler
                 // Skip if task is already running
                 if ($this->mutex->exists($mutexName)) {
                     echo "Skipping task (already running): {$task->getDescription()}\n";
+                    if ($task->shouldRunOnOneServer()) {
+                        $this->mutex->forget($task->getOneServerMutexName());
+                    }
                     continue;
                 }
 
                 // Acquire mutex lock
                 if (!$this->mutex->create($mutexName, $task->getExpiresAfter())) {
                     echo "Failed to acquire lock for task: {$task->getDescription()}\n";
+                    if ($task->shouldRunOnOneServer()) {
+                        $this->mutex->forget($task->getOneServerMutexName());
+                    }
                     continue;
                 }
 
@@ -205,10 +251,18 @@ final class Scheduler
                         $this->mutex->forget($mutexName);
                     }
 
+                    // Release one-server lock
+                    if ($task->shouldRunOnOneServer()) {
+                        $this->mutex->forget($task->getOneServerMutexName());
+                    }
+
                     echo "Task completed: {$task->getDescription()}\n";
                     $count++;
                 } catch (\Throwable $e) {
                     $this->mutex->forget($mutexName);
+                    if ($task->shouldRunOnOneServer()) {
+                        $this->mutex->forget($task->getOneServerMutexName());
+                    }
                     echo "Task failed: {$task->getDescription()} - {$e->getMessage()}\n";
                 }
             } else {
@@ -222,9 +276,17 @@ final class Scheduler
                         $this->executeTask($task);
                     }
 
+                    // Release one-server lock
+                    if ($task->shouldRunOnOneServer() && $this->mutex) {
+                        $this->mutex->forget($task->getOneServerMutexName());
+                    }
+
                     echo "Task completed: {$task->getDescription()}\n";
                     $count++;
                 } catch (\Throwable $e) {
+                    if ($task->shouldRunOnOneServer() && $this->mutex) {
+                        $this->mutex->forget($task->getOneServerMutexName());
+                    }
                     echo "Task failed: {$task->getDescription()} - {$e->getMessage()}\n";
                 }
             }
@@ -236,6 +298,8 @@ final class Scheduler
     /**
      * Execute task with hooks and output handling.
      *
+     * Performance: O(1) hooks execution, O(1) HTTP ping
+     *
      * @param ScheduledTask $task
      * @return void
      * @throws \Throwable
@@ -246,7 +310,21 @@ final class Scheduler
         $success = false;
         $exception = null;
 
+        // Get HTTP client for ping (if available)
+        $httpClient = $this->container?->has('http.client')
+            ? $this->container->get('http.client')
+            : null;
+
         try {
+            // HTTP ping before execution
+            if ($pingUrl = $task->getPingBeforeUrl()) {
+                \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
+                    'task' => $task->getDescription(),
+                    'event' => 'before',
+                    'time' => date('Y-m-d H:i:s')
+                ], $httpClient);
+            }
+
             // Execute before callback
             if ($before = $task->getBeforeCallback()) {
                 $before();
@@ -266,6 +344,15 @@ final class Scheduler
                 $output = ob_get_clean();
             }
 
+            // HTTP ping on success
+            if ($success && $pingUrl = $task->getPingSuccessUrl()) {
+                \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
+                    'task' => $task->getDescription(),
+                    'event' => 'success',
+                    'time' => date('Y-m-d H:i:s')
+                ], $httpClient);
+            }
+
             // Execute after callback
             if ($after = $task->getAfterCallback()) {
                 $after();
@@ -275,6 +362,16 @@ final class Scheduler
             if ($onSuccess = $task->getOnSuccessCallback()) {
                 $onSuccess();
             }
+
+            // HTTP ping after execution
+            if ($pingUrl = $task->getPingAfterUrl()) {
+                \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
+                    'task' => $task->getDescription(),
+                    'event' => 'after',
+                    'success' => $success,
+                    'time' => date('Y-m-d H:i:s')
+                ], $httpClient);
+            }
         } catch (\Throwable $e) {
             // Capture output on failure
             if ($task->getOutputFile() || $task->getEmailOutputTo()) {
@@ -283,6 +380,16 @@ final class Scheduler
 
             $exception = $e;
             $success = false;
+
+            // HTTP ping on failure
+            if ($pingUrl = $task->getPingFailureUrl()) {
+                \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
+                    'task' => $task->getDescription(),
+                    'event' => 'failure',
+                    'error' => $e->getMessage(),
+                    'time' => date('Y-m-d H:i:s')
+                ], $httpClient);
+            }
 
             // Execute onFailure callback
             if ($onFailure = $task->getOnFailureCallback()) {
@@ -296,7 +403,7 @@ final class Scheduler
                 $this->writeOutput($outputFile, $output, $task->shouldAppendOutput());
             }
 
-            // Handle email output
+            // Handle email output (improved - uses MailManager)
             if ($emailTo = $task->getEmailOutputTo()) {
                 $shouldEmail = !$task->shouldEmailOnlyOnFailure() || !$success;
                 if ($shouldEmail) {
@@ -326,7 +433,9 @@ final class Scheduler
     }
 
     /**
-     * Email task output.
+     * Email task output using MailManager (if available) or fallback to mail().
+     *
+     * Performance: O(1) - Single email send
      *
      * @param string $email
      * @param ScheduledTask $task
@@ -357,12 +466,30 @@ final class Scheduler
 
         $body .= "Output:\n{$output}";
 
-        // Use mail() function or queue email job
+        // Try to use MailManager if available (Clean Architecture - DIP)
+        if ($this->container && $this->container->has(\Toporia\Framework\Mail\Contracts\MailManagerInterface::class)) {
+            try {
+                $mailer = $this->container->get(\Toporia\Framework\Mail\Contracts\MailManagerInterface::class);
+                $message = new \Toporia\Framework\Mail\Message();
+                $message->to($email)
+                    ->subject($subject)
+                    ->html(nl2br(htmlspecialchars($body)));
+                $mailer->send($message);
+                return;
+            } catch (\Throwable $e) {
+                // Fallback to mail() if MailManager fails
+                error_log("MailManager failed, using mail() fallback: {$e->getMessage()}");
+            }
+        }
+
+        // Fallback: Use mail() function
         mail($email, $subject, $body);
     }
 
     /**
-     * Run task in background
+     * Run task in background.
+     *
+     * Performance: O(1) - Process fork or shell execution
      *
      * @param ScheduledTask $task
      * @param string|null $mutexName
@@ -381,12 +508,15 @@ final class Scheduler
             if ($pid === 0) {
                 // Child process
                 try {
-                    $task->execute();
+                    $this->executeTask($task);
                 } catch (\Throwable $e) {
                     error_log("Background task failed: {$e->getMessage()}");
                 } finally {
                     if ($mutexName && $this->mutex) {
                         $this->mutex->forget($mutexName);
+                    }
+                    if ($task->shouldRunOnOneServer() && $this->mutex) {
+                        $this->mutex->forget($task->getOneServerMutexName());
                     }
                 }
                 exit(0);

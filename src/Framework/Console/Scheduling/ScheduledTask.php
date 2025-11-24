@@ -9,6 +9,16 @@ namespace Toporia\Framework\Console\Scheduling;
  *
  * Represents a task that runs on a schedule.
  * Provides fluent interface for configuring task frequency.
+ *
+ * Performance:
+ * - O(1) configuration methods
+ * - Cached cron expression evaluation
+ * - Lazy constraint evaluation
+ *
+ * Clean Architecture:
+ * - Single Responsibility: Task configuration only
+ * - Open/Closed: Extensible via constraints and hooks
+ * - Dependency Inversion: No hard dependencies
  */
 final class ScheduledTask
 {
@@ -28,6 +38,16 @@ final class ScheduledTask
     private ?\Closure $afterCallback = null;
     private ?\Closure $onSuccessCallback = null;
     private ?\Closure $onFailureCallback = null;
+
+    // New features
+    private bool $skipMaintenanceMode = false; // Skip when maintenance mode is active
+    private bool $runOnOneServer = false; // Only run on one server (distributed systems)
+    private ?string $oneServerMutexName = null; // Mutex name for onOneServer
+    private array $environments = []; // Environment constraints
+    private ?string $pingBeforeUrl = null; // HTTP ping before execution
+    private ?string $pingAfterUrl = null; // HTTP ping after execution
+    private ?string $pingSuccessUrl = null; // HTTP ping on success
+    private ?string $pingFailureUrl = null; // HTTP ping on failure
 
     public function __construct(
         private mixed $callback,
@@ -257,6 +277,111 @@ final class ScheduledTask
     }
 
     /**
+     * Skip task execution when application is in maintenance mode.
+     *
+     * Performance: O(1) - Single file check
+     *
+     * @return self
+     */
+    public function skipMaintenanceMode(): self
+    {
+        $this->skipMaintenanceMode = true;
+        return $this;
+    }
+
+    /**
+     * Restrict task to run only in specified environments.
+     *
+     * Performance: O(N) where N = number of environments (typically 1-3)
+     *
+     * @param string|array $environments Environment names ('production', 'staging', etc.)
+     * @return self
+     */
+    public function environments(string|array $environments): self
+    {
+        $this->environments = is_array($environments) ? $environments : [$environments];
+        return $this;
+    }
+
+    /**
+     * Restrict task to run only on one server in distributed systems.
+     *
+     * Uses mutex to ensure only one server executes the task.
+     * Useful for tasks that should not run concurrently across multiple servers.
+     *
+     * Performance: O(1) mutex check
+     *
+     * @return self
+     */
+    public function onOneServer(): self
+    {
+        $this->runOnOneServer = true;
+
+        // Generate mutex name for one-server execution
+        if ($this->oneServerMutexName === null) {
+            $this->oneServerMutexName = 'schedule-one-server-' . md5($this->description ?? $this->generateMutexName());
+        }
+
+        return $this;
+    }
+
+    /**
+     * Send HTTP ping before task execution.
+     *
+     * Performance: O(1) - Fire-and-forget HTTP request
+     *
+     * @param string $url URL to ping
+     * @return self
+     */
+    public function pingBefore(string $url): self
+    {
+        $this->pingBeforeUrl = $url;
+        return $this;
+    }
+
+    /**
+     * Send HTTP ping after task execution.
+     *
+     * Performance: O(1) - Fire-and-forget HTTP request
+     *
+     * @param string $url URL to ping
+     * @return self
+     */
+    public function pingAfter(string $url): self
+    {
+        $this->pingAfterUrl = $url;
+        return $this;
+    }
+
+    /**
+     * Send HTTP ping on successful task execution.
+     *
+     * Performance: O(1) - Fire-and-forget HTTP request
+     *
+     * @param string $url URL to ping
+     * @return self
+     */
+    public function pingOnSuccess(string $url): self
+    {
+        $this->pingSuccessUrl = $url;
+        return $this;
+    }
+
+    /**
+     * Send HTTP ping on failed task execution.
+     *
+     * Performance: O(1) - Fire-and-forget HTTP request
+     *
+     * @param string $url URL to ping
+     * @return self
+     */
+    public function pingOnFailure(string $url): self
+    {
+        $this->pingFailureUrl = $url;
+        return $this;
+    }
+
+    /**
      * Set task description
      *
      * @param string $description
@@ -313,14 +438,32 @@ final class ScheduledTask
     /**
      * Check if the task is due to run
      *
+     * Performance: O(N) where N = filters + rejects + environments
+     *
      * @param \DateTime $currentTime
+     * @param string|null $basePath Application base path for maintenance check
      * @return bool
      */
-    public function isDue(\DateTime $currentTime): bool
+    public function isDue(\DateTime $currentTime, ?string $basePath = null): bool
     {
         // Check cron expression
         if (!$this->matchesCronExpression($currentTime)) {
             return false;
+        }
+
+        // Check environment constraints
+        if (!empty($this->environments)) {
+            $currentEnv = env('APP_ENV', 'production');
+            if (!in_array($currentEnv, $this->environments, true)) {
+                return false;
+            }
+        }
+
+        // Check maintenance mode (if enabled)
+        if ($this->skipMaintenanceMode) {
+            if (\Toporia\Framework\Console\Scheduling\Support\MaintenanceMode::isDown($basePath)) {
+                return false;
+            }
         }
 
         // Check filters
@@ -687,5 +830,87 @@ final class ScheduledTask
     public function getOnFailureCallback(): ?\Closure
     {
         return $this->onFailureCallback;
+    }
+
+    // ==================== New Feature Getters ====================
+
+    /**
+     * Check if task should skip maintenance mode.
+     *
+     * @return bool
+     */
+    public function shouldSkipMaintenanceMode(): bool
+    {
+        return $this->skipMaintenanceMode;
+    }
+
+    /**
+     * Check if task should run on one server only.
+     *
+     * @return bool
+     */
+    public function shouldRunOnOneServer(): bool
+    {
+        return $this->runOnOneServer;
+    }
+
+    /**
+     * Get one-server mutex name.
+     *
+     * @return string|null
+     */
+    public function getOneServerMutexName(): ?string
+    {
+        return $this->oneServerMutexName;
+    }
+
+    /**
+     * Get environment constraints.
+     *
+     * @return array<string>
+     */
+    public function getEnvironments(): array
+    {
+        return $this->environments;
+    }
+
+    /**
+     * Get ping before URL.
+     *
+     * @return string|null
+     */
+    public function getPingBeforeUrl(): ?string
+    {
+        return $this->pingBeforeUrl;
+    }
+
+    /**
+     * Get ping after URL.
+     *
+     * @return string|null
+     */
+    public function getPingAfterUrl(): ?string
+    {
+        return $this->pingAfterUrl;
+    }
+
+    /**
+     * Get ping success URL.
+     *
+     * @return string|null
+     */
+    public function getPingSuccessUrl(): ?string
+    {
+        return $this->pingSuccessUrl;
+    }
+
+    /**
+     * Get ping failure URL.
+     *
+     * @return string|null
+     */
+    public function getPingFailureUrl(): ?string
+    {
+        return $this->pingFailureUrl;
     }
 }

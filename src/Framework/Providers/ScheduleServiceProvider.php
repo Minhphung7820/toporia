@@ -28,6 +28,15 @@ final class ScheduleServiceProvider extends ServiceProvider
             $scheduler = new Scheduler();
             $scheduler->setContainer($c);
             $scheduler->setMutex($c->get(MutexInterface::class));
+
+            // Set base path for maintenance mode check
+            if ($c->has('app')) {
+                $app = $c->get('app');
+                if (method_exists($app, 'getBasePath')) {
+                    $scheduler->setBasePath($app->getBasePath());
+                }
+            }
+
             return $scheduler;
         });
         $container->bind('schedule', fn($c) => $c->get(Scheduler::class));
