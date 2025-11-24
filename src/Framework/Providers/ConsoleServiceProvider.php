@@ -90,6 +90,7 @@ final class ConsoleServiceProvider extends ServiceProvider
       \Toporia\Framework\Console\Commands\ScheduleRunCommand::class,
       \Toporia\Framework\Console\Commands\ScheduleWorkCommand::class,
       \Toporia\Framework\Console\Commands\ScheduleListCommand::class,
+      \Toporia\Framework\Console\Commands\ScheduleTestCommand::class,
 
       // Event commands
       \Toporia\Framework\Console\Commands\Event\EventListCommand::class,

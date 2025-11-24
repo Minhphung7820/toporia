@@ -49,10 +49,27 @@ final class ScheduledTask
     private ?string $pingSuccessUrl = null; // HTTP ping on success
     private ?string $pingFailureUrl = null; // HTTP ping on failure
 
+    // Enhanced features
+    private int $maxRetries = 0; // Maximum retry attempts on failure
+    private int $retryDelay = 60; // Delay between retries in seconds
+    private bool $exponentialBackoff = false; // Use exponential backoff for retries
+    private ?int $timeout = null; // Task timeout in seconds
+    private int $memoryLimit = 0; // Memory limit in MB (0 = no limit)
+    private int $priority = 0; // Task priority (higher = runs first)
+    private array $dependencies = []; // Task dependencies (task IDs that must complete first)
+    private ?string $taskId = null; // Unique task identifier for history tracking
+    private ?string $betweenStart = null; // Run between start time (HH:MM)
+    private ?string $betweenEnd = null; // Run between end time (HH:MM)
+    private ?string $unlessBetweenStart = null; // Skip between start time (HH:MM)
+    private ?string $unlessBetweenEnd = null; // Skip between end time (HH:MM)
+
     public function __construct(
         private mixed $callback,
         private ?string $description = null
-    ) {}
+    ) {
+        // Generate unique task ID for history tracking
+        $this->taskId = $this->generateTaskId();
+    }
 
     /**
      * Set the cron expression
@@ -466,6 +483,16 @@ final class ScheduledTask
             }
         }
 
+        // Check between time constraint
+        if (!$this->isBetweenTime($currentTime)) {
+            return false;
+        }
+
+        // Check unlessBetween time constraint
+        if ($this->isUnlessBetweenTime($currentTime)) {
+            return false;
+        }
+
         // Check filters
         foreach ($this->filters as $filter) {
             if (!$filter()) {
@@ -556,24 +583,79 @@ final class ScheduledTask
     /**
      * Check if current time matches cron expression
      *
+     * Performance: O(1) - Uses optimized CronExpression parser
+     *
      * @param \DateTime $currentTime
      * @return bool
      */
     private function matchesCronExpression(\DateTime $currentTime): bool
     {
-        [$minute, $hour, $day, $month, $dayOfWeek] = explode(' ', $this->expression);
-
         // Apply timezone if set
         if ($this->timezone !== null) {
             $currentTime = clone $currentTime;
             $currentTime->setTimezone(new \DateTimeZone($this->timezone));
         }
 
+        try {
+            $cron = new \Toporia\Framework\Console\Scheduling\Support\CronExpression($this->expression);
+            return $cron->matches($currentTime);
+        } catch (\InvalidArgumentException $e) {
+            // Fallback to old parser for backward compatibility
+            return $this->matchesCronExpressionLegacy($currentTime);
+        }
+    }
+
+    /**
+     * Legacy cron expression matcher (backward compatibility).
+     *
+     * @param \DateTime $currentTime
+     * @return bool
+     */
+    private function matchesCronExpressionLegacy(\DateTime $currentTime): bool
+    {
+        [$minute, $hour, $day, $month, $dayOfWeek] = explode(' ', $this->expression);
+
         return $this->matchesCronField($minute, $currentTime->format('i'))
             && $this->matchesCronField($hour, $currentTime->format('H'))
             && $this->matchesCronField($day, $currentTime->format('d'))
             && $this->matchesCronField($month, $currentTime->format('m'))
             && $this->matchesCronField($dayOfWeek, $currentTime->format('w'));
+    }
+
+    /**
+     * Get next run time for this task.
+     *
+     * Performance: O(1) - Direct calculation
+     *
+     * @param \DateTime|null $fromTime Starting time (default: now)
+     * @return \DateTime
+     */
+    public function getNextRunTime(?\DateTime $fromTime = null): \DateTime
+    {
+        $fromTime = $fromTime ?? new \DateTime();
+
+        // Apply timezone if set
+        if ($this->timezone !== null) {
+            $fromTime = clone $fromTime;
+            $fromTime->setTimezone(new \DateTimeZone($this->timezone));
+        }
+
+        try {
+            $cron = new \Toporia\Framework\Console\Scheduling\Support\CronExpression($this->expression);
+            $nextRun = $cron->getNextRunTime($fromTime);
+
+            // Convert back to default timezone if needed
+            if ($this->timezone !== null) {
+                $nextRun->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+            }
+
+            return $nextRun;
+        } catch (\InvalidArgumentException $e) {
+            // Fallback: approximate next run
+            $next = clone $fromTime;
+            $next->modify('+1 minute');
+            return $next;
+        }
     }
 
     /**
@@ -912,5 +994,265 @@ final class ScheduledTask
     public function getPingFailureUrl(): ?string
     {
         return $this->pingFailureUrl;
+    }
+
+    // ==================== Enhanced Features ====================
+
+    /**
+     * Set maximum retry attempts on failure.
+     *
+     * Performance: O(1)
+     *
+     * @param int $maxRetries Maximum retry attempts
+     * @param int $delay Delay between retries in seconds
+     * @param bool $exponentialBackoff Use exponential backoff
+     * @return self
+     */
+    public function retry(int $maxRetries, int $delay = 60, bool $exponentialBackoff = false): self
+    {
+        $this->maxRetries = $maxRetries;
+        $this->retryDelay = $delay;
+        $this->exponentialBackoff = $exponentialBackoff;
+        return $this;
+    }
+
+    /**
+     * Set task timeout in seconds.
+     *
+     * Performance: O(1)
+     *
+     * @param int $seconds Timeout in seconds
+     * @return self
+     */
+    public function timeout(int $seconds): self
+    {
+        $this->timeout = $seconds;
+        return $this;
+    }
+
+    /**
+     * Set memory limit for task in MB.
+     *
+     * Performance: O(1)
+     *
+     * @param int $mb Memory limit in megabytes (0 = no limit)
+     * @return self
+     */
+    public function memory(int $mb): self
+    {
+        $this->memoryLimit = $mb;
+        return $this;
+    }
+
+    /**
+     * Set task priority (higher = runs first).
+     *
+     * Performance: O(1)
+     *
+     * @param int $priority Priority value
+     * @return self
+     */
+    public function priority(int $priority): self
+    {
+        $this->priority = $priority;
+        return $this;
+    }
+
+    /**
+     * Add task dependency (task must complete before this runs).
+     *
+     * Performance: O(1) per dependency
+     *
+     * @param string|array $taskIds Task ID(s) that must complete first
+     * @return self
+     */
+    public function dependsOn(string|array $taskIds): self
+    {
+        $ids = is_array($taskIds) ? $taskIds : [$taskIds];
+        $this->dependencies = array_merge($this->dependencies, $ids);
+        return $this;
+    }
+
+    /**
+     * Run task only between specified times.
+     *
+     * Performance: O(1) - Simple time comparison
+     *
+     * @param string $start Start time (HH:MM format)
+     * @param string $end End time (HH:MM format)
+     * @return self
+     */
+    public function between(string $start, string $end): self
+    {
+        $this->betweenStart = $start;
+        $this->betweenEnd = $end;
+        return $this;
+    }
+
+    /**
+     * Skip task execution between specified times.
+     *
+     * Performance: O(1) - Simple time comparison
+     *
+     * @param string $start Start time (HH:MM format)
+     * @param string $end End time (HH:MM format)
+     * @return self
+     */
+    public function unlessBetween(string $start, string $end): self
+    {
+        $this->unlessBetweenStart = $start;
+        $this->unlessBetweenEnd = $end;
+        return $this;
+    }
+
+    /**
+     * Generate unique task ID for history tracking.
+     *
+     * @return string
+     */
+    private function generateTaskId(): string
+    {
+        if ($this->description !== null) {
+            return 'task-' . md5($this->description);
+        }
+
+        if (is_string($this->callback)) {
+            return 'task-' . md5($this->callback);
+        }
+
+        if (is_array($this->callback)) {
+            $class = is_object($this->callback[0]) ? get_class($this->callback[0]) : $this->callback[0];
+            return 'task-' . md5($class . '::' . $this->callback[1]);
+        }
+
+        return 'task-' . md5(spl_object_hash($this->callback));
+    }
+
+    /**
+     * Get task ID.
+     *
+     * @return string
+     */
+    public function getTaskId(): string
+    {
+        return $this->taskId ?? $this->generateTaskId();
+    }
+
+    /**
+     * Get max retries.
+     *
+     * @return int
+     */
+    public function getMaxRetries(): int
+    {
+        return $this->maxRetries;
+    }
+
+    /**
+     * Get retry delay.
+     *
+     * @return int
+     */
+    public function getRetryDelay(): int
+    {
+        return $this->retryDelay;
+    }
+
+    /**
+     * Check if exponential backoff is enabled.
+     *
+     * @return bool
+     */
+    public function hasExponentialBackoff(): bool
+    {
+        return $this->exponentialBackoff;
+    }
+
+    /**
+     * Get timeout.
+     *
+     * @return int|null
+     */
+    public function getTimeout(): ?int
+    {
+        return $this->timeout;
+    }
+
+    /**
+     * Get memory limit.
+     *
+     * @return int
+     */
+    public function getMemoryLimit(): int
+    {
+        return $this->memoryLimit;
+    }
+
+    /**
+     * Get priority.
+     *
+     * @return int
+     */
+    public function getPriority(): int
+    {
+        return $this->priority;
+    }
+
+    /**
+     * Get dependencies.
+     *
+     * @return array<string>
+     */
+    public function getDependencies(): array
+    {
+        return $this->dependencies;
+    }
+
+    /**
+     * Check if task should run between times.
+     *
+     * @param \DateTime $currentTime
+     * @return bool
+     */
+    private function isBetweenTime(\DateTime $currentTime): bool
+    {
+        if ($this->betweenStart === null || $this->betweenEnd === null) {
+            return true; // No between constraint
+        }
+
+        $current = $currentTime->format('H:i');
+        $start = $this->betweenStart;
+        $end = $this->betweenEnd;
+
+        // Handle overnight range (e.g., 22:00 - 06:00)
+        if ($start > $end) {
+            return $current >= $start || $current <= $end;
+        }
+
+        return $current >= $start && $current <= $end;
+    }
+
+    /**
+     * Check if task should skip between times.
+     *
+     * @param \DateTime $currentTime
+     * @return bool
+     */
+    private function isUnlessBetweenTime(\DateTime $currentTime): bool
+    {
+        if ($this->unlessBetweenStart === null || $this->unlessBetweenEnd === null) {
+            return false; // No unlessBetween constraint
+        }
+
+        $current = $currentTime->format('H:i');
+        $start = $this->unlessBetweenStart;
+        $end = $this->unlessBetweenEnd;
+
+        // Handle overnight range (e.g., 22:00 - 06:00)
+        if ($start > $end) {
+            return $current >= $start || $current <= $end;
+        }
+
+        return $current >= $start && $current <= $end;
     }
 }

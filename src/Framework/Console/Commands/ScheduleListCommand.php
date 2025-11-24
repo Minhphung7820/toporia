@@ -26,7 +26,7 @@ final class ScheduleListCommand extends Command
 
     public function handle(): int
     {
-        $tasks = $this->scheduler->listTasks();
+        $tasks = $this->scheduler->getTasks();
 
         if (empty($tasks)) {
             $this->info('No scheduled tasks defined.');
@@ -37,14 +37,21 @@ final class ScheduleListCommand extends Command
         $this->newLine();
 
         // Prepare table data
-        $headers = ['Expression', 'Description', 'Next Run'];
+        $headers = ['ID', 'Expression', 'Description', 'Next Run', 'Priority', 'Status'];
         $rows = [];
+        $now = new \DateTime();
 
         foreach ($tasks as $task) {
+            $nextRun = $task->getNextRunTime($now);
+            $isDue = $task->isDue($now);
+
             $rows[] = [
-                $task['expression'],
-                $task['description'] ?: '(no description)',
-                $this->getNextRunTime($task['expression'])
+                substr($task->getTaskId(), 0, 8),
+                $task->getExpression(),
+                $task->getDescription() ?: '(no description)',
+                $nextRun->format('Y-m-d H:i:s'),
+                (string)$task->getPriority(),
+                $isDue ? 'Due' : 'Pending',
             ];
         }
 
@@ -52,40 +59,65 @@ final class ScheduleListCommand extends Command
 
         $this->newLine();
         $this->info("Total: " . count($tasks) . " task(s)");
-        $this->info("Current time: " . date('Y-m-d H:i:s'));
+        $this->info("Current time: " . $now->format('Y-m-d H:i:s'));
+
+        // Show detailed information if verbose
+        if ($this->hasOption('verbose') || $this->hasOption('v')) {
+            $this->displayDetailedInfo($tasks);
+        }
 
         return 0;
     }
 
     /**
-     * Get next run time for cron expression (simplified)
+     * Display detailed information about tasks.
      *
-     * @param string $expression
-     * @return string
+     * @param array $tasks
+     * @return void
      */
-    private function getNextRunTime(string $expression): string
+    private function displayDetailedInfo(array $tasks): void
     {
-        // Simple approximation - for exact calculation, use cron-expression library
-        if ($expression === '* * * * *') {
-            return 'Every minute';
-        }
+        $this->newLine();
+        $this->writeln('Detailed Information:');
+        $this->line('-', 80);
 
-        if (preg_match('/^\*\/(\d+) \* \* \* \*$/', $expression, $matches)) {
-            return "Every {$matches[1]} minutes";
-        }
+        foreach ($tasks as $task) {
+            $this->writeln("Task: {$task->getDescription()}");
+            $this->writeln("  ID: {$task->getTaskId()}");
+            $this->writeln("  Expression: {$task->getExpression()}");
 
-        if (preg_match('/^0 \* \* \* \*$/', $expression)) {
-            return 'Every hour';
-        }
+            $nextRun = $task->getNextRunTime();
+            $this->writeln("  Next Run: {$nextRun->format('Y-m-d H:i:s')}");
 
-        if (preg_match('/^0 0 \* \* \*$/', $expression)) {
-            return 'Daily at midnight';
-        }
+            if ($task->getPriority() !== 0) {
+                $this->writeln("  Priority: {$task->getPriority()}");
+            }
 
-        if (preg_match('/^0 (\d+) \* \* \*$/', $expression, $matches)) {
-            return "Daily at {$matches[1]}:00";
-        }
+            if (!empty($task->getDependencies())) {
+                $this->writeln("  Dependencies: " . implode(', ', $task->getDependencies()));
+            }
 
-        return '(see expression)';
+            if ($task->getTimeout() !== null) {
+                $this->writeln("  Timeout: {$task->getTimeout()}s");
+            }
+
+            if ($task->getMaxRetries() > 0) {
+                $this->writeln("  Max Retries: {$task->getMaxRetries()}");
+            }
+
+            // Show statistics
+            $stats = \Toporia\Framework\Console\Scheduling\Support\TaskHistory::getStatistics($task->getTaskId());
+            if ($stats['total'] > 0) {
+                $this->writeln("  Statistics:");
+                $this->writeln("    Total Runs: {$stats['total']}");
+                $this->writeln("    Successful: {$stats['successful']}");
+                $this->writeln("    Failed: {$stats['failed']}");
+                if ($stats['avgDuration'] !== null) {
+                    $this->writeln("    Avg Duration: " . number_format($stats['avgDuration'], 2) . "s");
+                }
+            }
+
+            $this->newLine();
+        }
     }
 }

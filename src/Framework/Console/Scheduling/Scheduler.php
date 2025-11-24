@@ -175,25 +175,53 @@ final class Scheduler
     /**
      * Get tasks that are due to run
      *
+     * Performance: O(N log N) - Sorting by priority
+     *
      * @param \DateTime|null $currentTime
+     * @param array<string, bool> $completedTasks Map of completed task IDs
      * @return ScheduledTask[]
      */
-    public function getDueTasks(?\DateTime $currentTime = null): array
+    public function getDueTasks(?\DateTime $currentTime = null, array $completedTasks = []): array
     {
         $currentTime = $currentTime ?? new \DateTime();
         $dueTasks = [];
 
         foreach ($this->tasks as $task) {
-            if ($task->isDue($currentTime, $this->basePath)) {
-                $dueTasks[] = $task;
+            if (!$task->isDue($currentTime, $this->basePath)) {
+                continue;
             }
+
+            // Check dependencies
+            $dependencies = $task->getDependencies();
+            if (!empty($dependencies)) {
+                $allDependenciesMet = true;
+                foreach ($dependencies as $depId) {
+                    if (!isset($completedTasks[$depId])) {
+                        $allDependenciesMet = false;
+                        break;
+                    }
+                }
+
+                if (!$allDependenciesMet) {
+                    continue; // Skip task if dependencies not met
+                }
+            }
+
+            $dueTasks[] = $task;
         }
+
+        // Sort by priority (higher priority runs first)
+        usort($dueTasks, function (ScheduledTask $a, ScheduledTask $b) {
+            return $b->getPriority() <=> $a->getPriority();
+        });
 
         return $dueTasks;
     }
 
     /**
      * Run all tasks that are due
+     *
+     * Performance: O(N × T) where N = tasks, T = task execution time
      *
      * @param \DateTime|null $currentTime
      * @return int Number of tasks executed
@@ -202,6 +230,7 @@ final class Scheduler
     {
         $dueTasks = $this->getDueTasks($currentTime);
         $count = 0;
+        $completedTasks = []; // Track completed tasks for dependencies
 
         foreach ($dueTasks as $task) {
             // Check for one-server execution
@@ -258,12 +287,19 @@ final class Scheduler
 
                     echo "Task completed: {$task->getDescription()}\n";
                     $count++;
+                    $completedTasks[$task->getTaskId()] = true;
                 } catch (\Throwable $e) {
                     $this->mutex->forget($mutexName);
                     if ($task->shouldRunOnOneServer()) {
                         $this->mutex->forget($task->getOneServerMutexName());
                     }
-                    echo "Task failed: {$task->getDescription()} - {$e->getMessage()}\n";
+
+                    // Handle retry
+                    if ($task->getMaxRetries() > 0) {
+                        $this->handleRetry($task, $e, $mutexName);
+                    } else {
+                        echo "Task failed: {$task->getDescription()} - {$e->getMessage()}\n";
+                    }
                 }
             } else {
                 // No overlap prevention - just run the task
@@ -283,11 +319,18 @@ final class Scheduler
 
                     echo "Task completed: {$task->getDescription()}\n";
                     $count++;
+                    $completedTasks[$task->getTaskId()] = true;
                 } catch (\Throwable $e) {
                     if ($task->shouldRunOnOneServer() && $this->mutex) {
                         $this->mutex->forget($task->getOneServerMutexName());
                     }
-                    echo "Task failed: {$task->getDescription()} - {$e->getMessage()}\n";
+
+                    // Handle retry
+                    if ($task->getMaxRetries() > 0) {
+                        $this->handleRetry($task, $e);
+                    } else {
+                        echo "Task failed: {$task->getDescription()} - {$e->getMessage()}\n";
+                    }
                 }
             }
         }
@@ -309,11 +352,25 @@ final class Scheduler
         $output = '';
         $success = false;
         $exception = null;
+        $taskId = $task->getTaskId();
+
+        // Record task start in history
+        \Toporia\Framework\Console\Scheduling\Support\TaskHistory::recordStart($taskId);
 
         // Get HTTP client for ping (if available)
         $httpClient = $this->container?->has('http.client')
             ? $this->container->get('http.client')
             : null;
+
+        // Set memory limit if specified
+        $originalMemoryLimit = ini_get('memory_limit');
+        if ($task->getMemoryLimit() > 0) {
+            ini_set('memory_limit', $task->getMemoryLimit() . 'M');
+        }
+
+        // Set timeout if specified
+        $timeout = $task->getTimeout();
+        $startTime = microtime(true);
 
         try {
             // HTTP ping before execution
@@ -335,8 +392,38 @@ final class Scheduler
                 ob_start();
             }
 
-            // Execute the task
-            $task->execute();
+            // Execute the task with timeout monitoring
+            if ($timeout !== null) {
+                // Use pcntl_alarm for timeout (if available)
+                if (function_exists('pcntl_alarm') && function_exists('pcntl_signal')) {
+                    $timedOut = false;
+                    pcntl_signal(SIGALRM, function () use (&$timedOut) {
+                        $timedOut = true;
+                    });
+                    pcntl_alarm($timeout);
+
+                    try {
+                        $task->execute();
+                        pcntl_alarm(0); // Cancel alarm
+                        if ($timedOut) {
+                            throw new \RuntimeException("Task execution exceeded timeout of {$timeout} seconds");
+                        }
+                    } catch (\Throwable $e) {
+                        pcntl_alarm(0); // Cancel alarm
+                        throw $e;
+                    }
+                } else {
+                    // Fallback: Check timeout manually
+                    $task->execute();
+                    $elapsed = microtime(true) - $startTime;
+                    if ($elapsed > $timeout) {
+                        throw new \RuntimeException("Task execution exceeded timeout of {$timeout} seconds");
+                    }
+                }
+            } else {
+                $task->execute();
+            }
+
             $success = true;
 
             // Capture output
@@ -398,6 +485,18 @@ final class Scheduler
 
             throw $e;
         } finally {
+            // Restore memory limit
+            if ($task->getMemoryLimit() > 0) {
+                ini_set('memory_limit', $originalMemoryLimit);
+            }
+
+            // Record task finish in history
+            \Toporia\Framework\Console\Scheduling\Support\TaskHistory::recordFinish(
+                $taskId,
+                $success,
+                $exception?->getMessage()
+            );
+
             // Handle output file
             if ($outputFile = $task->getOutputFile()) {
                 $this->writeOutput($outputFile, $output, $task->shouldAppendOutput());
@@ -410,6 +509,82 @@ final class Scheduler
                     $this->emailOutput($emailTo, $task, $output, $success, $exception);
                 }
             }
+        }
+    }
+
+    /**
+     * Handle task retry with exponential backoff.
+     *
+     * Performance: O(1) per retry attempt
+     *
+     * @param ScheduledTask $task
+     * @param \Throwable $exception
+     * @param string|null $mutexName
+     * @return void
+     */
+    private function handleRetry(ScheduledTask $task, \Throwable $exception, ?string $mutexName = null): void
+    {
+        $maxRetries = $task->getMaxRetries();
+        $retryDelay = $task->getRetryDelay();
+        $exponentialBackoff = $task->hasExponentialBackoff();
+
+        // Get retry count from cache (simple implementation)
+        $retryKey = 'schedule-retry-' . $task->getTaskId();
+        $retryCount = 0;
+
+        if ($this->container && $this->container->has('cache')) {
+            $cache = $this->container->get('cache');
+            $retryCount = (int)($cache->get($retryKey) ?? 0);
+        }
+
+        if ($retryCount < $maxRetries) {
+            $retryCount++;
+            $delay = $exponentialBackoff
+                ? $retryDelay * (2 ** ($retryCount - 1))
+                : $retryDelay;
+
+            echo "Task failed, retrying ({$retryCount}/{$maxRetries}) in {$delay} seconds: {$task->getDescription()}\n";
+
+            // Store retry count
+            if ($this->container && $this->container->has('cache')) {
+                $cache = $this->container->get('cache');
+                $cache->set($retryKey, $retryCount, 3600); // Store for 1 hour
+            }
+
+            // Schedule retry (simple sleep for now - could be improved with queue)
+            sleep($delay);
+
+            try {
+                // Release mutex before retry
+                if ($mutexName && $this->mutex) {
+                    $this->mutex->forget($mutexName);
+                }
+
+                // Retry execution
+                $this->executeTask($task);
+
+                // Clear retry count on success
+                if ($this->container && $this->container->has('cache')) {
+                    $cache = $this->container->get('cache');
+                    $cache->delete($retryKey);
+                }
+
+                echo "Task succeeded on retry: {$task->getDescription()}\n";
+            } catch (\Throwable $e) {
+                if ($retryCount >= $maxRetries) {
+                    // Max retries reached
+                    if ($this->container && $this->container->has('cache')) {
+                        $cache = $this->container->get('cache');
+                        $cache->delete($retryKey);
+                    }
+                    echo "Task failed after {$maxRetries} retries: {$task->getDescription()} - {$e->getMessage()}\n";
+                } else {
+                    // Recursive retry
+                    $this->handleRetry($task, $e, $mutexName);
+                }
+            }
+        } else {
+            echo "Task failed after {$maxRetries} retries: {$task->getDescription()} - {$exception->getMessage()}\n";
         }
     }
 
@@ -554,6 +729,7 @@ final class Scheduler
             $list[] = [
                 'description' => $task->getDescription(),
                 'expression' => $task->getExpression(),
+                'task' => $task, // Include full task object for detailed info
             ];
         }
 
