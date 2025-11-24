@@ -6,6 +6,7 @@ namespace Toporia\Framework\Queue;
 
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface, QueueManagerInterface};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
 
 /**
  * Queue Manager
@@ -106,8 +107,8 @@ final class QueueManager implements QueueManagerInterface
             throw new \InvalidArgumentException('Database queue requires connection');
         }
 
-        // Inject container for dependency injection support
-        return new DatabaseQueue($connection, $this->container);
+        // DatabaseQueue doesn't need container (Worker handles job execution with DI)
+        return new DatabaseQueue($connection);
     }
 
     /**
@@ -131,7 +132,12 @@ final class QueueManager implements QueueManagerInterface
      */
     public function push(JobInterface $job, string $queue = 'default'): string
     {
-        return $this->driver()->push($job, $queue);
+        $jobId = $this->driver()->push($job, $queue);
+
+        // Dispatch JobQueued event if dispatcher is available
+        $this->dispatchJobQueuedEvent($job, $queue, 0);
+
+        return $jobId;
     }
 
     /**
@@ -144,7 +150,32 @@ final class QueueManager implements QueueManagerInterface
      */
     public function later(JobInterface $job, int $delay, string $queue = 'default'): string
     {
-        return $this->driver()->later($job, $delay, $queue);
+        $jobId = $this->driver()->later($job, $delay, $queue);
+
+        // Dispatch JobQueued event if dispatcher is available
+        $this->dispatchJobQueuedEvent($job, $queue, $delay);
+
+        return $jobId;
+    }
+
+    /**
+     * Dispatch JobQueued event if event dispatcher is available.
+     *
+     * @param JobInterface $job
+     * @param string $queue
+     * @param int $delay
+     * @return void
+     */
+    private function dispatchJobQueuedEvent(JobInterface $job, string $queue, int $delay): void
+    {
+        if ($this->container && $this->container->has(EventDispatcherInterface::class)) {
+            try {
+                $dispatcher = $this->container->get(EventDispatcherInterface::class);
+                $dispatcher->dispatch(new \Toporia\Framework\Queue\Events\JobQueued($job, $queue, $delay));
+            } catch (\Throwable $e) {
+                // Silent fail - event dispatch should not break job queuing
+            }
+        }
     }
 
     /**

@@ -73,6 +73,37 @@ abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\Que
      */
     protected int $timeout = 0;
 
+    /**
+     * Job priority (higher = processed first).
+     * Default: 0 (normal priority)
+     *
+     * @var int
+     */
+    protected int $priority = 0;
+
+    /**
+     * Job tags for filtering and monitoring.
+     *
+     * @var array<string>
+     */
+    protected array $tags = [];
+
+    /**
+     * Unique job identifier (prevents duplicate jobs).
+     * If set, only one job with this unique ID can be queued at a time.
+     *
+     * @var string|null
+     */
+    protected ?string $uniqueId = null;
+
+    /**
+     * Unique job lock expiration in seconds.
+     * Default: 3600 (1 hour)
+     *
+     * @var int
+     */
+    protected int $uniqueFor = 3600;
+
     public function __construct()
     {
         $this->id = uniqid('job_', true);
@@ -373,5 +404,90 @@ abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\Que
     public static function dispatchAfter(int $delay, ...$args): PendingDispatch
     {
         return static::dispatch(...$args)->delay($delay);
+    }
+
+    /**
+     * Set job priority.
+     *
+     * Higher priority jobs are processed first.
+     *
+     * @param int $priority Priority value (higher = processed first)
+     * @return self
+     */
+    public function priority(int $priority): self
+    {
+        $this->priority = $priority;
+        return $this;
+    }
+
+    /**
+     * Get job priority.
+     *
+     * @return int
+     */
+    public function getPriority(): int
+    {
+        return $this->priority;
+    }
+
+    /**
+     * Add tags to the job.
+     *
+     * Tags can be used for filtering and monitoring.
+     *
+     * @param string|array<string> $tags
+     * @return self
+     */
+    public function tag(string|array $tags): self
+    {
+        $tags = is_array($tags) ? $tags : [$tags];
+        $this->tags = array_merge($this->tags, $tags);
+        return $this;
+    }
+
+    /**
+     * Get job tags.
+     *
+     * @return array<string>
+     */
+    public function getTags(): array
+    {
+        return $this->tags;
+    }
+
+    /**
+     * Make job unique (prevent duplicates).
+     *
+     * Only one job with the same unique ID can be queued at a time.
+     *
+     * @param string $uniqueId Unique identifier
+     * @param int $for Lock expiration in seconds (default: 3600)
+     * @return self
+     */
+    public function unique(string $uniqueId, int $for = 3600): self
+    {
+        $this->uniqueId = $uniqueId;
+        $this->uniqueFor = $for;
+        return $this;
+    }
+
+    /**
+     * Get unique job ID.
+     *
+     * @return string|null
+     */
+    public function getUniqueId(): ?string
+    {
+        return $this->uniqueId;
+    }
+
+    /**
+     * Get unique lock expiration.
+     *
+     * @return int
+     */
+    public function getUniqueFor(): int
+    {
+        return $this->uniqueFor;
     }
 }

@@ -292,6 +292,16 @@ final class Worker
         // Get job middleware
         $middleware = $job->middleware();
 
+        // Auto-apply EnsureUnique middleware if job has uniqueId
+        if ($job instanceof \Toporia\Framework\Queue\Job && $job->getUniqueId() !== null) {
+            if ($this->container && $this->container->has('cache')) {
+                $cache = $this->container->get('cache');
+                $ensureUnique = new \Toporia\Framework\Queue\Middleware\EnsureUnique($cache);
+                // Add to beginning of middleware stack
+                array_unshift($middleware, $ensureUnique);
+            }
+        }
+
         if (empty($middleware)) {
             // No middleware, execute directly
             return $this->executeJob($job);

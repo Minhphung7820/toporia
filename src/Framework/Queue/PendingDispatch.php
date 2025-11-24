@@ -17,7 +17,8 @@ use Toporia\Framework\Queue\Contracts\Dispatcher;
  * dispatch(new SendEmailJob($to, $subject, $body))
  *     ->onQueue('emails')
  *     ->delay(60)
- *     ->afterCommit();
+ *     ->priority(10)
+ *     ->tag(['email', 'urgent']);
  * ```
  *
  * SOLID Principles:
@@ -31,8 +32,8 @@ final class PendingDispatch
 {
     private ?string $queue = null;
     private ?int $delay = null;
-    private bool $afterCommit = false;
     private bool $dispatched = false;
+    private array $tags = [];
 
     public function __construct(
         private readonly object $job,
@@ -64,13 +65,48 @@ final class PendingDispatch
     }
 
     /**
-     * Dispatch job after database commit.
+     * Set job priority.
      *
+     * @param int $priority
      * @return $this
      */
-    public function afterCommit(): self
+    public function priority(int $priority): self
     {
-        $this->afterCommit = true;
+        // Apply priority directly to job (no need to store in PendingDispatch)
+        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+            $this->job->priority($priority);
+        }
+        return $this;
+    }
+
+    /**
+     * Add tags to the job.
+     *
+     * @param string|array<string> $tags
+     * @return $this
+     */
+    public function tag(string|array $tags): self
+    {
+        $tags = is_array($tags) ? $tags : [$tags];
+        $this->tags = array_merge($this->tags, $tags);
+        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+            $this->job->tag($tags);
+        }
+        return $this;
+    }
+
+    /**
+     * Make job unique.
+     *
+     * @param string $uniqueId
+     * @param int $for
+     * @return $this
+     */
+    public function unique(string $uniqueId, int $for = 3600): self
+    {
+        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+            $this->job->unique($uniqueId, $for);
+        }
         return $this;
     }
 

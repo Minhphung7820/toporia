@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Queue;
 
-use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Database\Connection;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
 
 /**
  * Database Queue Driver
  *
- * Stores jobs in a database table with dependency injection support.
+ * Stores jobs in a database table.
  * Requires a 'jobs' table with proper schema.
+ *
+ * Note: Job execution with dependency injection is handled by Worker,
+ * not by this queue driver. This driver only handles push/pop operations.
  *
  * Performance Optimizations:
  * - Reuses Connection (no QueryBuilder overhead)
@@ -28,7 +30,7 @@ use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
  *
  * SOLID Principles:
  * - Single Responsibility: Only manages database queue
- * - Dependency Inversion: Depends on ContainerInterface
+ * - Dependency Inversion: Depends on Connection interface
  * - Open/Closed: Extend via custom job types
  */
 final class DatabaseQueue implements QueueInterface
@@ -36,8 +38,7 @@ final class DatabaseQueue implements QueueInterface
     private Connection $connection;
 
     public function __construct(
-        Connection $connection,
-        private readonly ?ContainerInterface $container = null
+        Connection $connection
     ) {
         $this->connection = $connection;
     }
@@ -47,10 +48,16 @@ final class DatabaseQueue implements QueueInterface
         // Ensure connection is alive
         $this->connection->ensureConnected();
 
+        // Get priority if job supports it
+        $priority = 0;
+        if ($job instanceof \Toporia\Framework\Queue\Job) {
+            $priority = $job->getPriority();
+        }
+
         // Use raw PDO for maximum performance - no QueryBuilder overhead
         // Direct PDO for maximum performance
-        $sql = "INSERT INTO jobs (id, queue, payload, attempts, available_at, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO jobs (id, queue, payload, attempts, available_at, created_at, priority)
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         $stmt = $this->connection->getPdo()->prepare($sql);
         $stmt->execute([
@@ -59,7 +66,8 @@ final class DatabaseQueue implements QueueInterface
             serialize($job),
             0,
             time(),
-            time()
+            time(),
+            $priority
         ]);
 
         return $job->getId();
@@ -70,9 +78,15 @@ final class DatabaseQueue implements QueueInterface
         // Ensure connection is alive
         $this->connection->ensureConnected();
 
+        // Get priority if job supports it
+        $priority = 0;
+        if ($job instanceof \Toporia\Framework\Queue\Job) {
+            $priority = $job->getPriority();
+        }
+
         // Use raw PDO for maximum performance
-        $sql = "INSERT INTO jobs (id, queue, payload, attempts, available_at, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO jobs (id, queue, payload, attempts, available_at, created_at, priority)
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
 
         $stmt = $this->connection->getPdo()->prepare($sql);
         $stmt->execute([
@@ -81,7 +95,8 @@ final class DatabaseQueue implements QueueInterface
             serialize($job),
             0,
             time() + $delay,
-            time()
+            time(),
+            $priority
         ]);
 
         return $job->getId();
@@ -172,10 +187,11 @@ final class DatabaseQueue implements QueueInterface
             default => 'FOR UPDATE',  // Fallback: Standard row locking
         };
 
+        // Order by priority (higher first), then by id (FIFO for same priority)
         $sql = "SELECT * FROM jobs
                 WHERE queue = ?
                 AND available_at <= ?
-                ORDER BY id ASC
+                ORDER BY priority DESC, id ASC
                 LIMIT 1
                 {$lockClause}";
 
