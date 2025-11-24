@@ -199,4 +199,3 @@ final class ScheduleTestCommand extends Command
         return round($bytes, 2) . ' ' . $units[$pow];
     }
 }
-
