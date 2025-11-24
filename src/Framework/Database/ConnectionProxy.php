@@ -72,7 +72,3 @@ class ConnectionProxy
         return $this->connection;
     }
 }
-
-
-
-
