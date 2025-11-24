@@ -6,7 +6,6 @@ namespace Toporia\Framework\Notification\Channels;
 
 use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface};
 use Toporia\Framework\Database\Connection;
-use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface};
 
 /**
  * Database Notification Channel

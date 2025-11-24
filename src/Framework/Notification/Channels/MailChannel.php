@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Toporia\Framework\Notification\Channels;
 
 use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface};
-use Toporia\Framework\Mail\{MailManagerInterface, Message};
-use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface};
+use Toporia\Framework\Mail\Contracts\MailManagerInterface;
+use Toporia\Framework\Mail\Message;
 use Toporia\Framework\Notification\Messages\MailMessage;
 
 /**
@@ -32,8 +32,7 @@ final class MailChannel implements ChannelInterface
     public function __construct(
         private readonly MailManagerInterface $mailer,
         private readonly array $config = []
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}

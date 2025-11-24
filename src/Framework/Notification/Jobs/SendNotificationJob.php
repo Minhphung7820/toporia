@@ -6,7 +6,6 @@ namespace Toporia\Framework\Notification\Jobs;
 
 use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationInterface};
 use Toporia\Framework\Queue\Job;
-use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationInterface};
 
 /**
  * Send Notification Job
@@ -119,7 +118,7 @@ final class SendNotificationJob extends Job
 
         throw new \RuntimeException(
             "Cannot reconstruct notifiable {$this->notifiableClass}. " .
-            "Implement fromArray() method or ensure it's an ORM Model."
+                "Implement fromArray() method or ensure it's an ORM Model."
         );
     }
 

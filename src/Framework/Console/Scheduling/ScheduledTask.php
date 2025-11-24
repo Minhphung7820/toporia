@@ -20,6 +20,14 @@ final class ScheduledTask
     private bool $withoutOverlapping = false;
     private ?string $mutexName = null;
     private int $expiresAfter = 1440; // 24 hours in minutes
+    private ?string $outputFile = null;
+    private bool $appendOutput = false;
+    private ?string $emailOutputTo = null;
+    private bool $emailOnlyOnFailure = false;
+    private ?\Closure $beforeCallback = null;
+    private ?\Closure $afterCallback = null;
+    private ?\Closure $onSuccessCallback = null;
+    private ?\Closure $onFailureCallback = null;
 
     public function __construct(
         private mixed $callback,
@@ -484,5 +492,200 @@ final class ScheduledTask
         }
 
         return 'schedule-' . md5(spl_object_hash($this->callback));
+    }
+
+    // ==================== Output Handling ====================
+
+    /**
+     * Send task output to a file.
+     *
+     * @param string $location File path
+     * @return self
+     */
+    public function sendOutputTo(string $location): self
+    {
+        $this->outputFile = $location;
+        $this->appendOutput = false;
+        return $this;
+    }
+
+    /**
+     * Append task output to a file.
+     *
+     * @param string $location File path
+     * @return self
+     */
+    public function appendOutputTo(string $location): self
+    {
+        $this->outputFile = $location;
+        $this->appendOutput = true;
+        return $this;
+    }
+
+    /**
+     * Email task output after execution.
+     *
+     * @param string $email Email address
+     * @return self
+     */
+    public function emailOutputTo(string $email): self
+    {
+        $this->emailOutputTo = $email;
+        $this->emailOnlyOnFailure = false;
+        return $this;
+    }
+
+    /**
+     * Email task output only on failure.
+     *
+     * @param string $email Email address
+     * @return self
+     */
+    public function emailOutputOnFailure(string $email): self
+    {
+        $this->emailOutputTo = $email;
+        $this->emailOnlyOnFailure = true;
+        return $this;
+    }
+
+    /**
+     * Get output file path.
+     *
+     * @return string|null
+     */
+    public function getOutputFile(): ?string
+    {
+        return $this->outputFile;
+    }
+
+    /**
+     * Check if output should be appended.
+     *
+     * @return bool
+     */
+    public function shouldAppendOutput(): bool
+    {
+        return $this->appendOutput;
+    }
+
+    /**
+     * Get email recipient for output.
+     *
+     * @return string|null
+     */
+    public function getEmailOutputTo(): ?string
+    {
+        return $this->emailOutputTo;
+    }
+
+    /**
+     * Check if email should only be sent on failure.
+     *
+     * @return bool
+     */
+    public function shouldEmailOnlyOnFailure(): bool
+    {
+        return $this->emailOnlyOnFailure;
+    }
+
+    // ==================== Hooks ====================
+
+    /**
+     * Register callback to run before task execution.
+     *
+     * @param \Closure $callback
+     * @return self
+     */
+    public function before(\Closure $callback): self
+    {
+        $this->beforeCallback = $callback;
+        return $this;
+    }
+
+    /**
+     * Register callback to run after task execution.
+     *
+     * @param \Closure $callback
+     * @return self
+     */
+    public function after(\Closure $callback): self
+    {
+        $this->afterCallback = $callback;
+        return $this;
+    }
+
+    /**
+     * Alias for after().
+     *
+     * @param \Closure $callback
+     * @return self
+     */
+    public function then(\Closure $callback): self
+    {
+        return $this->after($callback);
+    }
+
+    /**
+     * Register callback to run on successful execution.
+     *
+     * @param \Closure $callback
+     * @return self
+     */
+    public function onSuccess(\Closure $callback): self
+    {
+        $this->onSuccessCallback = $callback;
+        return $this;
+    }
+
+    /**
+     * Register callback to run on failed execution.
+     *
+     * @param \Closure $callback
+     * @return self
+     */
+    public function onFailure(\Closure $callback): self
+    {
+        $this->onFailureCallback = $callback;
+        return $this;
+    }
+
+    /**
+     * Get before callback.
+     *
+     * @return \Closure|null
+     */
+    public function getBeforeCallback(): ?\Closure
+    {
+        return $this->beforeCallback;
+    }
+
+    /**
+     * Get after callback.
+     *
+     * @return \Closure|null
+     */
+    public function getAfterCallback(): ?\Closure
+    {
+        return $this->afterCallback;
+    }
+
+    /**
+     * Get onSuccess callback.
+     *
+     * @return \Closure|null
+     */
+    public function getOnSuccessCallback(): ?\Closure
+    {
+        return $this->onSuccessCallback;
+    }
+
+    /**
+     * Get onFailure callback.
+     *
+     * @return \Closure|null
+     */
+    public function getOnFailureCallback(): ?\Closure
+    {
+        return $this->onFailureCallback;
     }
 }

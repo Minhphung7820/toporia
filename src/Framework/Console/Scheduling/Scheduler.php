@@ -201,7 +201,7 @@ final class Scheduler
                     if ($task->shouldRunInBackground()) {
                         $this->runTaskInBackground($task, $mutexName);
                     } else {
-                        $task->execute();
+                        $this->executeTask($task);
                         $this->mutex->forget($mutexName);
                     }
 
@@ -219,7 +219,7 @@ final class Scheduler
                     if ($task->shouldRunInBackground()) {
                         $this->runTaskInBackground($task);
                     } else {
-                        $task->execute();
+                        $this->executeTask($task);
                     }
 
                     echo "Task completed: {$task->getDescription()}\n";
@@ -231,6 +231,134 @@ final class Scheduler
         }
 
         return $count;
+    }
+
+    /**
+     * Execute task with hooks and output handling.
+     *
+     * @param ScheduledTask $task
+     * @return void
+     * @throws \Throwable
+     */
+    private function executeTask(ScheduledTask $task): void
+    {
+        $output = '';
+        $success = false;
+        $exception = null;
+
+        try {
+            // Execute before callback
+            if ($before = $task->getBeforeCallback()) {
+                $before();
+            }
+
+            // Capture output if needed
+            if ($task->getOutputFile() || $task->getEmailOutputTo()) {
+                ob_start();
+            }
+
+            // Execute the task
+            $task->execute();
+            $success = true;
+
+            // Capture output
+            if ($task->getOutputFile() || $task->getEmailOutputTo()) {
+                $output = ob_get_clean();
+            }
+
+            // Execute after callback
+            if ($after = $task->getAfterCallback()) {
+                $after();
+            }
+
+            // Execute onSuccess callback
+            if ($onSuccess = $task->getOnSuccessCallback()) {
+                $onSuccess();
+            }
+        } catch (\Throwable $e) {
+            // Capture output on failure
+            if ($task->getOutputFile() || $task->getEmailOutputTo()) {
+                $output = ob_get_clean();
+            }
+
+            $exception = $e;
+            $success = false;
+
+            // Execute onFailure callback
+            if ($onFailure = $task->getOnFailureCallback()) {
+                $onFailure($e);
+            }
+
+            throw $e;
+        } finally {
+            // Handle output file
+            if ($outputFile = $task->getOutputFile()) {
+                $this->writeOutput($outputFile, $output, $task->shouldAppendOutput());
+            }
+
+            // Handle email output
+            if ($emailTo = $task->getEmailOutputTo()) {
+                $shouldEmail = !$task->shouldEmailOnlyOnFailure() || !$success;
+                if ($shouldEmail) {
+                    $this->emailOutput($emailTo, $task, $output, $success, $exception);
+                }
+            }
+        }
+    }
+
+    /**
+     * Write output to file.
+     *
+     * @param string $file
+     * @param string $output
+     * @param bool $append
+     * @return void
+     */
+    private function writeOutput(string $file, string $output, bool $append): void
+    {
+        $directory = dirname($file);
+        if (!is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+
+        $mode = $append ? 'a' : 'w';
+        file_put_contents($file, $output, $append ? FILE_APPEND : 0);
+    }
+
+    /**
+     * Email task output.
+     *
+     * @param string $email
+     * @param ScheduledTask $task
+     * @param string $output
+     * @param bool $success
+     * @param \Throwable|null $exception
+     * @return void
+     */
+    private function emailOutput(
+        string $email,
+        ScheduledTask $task,
+        string $output,
+        bool $success,
+        ?\Throwable $exception
+    ): void {
+        $subject = $success
+            ? "Scheduled Task Completed: {$task->getDescription()}"
+            : "Scheduled Task Failed: {$task->getDescription()}";
+
+        $body = "Task: {$task->getDescription()}\n";
+        $body .= "Status: " . ($success ? 'Success' : 'Failed') . "\n";
+        $body .= "Time: " . date('Y-m-d H:i:s') . "\n\n";
+
+        if ($exception) {
+            $body .= "Error: {$exception->getMessage()}\n\n";
+            $body .= "Stack Trace:\n{$exception->getTraceAsString()}\n\n";
+        }
+
+        $body .= "Output:\n{$output}";
+
+        // Use mail() function or queue email job
+        mail($email, $subject, $body);
     }
 
     /**

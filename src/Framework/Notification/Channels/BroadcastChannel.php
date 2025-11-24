@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Toporia\Framework\Notification\Channels;
 
 use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface};
-use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterface, NotificationInterface};
 use Toporia\Framework\Notification\Messages\BroadcastMessage;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 
@@ -78,8 +77,7 @@ final class BroadcastChannel implements ChannelInterface
     public function __construct(
         private readonly RealtimeManagerInterface $realtime,
         private readonly array $config = []
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}
@@ -186,7 +184,7 @@ final class BroadcastChannel implements ChannelInterface
         if (!$userId) {
             throw new \RuntimeException(
                 'Notifiable must implement routeNotificationFor("broadcast") ' .
-                'returning user ID or channel name'
+                    'returning user ID or channel name'
             );
         }
 
