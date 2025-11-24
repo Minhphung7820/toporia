@@ -137,10 +137,16 @@ abstract class Grammar implements GrammarInterface
     }
 
     /**
-     * Compile JOIN clauses.
+     * Compile JOIN clauses
      *
-     * @param QueryBuilder $query
-     * @return string
+     * Supports both simple JOIN (array) and complex JOIN (JoinClause object)
+     *
+     * Architecture:
+     * - SOLID: Open/Closed - handles both old and new JOIN formats
+     * - Clean Architecture: Delegates complex logic to separate methods
+     * - High Reusability: compileJoinClause can be overridden
+     *
+     * Performance: O(n) where n = number of JOINs
      */
     protected function compileJoins(QueryBuilder $query): string
     {
@@ -151,16 +157,83 @@ abstract class Grammar implements GrammarInterface
 
         $compiled = [];
         foreach ($joins as $join) {
-            $type = strtoupper($join['type']);
-            $table = $this->wrapTable($join['table']);
-            $first = $this->wrapColumn($join['first']);
-            $operator = $join['operator'];
-            $second = $this->wrapColumn($join['second']);
+            // Complex JOIN with JoinClause object
+            if ($join instanceof \Toporia\Framework\Database\Query\JoinClause) {
+                $compiled[] = $this->compileJoinClause($join);
+            }
+            // Simple JOIN with array (backward compatibility)
+            else {
+                $type = strtoupper($join['type']);
+                $table = isset($join['isSubquery']) ? $join['table'] : $this->wrapTable($join['table']);
 
-            $compiled[] = "{$type} JOIN {$table} ON {$first} {$operator} {$second}";
+                // CROSS JOIN has no ON clause
+                if ($type === 'CROSS') {
+                    $compiled[] = "{$type} JOIN {$table}";
+                    continue;
+                }
+
+                $first = $this->wrapColumn($join['first']);
+                $operator = $join['operator'];
+                $second = $this->wrapColumn($join['second']);
+
+                $compiled[] = "{$type} JOIN {$table} ON {$first} {$operator} {$second}";
+            }
         }
 
         return implode(' ', $compiled);
+    }
+
+    /**
+     * Compile JoinClause object with complex conditions
+     *
+     * Example output:
+     * INNER JOIN orders ON users.id = orders.user_id AND orders.status = ? OR orders.priority > ?
+     *
+     * Performance: O(m) where m = number of conditions in JOIN
+     */
+    protected function compileJoinClause(\Toporia\Framework\Database\Query\JoinClause $join): string
+    {
+        $type = $join->getType();
+        $tableName = $join->getTable();
+
+        // Don't wrap if it's a subquery (starts with parenthesis)
+        $table = str_starts_with($tableName, '(') ? $tableName : $this->wrapTable($tableName);
+
+        $clauses = $join->getClauses();
+
+        if (empty($clauses)) {
+            return "{$type} JOIN {$table}";
+        }
+
+        // Compile all ON/WHERE conditions
+        $conditions = [];
+        foreach ($clauses as $index => $clause) {
+            $boolean = $index === 0 ? '' : $clause['boolean'] . ' ';
+
+            if ($clause['type'] === 'on') {
+                // ON column = column
+                $first = $this->wrapColumn($clause['first']);
+                $operator = $clause['operator'];
+                $second = $this->wrapColumn($clause['second']);
+                $conditions[] = "{$boolean}{$first} {$operator} {$second}";
+            } elseif ($clause['type'] === 'where') {
+                // WHERE column = value (uses ?)
+                $column = $this->wrapColumn($clause['column']);
+                $operator = $clause['operator'];
+                $conditions[] = "{$boolean}{$column} {$operator} ?";
+            } elseif ($clause['type'] === 'whereNull') {
+                // WHERE column IS NULL
+                $column = $this->wrapColumn($clause['column']);
+                $conditions[] = "{$boolean}{$column} IS NULL";
+            } elseif ($clause['type'] === 'whereNotNull') {
+                // WHERE column IS NOT NULL
+                $column = $this->wrapColumn($clause['column']);
+                $conditions[] = "{$boolean}{$column} IS NOT NULL";
+            }
+        }
+
+        $onClause = implode(' ', $conditions);
+        return "{$type} JOIN {$table} ON {$onClause}";
     }
 
     /**
@@ -199,6 +272,9 @@ abstract class Grammar implements GrammarInterface
             'basic' => $this->compileBasicWhere($where),
             'Basic' => $this->compileBasicWhere($where), // Backward compatibility
             'in' => $this->compileWhereIn($where),
+            'notIn' => $this->compileWhereNotIn($where),
+            'inSub' => $this->compileWhereInSub($where),
+            'notInSub' => $this->compileWhereNotInSub($where),
             'Null' => $this->compileWhereNull($where),
             'NotNull' => $this->compileWhereNotNull($where),
             'nested' => $this->compileNestedWhere($where),
@@ -212,8 +288,8 @@ abstract class Grammar implements GrammarInterface
             'Column' => $this->compileColumnWhere($where),
             'Exists' => $this->compileExistsWhere($where),
             'NotExists' => $this->compileNotExistsWhere($where),
-            'InSub' => $this->compileInSubWhere($where),
-            'NotInSub' => $this->compileNotInSubWhere($where),
+            'InSub' => $this->compileWhereInSub($where), // Backward compatibility
+            'NotInSub' => $this->compileWhereNotInSub($where), // Backward compatibility
             default => throw new \InvalidArgumentException("Unknown WHERE type: {$type}"),
         };
     }
@@ -250,6 +326,55 @@ abstract class Grammar implements GrammarInterface
 
         $placeholders = implode(', ', array_fill(0, count($values), '?'));
         return "{$column} IN ({$placeholders})";
+    }
+
+    /**
+     * Compile WHERE NOT IN clause
+     *
+     * Performance: O(n) where n = number of values
+     */
+    protected function compileWhereNotIn(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $values = $where['values'];
+
+        if (empty($values)) {
+            return '1 = 1'; // Optimization: NOT IN () always true
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($values), '?'));
+        return "{$column} NOT IN ({$placeholders})";
+    }
+
+    /**
+     * Compile WHERE IN with subquery
+     *
+     * Example: WHERE user_id IN (SELECT id FROM active_users WHERE status = ?)
+     *
+     * Performance: O(1) + subquery complexity
+     * High Reusability: Subquery SQL already compiled
+     */
+    protected function compileWhereInSub(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $subquery = $where['query'];
+
+        return "{$column} IN ({$subquery})";
+    }
+
+    /**
+     * Compile WHERE NOT IN with subquery
+     *
+     * Example: WHERE user_id NOT IN (SELECT user_id FROM banned_users)
+     *
+     * Performance: O(1) + subquery complexity
+     */
+    protected function compileWhereNotInSub(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $subquery = $where['query'];
+
+        return "{$column} NOT IN ({$subquery})";
     }
 
     /**

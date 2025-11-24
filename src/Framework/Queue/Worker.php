@@ -7,7 +7,9 @@ namespace Toporia\Framework\Queue;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Support\ColoredLogger;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
-use Toporia\Framework\Queue\Exceptions\{RateLimitExceededException, JobAlreadyRunningException};
+use Toporia\Framework\Queue\Exceptions\{RateLimitExceededException, JobAlreadyRunningException, JobTimeoutException};
+use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
+use Toporia\Framework\Queue\Events\{JobQueued, JobProcessing, JobProcessed, JobFailed, JobTimedOut, JobRetrying, WorkerStopping};
 
 /**
  * Queue Worker
@@ -30,17 +32,33 @@ final class Worker
     private bool $shouldQuit = false;
     private int $processed = 0;
     private ColoredLogger $logger;
+    private ?EventDispatcherInterface $dispatcher = null;
+    private int $memoryLimit = 0;
+    private int $maxRuntime = 0;
+    private float $startTime = 0;
 
     public function __construct(
         private QueueInterface $queue,
         private ?ContainerInterface $container = null,
         private int $maxJobs = 0,
         private int $sleep = 1,
-        ?string $timezone = null
+        ?string $timezone = null,
+        int $memoryLimit = 128,
+        int $maxRuntime = 0
     ) {
         // Get timezone from config or use default
         $timezone = $timezone ?? $this->getTimezone();
         $this->logger = new ColoredLogger($timezone);
+
+        // Resolve event dispatcher from container if available
+        if ($container && $container->has(EventDispatcherInterface::class)) {
+            $this->dispatcher = $container->get(EventDispatcherInterface::class);
+        }
+
+        // Set restart thresholds (convert MB to bytes)
+        $this->memoryLimit = $memoryLimit * 1024 * 1024;
+        $this->maxRuntime = $maxRuntime;
+        $this->startTime = microtime(true);
     }
 
     /**
@@ -85,6 +103,11 @@ final class Worker
 
             $this->processJob($job);
             $this->processed++;
+
+            // Check auto-restart conditions
+            if ($this->shouldRestart()) {
+                break;
+            }
 
             // Check if we've hit max jobs limit
             if ($this->maxJobs > 0 && $this->processed >= $this->maxJobs) {
@@ -133,10 +156,12 @@ final class Worker
      *
      * Execution flow:
      * 1. Increment attempts
-     * 2. Execute middleware pipeline
-     * 3. Execute job handle() method
-     * 4. On success: log completion
-     * 5. On failure: retry with backoff or mark as failed
+     * 2. Set timeout alarm if configured
+     * 3. Execute middleware pipeline
+     * 4. Execute job handle() method
+     * 5. Clear timeout alarm
+     * 6. On success: log completion
+     * 7. On failure: retry with backoff or mark as failed
      *
      * Performance: O(M + H) where M = middleware count, H = job execution time
      *
@@ -151,26 +176,87 @@ final class Worker
 
             $job->incrementAttempts();
 
+            // Dispatch JobProcessing event
+            $this->dispatchEvent(new JobProcessing($job, $attemptNumber));
+
+            // Set timeout alarm if supported and configured
+            $timeout = $job->getTimeout();
+            if ($timeout > 0 && function_exists('pcntl_alarm') && function_exists('pcntl_signal')) {
+                $this->registerTimeoutHandler($job);
+                pcntl_alarm($timeout);
+            }
+
             // Execute job through middleware pipeline
             $this->executeJobThroughMiddleware($job);
 
+            // Clear timeout alarm
+            if ($timeout > 0 && function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+
             $this->logger->success("Job completed: {$job->getId()}");
+
+            // Dispatch JobProcessed event
+            $this->dispatchEvent(new JobProcessed($job, $attemptNumber));
+        } catch (JobTimeoutException $e) {
+            // Clear alarm
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+
+            $this->logger->error("Job timed out: {$job->getId()} - {$e->getMessage()}");
+
+            // Dispatch JobTimedOut event
+            $this->dispatchEvent(new JobTimedOut($job, $job->getTimeout(), $job->attempts()));
+
+            // Call timeout callback
+            $job->timeout();
+
+            // Retry logic same as other exceptions
+            $willRetry = $job->attempts() < $job->getMaxAttempts();
+            $this->dispatchEvent(new JobFailed($job, $e, $job->attempts(), $willRetry));
+
+            if ($willRetry) {
+                $delay = $job->getBackoffDelay();
+                $this->dispatchEvent(new JobRetrying($job, $job->attempts(), $delay, $e));
+
+                if ($delay > 0) {
+                    $this->logger->warning("Retrying job: {$job->getId()} in {$delay}s (attempt {$job->attempts()})");
+                    $this->queue->later($job, $delay, $job->getQueue());
+                } else {
+                    $this->logger->warning("Retrying job: {$job->getId()} immediately (attempt {$job->attempts()})");
+                    $this->queue->push($job, $job->getQueue());
+                }
+            } else {
+                $this->logger->error("Job exceeded max attempts: {$job->getId()}");
+                $job->failed($e);
+
+                if ($this->queue instanceof DatabaseQueue) {
+                    $this->queue->storeFailed($job, $e);
+                }
+            }
         } catch (RateLimitExceededException $e) {
             // Rate limit exceeded - release back to queue with delay
             $retryAfter = $e->getRetryAfter();
             $this->logger->warning("Job rate limited: {$job->getId()}. Retrying in {$retryAfter}s");
+            $this->dispatchEvent(new JobRetrying($job, $job->attempts(), $retryAfter, $e));
             $this->queue->later($job, $retryAfter, $job->getQueue());
         } catch (JobAlreadyRunningException $e) {
             // Job already running - release back to queue with delay
             $this->logger->warning("Job already running: {$job->getId()}. Retrying in 60s");
+            $this->dispatchEvent(new JobRetrying($job, $job->attempts(), 60, $e));
             $this->queue->later($job, 60, $job->getQueue());
         } catch (\Throwable $e) {
             $this->logger->error("Job failed: {$job->getId()} - {$e->getMessage()}");
 
             // Check if we should retry
-            if ($job->attempts() < $job->getMaxAttempts()) {
+            $willRetry = $job->attempts() < $job->getMaxAttempts();
+            $this->dispatchEvent(new JobFailed($job, $e, $job->attempts(), $willRetry));
+
+            if ($willRetry) {
                 // Calculate backoff delay
                 $delay = $job->getBackoffDelay();
+                $this->dispatchEvent(new JobRetrying($job, $job->attempts(), $delay, $e));
 
                 if ($delay > 0) {
                     $this->logger->warning("Retrying job: {$job->getId()} in {$delay}s (attempt {$job->attempts()})");
@@ -285,7 +371,102 @@ final class Worker
     public function stop(): void
     {
         $this->logger->warning("Stopping worker...");
+        $this->dispatchEvent(new WorkerStopping($this->processed));
         $this->shouldQuit = true;
+    }
+
+    /**
+     * Dispatch an event if dispatcher is available.
+     *
+     * Performance: O(N) where N = number of listeners
+     * SOLID: Dependency Inversion - depends on EventDispatcherInterface
+     *
+     * @param object $event Event to dispatch
+     * @return void
+     */
+    private function dispatchEvent(object $event): void
+    {
+        if ($this->dispatcher) {
+            $this->dispatcher->dispatch($event);
+        }
+    }
+
+    /**
+     * Register timeout signal handler for job.
+     *
+     * Uses SIGALRM to interrupt job execution when timeout is reached.
+     *
+     * Performance: O(1) - Signal registration
+     * SOLID: Single Responsibility - only handles timeout signals
+     *
+     * @param JobInterface $job Job to monitor
+     * @return void
+     */
+    private function registerTimeoutHandler(JobInterface $job): void
+    {
+        pcntl_signal(SIGALRM, function () use ($job) {
+            throw new JobTimeoutException($job->getId(), $job->getTimeout());
+        });
+    }
+
+    /**
+     * Check if worker should restart based on configured thresholds.
+     *
+     * Restart conditions:
+     * - Memory usage exceeds limit
+     * - Runtime exceeds limit
+     *
+     * Performance: O(1) - Simple checks
+     * Clean Architecture: Single responsibility for restart logic
+     *
+     * @return bool True if worker should restart
+     */
+    private function shouldRestart(): bool
+    {
+        // Check memory limit
+        if ($this->memoryExceeded()) {
+            $memory = round(memory_get_usage(true) / 1024 / 1024, 2);
+            $limit = round($this->memoryLimit / 1024 / 1024, 2);
+            $this->logger->warning("Memory limit exceeded: {$memory}MB / {$limit}MB. Restarting worker.");
+            return true;
+        }
+
+        // Check runtime limit
+        if ($this->runtimeExceeded()) {
+            $runtime = round(microtime(true) - $this->startTime);
+            $this->logger->warning("Runtime limit exceeded: {$runtime}s / {$this->maxRuntime}s. Restarting worker.");
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if memory usage exceeds configured limit.
+     *
+     * @return bool
+     */
+    private function memoryExceeded(): bool
+    {
+        if ($this->memoryLimit <= 0) {
+            return false;
+        }
+
+        return memory_get_usage(true) >= $this->memoryLimit;
+    }
+
+    /**
+     * Check if runtime exceeds configured limit.
+     *
+     * @return bool
+     */
+    private function runtimeExceeded(): bool
+    {
+        if ($this->maxRuntime <= 0) {
+            return false;
+        }
+
+        return (microtime(true) - $this->startTime) >= $this->maxRuntime;
     }
 
     /**

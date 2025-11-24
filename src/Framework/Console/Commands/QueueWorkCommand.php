@@ -50,6 +50,8 @@ final class QueueWorkCommand extends Command
         $maxJobs = (int) $this->option('max-jobs', 0); // 0 = unlimited
         $sleep = (int) $this->option('sleep', 1);
         $stopWhenEmpty = $this->hasOption('stop-when-empty');
+        $memoryLimit = (int) $this->option('memory', 128); // MB
+        $maxRuntime = (int) $this->option('timeout', 0); // seconds, 0 = unlimited
 
         // Parse multiple queues (comma-separated)
         $queues = $this->parseQueues($queuesOption);
@@ -71,8 +73,16 @@ final class QueueWorkCommand extends Command
             return 1;
         }
 
-        // Create worker with container for dependency injection
-        $worker = new Worker($queue, $this->container, $maxJobs, $sleep);
+        // Create worker with container for dependency injection and auto-restart support
+        $worker = new Worker(
+            queue: $queue,
+            container: $this->container,
+            maxJobs: $maxJobs,
+            sleep: $sleep,
+            timezone: null,
+            memoryLimit: $memoryLimit,
+            maxRuntime: $maxRuntime
+        );
 
         // Setup graceful shutdown
         $this->setupSignalHandlers($worker);
@@ -208,15 +218,20 @@ final class QueueWorkCommand extends Command
         int $sleep,
         bool $stopWhenEmpty
     ): void {
+        $memoryLimit = (int) $this->option('memory', 128);
+        $maxRuntime = (int) $this->option('timeout', 0);
+
         $this->line('=', 80);
         $this->writeln('Queue Worker Started');
         $this->line('=', 80);
-        $this->writeln("Queue:     " . implode(',', $queues));
-        $this->writeln("Max Jobs:  " . ($maxJobs > 0 ? $maxJobs : 'unlimited'));
-        $this->writeln("Sleep:     {$sleep} second(s)");
+        $this->writeln("Queue:         " . implode(',', $queues));
+        $this->writeln("Max Jobs:      " . ($maxJobs > 0 ? $maxJobs : 'unlimited'));
+        $this->writeln("Sleep:         {$sleep} second(s)");
+        $this->writeln("Memory Limit:  {$memoryLimit} MB");
+        $this->writeln("Runtime Limit: " . ($maxRuntime > 0 ? "{$maxRuntime} seconds" : 'unlimited'));
         $this->writeln("Stop when empty: " . ($stopWhenEmpty ? 'yes' : 'no'));
-        $this->writeln("Time:      " . date('Y-m-d H:i:s'));
-        $this->writeln("PID:       " . getmypid());
+        $this->writeln("Time:          " . date('Y-m-d H:i:s'));
+        $this->writeln("PID:           " . getmypid());
         $this->line('=', 80);
         $this->newLine();
 

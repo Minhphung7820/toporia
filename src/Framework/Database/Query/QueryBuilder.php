@@ -356,36 +356,115 @@ class QueryBuilder implements QueryBuilderInterface
      *
      * Performance optimization: If values array is empty, adds WHERE 1=0
      * to return empty result set instead of SQL syntax error.
+     * Add WHERE IN clause with array or subquery
      *
-     * @param string $column
-     * @param array<int,mixed> $values
+     * Supports two syntaxes:
+     * 1. Array: whereIn('user_id', [1, 2, 3, 4, 5])
+     * 2. Subquery with Closure:
+     *    whereIn('user_id', function($query) {
+     *        $query->select('id')->from('active_users')->where('status', '=', 'active');
+     *    })
+     *
+     * Architecture:
+     * - SOLID: Open/Closed - extensible for subqueries
+     * - Clean Architecture: Separates array and subquery logic
+     * - High Reusability: Subquery builder reused
+     *
+     * Performance:
+     * - Array: O(n) where n = number of values
+     * - Subquery: O(1) + subquery complexity
+     *
+     * @param string $column Column name
+     * @param array|\Closure $values Array of values OR Closure for subquery
+     * @param string $boolean Boolean operator (AND/OR)
+     * @param bool $not Whether to negate (NOT IN)
      */
-    public function whereIn(string $column, array $values): self
+    public function whereIn(string $column, array|\Closure $values, string $boolean = 'AND', bool $not = false): self
     {
-        // Optimization: Empty array returns no results instead of SQL error
-        if (empty($values)) {
+        $type = $not ? 'notIn' : 'in';
+
+        // Subquery with Closure
+        if ($values instanceof \Closure) {
+            // Create subquery builder
+            $subQuery = new self($this->connection);
+
+            // Execute closure to build subquery
+            $values($subQuery);
+
+            // Get subquery SQL and bindings
+            $subquerySql = $subQuery->toSql();
+            $subqueryBindings = $subQuery->getBindings();
+
             $this->wheres[] = [
-                'type' => 'Raw',
-                'sql' => '1 = 0',
-                'boolean' => 'AND'
+                'type' => $type . 'Sub',
+                'column' => $column,
+                'query' => $subquerySql,
+                'boolean' => strtoupper($boolean)
             ];
-            $this->invalidateCache();
-            return $this;
+
+            // Add subquery bindings
+            foreach ($subqueryBindings as $binding) {
+                $this->bindings[] = $binding;
+            }
+        }
+        // Array of values
+        else {
+            // Optimization: Empty array returns no results instead of SQL error
+            if (empty($values)) {
+                $this->wheres[] = [
+                    'type' => 'Raw',
+                    'sql' => $not ? '1 = 1' : '1 = 0',  // NOT IN () = always true, IN () = always false
+                    'boolean' => strtoupper($boolean)
+                ];
+                $this->invalidateCache();
+                return $this;
+            }
+
+            $this->wheres[] = [
+                'type' => $type,
+                'column' => $column,
+                'values' => $values,
+                'boolean' => strtoupper($boolean)
+            ];
+
+            // Add value bindings
+            foreach ($values as $value) {
+                $this->bindings[] = $value;
+            }
         }
 
-        $this->wheres[] = [
-            'type' => 'in',
-            'column' => $column,
-            'values' => $values,
-            'boolean' => 'AND'
-        ];
-
-        foreach ($values as $value) {
-            $this->bindings[] = $value;
-        }
         $this->invalidateCache();
-
         return $this;
+    }
+
+    /**
+     * Add WHERE NOT IN clause
+     *
+     * Performance: Same as whereIn()
+     */
+    public function whereNotIn(string $column, array|\Closure $values, string $boolean = 'AND'): self
+    {
+        return $this->whereIn($column, $values, $boolean, true);
+    }
+
+    /**
+     * Add OR WHERE IN clause
+     *
+     * Performance: Same as whereIn()
+     */
+    public function orWhereIn(string $column, array|\Closure $values): self
+    {
+        return $this->whereIn($column, $values, 'OR', false);
+    }
+
+    /**
+     * Add OR WHERE NOT IN clause
+     *
+     * Performance: Same as whereIn()
+     */
+    public function orWhereNotIn(string $column, array|\Closure $values): self
+    {
+        return $this->whereIn($column, $values, 'OR', true);
     }
 
     /**
@@ -517,37 +596,223 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
-     * Add a JOIN clause.
+     * Add a JOIN clause with simple or complex conditions
      *
-     * @param string $type One of: INNER, LEFT, RIGHT (case-insensitive)
+     * Supports two syntaxes:
+     * 1. Simple: join('orders', 'users.id', '=', 'orders.user_id')
+     * 2. Complex with Closure:
+     *    join('orders', function($join) {
+     *        $join->on('users.id', '=', 'orders.user_id')
+     *             ->where('orders.status', '=', 'active');
+     *    })
+     *
+     * Architecture:
+     * - SOLID: Open/Closed - extensible without modification
+     * - Clean Architecture: Separates simple and complex JOIN logic
+     * - High Reusability: JoinClause can be reused for all JOIN types
+     *
+     * Performance:
+     * - Simple JOIN: O(1)
+     * - Complex JOIN: O(n) where n = number of conditions
+     *
+     * @param string $table Table to join
+     * @param \Closure|string $first Closure for complex conditions OR first column
+     * @param string|null $operator Comparison operator (=, !=, <, >, etc.)
+     * @param string|null $second Second column
+     * @param string $type JOIN type (INNER, LEFT, RIGHT, CROSS)
      */
-    public function join(string $table, string $first, string $operator, string $second, string $type = 'INNER'): self
-    {
-        $this->joins[] = [
-            'type' => strtoupper($type),
-            'table' => $table,
-            'first' => $first,
-            'operator' => $operator,
-            'second' => $second
-        ];
+    public function join(
+        string $table,
+        \Closure|string $first,
+        ?string $operator = null,
+        ?string $second = null,
+        string $type = 'INNER'
+    ): self {
+        // Complex JOIN with Closure
+        if ($first instanceof \Closure) {
+            $joinClause = new JoinClause($type, $table);
+            $joinClause->setParentQuery($this);
 
+            // Execute closure to build conditions
+            $first($joinClause);
+
+            // Store as JoinClause object
+            $this->joins[] = $joinClause;
+        }
+        // Simple JOIN with string parameters
+        else {
+            // Backward compatibility: store as array
+            $this->joins[] = [
+                'type' => strtoupper($type),
+                'table' => $table,
+                'first' => $first,
+                'operator' => $operator ?? '=',
+                'second' => $second
+            ];
+        }
+
+        $this->invalidateCache();
         return $this;
     }
 
     /**
-     * Convenience LEFT JOIN.
+     * Add a LEFT JOIN clause
+     *
+     * Supports both simple and complex syntax like join()
+     *
+     * Performance: Same as join()
      */
-    public function leftJoin(string $table, string $first, string $operator, string $second): self
-    {
+    public function leftJoin(
+        string $table,
+        \Closure|string $first,
+        ?string $operator = null,
+        ?string $second = null
+    ): self {
         return $this->join($table, $first, $operator, $second, 'LEFT');
     }
 
     /**
-     * Convenience RIGHT JOIN.
+     * Add a RIGHT JOIN clause
+     *
+     * Supports both simple and complex syntax like join()
+     *
+     * Performance: Same as join()
      */
-    public function rightJoin(string $table, string $first, string $operator, string $second): self
-    {
+    public function rightJoin(
+        string $table,
+        \Closure|string $first,
+        ?string $operator = null,
+        ?string $second = null
+    ): self {
         return $this->join($table, $first, $operator, $second, 'RIGHT');
+    }
+
+    /**
+     * Add a CROSS JOIN clause
+     *
+     * Cross joins don't have ON conditions, only table name
+     *
+     * Performance: O(1)
+     */
+    public function crossJoin(string $table): self
+    {
+        $this->joins[] = [
+            'type' => 'CROSS',
+            'table' => $table
+        ];
+
+        $this->invalidateCache();
+        return $this;
+    }
+
+    /**
+     * Join with a subquery (derived table)
+     *
+     * Usage:
+     * ```php
+     * $subQuery = (new QueryBuilder($connection))
+     *     ->select('user_id', 'COUNT(*) as order_count')
+     *     ->from('orders')
+     *     ->groupBy('user_id');
+     *
+     * $query->joinSub($subQuery, 'order_stats', 'users.id', '=', 'order_stats.user_id');
+     * ```
+     *
+     * Or with Closure:
+     * ```php
+     * $query->joinSub($subQuery, 'order_stats', function($join) {
+     *     $join->on('users.id', '=', 'order_stats.user_id')
+     *          ->where('order_stats.order_count', '>', 5);
+     * });
+     * ```
+     *
+     * Architecture:
+     * - SOLID: Single Responsibility (handles subquery joins only)
+     * - Clean Architecture: Separates subquery logic from simple joins
+     * - High Reusability: Works with any QueryBuilder instance
+     *
+     * Performance:
+     * - O(1) for storing join + O(subquery complexity)
+     * - Subquery compiled lazily when toSql() is called
+     *
+     * @param QueryBuilder|string $query Subquery QueryBuilder or raw SQL
+     * @param string $as Alias for the derived table
+     * @param \Closure|string $first Closure for complex conditions OR first column
+     * @param string|null $operator Comparison operator
+     * @param string|null $second Second column
+     * @param string $type JOIN type (INNER, LEFT, RIGHT)
+     */
+    public function joinSub(
+        QueryBuilder|string $query,
+        string $as,
+        \Closure|string $first,
+        ?string $operator = null,
+        ?string $second = null,
+        string $type = 'INNER'
+    ): self {
+        // Convert QueryBuilder to SQL
+        $subquerySql = $query instanceof QueryBuilder ? $query->toSql() : $query;
+
+        // Get bindings from subquery
+        if ($query instanceof QueryBuilder) {
+            foreach ($query->getBindings() as $binding) {
+                $this->bindings[] = $binding;
+            }
+        }
+
+        // Complex JOIN with Closure
+        if ($first instanceof \Closure) {
+            $joinClause = new JoinClause($type, "($subquerySql) AS $as");
+            $joinClause->setParentQuery($this);
+
+            $first($joinClause);
+
+            $this->joins[] = $joinClause;
+        }
+        // Simple JOIN
+        else {
+            $this->joins[] = [
+                'type' => strtoupper($type),
+                'table' => "($subquerySql) AS $as",
+                'first' => $first,
+                'operator' => $operator ?? '=',
+                'second' => $second,
+                'isSubquery' => true
+            ];
+        }
+
+        $this->invalidateCache();
+        return $this;
+    }
+
+    /**
+     * LEFT JOIN with subquery
+     *
+     * Performance: Same as joinSub()
+     */
+    public function leftJoinSub(
+        QueryBuilder|string $query,
+        string $as,
+        \Closure|string $first,
+        ?string $operator = null,
+        ?string $second = null
+    ): self {
+        return $this->joinSub($query, $as, $first, $operator, $second, 'LEFT');
+    }
+
+    /**
+     * RIGHT JOIN with subquery
+     *
+     * Performance: Same as joinSub()
+     */
+    public function rightJoinSub(
+        QueryBuilder|string $query,
+        string $as,
+        \Closure|string $first,
+        ?string $operator = null,
+        ?string $second = null
+    ): self {
+        return $this->joinSub($query, $as, $first, $operator, $second, 'RIGHT');
     }
 
     /**

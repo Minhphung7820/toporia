@@ -65,6 +65,14 @@ abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\Que
      */
     protected array $middleware = [];
 
+    /**
+     * Job execution timeout in seconds.
+     * 0 means no timeout.
+     *
+     * @var int
+     */
+    protected int $timeout = 0;
+
     public function __construct()
     {
         $this->id = uniqid('job_', true);
@@ -126,6 +134,39 @@ abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\Que
             $this->getId(),
             $exception->getMessage()
         ));
+    }
+
+    /**
+     * Called when job execution times out.
+     * Override to implement custom cleanup logic.
+     *
+     * @return void
+     */
+    public function timeout(): void
+    {
+        // Default: no cleanup
+    }
+
+    /**
+     * Get the timeout value in seconds.
+     *
+     * @return int Timeout in seconds (0 = no timeout)
+     */
+    public function getTimeout(): int
+    {
+        return $this->timeout;
+    }
+
+    /**
+     * Set job execution timeout.
+     *
+     * @param int $seconds Timeout in seconds
+     * @return self
+     */
+    public function setTimeout(int $seconds): self
+    {
+        $this->timeout = $seconds;
+        return $this;
     }
 
     /**
