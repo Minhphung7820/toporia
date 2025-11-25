@@ -149,7 +149,7 @@ trait HasObservers
         // Check for $observers property on model
         if (property_exists($class, 'observers')) {
             /** @var array<string> $observers */
-            $observers = (new \ReflectionClass($class))->getProperty('observers')->getValue(null);
+            $observers = reflection()->getPropertyValue(new $class(), 'observers');
             foreach ($observers as $observer) {
                 static::observe($observer);
             }

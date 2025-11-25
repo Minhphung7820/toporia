@@ -7,6 +7,7 @@ namespace Toporia\Framework\Foundation;
 use Toporia\Framework\Foundation\Contracts\ServiceProviderInterface;
 use Toporia\Framework\Container\Container;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Support\ReflectionService;
 
 
 /**
@@ -61,6 +62,9 @@ class Application
         $this->container->instance(Container::class, $this->container);
         $this->container->instance('app', $this);
         $this->container->instance(Application::class, $this);
+
+        // Register core services
+        $this->registerCoreServices();
     }
 
     /**
@@ -172,5 +176,27 @@ class Application
     public function has(string $id): bool
     {
         return $this->container->has($id);
+    }
+
+    /**
+     * Register core framework services.
+     *
+     * These services are essential for the framework operation and should
+     * be available immediately after application instantiation.
+     *
+     * Performance: O(1) - Singleton registration
+     *
+     * @return void
+     */
+    private function registerCoreServices(): void
+    {
+        // Register ReflectionService as singleton
+        // Only the container should use reflection directly
+        $this->container->singleton(ReflectionService::class, function () {
+            return new ReflectionService();
+        });
+
+        // Register as instance for easier access
+        $this->container->instance('reflection', $this->container->make(ReflectionService::class));
     }
 }

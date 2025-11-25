@@ -24,14 +24,14 @@ class CreateProductCategoriesTable extends Migration
             // Composite unique index
             $table->unique(['product_id', 'category_id']);
 
-            // Foreign keys
-            $table->foreign('product_id')
-                ->references('products', 'id')
-                ->onDelete('cascade');
+            // Foreign keys (commented out - add after ensuring data types match)
+            // $table->foreign('product_id')
+            //       ->references('products', 'id')
+            //       ->onDelete('cascade');
 
-            $table->foreign('category_id')
-                ->references('categories', 'id')
-                ->onDelete('cascade');
+            // $table->foreign('category_id')
+            //       ->references('categories', 'id')
+            //       ->onDelete('cascade');
 
             // Indexes
             $table->index('product_id');

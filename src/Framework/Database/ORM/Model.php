@@ -565,7 +565,8 @@ abstract class Model implements ModelInterface, ObservableInterface
 
         // Auto-infer from class name (works for both SQL and MongoDB)
         // Extract class name without namespace
-        $className = (new \ReflectionClass(static::class))->getShortName();
+        $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class);
+        $className = $reflection->getShortName(static::class);
 
         // Remove "Model" suffix if present
         // ProductModel -> Product
@@ -1494,9 +1495,10 @@ abstract class Model implements ModelInterface, ObservableInterface
 
         // Call model hook method if exists (only instance methods, not static)
         if (method_exists($this, $method)) {
-            $reflection = new \ReflectionMethod($this, $method);
+            $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class);
+            $reflectionMethod = $reflection->getMethod($this, $method);
             // Only call if it's not a static method (avoid calling event registration methods)
-            if (!$reflection->isStatic()) {
+            if (!$reflectionMethod->isStatic()) {
                 $result = $this->{$method}();
                 // If method returns false, cancel the operation
                 if ($result === false) {
@@ -2380,15 +2382,10 @@ abstract class Model implements ModelInterface, ObservableInterface
             }
 
             // Get relation parameters using reflection
-            $reflection = new \ReflectionClass($relation);
+            $reflectionService = app()->make(\Toporia\Framework\Support\ReflectionService::class);
 
-            $foreignKeyProp = $reflection->getProperty('foreignKey');
-            $foreignKeyProp->setAccessible(true);
-            $localKeyProp = $reflection->getProperty('localKey');
-            $localKeyProp->setAccessible(true);
-
-            $foreignKey = $foreignKeyProp->getValue($relation);
-            $localKey = $localKeyProp->getValue($relation);
+            $foreignKey = $reflectionService->getPropertyValue($relation, 'foreignKey');
+            $localKey = $reflectionService->getPropertyValue($relation, 'localKey');
 
             // Create fresh query builder from related model (includes table name)
             $freshQuery = $relatedModelClass::query();
@@ -2401,13 +2398,22 @@ abstract class Model implements ModelInterface, ObservableInterface
             // Note: Constructor will call addConstraints() which adds WHERE for single parent
             // We'll replace the query with a completely fresh one to remove that constraint
             $relationClass = get_class($relation);
-            $eagerRelation = new $relationClass($freshQuery, $dummyParent, $relatedModelClass, $foreignKey, $localKey);
+
+            // Handle different relation types with their specific constructor parameters
+            if ($relationClass === Relations\BelongsToMany::class) {
+                // Use newEagerInstance for BelongsToMany
+                $eagerRelation = $relation->newEagerInstance($freshQuery);
+            } else {
+                // Other relations (HasOne, HasMany, BelongsTo) use 5 parameters
+                $eagerRelation = new $relationClass($freshQuery, $dummyParent, $relatedModelClass, $foreignKey, $localKey);
+            }
 
             // Create a completely fresh query (with table set) to remove all constraints from constructor
-            $completelyFreshQuery = $relatedModelClass::query();
-            $queryProp = $reflection->getProperty('query');
-            $queryProp->setAccessible(true);
-            $queryProp->setValue($eagerRelation, $completelyFreshQuery);
+            // Only for non-BelongsToMany relations (BelongsToMany handles this in newEagerInstance)
+            if ($relationClass !== Relations\BelongsToMany::class) {
+                $completelyFreshQuery = $relatedModelClass::query();
+                $reflectionService->setPropertyValue($eagerRelation, 'query', $completelyFreshQuery);
+            }
 
             // Apply callback constraints if provided
             if ($callback !== null) {
@@ -2461,20 +2467,16 @@ abstract class Model implements ModelInterface, ObservableInterface
     protected static function getRelatedModelClass(RelationInterface $relation): ?string
     {
         // Use reflection to get the relatedClass property
-        $reflection = new \ReflectionClass($relation);
+        $reflectionService = app()->make(\Toporia\Framework\Support\ReflectionService::class);
 
         // Try to get relatedClass property (HasMany, BelongsTo, etc.)
-        if ($reflection->hasProperty('relatedClass')) {
-            $property = $reflection->getProperty('relatedClass');
-            $property->setAccessible(true);
-            return $property->getValue($relation);
+        if ($reflectionService->hasProperty($relation, 'relatedClass')) {
+            return $reflectionService->getPropertyValue($relation, 'relatedClass');
         }
 
         // For BelongsTo, try to get the related property
-        if ($reflection->hasProperty('related')) {
-            $property = $reflection->getProperty('related');
-            $property->setAccessible(true);
-            $related = $property->getValue($relation);
+        if ($reflectionService->hasProperty($relation, 'related')) {
+            $related = $reflectionService->getPropertyValue($relation, 'related');
             if (is_string($related)) {
                 return $related;
             }

@@ -242,7 +242,7 @@ final class Exists implements RuleInterface, DataAwareRuleInterface
 
         // Fallback: use reflection to access Validator's protected static method
         try {
-            $reflection = new \ReflectionClass(\Toporia\Framework\Validation\Validator::class);
+            $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class)->getClass(\Toporia\Framework\Validation\Validator::class);
             $method = $reflection->getMethod('getConnection');
             $method->setAccessible(true);
             return $method->invoke(null);

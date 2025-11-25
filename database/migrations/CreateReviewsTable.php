@@ -29,14 +29,14 @@ class CreateReviewsTable extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            // Foreign keys
-            $table->foreign('product_id')
-                ->references('products', 'id')
-                ->onDelete('cascade');
+            // Foreign keys (commented out - add after ensuring data types match)
+            // $table->foreign('product_id')
+            //       ->references('products', 'id')
+            //       ->onDelete('cascade');
 
-            $table->foreign('user_id')
-                ->references('users', 'id')
-                ->onDelete('set null');
+            // $table->foreign('user_id')
+            //       ->references('users', 'id')
+            //       ->onDelete('set null');
 
             // Indexes
             $table->index('product_id');

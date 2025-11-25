@@ -75,7 +75,7 @@ trait HasQueryScopes
      */
     protected static function discoverLocalScopes(): void
     {
-        $reflection = new \ReflectionClass(static::class);
+        $reflection = reflection()->getClass(static::class);
         $methods = $reflection->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
 
         foreach ($methods as $method) {
@@ -107,7 +107,7 @@ trait HasQueryScopes
     public static function addGlobalScope(string|object $scope, ?\Closure $implementation = null): void
     {
         // Access HasGlobalScopes trait's static property directly
-        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        $reflection = reflection()->getClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
         $property = $reflection->getProperty('globalScopes');
         $property->setAccessible(true);
         $globalScopes = $property->getValue(null) ?? [];
@@ -138,7 +138,7 @@ trait HasQueryScopes
     public static function getGlobalScopes(): array
     {
         // Access HasGlobalScopes trait's static property with correct class context
-        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        $reflection = reflection()->getClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
         $property = $reflection->getProperty('globalScopes');
         $property->setAccessible(true);
         $globalScopes = $property->getValue(null) ?? [];
@@ -154,7 +154,7 @@ trait HasQueryScopes
     public static function hasGlobalScope(string $name): bool
     {
         // Access HasGlobalScopes trait's static property with correct class context
-        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        $reflection = reflection()->getClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
         $property = $reflection->getProperty('globalScopes');
         $property->setAccessible(true);
         $globalScopes = $property->getValue(null) ?? [];
@@ -170,7 +170,7 @@ trait HasQueryScopes
     public static function removeGlobalScope(string $name): void
     {
         // Access HasGlobalScopes trait's static property with correct class context
-        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        $reflection = reflection()->getClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
         $property = $reflection->getProperty('globalScopes');
         $property->setAccessible(true);
         $globalScopes = $property->getValue(null) ?? [];

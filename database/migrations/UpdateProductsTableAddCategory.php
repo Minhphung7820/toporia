@@ -26,10 +26,10 @@ class UpdateProductsTableAddCategory extends Migration
             $table->json('specifications')->nullable()->after('rating_count');
             $table->string('status', 50)->default('active')->after('is_active');
 
-            // Foreign key
-            $table->foreign('category_id')
-                ->references('categories', 'id')
-                ->onDelete('set null');
+            // Foreign key (commented out - add after ensuring data types match)
+            // $table->foreign('category_id')
+            //       ->references('categories', 'id')
+            //       ->onDelete('set null');
 
             // Indexes
             $table->index('category_id');

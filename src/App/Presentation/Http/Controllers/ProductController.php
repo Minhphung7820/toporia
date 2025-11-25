@@ -18,6 +18,39 @@ use Toporia\Framework\Http\Request;
 final class ProductController extends BaseController
 {
     /**
+     * Demo method to test different HTTP methods.
+     *
+     * GET /api/products/test-methods
+     * POST /api/products/test-methods
+     * PUT /api/products/test-methods
+     * PATCH /api/products/test-methods
+     * DELETE /api/products/test-methods
+     */
+    public function testMethods(Request $request): void
+    {
+        $response = [
+            'method' => $request->method(),
+            'is_get' => $request->isGet(),
+            'is_post' => $request->isPost(),
+            'is_put' => $request->isPut(),
+            'is_patch' => $request->isPatch(),
+            'is_delete' => $request->isDelete(),
+            'get_data' => $request->get(),
+            'post_data' => $request->post(),
+            'put_data' => $request->put(),
+            'patch_data' => $request->patch(),
+            'delete_data' => $request->delete(),
+            'all_input' => $request->input(),
+        ];
+
+        $this->json([
+            'success' => true,
+            'message' => 'HTTP Methods Test',
+            'data' => $response,
+        ]);
+    }
+
+    /**
      * Get products with pagination and filters.
      *
      * GET /api/products?page=1&per_page=20&category_id=1&min_price=100&max_price=500&search=laptop

@@ -125,10 +125,11 @@ final class Request implements RequestInterface
     public function input(?string $key = null, mixed $default = null): mixed
     {
         if ($key === null) {
-            return $this->body;
+            return array_merge($this->query, $this->body);
         }
 
-        return $this->body[$key] ?? $default;
+        // Check query parameters first, then body
+        return $this->query[$key] ?? $this->body[$key] ?? $default;
     }
 
     /**
@@ -370,5 +371,167 @@ final class Request implements RequestInterface
     public function getAttributes(): array
     {
         return $this->attributes;
+    }
+
+    /**
+     * Get data from GET request (query parameters).
+     *
+     * @param string|null $key Parameter key
+     * @param mixed $default Default value if not found
+     * @return mixed
+     */
+    public function get(?string $key = null, mixed $default = null): mixed
+    {
+        if ($key === null) {
+            return $this->query;
+        }
+
+        return $this->query[$key] ?? $default;
+    }
+
+    /**
+     * Get data from POST request body.
+     *
+     * @param string|null $key Parameter key
+     * @param mixed $default Default value if not found
+     * @return mixed
+     */
+    public function post(?string $key = null, mixed $default = null): mixed
+    {
+        if ($key === null) {
+            return $this->body;
+        }
+
+        return $this->body[$key] ?? $default;
+    }
+
+    /**
+     * Get data from PUT request body.
+     *
+     * @param string|null $key Parameter key
+     * @param mixed $default Default value if not found
+     * @return mixed
+     */
+    public function put(?string $key = null, mixed $default = null): mixed
+    {
+        if ($this->method !== 'PUT') {
+            return $default;
+        }
+
+        if ($key === null) {
+            return $this->body;
+        }
+
+        return $this->body[$key] ?? $default;
+    }
+
+    /**
+     * Get data from PATCH request body.
+     *
+     * @param string|null $key Parameter key
+     * @param mixed $default Default value if not found
+     * @return mixed
+     */
+    public function patch(?string $key = null, mixed $default = null): mixed
+    {
+        if ($this->method !== 'PATCH') {
+            return $default;
+        }
+
+        if ($key === null) {
+            return $this->body;
+        }
+
+        return $this->body[$key] ?? $default;
+    }
+
+    /**
+     * Get data from DELETE request body.
+     *
+     * @param string|null $key Parameter key
+     * @param mixed $default Default value if not found
+     * @return mixed
+     */
+    public function delete(?string $key = null, mixed $default = null): mixed
+    {
+        if ($this->method !== 'DELETE') {
+            return $default;
+        }
+
+        if ($key === null) {
+            return $this->body;
+        }
+
+        return $this->body[$key] ?? $default;
+    }
+
+    /**
+     * Check if the request is a GET request.
+     *
+     * @return bool
+     */
+    public function isGet(): bool
+    {
+        return $this->method === 'GET';
+    }
+
+    /**
+     * Check if the request is a POST request.
+     *
+     * @return bool
+     */
+    public function isPost(): bool
+    {
+        return $this->method === 'POST';
+    }
+
+    /**
+     * Check if the request is a PUT request.
+     *
+     * @return bool
+     */
+    public function isPut(): bool
+    {
+        return $this->method === 'PUT';
+    }
+
+    /**
+     * Check if the request is a PATCH request.
+     *
+     * @return bool
+     */
+    public function isPatch(): bool
+    {
+        return $this->method === 'PATCH';
+    }
+
+    /**
+     * Check if the request is a DELETE request.
+     *
+     * @return bool
+     */
+    public function isDelete(): bool
+    {
+        return $this->method === 'DELETE';
+    }
+
+    /**
+     * Check if the request is a HEAD request.
+     *
+     * @return bool
+     */
+    public function isHead(): bool
+    {
+        return $this->method === 'HEAD';
+    }
+
+    /**
+     * Check if the request is an OPTIONS request.
+     *
+     * @return bool
+     */
+    public function isOptions(): bool
+    {
+        return $this->method === 'OPTIONS';
     }
 }

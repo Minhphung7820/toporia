@@ -97,7 +97,7 @@ class MorphTo extends Relation
 
         // If attributes are not set, try to get from raw attributes
         if (!$type) {
-            $reflection = new \ReflectionClass($this->parent);
+            $reflection = reflection()->getClass($this->parent);
             $property = $reflection->getProperty('attributes');
             $property->setAccessible(true);
             $attributes = $property->getValue($this->parent);
@@ -105,7 +105,7 @@ class MorphTo extends Relation
         }
 
         if (!$id) {
-            $reflection = new \ReflectionClass($this->parent);
+            $reflection = reflection()->getClass($this->parent);
             $property = $reflection->getProperty('attributes');
             $property->setAccessible(true);
             $attributes = $property->getValue($this->parent);

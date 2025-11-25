@@ -134,7 +134,7 @@ class HasMany extends Relation
         $table = $tempModel->getTableName();
 
         // Check if model uses timestamps (via reflection to access static property)
-        $reflection = new \ReflectionClass($this->relatedClass);
+        $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class)->getClass($this->relatedClass);
         $timestampsProperty = $reflection->getStaticPropertyValue('timestamps', true);
         $hasTimestamps = $timestampsProperty ?? true;
 
@@ -199,7 +199,7 @@ class HasMany extends Relation
 
         // Hydrate models with IDs
         $savedModels = [];
-        $modelReflection = new \ReflectionClass($this->relatedClass);
+        $modelReflection = app()->make(\Toporia\Framework\Support\ReflectionService::class)->getClass($this->relatedClass);
 
         // Check if exists property exists (it's private in Model base class)
         $hasExistsProperty = $modelReflection->hasProperty('exists');

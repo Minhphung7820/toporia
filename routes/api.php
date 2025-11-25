@@ -35,6 +35,14 @@ Route::get('/products/stats', [ProductController::class, 'stats']);
 Route::get('/products/complex', [ProductController::class, 'complex']);
 Route::get('/products/performance', [ProductController::class, 'performance']);
 Route::get('/products/top-rated', [ProductController::class, 'topRated']);
+
+// HTTP Methods Test Route
+Route::get('/products/test-methods', [ProductController::class, 'testMethods']);
+Route::post('/products/test-methods', [ProductController::class, 'testMethods']);
+Route::put('/products/test-methods', [ProductController::class, 'testMethods']);
+Route::patch('/products/test-methods', [ProductController::class, 'testMethods']);
+Route::delete('/products/test-methods', [ProductController::class, 'testMethods']);
+
 Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/products/{id}/reviews', [ProductController::class, 'reviews']);
 Route::get('/categories', [ProductController::class, 'categories']);

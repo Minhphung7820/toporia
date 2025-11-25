@@ -335,6 +335,133 @@ if (!function_exists('vite_assets')) {
     }
 }
 
+if (!function_exists('reflection')) {
+    /**
+     * Get ReflectionService instance from container.
+     *
+     * This is a helper function to make reflection access more convenient
+     * while still following the container-managed pattern.
+     *
+     * @return \Toporia\Framework\Support\ReflectionService
+     */
+    function reflection(): \Toporia\Framework\Support\ReflectionService
+    {
+        return app()->make(\Toporia\Framework\Support\ReflectionService::class);
+    }
+}
+
+if (!function_exists('data_get')) {
+    /**
+     * Get an item from an array or object using "dot" notation.
+     *
+     * @param mixed $target
+     * @param string|array|int|null $key
+     * @param mixed $default
+     * @return mixed
+     */
+    function data_get(mixed $target, string|array|int|null $key, mixed $default = null): mixed
+    {
+        if (is_null($key)) {
+            return $target;
+        }
+
+        $key = is_array($key) ? $key : explode('.', $key);
+
+        foreach ($key as $i => $segment) {
+            unset($key[$i]);
+
+            if (is_null($segment)) {
+                return $target;
+            }
+
+            if ($segment === '*') {
+                if (!is_array($target)) {
+                    return $default;
+                }
+
+                $result = [];
+                foreach ($target as $item) {
+                    $result[] = data_get($item, $key, $default);
+                }
+
+                return in_array('*', $key) ? array_merge(...$result) : $result;
+            }
+
+            if (is_array($target) && array_key_exists($segment, $target)) {
+                $target = $target[$segment];
+            } elseif (is_object($target) && isset($target->{$segment})) {
+                $target = $target->{$segment};
+            } else {
+                return $default;
+            }
+        }
+
+        return $target;
+    }
+}
+
+if (!function_exists('data_set')) {
+    /**
+     * Set an item on an array or object using dot notation.
+     *
+     * @param mixed $target
+     * @param string|array $key
+     * @param mixed $value
+     * @param bool $overwrite
+     * @return mixed
+     */
+    function data_set(mixed &$target, string|array $key, mixed $value, bool $overwrite = true): mixed
+    {
+        $segments = is_array($key) ? $key : explode('.', $key);
+
+        if (($segment = array_shift($segments)) === '*') {
+            if (!is_array($target)) {
+                $target = [];
+            }
+
+            if ($segments) {
+                foreach ($target as &$inner) {
+                    data_set($inner, $segments, $value, $overwrite);
+                }
+            } elseif ($overwrite) {
+                foreach ($target as &$inner) {
+                    $inner = $value;
+                }
+            }
+        } elseif (is_array($target)) {
+            if ($segments) {
+                if (!array_key_exists($segment, $target)) {
+                    $target[$segment] = [];
+                }
+
+                data_set($target[$segment], $segments, $value, $overwrite);
+            } elseif ($overwrite || !array_key_exists($segment, $target)) {
+                $target[$segment] = $value;
+            }
+        } elseif (is_object($target)) {
+            if ($segments) {
+                if (!isset($target->{$segment})) {
+                    $target->{$segment} = [];
+                }
+
+                data_set($target->{$segment}, $segments, $value, $overwrite);
+            } elseif ($overwrite || !isset($target->{$segment})) {
+                $target->{$segment} = $value;
+            }
+        } else {
+            $target = [];
+
+            if ($segments) {
+                data_set($target[$segment], $segments, $value, $overwrite);
+            } elseif ($overwrite) {
+                $target[$segment] = $value;
+            }
+        }
+
+        return $target;
+    }
+}
+
 if (!function_exists('http')) {
     /**
      * Get the HTTP client manager or make a request.
@@ -1258,5 +1385,36 @@ if (!function_exists('DB')) {
         }
 
         return $manager;
+    }
+}
+
+if (!function_exists('response')) {
+    /**
+     * Return a new response from the application.
+     *
+     * @param mixed $content
+     * @param int $status
+     * @param array $headers
+     * @return \Toporia\Framework\Http\Response
+     */
+    function response(mixed $content = '', int $status = 200, array $headers = []): \Toporia\Framework\Http\Response
+    {
+        $response = new \Toporia\Framework\Http\Response();
+
+        // Set headers first
+        foreach ($headers as $key => $value) {
+            $response->header($key, $value);
+        }
+
+        if (is_array($content) || is_object($content)) {
+            $response->json($content, $status);
+        } else {
+            $response->setStatus($status);
+            if ($content !== '') {
+                $response->html((string) $content, $status);
+            }
+        }
+
+        return $response;
     }
 }

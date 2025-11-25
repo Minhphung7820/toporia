@@ -22,6 +22,8 @@ use Toporia\Framework\Database\ORM\Model;
  */
 class CategoryModel extends Model
 {
+    protected static string $table = 'categories';
+
     protected static array $fillable = [
         'name',
         'slug',
@@ -50,5 +52,15 @@ class CategoryModel extends Model
     public static function active()
     {
         return static::query()->where('is_active', true);
+    }
+
+    /**
+     * Get the foreign key name for this model.
+     *
+     * @return string
+     */
+    protected function getForeignKey(): string
+    {
+        return 'category_id';
     }
 }

@@ -125,11 +125,12 @@ class BelongsToMany extends Relation
     {
         $rows = $this->query->get();
 
-        if (empty($rows)) {
+        if ($rows->isEmpty()) {
             return new ModelCollection([]);
         }
 
-        return call_user_func([$this->relatedClass, 'hydrate'], $rows);
+        // Convert RowCollection to array for hydrate method
+        return call_user_func([$this->relatedClass, 'hydrate'], $rows->toArray());
     }
 
     /**
@@ -337,9 +338,12 @@ class BelongsToMany extends Relation
      */
     public function newEagerInstance(\Toporia\Framework\Database\Query\QueryBuilder $freshQuery): static
     {
+        // Create a dummy parent without ID to avoid parent-specific constraints
+        $dummyParent = new ($this->parent::class)();
+
         $instance = new static(
             $freshQuery,
-            $this->parent,
+            $dummyParent,
             $this->relatedClass,
             $this->pivotTable,
             $this->foreignPivotKey,
@@ -351,14 +355,77 @@ class BelongsToMany extends Relation
         // Preserve pivot columns from original relation
         $instance->pivotColumns = $this->pivotColumns;
 
-        // BelongsToMany constructor calls addPivotConstraints() which adds parent WHERE clause
-        // We need to reset the query to remove parent-specific constraints
-        // Only eager constraints (WHERE IN) should be added later via addEagerConstraints()
-        $cleanQuery = $freshQuery->newQuery();
+        // Set up the query with proper JOIN but without parent WHERE constraints
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
 
-        // Use setter method instead of reflection (cleaner & faster)
+        // Build SELECT clause with pivot columns
+        $selectColumns = ["{$relatedTable}.*"];
+        foreach ($this->pivotColumns as $column) {
+            $selectColumns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
+        }
+
+        // Create a fresh query from the related model (this ensures table name is set)
+        $cleanQuery = call_user_func([$this->relatedClass, 'query'])
+            ->join(
+                $this->pivotTable,
+                "{$relatedTable}.{$this->relatedKey}",
+                '=',
+                "{$this->pivotTable}.{$this->relatedPivotKey}"
+            )
+            ->select($selectColumns);
+
         $instance->setQuery($cleanQuery);
 
         return $instance;
+    }
+
+    /**
+     * Get the pivot table name.
+     *
+     * @return string
+     */
+    public function getPivotTable(): string
+    {
+        return $this->pivotTable;
+    }
+
+    /**
+     * Get the foreign pivot key.
+     *
+     * @return string
+     */
+    public function getForeignPivotKey(): string
+    {
+        return $this->foreignPivotKey;
+    }
+
+    /**
+     * Get the related pivot key.
+     *
+     * @return string
+     */
+    public function getRelatedPivotKey(): string
+    {
+        return $this->relatedPivotKey;
+    }
+
+    /**
+     * Get the parent key.
+     *
+     * @return string
+     */
+    public function getParentKey(): string
+    {
+        return $this->parentKey;
+    }
+
+    /**
+     * Get the related key.
+     *
+     * @return string
+     */
+    public function getRelatedKey(): string
+    {
+        return $this->relatedKey;
     }
 }

@@ -49,7 +49,7 @@ abstract class ValueObject implements ValueObjectInterface
     public function toArray(): array
     {
         // Default implementation using reflection
-        $reflection = new \ReflectionClass($this);
+        $reflection = reflection()->getClass($this);
         $properties = $reflection->getProperties(\ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED);
 
         $array = [];

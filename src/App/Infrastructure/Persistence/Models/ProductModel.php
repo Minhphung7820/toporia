@@ -31,6 +31,8 @@ use Toporia\Framework\Database\ORM\Model;
  */
 class ProductModel extends Model
 {
+    protected static string $table = 'products';
+
     protected static array $fillable = [
         'category_id',
         'title',
@@ -68,7 +70,7 @@ class ProductModel extends Model
      */
     public function category()
     {
-        return $this->belongsTo(CategoryModel::class);
+        return $this->belongsTo(CategoryModel::class, 'category_id');
     }
 
     /**
@@ -76,7 +78,12 @@ class ProductModel extends Model
      */
     public function categories()
     {
-        return $this->belongsToMany(CategoryModel::class, 'product_categories');
+        return $this->belongsToMany(
+            CategoryModel::class,
+            'product_categories',
+            'product_id',    // Foreign key for current model (ProductModel)
+            'category_id'    // Foreign key for related model (CategoryModel)
+        );
     }
 
     /**
@@ -125,6 +132,16 @@ class ProductModel extends Model
     public function isInStock(): bool
     {
         return $this->stock > 0;
+    }
+
+    /**
+     * Get the foreign key name for this model.
+     *
+     * @return string
+     */
+    protected function getForeignKey(): string
+    {
+        return 'product_id';
     }
 
     /**

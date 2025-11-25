@@ -39,6 +39,7 @@ return [
             // '/api/auth/*'
             // Note: GET requests (like /api/csrf-cookie) are automatically safe
             // Note: /api/auth/* uses CSRF protection via XSRF-TOKEN cookie
+            '/api/products/test-methods', // Test route for HTTP methods
         ],
     ],
 
