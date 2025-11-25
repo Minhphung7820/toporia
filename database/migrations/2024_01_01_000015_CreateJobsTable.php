@@ -23,7 +23,7 @@ class CreateJobsTable extends Migration
             $table->integer('created_at')->unsigned();
 
             // Primary key
-            $table->primaryKey('id');
+            $table->primary('id');
 
             // Indexes
             $table->index(['queue', 'available_at']);

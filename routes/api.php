@@ -13,6 +13,7 @@ declare(strict_types=1);
 use Toporia\Framework\Support\Accessors\Route;
 use App\Presentation\Http\Controllers\Api\AuthController;
 use App\Presentation\Http\Controllers\Api\CsrfCookieController;
+use App\Presentation\Http\Controllers\ProductController;
 
 // CSRF Cookie endpoint for SPA authentication (must be called before login/register)
 // CSRF cookie endpoint for SPA authentication
@@ -27,5 +28,15 @@ Route::post('/auth/refresh', [AuthController::class, 'refresh']);
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+
+// Product API Routes
+Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/stats', [ProductController::class, 'stats']);
+Route::get('/products/complex', [ProductController::class, 'complex']);
+Route::get('/products/performance', [ProductController::class, 'performance']);
+Route::get('/products/top-rated', [ProductController::class, 'topRated']);
+Route::get('/products/{id}', [ProductController::class, 'show']);
+Route::get('/products/{id}/reviews', [ProductController::class, 'reviews']);
+Route::get('/categories', [ProductController::class, 'categories']);
 
 /** @var Router $router */

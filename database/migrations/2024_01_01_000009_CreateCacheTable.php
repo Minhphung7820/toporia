@@ -20,7 +20,7 @@ class CreateCacheTable extends Migration
             $table->integer('expiration')->unsigned();
 
             // Primary key
-            $table->primaryKey('key');
+            $table->primary('key');
 
             // Indexes
             $table->index('expiration');

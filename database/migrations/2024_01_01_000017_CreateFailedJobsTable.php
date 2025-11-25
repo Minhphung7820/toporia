@@ -22,7 +22,7 @@ class CreateFailedJobsTable extends Migration
             $table->integer('failed_at')->unsigned();
 
             // Primary key
-            $table->primaryKey('id');
+            $table->primary('id');
 
             // Indexes
             $table->index('queue');

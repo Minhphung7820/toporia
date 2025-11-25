@@ -31,12 +31,12 @@ final class MakeFactoryCommand extends Command
         $modelClass = $this->option('model');
         if (empty($modelClass)) {
             $modelClass = $this->guessModelName($baseName);
+        } else {
+            // Normalize model class (ensure full namespace)
+            $modelClass = $this->normalizeModelClass($modelClass);
         }
 
-        // Normalize model class (ensure full namespace)
-        $modelClass = $this->normalizeModelClass($modelClass);
-
-        $stubPath = $this->resolveStubPath('factory.stub');
+        $stubPath = $this->getStubPath('factory.stub');
 
         if (!file_exists($stubPath)) {
             $this->error("Stub file not found: {$stubPath}");
@@ -48,19 +48,14 @@ final class MakeFactoryCommand extends Command
         // Replace placeholders
         $namespace = 'Database\\Factories';
         $modelName = $this->class_basename($modelClass);
-        $stateName = $this->extractStateName($baseName);
 
         $replacements = [
             '{{ namespace }}' => $namespace,
             '{{namespace}}' => $namespace,
             '{{ class }}' => $name,
             '{{class}}' => $name,
-            '{{ model }}' => "'{$modelClass}'",
-            '{{model}}' => "'{$modelClass}'",
             '{{ modelName }}' => $modelName,
             '{{modelName}}' => $modelName,
-            '{{ stateName }}' => $stateName,
-            '{{stateName}}' => $stateName,
         ];
 
         foreach ($replacements as $placeholder => $replacement) {
@@ -104,12 +99,13 @@ final class MakeFactoryCommand extends Command
         // Remove 'Factory' suffix if present
         $baseName = preg_replace('/Factory$/', '', $factoryName);
 
-        // Try common patterns
+        // Try common patterns (most common first)
         $patterns = [
+            "App\\Infrastructure\\Persistence\\Models\\{$baseName}Model",
+            "App\\Infrastructure\\Persistence\\Models\\{$baseName}",
             "App\\Domain\\{$baseName}\\{$baseName}Model",
             "App\\Domain\\{$baseName}\\{$baseName}",
-            "App\\Infrastructure\\Database\\Models\\{$baseName}Model",
-            "App\\Infrastructure\\Database\\Models\\{$baseName}",
+            "App\\Models\\{$baseName}Model",
             "App\\Models\\{$baseName}",
         ];
 
@@ -120,8 +116,8 @@ final class MakeFactoryCommand extends Command
             }
         }
 
-        // Default pattern
-        return "App\\Domain\\{$baseName}\\{$baseName}Model";
+        // Default pattern (most common in this codebase)
+        return "App\\Infrastructure\\Persistence\\Models\\{$baseName}Model";
     }
 
     /**
@@ -137,12 +133,16 @@ final class MakeFactoryCommand extends Command
             if (class_exists($modelClass)) {
                 return $modelClass;
             }
+            // Return as is even if not found (user will fix)
+            return $modelClass;
         } else {
-            // Try common namespaces
+            // Try common namespaces (most common first)
             $patterns = [
+                "App\\Infrastructure\\Persistence\\Models\\{$modelClass}Model",
+                "App\\Infrastructure\\Persistence\\Models\\{$modelClass}",
                 "App\\Domain\\{$modelClass}\\{$modelClass}Model",
                 "App\\Domain\\{$modelClass}\\{$modelClass}",
-                "App\\Infrastructure\\Database\\Models\\{$modelClass}Model",
+                "App\\Models\\{$modelClass}Model",
                 "App\\Models\\{$modelClass}",
             ];
 
@@ -153,7 +153,8 @@ final class MakeFactoryCommand extends Command
             }
         }
 
-        return $modelClass;
+        // Default to most common pattern
+        return "App\\Infrastructure\\Persistence\\Models\\{$modelClass}Model";
     }
 
     /**
@@ -186,5 +187,31 @@ final class MakeFactoryCommand extends Command
         }
 
         return getcwd() ?: dirname(__DIR__, 5);
+    }
+
+    /**
+     * Resolve stub file path.
+     */
+    private function getStubPath(string $stub): string
+    {
+        $stubPath = dirname(__DIR__, 2) . '/stubs/' . $stub;
+
+        if (file_exists($stubPath)) {
+            return $stubPath;
+        }
+
+        // Fallback to alternative paths
+        $alternativePaths = [
+            dirname(__DIR__, 3) . '/stubs/' . $stub,
+            $this->getBasePath() . '/stubs/' . $stub,
+        ];
+
+        foreach ($alternativePaths as $altPath) {
+            if (file_exists($altPath)) {
+                return $altPath;
+            }
+        }
+
+        return $stubPath;
     }
 }

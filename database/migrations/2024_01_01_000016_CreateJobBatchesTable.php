@@ -28,7 +28,7 @@ class CreateJobBatchesTable extends Migration
             $table->integer('cancelled_at')->unsigned()->nullable();
 
             // Primary key
-            $table->primaryKey('id');
+            $table->primary('id');
 
             // Indexes for queries
             $table->index('created_at');
@@ -43,4 +43,4 @@ class CreateJobBatchesTable extends Migration
     {
         $this->schema->dropIfExists('job_batches');
     }
-};
+}

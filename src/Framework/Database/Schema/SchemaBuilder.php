@@ -549,7 +549,7 @@ class SchemaBuilder
         $type = $column['type'];
 
         return match ($type) {
-            'bigInteger' => match ($driver) {
+            'bigInteger', 'unsignedBigInteger' => match ($driver) {
                 'mysql' => 'BIGINT',
                 'pgsql' => !empty($column['autoIncrement']) ? 'BIGSERIAL' : 'BIGINT',
                 'sqlite' => 'INTEGER',

@@ -57,8 +57,11 @@ final class MakeMigrationCommand extends Command
         $stubContent = str_replace(['{{ class }}', '{{class}}'], $className, $stubContent);
         $stubContent = str_replace(['{{ description }}', '{{description}}'], $description, $stubContent);
 
-        // Generate filename (class name based, not timestamp)
-        $filename = "{$className}.php";
+        // Generate timestamp prefix (YYYY_MM_DD_HHMMSS format)
+        $timestamp = $this->generateTimestamp();
+
+        // Generate filename with timestamp prefix
+        $filename = "{$timestamp}_{$className}.php";
 
         // Determine path
         $path = $this->option('path') ?: $this->getBasePath() . '/database/migrations';
@@ -101,6 +104,75 @@ final class MakeMigrationCommand extends Command
     private function generateDescription(string $name): string
     {
         return ucfirst(str_replace('_', ' ', $name)) . '.';
+    }
+
+    /**
+     * Generate timestamp prefix for migration filename.
+     * Format: YYYY_MM_DD_HHMMSS (e.g., 2024_01_01_000001)
+     */
+    private function generateTimestamp(): string
+    {
+        $now = new \DateTime();
+        $date = $now->format('Y_m_d');
+
+        // Get the next sequence number for this date
+        $sequence = $this->getNextSequenceNumber($date);
+
+        return sprintf('%s_%06d', $date, $sequence);
+    }
+
+    /**
+     * Get the next sequence number for migrations on the same date.
+     * This ensures migrations are ordered correctly even if created on the same day.
+     */
+    private function getNextSequenceNumber(string $date): int
+    {
+        $path = $this->option('path') ?: $this->getBasePath() . '/database/migrations';
+
+        if (!is_dir($path)) {
+            return 1;
+        }
+
+        $files = scandir($path);
+        $maxSequence = 0;
+        $pattern = '/^' . preg_quote($date, '/') . '_(\d{6})_/';
+
+        foreach ($files as $file) {
+            if (preg_match($pattern, $file, $matches)) {
+                $sequence = (int) $matches[1];
+                if ($sequence > $maxSequence) {
+                    $maxSequence = $sequence;
+                }
+            }
+        }
+
+        return $maxSequence + 1;
+    }
+
+    /**
+     * Resolve stub file path.
+     */
+    private function resolveStubPath(string $stub): string
+    {
+        $stubPath = dirname(__DIR__, 2) . '/stubs/' . $stub;
+
+        if (file_exists($stubPath)) {
+            return $stubPath;
+        }
+
+        // Fallback to alternative paths
+        $alternativePaths = [
+            dirname(__DIR__, 3) . '/stubs/' . $stub,
+            $this->getBasePath() . '/stubs/' . $stub,
+        ];
+
+        foreach ($alternativePaths as $altPath) {
+            if (file_exists($altPath)) {
+                return $altPath;
+            }
+        }
+
+        return $stubPath;
     }
 
     private function getBasePath(): string

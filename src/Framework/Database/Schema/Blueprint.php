@@ -198,14 +198,26 @@ class Blueprint
 
     /**
      * Add foreign ID column (unsigned big integer).
-     * Modern ORM helper.
+     * Modern ORM helper with Laravel-like constrained() support.
+     *
+     * Usage:
+     * $table->foreignId('user_id')->constrained()
+     * $table->foreignId('user_id')->constrained('users', 'id')
+     * $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade')
      *
      * @param string $name Column name (default: table name + '_id').
-     * @return ColumnDefinition
+     * @return ForeignIdColumnDefinition
      */
-    public function foreignId(string $name): ColumnDefinition
+    public function foreignId(string $name): ForeignIdColumnDefinition
     {
-        return $this->unsignedBigInteger($name);
+        // Create column using same pattern as unsignedBigInteger
+        $column = &$this->columns[];
+        $column['name'] = $name;
+        $column['type'] = 'unsignedBigInteger';
+        $column['unsigned'] = true;
+        $column['nullable'] = false;
+
+        return new ForeignIdColumnDefinition($column, $this, $name);
     }
 
     /**

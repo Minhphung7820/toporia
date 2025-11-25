@@ -36,7 +36,9 @@
   "autoload": {
     "psr-4": {
       "Toporia\\Framework\\": "src/Framework/",
-      "App\\": "src/App/"
+      "App\\": "src/App/",
+      "Database\\Factories\\": "database/factories/",
+      "Database\\Seeders\\": "database/seeders/"
     },
     "files": [
       "src/Framework/Support/helpers.php"

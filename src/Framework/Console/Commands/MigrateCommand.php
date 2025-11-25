@@ -37,8 +37,7 @@ final class MigrateCommand extends Command
 
     public function __construct(
         private DatabaseManager $db
-    ) {
-    }
+    ) {}
 
     /**
      * Execute the command.
@@ -51,7 +50,8 @@ final class MigrateCommand extends Command
         $this->printHeader();
 
         try {
-            $connection = $this->db->connection();
+            $connectionProxy = $this->db->connection();
+            $connection = $connectionProxy->getConnection();
             $migrator = new Migrator($connection);
 
             // Get migrations path
@@ -75,7 +75,7 @@ final class MigrateCommand extends Command
             $this->printPendingInfo($pendingCount);
 
             // Run migrations with progress tracking
-            $ranMigrations = $migrator->run($migrationsPath, function($file, $status, $error = null) {
+            $ranMigrations = $migrator->run($migrationsPath, function ($file, $status, $error = null) {
                 $this->printMigrationStatus($file, $status, $error);
             });
 
@@ -84,7 +84,6 @@ final class MigrateCommand extends Command
             $this->printSummary(count($ranMigrations), $duration);
 
             return 0;
-
         } catch (\Throwable $e) {
             $this->printException($e);
             return 1;

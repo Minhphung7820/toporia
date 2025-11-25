@@ -48,7 +48,7 @@ final class CreateNotificationsTable extends Migration
         $this->schema->create('notifications', function ($table) {
             // Primary key
             $table->string('id', 255); // notification_xxxxx format
-            $table->primaryKey('id');
+            $table->primary('id');
 
             // Notification metadata
             $table->string('type'); // Full class name

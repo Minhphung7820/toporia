@@ -62,17 +62,20 @@ trait BuildsAdvancedQueries
      * - Query organization and readability
      * - Reusing subqueries
      *
+     * Note: This method is named `withCte()` to avoid conflict with
+     * ModelQueryBuilder::with() for eager loading relationships.
+     *
      * Example:
      * ```php
      * // Simple CTE
-     * $query->with('active_users', function($query) {
+     * $query->withCte('active_users', function($query) {
      *     $query->table('users')->where('status', 'active');
      * })
      * ->from('active_users')
      * ->select('*');
      *
      * // CTE with columns
-     * $query->with('user_stats', function($query) {
+     * $query->withCte('user_stats', function($query) {
      *     $query->table('users')
      *           ->select(['id', 'COUNT(*) as order_count'])
      *           ->groupBy('id');
@@ -81,8 +84,8 @@ trait BuildsAdvancedQueries
      * ->where('order_count', '>', 10);
      *
      * // Multiple CTEs
-     * $query->with('cte1', function($q) { ... })
-     *       ->with('cte2', function($q) { ... })
+     * $query->withCte('cte1', function($q) { ... })
+     *       ->withCte('cte2', function($q) { ... })
      *       ->from('cte1')
      *       ->join('cte2', 'cte1.id', '=', 'cte2.id');
      * ```
@@ -97,7 +100,7 @@ trait BuildsAdvancedQueries
      * @param array<string>|null $columns Optional column names for the CTE
      * @return $this
      */
-    public function with(string $name, Closure|QueryBuilder|string $query, ?array $columns = null): self
+    public function withCte(string $name, Closure|QueryBuilder|string $query, ?array $columns = null): self
     {
         // If query is a Closure, build it
         if ($query instanceof Closure) {
@@ -126,7 +129,7 @@ trait BuildsAdvancedQueries
      * Example:
      * ```php
      * // Find all descendants of a category
-     * $query->withRecursive('category_tree', function($query) {
+     * $query->withRecursiveCte('category_tree', function($query) {
      *     // Anchor member: root categories
      *     $query->table('categories')
      *           ->where('parent_id', null)
@@ -149,7 +152,7 @@ trait BuildsAdvancedQueries
      * @param array<string>|null $columns Optional column names
      * @return $this
      */
-    public function withRecursive(
+    public function withRecursiveCte(
         string $name,
         Closure $anchor,
         Closure $recursive,
@@ -189,13 +192,13 @@ trait BuildsAdvancedQueries
      * ```php
      * // Add row numbers
      * $query->select('*')
-     *       ->window('row_number', 'ROW_NUMBER()', ['created_at' => 'DESC'])
+     *       ->addWindowFunction('row_number', 'ROW_NUMBER()', ['created_at' => 'DESC'])
      *       ->get();
      * // SELECT *, ROW_NUMBER() OVER (ORDER BY created_at DESC) AS row_number
      *
      * // Partitioned window function
      * $query->select('*')
-     *       ->window('rank_in_category', 'RANK()', ['category_id'], ['price' => 'DESC'])
+     *       ->addWindowFunction('rank_in_category', 'RANK()', ['category_id'], ['price' => 'DESC'])
      *       ->get();
      * // SELECT *, RANK() OVER (PARTITION BY category_id ORDER BY price DESC) AS rank_in_category
      * ```
@@ -208,7 +211,7 @@ trait BuildsAdvancedQueries
      * @param array<string, string>|null $orderBy Order by columns (column => direction)
      * @return $this
      */
-    public function window(
+    public function addWindowFunction(
         string $alias,
         string $function,
         ?array $partitionBy = null,
@@ -265,5 +268,47 @@ trait BuildsAdvancedQueries
     public function getWindowFunctions(): array
     {
         return $this->windowFunctions;
+    }
+
+    // =========================================================================
+    // BACKWARD COMPATIBILITY ALIASES
+    // =========================================================================
+
+    /**
+     * Alias for withRecursiveCte() for backward compatibility.
+     *
+     * @deprecated Use withRecursiveCte() instead
+     * @param string $name CTE name
+     * @param Closure $anchor Anchor member (non-recursive part)
+     * @param Closure $recursive Recursive member
+     * @param array<string>|null $columns Optional column names
+     * @return $this
+     */
+    public function withRecursive(
+        string $name,
+        Closure $anchor,
+        Closure $recursive,
+        ?array $columns = null
+    ): self {
+        return $this->withRecursiveCte($name, $anchor, $recursive, $columns);
+    }
+
+    /**
+     * Alias for addWindowFunction() for backward compatibility.
+     *
+     * @deprecated Use addWindowFunction() instead
+     * @param string $alias Alias for the window function result
+     * @param string $function Window function
+     * @param array<string>|null $partitionBy Columns to partition by
+     * @param array<string, string>|null $orderBy Order by columns
+     * @return $this
+     */
+    public function window(
+        string $alias,
+        string $function,
+        ?array $partitionBy = null,
+        ?array $orderBy = null
+    ): self {
+        return $this->addWindowFunction($alias, $function, $partitionBy, $orderBy);
     }
 }

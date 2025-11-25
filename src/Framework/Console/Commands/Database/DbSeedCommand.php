@@ -42,8 +42,25 @@ final class DbSeedCommand extends Command
                 $class = 'Database\\Seeders\\' . $class;
             }
 
+            // Try to require seeder file if class doesn't exist
             if (!class_exists($class)) {
-                $this->error("Seeder class [{$class}] does not exist.");
+                // Extract class name from full namespace
+                $className = basename(str_replace('\\', '/', $class));
+                // Get project root (5 levels up from this file)
+                $projectRoot = dirname(__DIR__, 5);
+                $seederFile = $projectRoot . '/database/seeders/' . $className . '.php';
+
+                if (file_exists($seederFile)) {
+                    require_once $seederFile;
+                } else {
+                    $this->error("Seeder file not found: {$seederFile}");
+                    $this->error("Looking for class: {$class}");
+                    return 1;
+                }
+            }
+
+            if (!class_exists($class)) {
+                $this->error("Seeder class [{$class}] does not exist after requiring file.");
                 return 1;
             }
 
@@ -81,8 +98,12 @@ final class DbSeedCommand extends Command
     private function resolveDatabaseManager(): DatabaseManager
     {
         // Try to resolve from container
-        if (function_exists('app') && app()->has('db')) {
-            return app()->get('db');
+        if (function_exists('container')) {
+            try {
+                return container(DatabaseManager::class);
+            } catch (\Throwable $e) {
+                // Fall through to fallback
+            }
         }
 
         // Fallback: create from config

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM;
 
+use Closure;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Contracts\RelationInterface;
@@ -649,50 +650,15 @@ class ModelQueryBuilder extends QueryBuilder
      * });
      * ```
      */
-    public function chunk(int $chunkSize, ?callable $callback = null): ?\Generator
+    public function chunk(int $count, \Closure $callback): bool
     {
-        // If callback provided, execute synchronously and return void
-        if ($callback !== null) {
-            $offset = 0;
-
-            while (true) {
-                // Clone query to preserve original state
-                $query = clone $this;
-                $chunk = $query
-                    ->limit($chunkSize)
-                    ->offset($offset)
-                    ->getModels();
-
-                if ($chunk->isEmpty()) {
-                    break;
-                }
-
-                $callback($chunk);
-
-                // If chunk is smaller than chunkSize, we're done
-                if ($chunk->count() < $chunkSize) {
-                    break;
-                }
-
-                $offset += $chunkSize;
-
-                // Force garbage collection to free memory
-                if (function_exists('gc_collect_cycles')) {
-                    gc_collect_cycles();
-                }
-            }
-
-            return null;
-        }
-
-        // Otherwise, return generator for lazy iteration
         $offset = 0;
 
         while (true) {
             // Clone query to preserve original state
             $query = clone $this;
             $chunk = $query
-                ->limit($chunkSize)
+                ->limit($count)
                 ->offset($offset)
                 ->getModels();
 
@@ -700,20 +666,22 @@ class ModelQueryBuilder extends QueryBuilder
                 break;
             }
 
-            yield $chunk;
+            $callback($chunk);
 
-            // If chunk is smaller than chunkSize, we're done
-            if ($chunk->count() < $chunkSize) {
+            // If chunk is smaller than count, we're done
+            if ($chunk->count() < $count) {
                 break;
             }
 
-            $offset += $chunkSize;
+            $offset += $count;
 
             // Force garbage collection to free memory
             if (function_exists('gc_collect_cycles')) {
                 gc_collect_cycles();
             }
         }
+
+        return true;
     }
 
     /**
@@ -762,72 +730,35 @@ class ModelQueryBuilder extends QueryBuilder
      * }
      * ```
      */
-    public function chunkById(int $chunkSize, ?callable $callback = null): ?\Generator
+    public function chunkById(int $count, Closure $callback, ?string $column = null, ?string $alias = null): bool
     {
         /** @var callable $getPrimaryKey */
         $getPrimaryKey = [$this->modelClass, 'getPrimaryKey'];
-        $primaryKey = $getPrimaryKey();
+        $primaryKey = $column ?? $getPrimaryKey();
         $lastId = 0;
 
-        // If callback provided, execute synchronously and return void
-        if ($callback !== null) {
-            while (true) {
-                // Clone query to preserve original state
-                $query = clone $this;
-                $chunk = $query
-                    ->where($primaryKey, '>', $lastId)
-                    ->orderBy($primaryKey, 'ASC')
-                    ->limit($chunkSize)
-                    ->getModels();
-
-                if ($chunk->isEmpty()) {
-                    break;
-                }
-
-                $callback($chunk);
-
-                // Get last ID from chunk
-                /** @var \Toporia\Framework\Database\ORM\Model $lastModel */
-                $lastModel = $chunk->last();
-                $lastId = $lastModel->getKey();
-
-                // If chunk is smaller than chunkSize, we're done
-                if ($chunk->count() < $chunkSize) {
-                    break;
-                }
-
-                // Force garbage collection to free memory
-                if (function_exists('gc_collect_cycles')) {
-                    gc_collect_cycles();
-                }
-            }
-
-            return null;
-        }
-
-        // Otherwise, return generator for lazy iteration
         while (true) {
             // Clone query to preserve original state
             $query = clone $this;
             $chunk = $query
                 ->where($primaryKey, '>', $lastId)
                 ->orderBy($primaryKey, 'ASC')
-                ->limit($chunkSize)
+                ->limit($count)
                 ->getModels();
 
             if ($chunk->isEmpty()) {
                 break;
             }
 
-            yield $chunk;
+            $callback($chunk);
 
             // Get last ID from chunk
             /** @var \Toporia\Framework\Database\ORM\Model $lastModel */
             $lastModel = $chunk->last();
             $lastId = $lastModel->getKey();
 
-            // If chunk is smaller than chunkSize, we're done
-            if ($chunk->count() < $chunkSize) {
+            // If chunk is smaller than count, we're done
+            if ($chunk->count() < $count) {
                 break;
             }
 
@@ -836,5 +767,7 @@ class ModelQueryBuilder extends QueryBuilder
                 gc_collect_cycles();
             }
         }
+
+        return true;
     }
 }

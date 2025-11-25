@@ -38,12 +38,11 @@ final class DatabaseSeeder extends Seeder
      */
     protected function seed(): void
     {
-        // Example: Seed users, roles, etc.
-        // $this->call(RoleSeeder::class);
-        // $this->call(UserSeeder::class);
+        // Seed users first (they might be referenced by other tables)
+        $this->call(UserSeeder::class);
 
-        // Or use factory directly
-        // $this->factory(UserFactory::new(), 10);
+        // Then seed other data
+        // $this->call(ProductSeeder::class);
     }
 
     /**

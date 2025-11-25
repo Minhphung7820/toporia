@@ -40,6 +40,7 @@ abstract class Model implements ModelInterface, ObservableInterface
     use Concerns\HasModelCollections;
     use Concerns\HasMassAssignmentProtection;
     use Concerns\HasEagerLoading;
+    use Concerns\HasFactory;
     /**
      * Database table name (override in child class).
      *

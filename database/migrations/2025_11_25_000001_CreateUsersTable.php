@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Toporia\Framework\Database\Migration\Migration;
 
 /**
- * Create users table for authentication.
+ * CreateUsersTable.
  */
 class CreateUsersTable extends Migration
 {
@@ -18,12 +18,13 @@ class CreateUsersTable extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('remember_token', 100)->nullable();
+            $table->string('phone')->nullable();
+            $table->string('avatar')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->enum('role', ['user', 'admin', 'moderator'])->default('user');
             $table->timestamps();
-
-            // Indexes
-            $table->index('email');
         });
     }
 

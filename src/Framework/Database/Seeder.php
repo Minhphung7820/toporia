@@ -155,14 +155,14 @@ abstract class Seeder implements SeederInterface
     /**
      * Create models using factory.
      *
-     * @param FactoryInterface<TModel> $factory Factory instance
+     * @param FactoryInterface<TModel>|string $factory Factory instance or class name
      * @param int $count Number of models to create
      * @param array<string, mixed> $attributes Additional attributes
      * @return array<int, Model>
      * @template TModel of Model
      */
     protected function factory(
-        FactoryInterface $factory,
+        FactoryInterface|string $factory,
         int $count = 1,
         array $attributes = []
     ): array {
@@ -170,11 +170,97 @@ abstract class Seeder implements SeederInterface
             return [];
         }
 
+        // Resolve factory if string provided
+        if (is_string($factory)) {
+            $factory = $factory::new();
+        }
+
         if ($count === 1) {
             return [$factory->create($attributes)];
         }
 
         return $factory->createMany($count, $attributes);
+    }
+
+    /**
+     * Batch insert data from factory definitions (most performant).
+     *
+     * This method generates factory definitions and inserts them directly
+     * without creating model instances, which is much faster for large datasets.
+     *
+     * @param string|FactoryInterface $factory Factory class name or instance
+     * @param int $count Number of records to create
+     * @param array<string, mixed> $attributes Additional attributes
+     * @param string|null $table Table name (inferred from model if null)
+     * @return array<int> Inserted IDs
+     */
+    protected function factoryBatch(
+        string|FactoryInterface $factory,
+        int $count,
+        array $attributes = [],
+        ?string $table = null
+    ): array {
+        if ($count <= 0) {
+            return [];
+        }
+
+        // Resolve factory if string provided
+        if (is_string($factory)) {
+            $factory = $factory::new();
+        }
+
+        // Get table name from model
+        if ($table === null) {
+            $reflection = new \ReflectionClass($factory);
+            if ($reflection->hasProperty('model')) {
+                $property = $reflection->getProperty('model');
+                $property->setAccessible(true);
+                $modelClass = $property->getValue($factory);
+
+                if ($modelClass && method_exists($modelClass, 'getTableName')) {
+                    $table = $modelClass::getTableName();
+                } elseif ($modelClass && method_exists($modelClass, 'getTable')) {
+                    $table = (new $modelClass)->getTable();
+                } else {
+                    throw new \InvalidArgumentException("Cannot infer table name. Please provide table parameter.");
+                }
+            } else {
+                throw new \InvalidArgumentException("Factory must have model property or table must be provided.");
+            }
+        }
+
+        if ($table === null) {
+            throw new \InvalidArgumentException("Table name is required for batch insert.");
+        }
+
+        // Generate data using factory
+        $data = [];
+        $reflection = new \ReflectionClass($factory);
+        $method = $reflection->getMethod('definition');
+        $method->setAccessible(true);
+
+        // Access defaultAttributes via reflection
+        $defaultAttributesProp = $reflection->getProperty('defaultAttributes');
+        $defaultAttributesProp->setAccessible(true);
+        $defaultAttributes = $defaultAttributesProp->getValue($factory);
+
+        for ($i = 0; $i < $count; $i++) {
+            $sequenceIndexProp = $reflection->getProperty('sequenceIndex');
+            $sequenceIndexProp->setAccessible(true);
+            $sequenceIndexProp->setValue($factory, $i);
+
+            $row = array_merge($method->invoke($factory), $defaultAttributes, $attributes);
+            $data[] = $row;
+        }
+
+        // Batch insert
+        $this->insert($table, $data);
+
+        // Return IDs (approximate - actual IDs depend on auto-increment)
+        $connection = $this->getConnection();
+        $lastId = (int) $connection->selectOne("SELECT MAX(id) as max_id FROM {$table}")['max_id'] ?? 0;
+
+        return range($lastId - $count + 1, $lastId);
     }
 
     /**
@@ -241,9 +327,9 @@ abstract class Seeder implements SeederInterface
             $values = array_fill(0, count($chunk), $placeholders);
 
             $sql = sprintf(
-                'INSERT INTO %s (%s) VALUES %s',
-                $connection->getPdo()->quote($table),
-                implode(',', array_map(fn($col) => $connection->getPdo()->quote($col), $columns)),
+                'INSERT INTO `%s` (%s) VALUES %s',
+                $table,
+                implode(',', array_map(fn($col) => "`{$col}`", $columns)),
                 implode(',', $values)
             );
 
@@ -349,6 +435,28 @@ abstract class Seeder implements SeederInterface
     }
 
     /**
+     * Get Faker instance.
+     *
+     * @return \Faker\Generator
+     */
+    protected function faker(): \Faker\Generator
+    {
+        return \Faker\Factory::create();
+    }
+
+    /**
+     * Get seeder option (for command-line options).
+     *
+     * @param string $key Option key.
+     * @return string|null Option value.
+     */
+    protected function getOption(string $key): ?string
+    {
+        // This can be overridden to read from command options
+        return null;
+    }
+
+    /**
      * Resolve database manager from container.
      *
      * @return DatabaseManager
@@ -356,12 +464,70 @@ abstract class Seeder implements SeederInterface
     protected function resolveDatabaseManager(): DatabaseManager
     {
         // Try to resolve from container
-        if (function_exists('app') && app()->has('db')) {
-            return app()->get('db');
+        if (function_exists('container')) {
+            try {
+                return container(DatabaseManager::class);
+            } catch (\Throwable $e) {
+                // Fall through to fallback
+            }
         }
 
         // Fallback: create from config
         $config = config('database', []);
         return new DatabaseManager($config);
+    }
+
+    /**
+     * Output an info message.
+     *
+     * @param string $message
+     * @return void
+     */
+    protected function info(string $message): void
+    {
+        echo "[INFO] {$message}" . PHP_EOL;
+    }
+
+    /**
+     * Output a line message.
+     *
+     * @param string $message
+     * @return void
+     */
+    protected function line(string $message): void
+    {
+        echo $message . PHP_EOL;
+    }
+
+    /**
+     * Output a success message.
+     *
+     * @param string $message
+     * @return void
+     */
+    protected function success(string $message): void
+    {
+        echo "[SUCCESS] {$message}" . PHP_EOL;
+    }
+
+    /**
+     * Output an error message.
+     *
+     * @param string $message
+     * @return void
+     */
+    protected function error(string $message): void
+    {
+        echo "[ERROR] {$message}" . PHP_EOL;
+    }
+
+    /**
+     * Output a new line.
+     *
+     * @return void
+     */
+    protected function newLine(): void
+    {
+        echo PHP_EOL;
     }
 }

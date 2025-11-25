@@ -27,7 +27,7 @@ final class MakeSeederCommand extends Command
             $name .= 'Seeder';
         }
 
-        $stubPath = $this->resolveStubPath('seeder.stub');
+        $stubPath = $this->getStubPath('seeder.stub');
 
         if (!file_exists($stubPath)) {
             $this->error("Stub file not found: {$stubPath}");
@@ -100,11 +100,11 @@ final class MakeSeederCommand extends Command
         // Try to find factory
         $factoryClass = "Database\\Factories\\{$baseName}Factory";
         if (class_exists($factoryClass)) {
-            return $factoryClass;
+            return $factoryClass . '::class';
         }
 
         // Return pattern for user to fill
-        return "{$baseName}Factory::new()";
+        return "{$baseName}Factory::class";
     }
 
     /**
@@ -137,11 +137,19 @@ final class MakeSeederCommand extends Command
      */
     private function generateFactoryUse(string $factoryName): string
     {
+        // Extract class name from pattern like "ProductFactory::class"
+        $factoryClass = preg_replace('/::class$/', '', $factoryName);
+
         // If it's a full class name, generate use statement
-        if (str_contains($factoryName, '\\')) {
-            $factoryClass = preg_replace('/::new\(\)$/', '', $factoryName);
+        if (str_contains($factoryClass, '\\')) {
             if (class_exists($factoryClass)) {
                 return "use {$factoryClass};";
+            }
+        } else {
+            // Try to find in Database\Factories namespace
+            $fullClass = "Database\\Factories\\{$factoryClass}";
+            if (class_exists($fullClass)) {
+                return "use {$fullClass};";
             }
         }
 
@@ -155,5 +163,31 @@ final class MakeSeederCommand extends Command
         }
 
         return getcwd() ?: dirname(__DIR__, 5);
+    }
+
+    /**
+     * Resolve stub file path.
+     */
+    private function getStubPath(string $stub): string
+    {
+        $stubPath = dirname(__DIR__, 2) . '/stubs/' . $stub;
+
+        if (file_exists($stubPath)) {
+            return $stubPath;
+        }
+
+        // Fallback to alternative paths
+        $alternativePaths = [
+            dirname(__DIR__, 3) . '/stubs/' . $stub,
+            $this->getBasePath() . '/stubs/' . $stub,
+        ];
+
+        foreach ($alternativePaths as $altPath) {
+            if (file_exists($altPath)) {
+                return $altPath;
+            }
+        }
+
+        return $stubPath;
     }
 }

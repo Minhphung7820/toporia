@@ -144,6 +144,11 @@ class Connection implements ConnectionInterface
 
             // Bind parameters
             foreach ($bindings as $key => $value) {
+                // Convert arrays/objects to JSON strings for JSON columns
+                if (is_array($value) || is_object($value)) {
+                    $value = json_encode($value, JSON_UNESCAPED_UNICODE);
+                }
+
                 $type = $this->getPdoType($value);
                 $statement->bindValue(
                     is_int($key) ? $key + 1 : $key,

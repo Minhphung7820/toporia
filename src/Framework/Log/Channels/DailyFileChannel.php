@@ -75,14 +75,20 @@ final class DailyFileChannel implements ChannelInterface
         // Ensure file exists and has writable permissions for queue workers
         if (!file_exists($logFile)) {
             // Create file with permissions that allow queue workers to write
-            touch($logFile);
+            // Use @ to suppress errors if directory doesn't exist or permission denied
+            @touch($logFile);
             @chmod($logFile, 0666); // Read/write for all (safe for log files)
         } else {
             // Ensure existing file is writable (fix permission issues)
             @chmod($logFile, 0666);
         }
 
-        file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+        // Use @ to suppress permission errors - log to stderr if file write fails
+        $result = @file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+        if ($result === false) {
+            // If file write fails, try to write to stderr as fallback
+            error_log($logEntry);
+        }
 
         // Cleanup old logs if retention policy is set
         if ($this->daysToKeep !== null) {
