@@ -29,10 +29,14 @@ class QueryBuilder implements QueryBuilderInterface
 {
     use \Toporia\Framework\Support\Macroable;
     use Concerns\BuildsWhereClausesAdvanced;
+    use Concerns\BuildsWhereClausesExtended;
     use Concerns\BuildsSubqueries;
     use Concerns\BuildsConditionalClauses;
     use Concerns\BuildsUnions;
     use Concerns\BuildsLocks;
+    use Concerns\BuildsAggregates;
+    use Concerns\BuildsChunking;
+    use Concerns\BuildsAdvancedQueries;
     /**
      * Target table name.
      *
@@ -703,6 +707,55 @@ class QueryBuilder implements QueryBuilderInterface
 
         $this->invalidateCache();
         return $this;
+    }
+
+    /**
+     * Add a FULL OUTER JOIN clause.
+     *
+     * Returns all rows from both tables, matching where possible.
+     * Supported by PostgreSQL and SQL Server. MySQL doesn't support FULL OUTER JOIN.
+     *
+     * Example:
+     * ```php
+     * $query->fullOuterJoin('orders', 'users.id', '=', 'orders.user_id');
+     * // FULL OUTER JOIN orders ON users.id = orders.user_id
+     * ```
+     *
+     * Performance: O(1) - Single JOIN clause addition
+     *
+     * @param string $table Table to join
+     * @param \Closure|string $first Closure for complex conditions OR first column
+     * @param string|null $operator Comparison operator
+     * @param string|null $second Second column
+     * @return $this
+     */
+    public function fullOuterJoin(
+        string $table,
+        \Closure|string $first,
+        ?string $operator = null,
+        ?string $second = null
+    ): self {
+        return $this->join($table, $first, $operator, $second, 'FULL OUTER');
+    }
+
+    /**
+     * FULL OUTER JOIN with subquery.
+     *
+     * @param QueryBuilder|string $query Subquery QueryBuilder or raw SQL
+     * @param string $as Alias for the derived table
+     * @param \Closure|string $first Closure for complex conditions OR first column
+     * @param string|null $operator Comparison operator
+     * @param string|null $second Second column
+     * @return $this
+     */
+    public function fullOuterJoinSub(
+        QueryBuilder|string $query,
+        string $as,
+        \Closure|string $first,
+        ?string $operator = null,
+        ?string $second = null
+    ): self {
+        return $this->joinSub($query, $as, $first, $operator, $second, 'FULL OUTER');
     }
 
     /**
@@ -1563,6 +1616,9 @@ class QueryBuilder implements QueryBuilderInterface
             return $this->cachedSql;
         }
 
+        // Compile CTEs first (if any)
+        $cteSql = $this->compileCtes();
+
         // Use Grammar for compilation (supports MySQL, PostgreSQL, SQLite)
         $grammar = $this->connection->getGrammar();
         $compiledSql = $grammar->compileSelect($this);
@@ -1571,12 +1627,67 @@ class QueryBuilder implements QueryBuilderInterface
         $compiledSql .= $this->compileUnions();
         $compiledSql .= $this->compileLock();
 
+        // Prepend CTEs if present
+        if ($cteSql !== '') {
+            $compiledSql = $cteSql . ' ' . $compiledSql;
+        }
+
         // Cache if enabled
         if (self::$cachingEnabled) {
             $this->cachedSql = $compiledSql;
         }
 
         return $compiledSql;
+    }
+
+    /**
+     * Compile CTEs (Common Table Expressions).
+     *
+     * @return string
+     */
+    private function compileCtes(): string
+    {
+        $ctes = $this->getCtes();
+
+        if (empty($ctes)) {
+            return '';
+        }
+
+        $cteParts = [];
+
+        foreach ($ctes as $cte) {
+            $name = $cte['name'];
+            $query = $cte['query'];
+            $columns = $cte['columns'] ?? null;
+            $isRecursive = $cte['recursive'] ?? false;
+
+            // Build CTE name with optional columns
+            $cteName = $name;
+            if ($columns !== null && !empty($columns)) {
+                $cteName .= '(' . implode(', ', $columns) . ')';
+            }
+
+            // Build query SQL
+            if ($isRecursive) {
+                // Recursive CTE: anchor UNION ALL recursive
+                $anchor = $cte['query']['anchor'];
+                $recursive = $cte['query']['recursive'];
+
+                $anchorSql = $anchor instanceof QueryBuilder ? $anchor->toSql() : $anchor;
+                $recursiveSql = $recursive instanceof QueryBuilder ? $recursive->toSql() : $recursive;
+
+                $querySql = "({$anchorSql} UNION ALL {$recursiveSql})";
+            } else {
+                $querySql = $query instanceof QueryBuilder ? $query->toSql() : $query;
+                $querySql = "({$querySql})";
+            }
+
+            $cteParts[] = "{$cteName} AS {$querySql}";
+        }
+
+        $recursiveKeyword = !empty(array_filter($ctes, fn($cte) => ($cte['recursive'] ?? false))) ? 'RECURSIVE ' : '';
+
+        return 'WITH ' . $recursiveKeyword . implode(', ', $cteParts);
     }
 
     /**
@@ -1791,23 +1902,33 @@ class QueryBuilder implements QueryBuilderInterface
             $boolean = $index === 0 ? 'WHERE' : $where['boolean'];
 
             $sql .= match ($where['type']) {
-                'basic'      => sprintf(' %s %s %s ?', $boolean, $where['column'], $where['operator']),
-                'in'         => sprintf(' %s %s IN (%s)', $boolean, $where['column'], implode(', ', array_fill(0, count($where['values']), '?'))),
-                'Null'       => sprintf(' %s %s IS NULL', $boolean, $where['column']),
-                'NotNull'    => sprintf(' %s %s IS NOT NULL', $boolean, $where['column']),
-                'Raw'        => sprintf(' %s %s', $boolean, $where['sql']),
-                'nested'     => $this->compileNestedWhere($where, $boolean),
-                'DateBasic'  => sprintf(' %s DATE(%s) %s ?', $boolean, $where['column'], $where['operator']),
-                'MonthBasic' => sprintf(' %s MONTH(%s) %s ?', $boolean, $where['column'], $where['operator']),
-                'DayBasic'   => sprintf(' %s DAY(%s) %s ?', $boolean, $where['column'], $where['operator']),
-                'YearBasic'  => sprintf(' %s YEAR(%s) %s ?', $boolean, $where['column'], $where['operator']),
-                'TimeBasic'  => sprintf(' %s TIME(%s) %s ?', $boolean, $where['column'], $where['operator']),
-                'Column'     => sprintf(' %s %s %s %s', $boolean, $where['first'], $where['operator'], $where['second']),
-                'Exists'     => $this->compileExistsWhere($where, $boolean),
-                'NotExists'  => $this->compileNotExistsWhere($where, $boolean),
-                'InSub'      => $this->compileInSubWhere($where, $boolean),
-                'NotInSub'   => $this->compileNotInSubWhere($where, $boolean),
-                default      => ''
+                'basic'           => sprintf(' %s %s %s ?', $boolean, $where['column'], $where['operator']),
+                'in'              => sprintf(' %s %s IN (%s)', $boolean, $where['column'], implode(', ', array_fill(0, count($where['values']), '?'))),
+                'notIn'           => sprintf(' %s %s NOT IN (%s)', $boolean, $where['column'], implode(', ', array_fill(0, count($where['values']), '?'))),
+                'Null'            => sprintf(' %s %s IS NULL', $boolean, $where['column']),
+                'NotNull'         => sprintf(' %s %s IS NOT NULL', $boolean, $where['column']),
+                'Raw'             => sprintf(' %s %s', $boolean, $where['sql']),
+                'nested'          => $this->compileNestedWhere($where, $boolean),
+                'DateBasic'       => sprintf(' %s DATE(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'MonthBasic'      => sprintf(' %s MONTH(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'DayBasic'        => sprintf(' %s DAY(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'YearBasic'       => sprintf(' %s YEAR(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'TimeBasic'       => sprintf(' %s TIME(%s) %s ?', $boolean, $where['column'], $where['operator']),
+                'Column'          => sprintf(' %s %s %s %s', $boolean, $where['first'], $where['operator'], $where['second']),
+                'Exists'          => $this->compileExistsWhere($where, $boolean),
+                'NotExists'       => $this->compileNotExistsWhere($where, $boolean),
+                'InSub'           => $this->compileInSubWhere($where, $boolean),
+                'NotInSub'        => $this->compileNotInSubWhere($where, $boolean),
+                'Between'         => sprintf(' %s %s BETWEEN ? AND ?', $boolean, $where['column']),
+                'NotBetween'      => sprintf(' %s %s NOT BETWEEN ? AND ?', $boolean, $where['column']),
+                'JsonContains'    => $this->compileJsonContainsWhere($where, $boolean),
+                'JsonDoesntContain' => $this->compileJsonDoesntContainWhere($where, $boolean),
+                'JsonLength'       => $this->compileJsonLengthWhere($where, $boolean),
+                'Like'            => sprintf(' %s %s LIKE ?', $boolean, $where['column']),
+                'NotLike'         => sprintf(' %s %s NOT LIKE ?', $boolean, $where['column']),
+                'Regexp'          => $this->compileRegexpWhere($where, $boolean),
+                'FullText'        => $this->compileFullTextWhere($where, $boolean),
+                default           => ''
             };
         }
 
@@ -1901,6 +2022,105 @@ class QueryBuilder implements QueryBuilderInterface
         $subquery = $where['query'];
 
         return sprintf(' %s %s NOT IN (%s)', $boolean, $where['column'], $subquery->toSql());
+    }
+
+    /**
+     * Compile a WHERE JSON CONTAINS clause.
+     *
+     * @param array  $where   WHERE clause data
+     * @param string $boolean Boolean operator
+     * @return string
+     */
+    private function compileJsonContainsWhere(array $where, string $boolean): string
+    {
+        $driver = $this->connection->getDriverName();
+        $column = $where['column'];
+        $value = json_encode($where['value']);
+
+        return match ($driver) {
+            'mysql' => sprintf(' %s JSON_CONTAINS(%s, ?)', $boolean, $column),
+            'pgsql' => sprintf(' %s %s @> ?::jsonb', $boolean, $column),
+            default => sprintf(' %s JSON_CONTAINS(%s, ?)', $boolean, $column), // Fallback to MySQL syntax
+        };
+    }
+
+    /**
+     * Compile a WHERE JSON DOESN'T CONTAIN clause.
+     *
+     * @param array  $where   WHERE clause data
+     * @param string $boolean Boolean operator
+     * @return string
+     */
+    private function compileJsonDoesntContainWhere(array $where, string $boolean): string
+    {
+        $driver = $this->connection->getDriverName();
+        $column = $where['column'];
+
+        return match ($driver) {
+            'mysql' => sprintf(' %s NOT JSON_CONTAINS(%s, ?)', $boolean, $column),
+            'pgsql' => sprintf(' %s NOT (%s @> ?::jsonb)', $boolean, $column),
+            default => sprintf(' %s NOT JSON_CONTAINS(%s, ?)', $boolean, $column),
+        };
+    }
+
+    /**
+     * Compile a WHERE JSON LENGTH clause.
+     *
+     * @param array  $where   WHERE clause data
+     * @param string $boolean Boolean operator
+     * @return string
+     */
+    private function compileJsonLengthWhere(array $where, string $boolean): string
+    {
+        $driver = $this->connection->getDriverName();
+        $column = $where['column'];
+        $operator = $where['operator'];
+
+        return match ($driver) {
+            'mysql' => sprintf(' %s JSON_LENGTH(%s) %s ?', $boolean, $column, $operator),
+            'pgsql' => sprintf(' %s jsonb_array_length(%s) %s ?', $boolean, $column, $operator),
+            default => sprintf(' %s JSON_LENGTH(%s) %s ?', $boolean, $column, $operator),
+        };
+    }
+
+    /**
+     * Compile a WHERE REGEXP clause.
+     *
+     * @param array  $where   WHERE clause data
+     * @param string $boolean Boolean operator
+     * @return string
+     */
+    private function compileRegexpWhere(array $where, string $boolean): string
+    {
+        $driver = $this->connection->getDriverName();
+        $column = $where['column'];
+
+        return match ($driver) {
+            'mysql' => sprintf(' %s %s REGEXP ?', $boolean, $column),
+            'pgsql' => sprintf(' %s %s ~ ?', $boolean, $column),
+            'sqlite' => sprintf(' %s %s REGEXP ?', $boolean, $column),
+            default => sprintf(' %s %s REGEXP ?', $boolean, $column),
+        };
+    }
+
+    /**
+     * Compile a WHERE FULLTEXT clause.
+     *
+     * @param array  $where   WHERE clause data
+     * @param string $boolean Boolean operator
+     * @return string
+     */
+    private function compileFullTextWhere(array $where, string $boolean): string
+    {
+        $driver = $this->connection->getDriverName();
+        $columns = $where['columns'];
+        $columnsStr = implode(', ', $columns);
+
+        return match ($driver) {
+            'mysql' => sprintf(' %s MATCH(%s) AGAINST(? IN NATURAL LANGUAGE MODE)', $boolean, $columnsStr),
+            'pgsql' => sprintf(' %s to_tsvector(\'english\', %s) @@ to_tsquery(\'english\', ?)', $boolean, implode(" || ' ' || ", $columns)),
+            default => sprintf(' %s MATCH(%s) AGAINST(? IN NATURAL LANGUAGE MODE)', $boolean, $columnsStr),
+        };
     }
 
     /**

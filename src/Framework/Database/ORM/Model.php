@@ -1305,6 +1305,151 @@ abstract class Model implements ModelInterface, ObservableInterface
     }
 
     /**
+     * Get the original attribute values.
+     *
+     * Returns the attributes as they were when the model was first retrieved
+     * or last synced with the database.
+     *
+     * Example:
+     * ```php
+     * $user = UserModel::find(1);
+     * $user->name = 'New Name';
+     * $original = $user->getOriginal('name'); // Returns original name
+     * $allOriginal = $user->getOriginal(); // Returns all original attributes
+     * ```
+     *
+     * Performance: O(1) for single attribute, O(N) for all attributes
+     *
+     * @param string|null $key Optional attribute key
+     * @return mixed|array<string, mixed> Original attribute value(s)
+     */
+    public function getOriginal(?string $key = null): mixed
+    {
+        if ($key === null) {
+            return $this->original;
+        }
+
+        return $this->original[$key] ?? null;
+    }
+
+    /**
+     * Get the attributes that have changed since the last sync.
+     *
+     * Returns an associative array of changed attributes with their new values.
+     *
+     * Example:
+     * ```php
+     * $user = UserModel::find(1);
+     * $user->name = 'New Name';
+     * $user->email = 'new@example.com';
+     * $changes = $user->getChanges(); // ['name' => 'New Name', 'email' => 'new@example.com']
+     * ```
+     *
+     * Performance: O(N) where N = number of attributes
+     *
+     * @return array<string, mixed> Changed attributes
+     */
+    public function getChanges(): array
+    {
+        return $this->getDirty();
+    }
+
+    /**
+     * Determine if a specific attribute was changed.
+     *
+     * Example:
+     * ```php
+     * $user = UserModel::find(1);
+     * $user->name = 'New Name';
+     * $user->wasChanged('name'); // true
+     * $user->wasChanged('email'); // false
+     * ```
+     *
+     * Performance: O(1) - Single attribute check
+     *
+     * @param string|null $attribute Optional attribute name (checks all if null)
+     * @return bool True if attribute(s) changed
+     */
+    public function wasChanged(?string $attribute = null): bool
+    {
+        if ($attribute === null) {
+            return $this->isDirty();
+        }
+
+        $dirty = $this->getDirty();
+        return array_key_exists($attribute, $dirty);
+    }
+
+    /**
+     * Update the model's timestamp.
+     *
+     * Updates the updated_at timestamp without saving the model.
+     * Useful for touch relationships or update timestamps without modifying other attributes.
+     *
+     * Example:
+     * ```php
+     * $user->touch(); // Updates updated_at
+     * $user->touch('last_login_at'); // Updates custom timestamp
+     * ```
+     *
+     * Performance: O(1) - Single attribute update
+     *
+     * @param string|null $attribute Timestamp attribute name (default: 'updated_at')
+     * @return bool True if timestamp was updated
+     */
+    public function touch(?string $attribute = null): bool
+    {
+        $attribute = $attribute ?? 'updated_at';
+
+        if (!static::$timestamps) {
+            return false;
+        }
+
+        $this->attributes[$attribute] = date('Y-m-d H:i:s');
+        $this->syncOriginal();
+
+        return true;
+    }
+
+    /**
+     * Create a copy of the model instance.
+     *
+     * Returns a new model instance with the same attributes but without
+     * the primary key and existence flag. Useful for duplicating records.
+     *
+     * Example:
+     * ```php
+     * $original = ProductModel::find(1);
+     * $copy = $original->replicate();
+     * $copy->name = 'Copy of ' . $original->name;
+     * $copy->save(); // Creates new record
+     *
+     * // Exclude specific attributes
+     * $copy = $original->replicate(['sku', 'barcode']);
+     * ```
+     *
+     * Performance: O(N) where N = number of attributes
+     *
+     * @param array<string>|null $except Attributes to exclude from replication
+     * @return static New model instance
+     */
+    public function replicate(?array $except = null): static
+    {
+        $except = $except ?? [];
+        $except[] = static::$primaryKey;
+        $except[] = 'created_at';
+        $except[] = 'updated_at';
+
+        $attributes = array_diff_key($this->attributes, array_flip($except));
+
+        $instance = new static();
+        $instance->attributes = $attributes;
+        $instance->exists = false;
+
+        return $instance;
+    }
+
+    /**
      * Update timestamps on the model (created_at on insert, updated_at always).
      */
     private function updateTimestamps(): void

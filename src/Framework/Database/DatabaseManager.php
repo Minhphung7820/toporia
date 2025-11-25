@@ -98,6 +98,115 @@ class DatabaseManager
     }
 
     /**
+     * Execute a callback within a database transaction.
+     *
+     * Automatically begins a transaction, executes the callback, and commits.
+     * If an exception is thrown, the transaction is rolled back and the exception is re-thrown.
+     *
+     * Example:
+     * ```php
+     * DB()->transaction(function() {
+     *     UserModel::create(['name' => 'John']);
+     *     OrderModel::create(['user_id' => 1, 'total' => 100]);
+     *     // If any operation fails, both are rolled back
+     * });
+     *
+     * // With return value
+     * $result = DB()->transaction(function() {
+     *     $user = UserModel::create(['name' => 'John']);
+     *     return $user;
+     * });
+     *
+     * // With attempts (retry on deadlock)
+     * DB()->transaction(function() {
+     *     // Complex operations
+     * }, 3); // Retry up to 3 times on deadlock
+     * ```
+     *
+     * Performance:
+     * - O(1) transaction overhead
+     * - Automatic rollback on exceptions
+     * - Deadlock retry support
+     *
+     * Clean Architecture:
+     * - Single Responsibility: Only handles transaction lifecycle
+     * - Open/Closed: Extensible via callback
+     * - Dependency Inversion: Depends on ConnectionInterface
+     *
+     * @param \Closure $callback Callback to execute within transaction
+     * @param int $attempts Number of attempts on deadlock (default: 1)
+     * @param string|null $connection Connection name (null for default)
+     * @return mixed Return value from callback
+     * @throws \Throwable Re-throws any exception from callback
+     */
+    public function transaction(\Closure $callback, int $attempts = 1, ?string $connection = null): mixed
+    {
+        $conn = $this->getConnection($connection);
+
+        for ($currentAttempt = 1; $currentAttempt <= $attempts; $currentAttempt++) {
+            // Begin transaction
+            $conn->beginTransaction();
+
+            try {
+                // Execute callback
+                $result = $callback($conn);
+
+                // Commit transaction
+                $conn->commit();
+
+                return $result;
+            } catch (\Throwable $e) {
+                // Rollback on any exception
+                $conn->rollback();
+
+                // Check if we should retry (deadlock detection)
+                if ($this->isDeadlockException($e) && $currentAttempt < $attempts) {
+                    // Wait a bit before retry (exponential backoff)
+                    usleep(100000 * $currentAttempt); // 100ms, 200ms, 300ms...
+                    continue;
+                }
+
+                // Re-throw exception if not retrying
+                throw $e;
+            }
+        }
+
+        // This should never be reached, but PHP requires a return
+        throw new \RuntimeException('Transaction failed after ' . $attempts . ' attempts');
+    }
+
+    /**
+     * Check if exception is a deadlock exception.
+     *
+     * Detects database deadlock errors that can be safely retried.
+     *
+     * @param \Throwable $e Exception to check
+     * @return bool True if exception indicates deadlock
+     */
+    private function isDeadlockException(\Throwable $e): bool
+    {
+        $message = $e->getMessage();
+        $code = $e->getCode();
+
+        // MySQL deadlock error code: 1213
+        if ($code === 1213) {
+            return true;
+        }
+
+        // PostgreSQL deadlock detection
+        if (stripos($message, 'deadlock detected') !== false) {
+            return true;
+        }
+
+        // SQLite deadlock detection
+        if (stripos($message, 'database is locked') !== false) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Create a new connection instance.
      *
      * @param string $name Connection name.
