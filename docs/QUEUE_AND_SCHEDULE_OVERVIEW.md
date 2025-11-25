@@ -282,3 +282,4 @@ Cả hai hệ thống Queue và Schedule đều:
 
 Sử dụng Queue cho on-demand tasks và Schedule cho periodic tasks để có hệ thống background processing mạnh mẽ!
 
+
