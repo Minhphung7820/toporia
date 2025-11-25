@@ -1,25 +1,27 @@
 # Toporia Framework - Codebase Overview
 
-## 📋 Executive Summary
+## Project Summary
 
-**Toporia** is a professional PHP framework (v1.0.0) built on **Clean Architecture** and **SOLID principles**. It provides a zero-dependency core with optional integrations, inspired by Laravel's elegance and Symfony's architecture.
+**Toporia** is a modern PHP framework (v1.0.0) built on Clean Architecture and SOLID principles. It's a zero-dependency core framework with optional integrations, designed for building scalable web applications with strict separation of concerns.
 
-- **Total Framework Files**: ~565 PHP files
-- **Application Files**: ~94 PHP files
-- **Architecture**: Clean Architecture (4 layers)
-- **PHP Version**: >= 8.1
-- **Frontend**: Vue 3 SPA with Vite
+**Key Characteristics:**
+- PHP 8.1+ required
+- Clean Architecture with 4 layers (Domain, Application, Infrastructure, Presentation)
+- SOLID principles throughout
+- PSR standards compliance (PSR-3 logging, PSR-7 inspired HTTP, PSR-11 container, PSR-14 events)
+- Zero framework dependencies in core
+- Comprehensive feature set (ORM, Queue, Cache, Auth, Realtime, Search, etc.)
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
-### Clean Architecture Layers
+### Layer Structure
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                  Presentation Layer                     │
-│  (Controllers, Actions, Middleware, Views, API)         │
+│  (Controllers, Actions, Middleware, Views, API)          │
 │  Location: src/App/Presentation/                        │
 └─────────────────────────────────────────────────────────┘
                            ↓
@@ -32,520 +34,886 @@
 ┌─────────────────────────────────────────────────────────┐
 │                    Domain Layer                         │
 │  (Entities, Value Objects, Repository Interfaces)       │
-│  Location: src/App/Domain/                             │
+│  Location: src/App/Domain/                              │
+│  IMPORTANT: NO framework dependencies                  │
 └─────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────┐
 │                 Infrastructure Layer                    │
-│   (Repository Implementations, External Services)      │
+│   (Repository Implementations, External Services)       │
 │  Location: src/App/Infrastructure/                      │
 └─────────────────────────────────────────────────────────┘
                            ↓
 ┌─────────────────────────────────────────────────────────┐
 │                   Framework Layer                       │
-│  (HTTP, Routing, Container, Events, Database, etc.)    │
-│  Location: src/Framework/                              │
+│  (HTTP, Routing, Container, Events, Database, etc.)     │
+│  Location: src/Framework/                               │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Key Principles
-- **Dependency Inversion**: High-level modules don't depend on low-level modules
-- **Interface Segregation**: Small, focused interfaces
-- **Single Responsibility**: Each class has one reason to change
-- **Open/Closed**: Open for extension, closed for modification
+### Directory Structure
 
----
-
-## 📁 Directory Structure
-
-### Root Level
 ```
 toporia/
-├── bootstrap/          # Application bootstrap files
-├── config/             # Configuration files (24 config files)
-├── configs/            # Additional configs (.npmrc, .nvmrc, etc.)
-├── database/           # Migrations, seeders, factories
-├── docker/             # Docker configuration
-├── docs/               # Documentation
-├── public/             # Public web root
-├── resources/          # Frontend assets (JS, Vue, translations)
-├── routes/             # Route definitions (web.php, api.php)
-├── scripts/            # Utility scripts
-├── src/                # Source code
-│   ├── Framework/      # Framework core (~565 files)
-│   └── App/            # Application code (~94 files)
-├── storage/            # Logs, cache, sessions, temp files
-├── tests/              # Test suites (Unit, Feature, Integration, Performance)
-└── vendor/             # Composer dependencies
+├── bootstrap/              # Application bootstrap files
+│   ├── app.php            # Main bootstrap (loads env, config, providers)
+│   └── helpers.php        # 50+ global helper functions
+├── config/                 # Configuration files
+│   ├── app.php
+│   ├── database.php
+│   ├── queue.php
+│   └── ... (20+ config files)
+├── public/                 # Web root
+│   └── index.php          # HTTP entry point
+├── routes/                 # Route definitions
+│   ├── web.php            # Web routes (SPA fallback)
+│   └── api.php            # API routes
+├── src/
+│   ├── Framework/         # Framework layer (reusable mini-framework)
+│   │   ├── Application/   # Application base classes
+│   │   ├── Auth/         # Authentication & Authorization
+│   │   ├── Bus/          # Command/Query bus
+│   │   ├── Cache/        # Caching system
+│   │   ├── Config/       # Configuration management
+│   │   ├── Console/      # CLI framework
+│   │   ├── Container/    # DI container
+│   │   ├── Database/     # ORM, Query Builder, Migrations
+│   │   ├── DateTime/     # Date/time utilities
+│   │   ├── Domain/       # Framework domain models
+│   │   ├── Error/        # Error handling
+│   │   ├── Events/       # Event system
+│   │   ├── Foundation/   # Core application class
+│   │   ├── Hashing/      # Password hashing
+│   │   ├── Http/         # Request/Response (PSR-7 inspired)
+│   │   ├── Log/          # PSR-3 logging
+│   │   ├── Mail/          # Email system
+│   │   ├── Notification/ # Multi-channel notifications
+│   │   ├── Observer/     # Observer pattern
+│   │   ├── Pipeline/     # Middleware pipeline
+│   │   ├── Process/      # Process management
+│   │   ├── Providers/    # Framework service providers
+│   │   ├── Queue/        # Async job processing
+│   │   ├── RateLimit/    # Rate limiting
+│   │   ├── Realtime/     # Broadcasting (WebSocket, SSE, etc.)
+│   │   ├── Routing/      # Router with middleware
+│   │   ├── Search/       # Elasticsearch integration
+│   │   ├── Security/     # CSRF, XSS, security headers
+│   │   ├── Session/      # Session management
+│   │   ├── Storage/      # File storage (Local, S3, etc.)
+│   │   ├── Support/      # Collections, helpers, facades
+│   │   ├── Testing/      # Testing utilities
+│   │   ├── Translation/  # i18n system
+│   │   └── Validation/   # Form validation
+│   └── App/              # Application layer
+│       ├── Domain/       # Business entities & interfaces
+│       ├── Application/  # Use cases & services
+│       ├── Infrastructure/ # Repository implementations
+│       └── Presentation/  # Controllers, middleware, views
+├── storage/               # Logs, cache, uploads
+├── tests/                 # PHPUnit tests
+├── vendor/                # Composer dependencies
+├── console                # CLI entry point
+├── composer.json
+└── README.md
 ```
 
 ---
 
-## 🔧 Framework Core (`src/Framework/`)
+## Bootstrap Flow
 
-### Core Components
+### HTTP Request Flow
 
-#### 1. **Foundation** (`Foundation/`)
-- `Application.php` - Central application bootstrapper
-- Bootstrap classes:
-  - `LoadEnvironmentVariables` - Environment variable loading
-  - `HandleExceptions` - Error/exception handling
-  - `LoadConfiguration` - Configuration loading
-  - `RegisterFacades` - Facade registration
-  - `RegisterProviders` - Service provider registration
-  - `BootProviders` - Service provider booting
+1. **Entry Point** (`public/index.php`)
+   - Starts session
+   - Loads autoloader
+   - Bootstraps application via `bootstrap/app.php`
+   - Dispatches request through router
 
-#### 2. **Container** (`Container/`)
-- **Dependency Injection Container** with:
-  - Auto-wiring via reflection
-  - Singleton pattern support
-  - Contextual bindings
-  - Tagged bindings
-  - Extending bindings
-  - Method injection
-  - Circular dependency detection
-  - Performance: O(1) singleton lookup, O(N) dependency resolution
+2. **Bootstrap** (`bootstrap/app.php`)
+   - Load environment variables (`.env`)
+   - Register exception handler
+   - Create Application instance
+   - Load helper functions
+   - Load configuration files
+   - Register facades (ServiceAccessor)
+   - Register service providers (framework + app)
+   - Boot service providers (loads routes)
 
-#### 3. **Routing** (`Routing/`)
-- Fully OOP router with fluent API
-- RESTful HTTP verbs (GET, POST, PUT, PATCH, DELETE, ANY)
-- Route parameters with regex support (`{id}`, `{slug}`)
-- Named routes for URL generation
-- Route groups with shared attributes (prefix, middleware, namespace)
-- Middleware pipeline with before/after hooks
+3. **Request Dispatch** (`Router::dispatch()`)
+   - Match route by method + path
+   - Extract route parameters
+   - Build middleware pipeline
+   - Execute middleware (before hooks)
+   - Execute controller/action
+   - Execute middleware (after hooks)
+   - Send response
+
+### Console Command Flow
+
+1. **Entry Point** (`console`)
+   - Loads autoloader
+   - Bootstraps application
+   - Gets Console Application from container
+   - Runs command with arguments
+
+2. **Command Execution**
+   - Parse arguments/options
+   - Resolve command handler
+   - Execute with dependency injection
+   - Return exit code
+
+---
+
+## Core Framework Components
+
+### 1. Dependency Injection Container
+
+**Location:** `src/Framework/Container/Container.php`
+
+**Features:**
+- Auto-wiring via reflection
+- Singleton pattern support
+- Contextual bindings
+- Tagged bindings
+- Extending bindings
+- Method injection (`call()`)
+- Circular dependency detection
+- Reflection caching for performance
+
+**Usage:**
+```php
+$container->singleton(MyService::class, fn() => new MyService());
+$service = $container->get(MyService::class);
+$result = $container->call([Controller::class, 'method'], ['param' => 'value']);
+```
+
+### 2. Application Class
+
+**Location:** `src/Framework/Foundation/Application.php`
+
+**Responsibilities:**
+- Manages DI container
+- Registers service providers
+- Boots service providers
+- Provides path helpers
+
+**Key Methods:**
+- `register()` - Register service provider
+- `boot()` - Boot all providers
+- `make()` - Resolve from container
+- `path()` - Get application path
+
+### 3. Router
+
+**Location:** `src/Framework/Routing/Router.php`
+
+**Features:**
+- RESTful methods (GET, POST, PUT, PATCH, DELETE, ANY)
+- Route parameters with regex (`{id}`, `{slug}`)
+- Named routes
+- Route groups (prefix, middleware, namespace)
+- Middleware pipeline
 - Dependency injection for controllers
 
-#### 4. **HTTP Layer** (`Http/`)
-- PSR-7 inspired Request/Response abstraction
-- JSON detection and response helpers
-- File upload handling with validation
-- Cookie management with encryption (Modern framework)
-- Security headers middleware (CSP, HSTS, X-Frame-Options)
-- Middleware pipeline system
+**Usage:**
+```php
+$router->get('/products/{id}', [ProductController::class, 'show'])
+    ->name('products.show')
+    ->middleware(['auth']);
 
-#### 5. **Database & ORM** (`Database/`)
-- **DatabaseManager**: Multi-connection support (MySQL, PostgreSQL, SQLite)
-- **QueryBuilder**: Fluent query builder with automatic parameter binding
-- **ORM Model**: Eloquent-style Active Record pattern
-  - Relationships: HasOne, HasMany, BelongsTo, BelongsToMany
-  - Eager loading to prevent N+1 queries
-  - Relationship aggregates (withCount, withSum, withAvg, etc.)
-  - Bulk upsert (100x faster than separate queries)
-  - Model hooks (creating, created, updating, updated, deleting, deleted)
-  - Mass assignment protection
-  - Attribute casting
-  - Global scopes
-  - Model collections
-- **Factory System**: Model factories with Faker integration
-- **Seeder System**: Database seeders with transaction support and dependency management
-- **Migrations**: Schema builder for database migrations
+$router->group(['prefix' => 'admin', 'middleware' => ['auth']], function($router) {
+    $router->get('/users', [AdminController::class, 'users']);
+});
+```
 
-#### 6. **Authentication & Authorization** (`Auth/`)
-- Session-based authentication
-- Token-based authentication (API)
-- Gate system for closure-based authorization
-- Policy classes for resource-based authorization
-- Password hashing (Bcrypt, Argon2id)
-- Guards: Session, Token, Personal Access Token
+### 4. HTTP Layer
 
-#### 7. **Security** (`Security/`)
-- CSRF protection with token management
-- XSS protection service
-- Replay attack protection (nonce-based)
-- Rate limiting (cache-based)
-- Security headers middleware
-- Cookie encryption/decryption
+**Location:** `src/Framework/Http/`
 
-#### 8. **Events** (`Events/`)
-- Priority-based event dispatchers
+**Components:**
+- `Request` - PSR-7 inspired request abstraction
+- `Response` - Response builder with JSON helpers
+- `FormRequest` - Validation wrapper
+- `MiddlewarePipeline` - Middleware execution
+
+**Features:**
+- JSON detection
+- File upload handling
+- Cookie management with encryption
+- Security headers
+
+### 5. Database & ORM
+
+**Location:** `src/Framework/Database/`
+
+**Components:**
+- `DatabaseManager` - Multi-connection manager
+- `QueryBuilder` - Fluent query builder
+- `Model` - Eloquent-style ORM (Active Record)
+- `Migration` - Database migrations
+- `Schema` - Schema builder
+
+**ORM Features:**
+- Relationships (HasOne, HasMany, BelongsTo, BelongsToMany, HasManyThrough, HasOneThrough, MorphOne)
+- Eager loading (prevents N+1 queries)
+- Relationship aggregates (withCount, withSum, withAvg, etc.)
+- Bulk upsert (100x faster than separate queries)
+- Model events (creating, created, updating, updated, deleting, deleted)
+- Soft deletes
+- Query scopes
+- Model caching
+- Chunking for large datasets
+
+**Supported Databases:**
+- MySQL
+- PostgreSQL
+- SQLite
+- MongoDB
+
+### 6. Queue System
+
+**Location:** `src/Framework/Queue/`
+
+**Components:**
+- `QueueManager` - Multi-driver queue manager
+- `Worker` - Job processor with retry logic
+- `Job` - Base job class
+- `DatabaseQueue` - Database driver
+- `RedisQueue` - Redis driver
+- `SyncQueue` - Synchronous driver
+
+**Features:**
+- Multiple drivers (Sync, Database, Redis)
+- Delayed job execution
+- Job retries with exponential backoff
+- Failed job handling
+- Job middleware (RateLimit, Throttle, EnsureUnique)
+- Graceful shutdown
+- Memory/runtime limits
+- Job cancellation
+- Job progress tracking
+- Metrics collection
+
+**Worker Features** (from `Worker.php`):
+- Multi-queue support with priority
+- Signal handling (graceful shutdown)
+- Timeout handling (SIGALRM)
+- Auto-restart on memory/runtime limits
+- Middleware pipeline execution
+- Event dispatching (JobProcessing, JobProcessed, JobFailed, etc.)
+
+### 7. Event System
+
+**Location:** `src/Framework/Events/`
+
+**Features:**
+- Priority-based event dispatcher
 - Event propagation control
 - Event subscriber pattern
 - PSR-14 inspired interface design
 
-#### 9. **Queue System** (`Queue/`)
-- Multiple drivers: Sync, Database, Redis, RabbitMQ
-- Job interface with dependency injection
-- Queue workers
-- Failed job handling
+**Usage:**
+```php
+event(new UserRegistered($user));
+$dispatcher->subscribe(UserEventSubscriber::class);
+```
 
-#### 10. **Cache** (`Cache/`)
-- Multiple drivers: File, Redis, Array
-- Cache tags support
-- TTL management
+### 8. Command Bus
 
-#### 11. **Logging** (`Log/`) - PSR-3
-- Multi-channel logger (Daily, Single, Stack, Syslog, Stderr)
-- Daily file rotation with YYYY-MM-DD.log format
+**Location:** `src/Framework/Bus/`
+
+**Features:**
+- Command/Query dispatcher
+- Auto-wired handlers
+- Queue support
+- Middleware pipeline
+- Batching support
+
+**Usage:**
+```php
+dispatch(new SendWelcomeEmail('user@example.com', 'John'));
+$result = dispatch_sync(new GetUserQuery($id));
+```
+
+### 9. Cache System
+
+**Location:** `src/Framework/Cache/`
+
+**Drivers:**
+- File
+- Redis
+- Memory
+
+**Features:**
+- PSR-16 inspired interface
+- `remember()` pattern
+- Increment/decrement
+- Forever caching
+
+### 10. Authentication & Authorization
+
+**Location:** `src/Framework/Auth/`
+
+**Features:**
+- Session-based auth
+- Token-based auth (API)
+- Gate system (closure-based)
+- Policy classes (resource-based)
+- Password hashing (Bcrypt, Argon2id)
+- Automatic hash migration
+
+### 11. Security
+
+**Location:** `src/Framework/Security/`
+
+**Features:**
+- CSRF protection
+- XSS protection (input sanitization, output escaping)
+- SQL injection prevention (parameterized queries)
+- Security headers (CSP, HSTS, X-Frame-Options)
+- Rate limiting
+- Cookie encryption
+
+### 12. Logging
+
+**Location:** `src/Framework/Log/`
+
+**Features:**
+- PSR-3 compliant
+- Multi-channel (Daily, Single, Stack, Syslog, Stderr)
+- Daily file rotation (YYYY-MM-DD.log)
 - Auto-cleanup of old logs
-- Placeholder interpolation (`{user_id}` syntax)
+- Placeholder interpolation (`{user_id}`)
 - Context data as structured JSON
 - Thread-safe file locking
 
-#### 12. **Mail** (`Mail/`)
-- Mailable classes
-- Multiple drivers: SMTP, Sendmail, Log
-- Queue support for emails
+### 13. Realtime/Broadcasting
 
-#### 13. **Notification** (`Notification/`)
-- Multi-channel notifications (Mail, Database, SMS)
-- Notification drivers
-- Queue support
+**Location:** `src/Framework/Realtime/`
 
-#### 14. **Storage** (`Storage/`)
-- File system abstraction
-- Multiple drivers: Local, S3, FTP
+**Transports:**
+- WebSocket
+- SSE (Server-Sent Events)
+- Long-polling
+- Socket.IO
+- Memory (testing)
+
+**Brokers:**
+- Redis Pub/Sub
+- RabbitMQ
+- Kafka
+- NATS
+- PostgreSQL
+
+**Architecture:**
+- Producer: Can be called from anywhere (HTTP, CLI, Jobs, Events)
+- Consumer: Only in CLI commands (long-lived processes)
+- Multi-server support via brokers
+
+### 14. Search (Elasticsearch)
+
+**Location:** `src/Framework/Search/`
+
+**Features:**
+- Reusable `SearchManager`
+- Bulk indexing
+- Queue-aware sync
+- ORM trait for auto document updates
+- Fluent query builder
+- Console reindex command
+- Connection pooling and retries
+
+### 15. Task Scheduling
+
+**Location:** `src/Framework/Console/Scheduling/`
+
+**Features:**
+- Cron-like scheduler
+- Frequency helpers (everyMinute, hourly, daily, etc.)
+- Conditional execution (when, skip)
+- Custom cron expressions
+- Timezone support
+
+### 16. Storage
+
+**Location:** `src/Framework/Storage/`
+
+**Drivers:**
+- Local
+- S3
+- DigitalOcean Spaces
+- MinIO
+
+**Features:**
+- Clean Storage facade
 - File upload handling
+- Hash-based filenames
 
-#### 15. **Validation** (`Validation/`)
+### 17. Mail
+
+**Location:** `src/Framework/Mail/`
+
+**Drivers:**
+- SMTP
+- Log
+- Array
+
+**Features:**
+- HTML email support
+- Queue integration
+
+### 18. Notifications
+
+**Location:** `src/Framework/Notification/`
+
+**Channels:**
+- Mail
+- Database
+- SMS
+- Slack
+- Broadcast (WebSocket/SSE)
+
+**Features:**
+- Notifiable trait for models
+- Database notification storage
+- Real-time broadcast notifications
+
+### 19. Validation
+
+**Location:** `src/Framework/Validation/`
+
+**Features:**
 - Form request validation
-- Rule-based validation
-- Custom validation rules
-- Array validation
+- 20+ built-in rules
+- Database validation rules (unique, exists)
+- Custom rule support
 
-#### 16. **Translation** (`Translation/`)
-- Multi-language support
-- File-based translation loaders
-- Cache support
-- Placeholder replacement
+### 20. Collections
 
-#### 17. **Realtime** (`Realtime/`)
-- WebSocket, SSE, Long-polling transports
-- Brokers: Redis Pub/Sub, Kafka, RabbitMQ, NATS, PostgreSQL
-- Channel-based messaging
-- Multi-server support
+**Location:** `src/Framework/Support/Collections/`
 
-#### 18. **Console** (`Console/`)
-- Professional CLI with Command pattern
-- Input parsing (arguments, options, flags)
-- Colored output and formatted tables
-- Interactive prompts and confirmations
-- Built-in commands (cache, queue, schedule, migrate, etc.)
+**Types:**
+- `Collection` - Eager collection (40+ methods)
+- `LazyCollection` - Generator-based lazy evaluation
 
-#### 19. **Search** (`Search/`)
-- Elasticsearch integration
-- Search query builder
-
-#### 20. **Testing** (`Testing/`)
-- Test case base classes
-- Database testing helpers
-- Mock utilities
+**Features:**
+- Functional programming patterns
+- Statistical operations
+- Set operations
 
 ---
 
-## 🎯 Application Layer (`src/App/`)
+## Application Layer Structure
 
-### Structure
+### Domain Layer (`src/App/Domain/`)
 
-#### **Domain Layer** (`Domain/`)
-- **Entities**: Business entities (e.g., `Product.php`)
-- **Value Objects**: Immutable value objects
-- **Contracts**: Repository interfaces, domain contracts
+**Purpose:** Pure business logic, no framework dependencies
 
-#### **Application Layer** (`Application/`)
-- **Services**: Application services
-- **UseCases**: Use case implementations
-- **Rules**: Validation rules
-- **Observers**: Domain observers
+**Structure:**
+- `Entities/` - Business entities (plain PHP classes)
+- `Contracts/Repository/` - Repository interfaces
+- `ValueObjects/` - Value objects
 
-#### **Infrastructure Layer** (`Infrastructure/`)
-- **Persistence**: Database implementations
-- **Repository**: Repository implementations
-- **Auth**: Authentication implementations
-- **Mails**: Email templates and mailables
-- **Notifications**: Notification implementations
-- **Jobs**: Queue jobs
-- **Services**: External service integrations
-- **Export/Import**: Data export/import services
-- **Transformer**: Data transformers
+**Example:**
+```php
+// Domain/Entities/Product.php
+class Product {
+    public function __construct(
+        public readonly string $id,
+        public readonly string $name,
+        public readonly float $price
+    ) {}
+}
 
-#### **Presentation Layer** (`Presentation/`)
-- **Http/Controllers**: HTTP controllers
-  - `AppController` - Vue SPA controller
-  - `Api/AuthController` - Authentication API
-  - `Api/CsrfCookieController` - CSRF cookie endpoint
-- **Views**: PHP views (app.php, emails/)
-- **Console**: Console commands
-
----
-
-## 🌐 Frontend Architecture
-
-### Vue 3 SPA Structure (`resources/js/`)
-
-```
-resources/js/
-├── app.js              # Vue app entry point
-├── App.vue             # Root Vue component
-├── router/
-│   └── index.js        # Vue Router configuration
-├── pages/              # Page components
-│   ├── Home.vue        # Welcome page (Laravel style)
-│   ├── About.vue
-│   ├── Login.vue
-│   ├── Register.vue
-│   ├── ForgotPassword.vue
-│   ├── ResetPassword.vue
-│   ├── ChangePassword.vue
-│   └── errors/         # Error pages (403, 404, 500)
-├── services/           # API services
-├── stores/             # Pinia stores (state management)
-└── ...
+// Domain/Contracts/Repository/ProductRepositoryInterface.php
+interface ProductRepositoryInterface {
+    public function findById(string $id): ?Product;
+    public function save(Product $product): void;
+}
 ```
 
-### Build System
-- **Vite**: Modern build tool
-- **Vue 3**: Composition API
-- **Vue Router**: Client-side routing
-- **Pinia**: State management
+### Application Layer (`src/App/Application/`)
 
----
+**Purpose:** Use cases and business services
 
-## 🔄 Request Flow
+**Structure:**
+- `UseCases/` - Use case handlers
+- `Services/` - Application services
+- `Rules/` - Custom validation rules
+- `Observers/` - Model observers
 
-### HTTP Request Flow
+**Example:**
+```php
+// Application/UseCases/CreateProduct/CreateProductHandler.php
+final class CreateProductHandler {
+    public function __construct(
+        private ProductRepositoryInterface $repository
+    ) {}
 
-```
-1. public/index.php
-   ↓
-2. bootstrap/app.php
-   - Load environment variables
-   - Handle exceptions
-   - Create Application instance
-   - Load helpers
-   - Load configuration
-   - Register facades
-   - Register service providers
-   - Boot service providers (loads routes)
-   ↓
-3. Router::dispatch()
-   - Match route
-   - Build middleware pipeline
-   - Execute middleware (before)
-   - Resolve controller with DI
-   - Execute controller method
-   - Execute middleware (after)
-   - Return response
+    public function __invoke(CreateProductCommand $command): Product {
+        $product = new Product(...);
+        $this->repository->save($product);
+        return $product;
+    }
+}
 ```
 
-### Route Registration
+### Infrastructure Layer (`src/App/Infrastructure/`)
 
-Routes are loaded in service providers:
-- `routes/web.php` - Web routes (loaded by RoutingServiceProvider)
-- `routes/api.php` - API routes (loaded by RoutingServiceProvider)
+**Purpose:** External concerns and implementations
 
-Current routes:
-- **Web**: `Route::any('/{any}', [AppController::class, 'index'])` - Vue SPA fallback
-- **API**: Authentication routes (`/api/auth/*`)
+**Structure:**
+- `Repository/` - Repository implementations
+- `Persistence/` - ORM models
+- `Providers/` - Service providers
+- `Jobs/` - Queue jobs
+- `Notifications/` - Notification classes
+- `Auth/` - Auth implementations
+- `Services/` - External service integrations
 
----
+**Example:**
+```php
+// Infrastructure/Repository/ProductRepository.php
+class ProductRepository implements ProductRepositoryInterface {
+    public function __construct(private ProductModel $model) {}
 
-## 🗄️ Database Architecture
-
-### ORM Features
-- **Active Record Pattern**: Models extend `Model` base class
-- **Relationships**: HasOne, HasMany, BelongsTo, BelongsToMany
-- **Eager Loading**: `with()` method to prevent N+1 queries
-- **Query Builder**: Fluent interface for complex queries
-- **Migrations**: Schema builder for database changes
-- **Factories**: Model factories with Faker for testing/seeding
-- **Seeders**: Database seeders with transaction support
-
-### Factory/Seeder System
-- **Factory**: Base factory class with Faker integration
-- **Seeder**: Base seeder class with dependency management
-- **SeederManager**: Manages seeder execution
-- **Custom Faker Providers**: Vietnamese provider for locale-specific data
-
----
-
-## 🔐 Security Features
-
-1. **CSRF Protection**: Token-based validation with Modern framework cookies
-2. **XSS Protection**: HTML escaping service
-3. **Replay Attack Protection**: Nonce-based protection
-4. **Rate Limiting**: Cache-based rate limiting for API
-5. **Security Headers**: CSP, HSTS, X-Frame-Options
-6. **Cookie Encryption**: Encrypted cookies with Laravel compatibility
-7. **Password Hashing**: Bcrypt and Argon2id support
-8. **Mass Assignment Protection**: Fillable/guarded attributes
-
----
-
-## 🧪 Testing Structure
-
-```
-tests/
-├── Unit/              # Unit tests
-├── Feature/           # Feature tests
-├── Integration/       # Integration tests
-└── Performance/       # Performance tests
+    public function findById(string $id): ?Product {
+        $model = $this->model->find($id);
+        return $model ? $this->toEntity($model) : null;
+    }
+}
 ```
 
-Test suites configured in `phpunit.xml`.
+### Presentation Layer (`src/App/Presentation/`)
+
+**Purpose:** HTTP interface
+
+**Structure:**
+- `Http/Controllers/` - MVC controllers
+- `Http/Middleware/` - HTTP middleware
+- `Console/Commands/` - CLI commands
+- `Views/` - View templates
+
+**Example:**
+```php
+// Presentation/Http/Controllers/ProductController.php
+class ProductController extends BaseController {
+    public function store(CreateProductRequest $request): JsonResponse {
+        $product = dispatch(new CreateProductCommand(...));
+        return response()->json($product);
+    }
+}
+```
 
 ---
 
-## 🐳 Docker Setup
+## Service Providers
 
-### Services (docker-compose.yml)
-- **app**: PHP-FPM application container
-- **nginx**: Web server (port 8000)
-- **mysql**: MySQL 8.0 database
-- **redis**: Redis cache/queue
-- **kafka**: Apache Kafka for realtime messaging
-- **rabbitmq**: RabbitMQ message broker
-- **elasticsearch**: Elasticsearch for search
-- **zookeeper**: ZooKeeper for Kafka
+### Framework Providers
 
----
+**Location:** `src/Framework/Providers/`
 
-## 📦 Service Providers
+**Auto-registered via:** `FrameworkServiceProvider::providers()`
 
-### Framework Service Providers (`src/Framework/Providers/`)
-1. **AuthServiceProvider** - Authentication services
-2. **BusServiceProvider** - Command bus
-3. **CacheServiceProvider** - Cache services
-4. **ConfigServiceProvider** - Configuration
-5. **ConsoleServiceProvider** - CLI commands
-6. **DatabaseServiceProvider** - Database connections
-7. **DateTimeServiceProvider** - Date/time utilities
-8. **EventServiceProvider** - Event dispatcher
-9. **HashServiceProvider** - Password hashing
-10. **HttpServiceProvider** - HTTP services
-11. **LogServiceProvider** - Logging
-12. **MailServiceProvider** - Mail services
-13. **NotificationServiceProvider** - Notifications
-14. **ObserverServiceProvider** - Model observers
-15. **QueueServiceProvider** - Queue system
-16. **RealtimeServiceProvider** - Realtime messaging
-17. **RoutingServiceProvider** - Route loading
-18. **ScheduleServiceProvider** - Task scheduling
-19. **SearchServiceProvider** - Search services
-20. **SecurityServiceProvider** - Security services
-21. **SessionServiceProvider** - Session management
-22. **StorageServiceProvider** - File storage
-23. **TranslationServiceProvider** - Translations
-24. **UrlServiceProvider** - URL generation
-25. **ViteServiceProvider** - Vite integration
+**Key Providers:**
+- `ConfigServiceProvider` - Configuration management
+- `HttpServiceProvider` - Request/Response
+- `EventServiceProvider` - Event dispatcher
+- `RoutingServiceProvider` - Router
+- `DatabaseServiceProvider` - Database manager
+- `QueueServiceProvider` - Queue manager
+- `AuthServiceProvider` - Authentication
+- `CacheServiceProvider` - Cache manager
+- `LogServiceProvider` - Logger
+- `RealtimeServiceProvider` - Broadcasting
+- `SearchServiceProvider` - Elasticsearch
+- ... (25+ providers)
 
----
+### Application Providers
 
-## 🔑 Key Design Patterns
+**Location:** `src/App/Infrastructure/Providers/`
 
-1. **Service Provider Pattern**: Modular service registration
-2. **Repository Pattern**: Data access abstraction
-3. **Factory Pattern**: Object creation
-4. **Observer Pattern**: Model events
-5. **Strategy Pattern**: Multiple drivers (cache, queue, etc.)
-6. **Command Pattern**: Console commands
-7. **Facade Pattern**: Static accessors (Route, Log, etc.)
-8. **Dependency Injection**: Constructor and method injection
+**Registered in:** `bootstrap/app.php` → `RegisterProviders::bootstrap()`
+
+**Key Providers:**
+- `DomainServiceProvider` - Repository bindings (MUST be first)
+- `AppServiceProvider` - Application services
+- `EventServiceProvider` - Event listeners
+- `RouteServiceProvider` - Route loading
+- `ScheduleServiceProvider` - Task scheduling
+
+**Provider Pattern:**
+```php
+class MyServiceProvider extends ServiceProvider {
+    public function register(ContainerInterface $container): void {
+        // Bind services (don't resolve yet)
+        $container->singleton(MyService::class, fn() => new MyService());
+    }
+
+    public function boot(ContainerInterface $container): void {
+        // Safe to resolve services here
+        // Routes loaded here
+    }
+}
+```
 
 ---
 
-## 📝 Configuration Files
+## Key Patterns & Conventions
 
-Located in `config/`:
-- `app.php` - Application configuration
-- `auth.php` - Authentication configuration
-- `cache.php` - Cache configuration
+### 1. Clean Architecture
+
+- **Dependency Rule:** Dependencies point inward (Framework ← Infrastructure ← Application ← Domain)
+- **Domain Independence:** Domain layer has NO framework dependencies
+- **Interface-Based:** Program to interfaces, not implementations
+
+### 2. SOLID Principles
+
+- **Single Responsibility:** Each class has one reason to change
+- **Open/Closed:** Open for extension, closed for modification
+- **Liskov Substitution:** Subtypes must be substitutable
+- **Interface Segregation:** Small, focused interfaces
+- **Dependency Inversion:** Depend on abstractions
+
+### 3. Service Provider Pattern
+
+- `register()` - Bind services (no resolution)
+- `boot()` - Initialize services (safe to resolve)
+
+### 4. Command Bus Pattern
+
+- Commands are simple DTOs
+- Handlers auto-wired via DI
+- Naming: `CommandName` → `CommandNameHandler`
+- Queue support via `ShouldQueue` interface
+
+### 5. Repository Pattern
+
+- Interfaces in Domain layer
+- Implementations in Infrastructure layer
+- ORM models in Infrastructure/Persistence
+
+### 6. Observer Pattern
+
+- Model observers for lifecycle hooks
+- Event listeners for domain events
+- Registered in `config/observers.php`
+
+### 7. Middleware Pipeline
+
+- Before hooks → Controller → After hooks
+- Can modify request/response
+- Can short-circuit execution
+
+---
+
+## Configuration
+
+**Location:** `config/`
+
+**Key Files:**
+- `app.php` - Application config (name, timezone, debug)
 - `database.php` - Database connections
-- `filesystems.php` - Storage configuration
-- `hashing.php` - Password hashing
-- `http.php` - HTTP configuration
-- `kafka.php` - Kafka configuration
-- `logging.php` - Logging configuration
-- `mail.php` - Mail configuration
-- `middleware.php` - Middleware groups and aliases
-- `notification.php` - Notification configuration
 - `queue.php` - Queue configuration
-- `realtime.php` - Realtime messaging
-- `search.php` - Search configuration
-- `security.php` - Security settings
-- `session.php` - Session configuration
-- `translation.php` - Translation configuration
-- `vite.php` - Vite configuration
+- `cache.php` - Cache drivers
+- `middleware.php` - Middleware groups and aliases
+- `auth.php` - Authentication config
+- `realtime.php` - Broadcasting config
+- `search.php` - Elasticsearch config
+- ... (20+ config files)
+
+**Access:**
+```php
+config('app.name');
+config('database.default');
+```
 
 ---
 
-## 🚀 Key Features Summary
+## Routes
 
-### Framework Core
-✅ Clean Architecture with 4-layer separation
-✅ SOLID principles throughout
-✅ Zero-dependency core
-✅ PSR standards (PSR-3, PSR-7, PSR-11, PSR-14)
-✅ Auto-wiring dependency injection
-✅ Service provider pattern
-✅ Facade pattern for static access
+**Location:** `routes/`
 
-### Database & ORM
-✅ Eloquent-style ORM
-✅ Relationships (HasOne, HasMany, BelongsTo, BelongsToMany)
-✅ Eager loading
-✅ Query builder
-✅ Migrations
-✅ Factories & Seeders
-✅ Bulk operations
+**Files:**
+- `web.php` - Web routes (SPA fallback route)
+- `api.php` - API routes (prefixed with `/api`)
 
-### Security
-✅ CSRF protection
-✅ XSS protection
-✅ Replay attack protection
-✅ Rate limiting
-✅ Security headers
-✅ Cookie encryption
-
-### Frontend
-✅ Vue 3 SPA
-✅ Vite build system
-✅ Vue Router
-✅ Pinia state management
-
-### Infrastructure
-✅ Docker setup
-✅ Multiple queue drivers
-✅ Multiple cache drivers
-✅ Multiple storage drivers
-✅ Realtime messaging (WebSocket, SSE, Kafka, etc.)
-✅ Search (Elasticsearch)
+**Loading:**
+- Loaded in `RouteServiceProvider::boot()`
+- API routes loaded first (before web catch-all)
+- Middleware groups applied automatically
 
 ---
 
-## 📚 Documentation
+## Helper Functions
 
-Comprehensive documentation available in `/docs`:
-- Architecture guides
-- ORM documentation
-- Security features
-- Testing guides
-- And more...
+**Location:** `bootstrap/helpers.php`
 
----
-
-## 🎯 Current State
-
-- **Version**: 1.0.0
-- **Status**: Production-ready framework
-- **Welcome Page**: Fluent welcome page in Vue SPA (`Home.vue`)
-- **Routes**: All routes handled by Vue SPA (SPA fallback pattern)
-- **API**: Authentication API endpoints available
-- **Database**: Factory/Seeder system implemented
-- **Frontend**: Vue 3 SPA with modern UI
+**50+ Global Helpers:**
+- `app()` - Get application/service
+- `config()` - Get config value
+- `env()` - Get environment variable
+- `route()` - Generate URL from route name
+- `response()` - Create response
+- `auth()` - Get auth instance
+- `e()` - Escape HTML
+- `dispatch()` - Dispatch command
+- `event()` - Dispatch event
+- `log_info()`, `log_error()` - Logging
+- `cache()` - Cache operations
+- ... (many more)
 
 ---
 
-## 🔄 Development Workflow
+## Testing
 
-1. **Backend**: PHP code in `src/App/` following Clean Architecture
-2. **Frontend**: Vue components in `resources/js/`
-3. **Routes**: Defined in `routes/web.php` and `routes/api.php`
-4. **Database**: Migrations in `database/migrations/`, seeders in `database/seeders/`
-5. **Build**: `npm run dev` for development, `npm run build` for production
-6. **Testing**: `composer test` for PHPUnit tests
+**Location:** `tests/`
+
+**Test Suites:**
+- Unit
+- Feature
+- Integration
+- Performance
+
+**Commands:**
+```bash
+composer test              # Run all tests
+composer test:unit         # Unit tests only
+composer test:coverage     # With coverage
+```
 
 ---
 
-This codebase represents a professional, enterprise-grade PHP framework built with modern best practices and Clean Architecture principles.
+## Console Commands
 
+**Framework Commands:**
+- `cache:clear` - Clear cache
+- `queue:work` - Start queue worker
+- `schedule:run` - Run scheduled tasks
+- `migrate` - Run migrations
+- `db:seed` - Run seeders
+- `search:reindex` - Reindex Elasticsearch
+- ... (many more)
+
+**Application Commands:**
+- Registered in `src/App/Presentation/Console/Kernel.php`
+
+---
+
+## Key Files Reference
+
+### Bootstrap
+- `public/index.php` - HTTP entry point
+- `console` - CLI entry point
+- `bootstrap/app.php` - Application bootstrap
+- `bootstrap/helpers.php` - Helper functions
+
+### Configuration
+- `config/app.php` - Application config
+- `config/middleware.php` - Middleware groups
+- `config/observers.php` - Model observers
+
+### Routes
+- `routes/web.php` - Web routes
+- `routes/api.php` - API routes
+
+### Application
+- `src/App/Presentation/Console/Kernel.php` - Console command registration
+- `src/App/Infrastructure/Providers/RouteServiceProvider.php` - Route loading
+
+### Framework
+- `src/Framework/Foundation/Application.php` - Application class
+- `src/Framework/Container/Container.php` - DI container
+- `src/Framework/Routing/Router.php` - Router
+- `src/Framework/Queue/Worker.php` - Queue worker
+- `src/Framework/Database/ORM/Model.php` - Base model
+
+---
+
+## Dependencies
+
+**Core Requirements:**
+- PHP >= 8.1
+- Composer
+
+**Optional Extensions:**
+- `ext-redis` - Redis support
+- `ext-rdkafka` - High-performance Kafka
+- `ext-pdo_mysql` / `ext-pdo_pgsql` / `ext-pdo_sqlite` - Database support
+- `ext-pcntl` - Multi-process execution
+- `ext-zip` - Excel import/export
+
+**Composer Packages:**
+- `phpmailer/phpmailer` - Email
+- `aws/aws-sdk-php` - AWS S3
+- `php-amqplib/php-amqplib` - RabbitMQ
+- `nmred/kafka-php` - Kafka (pure PHP)
+- `elasticsearch/elasticsearch` - Elasticsearch
+- `phpoffice/phpspreadsheet` - Excel
+- `openspout/openspout` - Excel (streaming)
+
+---
+
+## Performance Characteristics
+
+**Benchmarks:**
+- Logger: ~0.5ms per write (2000 writes/sec)
+- Router: ~0.1ms per route match
+- Container: ~0.05ms per resolution
+- ORM Query: ~1-5ms per database query
+- Upsert: 100x faster than separate insert/update
+
+**Optimizations:**
+- O(1) container singleton lookup
+- O(1) route matching (optimized regex)
+- Lazy loading of services
+- Query optimization (eager loading prevents N+1)
+- File locking for thread-safety
+- Opcode caching compatible
+
+---
+
+## Development Workflow
+
+### Setup
+```bash
+composer install
+cp .env.example .env
+php console key:generate
+php console migrate
+php -S localhost:8000 -t public
+```
+
+### Running Tests
+```bash
+composer test
+composer test:coverage
+```
+
+### Queue Worker
+```bash
+php console queue:work
+```
+
+### Scheduled Tasks
+```bash
+php console schedule:run
+# Or via cron: * * * * * php /path/to/console schedule:run
+```
+
+---
+
+## Summary
+
+Toporia is a comprehensive PHP framework built with Clean Architecture principles. It provides:
+
+1. **Strong Architecture** - Clear layer separation, SOLID principles
+2. **Rich Feature Set** - ORM, Queue, Cache, Auth, Realtime, Search, etc.
+3. **Developer Experience** - Fluent APIs, helper functions, comprehensive docs
+4. **Performance** - Optimized for speed with caching and lazy loading
+5. **Flexibility** - Zero-dependency core with optional integrations
+6. **Type Safety** - PHP 8.1+ type hints throughout
+7. **Testing** - Comprehensive test suite with multiple test types
+
+The codebase is well-organized, follows consistent patterns, and is designed for maintainability and scalability.
 
