@@ -108,4 +108,112 @@ interface RequestInterface
      * @return string
      */
     public function ip(): string;
+
+    // ============================================================================
+    // Advanced Request Methods (Enhanced Interface)
+    // ============================================================================
+
+    /**
+     * Merge new input into the current request's input array.
+     *
+     * @param array<string, mixed> $input New input data to merge
+     * @return self Fluent interface
+     */
+    public function merge(array $input): self;
+
+    /**
+     * Get a subset of the input data containing only the specified keys.
+     *
+     * @param array<string> $keys Keys to retrieve
+     * @return array<string, mixed> Filtered input data
+     */
+    public function only(array $keys): array;
+
+    /**
+     * Get all input except specified keys.
+     *
+     * @param array<string> $keys Keys to exclude
+     * @return array<string, mixed> Filtered input data
+     */
+    public function except(array $keys): array;
+
+    /**
+     * Check if the request has specific input key.
+     *
+     * @param string $key Input key
+     * @return bool
+     */
+    public function has(string $key): bool;
+
+    /**
+     * Get input data with type casting and validation.
+     *
+     * @param string $key Input key
+     * @param mixed $default Default value
+     * @param string|null $type Expected type
+     * @param callable|null $validator Optional validation callback
+     * @return mixed Typed and validated value
+     */
+    public function typed(string $key, mixed $default = null, ?string $type = null, ?callable $validator = null): mixed;
+
+    /**
+     * Get request data with automatic sanitization.
+     *
+     * @param string $key Input key
+     * @param mixed $default Default value
+     * @param string $sanitizer Sanitization method
+     * @return mixed Sanitized value
+     */
+    public function safe(string $key, mixed $default = null, string $sanitizer = 'html'): mixed;
+
+    /**
+     * Check if the request is from a mobile device.
+     *
+     * @return bool
+     */
+    public function isMobile(): bool;
+
+    /**
+     * Check if the request is from a bot/crawler.
+     *
+     * @return bool
+     */
+    public function isBot(): bool;
+
+    /**
+     * Get the request fingerprint for caching/security purposes.
+     *
+     * @param array<string> $includeHeaders Additional headers to include
+     * @return string Unique request fingerprint
+     */
+    public function fingerprint(array $includeHeaders = []): string;
+
+    /**
+     * Get request signature for API authentication.
+     *
+     * @param string $secret Secret key for signing
+     * @param string $algorithm Hash algorithm
+     * @param array<string> $includeHeaders Headers to include in signature
+     * @return string Request signature
+     */
+    public function signature(string $secret, string $algorithm = 'sha256', array $includeHeaders = []): string;
+
+    /**
+     * Verify request signature for API authentication.
+     *
+     * @param string $expectedSignature Expected signature
+     * @param string $secret Secret key
+     * @param string $algorithm Hash algorithm
+     * @param array<string> $includeHeaders Headers to include
+     * @return bool True if signature is valid
+     */
+    public function verifySignature(string $expectedSignature, string $secret, string $algorithm = 'sha256', array $includeHeaders = []): bool;
+
+    /**
+     * Convert request to array for logging/debugging.
+     *
+     * @param bool $includeSensitive Whether to include sensitive data
+     * @return array<string, mixed> Request data array
+     */
+    public function toArray(bool $includeSensitive = false): array;
 }
