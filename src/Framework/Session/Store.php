@@ -228,4 +228,208 @@ final class Store implements SessionStoreInterface
             $this->start();
         }
     }
+
+    // ============================================================================
+    // Enhanced Session Methods for Request Integration
+    // ============================================================================
+
+    /**
+     * Get flash data from session.
+     *
+     * Flash data is temporary data that persists only for the next request.
+     *
+     * @param string|null $key Flash key or null for all flash data
+     * @param mixed $default Default value if key not found
+     * @return mixed Flash data
+     */
+    public function getFlash(?string $key = null, mixed $default = null): mixed
+    {
+        $this->ensureStarted();
+        $flashData = $this->driver->get('_flash', []);
+
+        if ($key === null) {
+            return $flashData;
+        }
+
+        return $flashData[$key] ?? $default;
+    }
+
+    /**
+     * Set flash data in session.
+     *
+     * @param string|array $key Flash key or array of key-value pairs
+     * @param mixed $value Flash value (ignored if key is array)
+     * @return void
+     */
+    public function setFlash(string|array $key, mixed $value = null): void
+    {
+        $this->ensureStarted();
+        $flashData = $this->driver->get('_flash', []);
+
+        if (is_array($key)) {
+            $flashData = array_merge($flashData, $key);
+        } else {
+            $flashData[$key] = $value;
+        }
+
+        $this->driver->set('_flash', $flashData);
+    }
+
+    /**
+     * Check if flash data exists.
+     *
+     * @param string|null $key Specific flash key to check (null = any flash data)
+     * @return bool True if flash data exists
+     */
+    public function hasFlash(?string $key = null): bool
+    {
+        $this->ensureStarted();
+        $flashData = $this->driver->get('_flash', []);
+
+        if ($key === null) {
+            return !empty($flashData);
+        }
+
+        return isset($flashData[$key]);
+    }
+
+    /**
+     * Remove flash data from session.
+     *
+     * @param string|null $key Specific flash key to remove (null = all flash data)
+     * @return void
+     */
+    public function removeFlash(?string $key = null): void
+    {
+        $this->ensureStarted();
+
+        if ($key === null) {
+            $this->driver->remove('_flash');
+        } else {
+            $flashData = $this->driver->get('_flash', []);
+            unset($flashData[$key]);
+            $this->driver->set('_flash', $flashData);
+        }
+    }
+
+    /**
+     * Get old input data from session.
+     *
+     * Old input is form data from the previous request, used for form repopulation.
+     *
+     * @param string|null $key Input key or null for all old input
+     * @param mixed $default Default value if key not found
+     * @return mixed Old input data
+     */
+    public function getOldInput(?string $key = null, mixed $default = null): mixed
+    {
+        $this->ensureStarted();
+        $oldInput = $this->driver->get('_old_input', []);
+
+        if ($key === null) {
+            return $oldInput;
+        }
+
+        return $oldInput[$key] ?? $default;
+    }
+
+    /**
+     * Set old input data in session.
+     *
+     * @param array $input Input data to store
+     * @return void
+     */
+    public function setOldInput(array $input): void
+    {
+        $this->ensureStarted();
+        $this->driver->set('_old_input', $input);
+    }
+
+    /**
+     * Check if old input data exists.
+     *
+     * @param string|null $key Specific input key to check (null = any old input)
+     * @return bool True if old input exists
+     */
+    public function hasOldInput(?string $key = null): bool
+    {
+        $this->ensureStarted();
+        $oldInput = $this->driver->get('_old_input', []);
+
+        if ($key === null) {
+            return !empty($oldInput);
+        }
+
+        return isset($oldInput[$key]);
+    }
+
+    /**
+     * Remove old input data from session.
+     *
+     * @return void
+     */
+    public function removeOldInput(): void
+    {
+        $this->ensureStarted();
+        $this->driver->remove('_old_input');
+    }
+
+    /**
+     * Get multiple session values at once.
+     *
+     * @param array<string> $keys Session keys to retrieve
+     * @param mixed $default Default value for missing keys
+     * @return array<string, mixed> Session values
+     */
+    public function getMultiple(array $keys, mixed $default = null): array
+    {
+        $this->ensureStarted();
+        $result = [];
+
+        foreach ($keys as $key) {
+            $result[$key] = $this->driver->get($key, $default);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Set multiple session values at once.
+     *
+     * @param array<string, mixed> $values Key-value pairs to set
+     * @return void
+     */
+    public function setMultiple(array $values): void
+    {
+        $this->ensureStarted();
+
+        foreach ($values as $key => $value) {
+            $this->driver->set($key, $value);
+        }
+    }
+
+    /**
+     * Pull a value from session (get and remove).
+     *
+     * @param string $key Session key
+     * @param mixed $default Default value if key not found
+     * @return mixed Session value
+     */
+    public function pull(string $key, mixed $default = null): mixed
+    {
+        $this->ensureStarted();
+        $value = $this->driver->get($key, $default);
+        $this->driver->remove($key);
+        return $value;
+    }
+
+    /**
+     * Check if session is started.
+     *
+     * @return bool True if session is started
+     */
+    public function isStarted(): bool
+    {
+        return $this->started;
+    }
 }

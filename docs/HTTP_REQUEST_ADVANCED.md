@@ -339,6 +339,235 @@ No additional configuration required! All features work out of the box with opti
 5. **Input Validation**: Type-safe input handling
 6. **Secure Debugging**: Sensitive data filtering
 
+### 11. **Core Laravel-Compatible Methods**
+
+#### Missing Core Methods Now Available
+```php
+// Headers, Cookies, Files, Server access
+$headers = $request->headers();           // Get all headers
+$cookies = $request->cookies();           // Get all cookies
+$files = $request->files();               // Get uploaded files
+$server = $request->server();             // Get server info
+
+// Specific access methods
+$userAgent = $request->server('HTTP_USER_AGENT');
+$sessionCookie = $request->cookie('session_id');
+$uploadedFile = $request->file('avatar');
+
+// File upload validation
+if ($request->hasFile('document')) {
+    $file = $request->file('document');
+    // Process file upload
+}
+```
+
+#### Enhanced URL Methods
+```php
+// URL construction and analysis
+$fullUrl = $request->fullUrl();          // https://example.com/api/users?page=1
+$baseUrl = $request->url();              // https://example.com/api/users
+$rootUrl = $request->root();             // https://example.com
+
+// Environment access with type casting
+$debug = $request->env('APP_DEBUG', false, 'bool');
+$port = $request->env('APP_PORT', 8000, 'int');
+```
+
+#### Type-Safe Input Methods
+```php
+// Enhanced type casting
+$isActive = $request->boolean('is_active');     // Smart boolean conversion
+$age = $request->integer('age', 18);            // Integer with default
+$price = $request->float('price', 0.0);         // Float with default
+$createdAt = $request->date('created_at');      // DateTime conversion
+
+// Fluent string operations
+$name = $request->string('name')->trim()->title();
+$email = $request->string('email')->lower();
+
+// Enum support (PHP 8.1+)
+$status = $request->enum('status', StatusEnum::class, StatusEnum::PENDING);
+```
+
+#### Content Negotiation
+```php
+// Advanced content type detection
+if ($request->isJson()) {
+    return $this->handleJsonRequest($request);
+}
+
+if ($request->wantsJson()) {
+    return response()->json($data);
+}
+
+if ($request->acceptsHtml()) {
+    return view('template', $data);
+}
+
+// Format detection
+$format = $request->format(); // 'json', 'html', 'xml'
+```
+
+#### Authentication Helpers
+```php
+// Bearer token extraction
+$token = $request->bearerToken();
+if ($token) {
+    $user = $this->authenticateWithToken($token);
+}
+
+// Advanced request validation
+if ($request->filled(['name', 'email'])) {
+    // All required fields are present and not empty
+}
+
+if ($request->missing('required_field')) {
+    return response()->json(['error' => 'Missing required field'], 400);
+}
+```
+
 ## 🎉 Conclusion
 
 Toporia's enhanced Request class provides enterprise-grade features while maintaining simplicity and performance. It's designed to handle real-world scenarios that Laravel's Request class struggles with, all while following Clean Architecture and SOLID principles.
+
+### 12. **Clean Session Management**
+
+#### Dependency Injection Architecture
+The Request class now uses **Clean Architecture** with **Session dependency injection** instead of direct `session_start()` calls:
+
+```php
+// Session is automatically injected by the container
+$request = app('request'); // Session already available
+
+// Clean session access through dependency injection
+$session = $request->session();              // All session data
+$userId = $request->session('user_id');      // Specific session value
+$theme = $request->session('theme', 'light'); // With default
+
+// Multiple session keys (optimized single call)
+$data = $request->session(['user_id', 'username']);
+
+// Flash data (temporary session data)
+$flash = $request->flash();                  // All flash data
+$message = $request->flash('message');       // Specific flash message
+$status = $request->flash('status', 'info'); // With default
+
+// Old input (form repopulation)
+$oldInput = $request->old();                 // All old input
+$oldName = $request->old('name');            // Specific old input
+$oldEmail = $request->old('email', '');      // With default
+```
+
+#### Architecture Benefits
+✅ **Clean Architecture**: Session logic separated into dedicated Store class
+✅ **Dependency Injection**: Session injected via container, not global state
+✅ **SOLID Principles**: Single responsibility, interface segregation
+✅ **Testability**: Easy to mock session for unit tests
+✅ **Reusability**: Session Store can be used independently
+✅ **No Global State**: No direct `session_start()` or `$_SESSION` access
+✅ **Driver Support**: File, Database, Redis, Cookie session drivers
+✅ **Performance**: Lazy session start, O(1) operations
+
+#### Session Store Enhancement
+The framework's Session Store has been enhanced with Request-specific methods:
+
+```php
+// Enhanced Session Store methods (used internally by Request)
+$store = app('session');
+
+// Flash data management
+$store->setFlash('message', 'Success!');
+$message = $store->getFlash('message');
+$hasFlash = $store->hasFlash('message');
+$store->removeFlash('message');
+
+// Old input management
+$store->setOldInput(['name' => 'John', 'email' => 'john@example.com']);
+$oldName = $store->getOldInput('name');
+$hasOld = $store->hasOldInput('name');
+$store->removeOldInput();
+
+// Batch operations
+$data = $store->getMultiple(['user_id', 'username']);
+$store->setMultiple(['theme' => 'dark', 'lang' => 'en']);
+
+// Pull and remove
+$tempData = $store->pull('temp_key'); // Get and remove in one operation
+```
+
+#### Flash Operations
+```php
+// Flash current input for form repopulation
+$request->flashInput();                      // Flash all input
+$request->flashInput(['name', 'email']);     // Flash specific fields
+
+// Flash custom data
+$request->flashData('message', 'Success!');  // Single flash
+$request->flashData([                        // Multiple flash
+    'message' => 'Success!',
+    'status' => 'success'
+]);
+
+// Chaining operations
+$request->flashData('message', 'Saved!')
+        ->flashInput(['name', 'email']);
+```
+
+#### Session Utilities
+```php
+// Session checks
+$sessionId = $request->sessionId();          // Get session ID
+$hasUser = $request->hasSession('user_id');  // Check session key
+$hasFlash = $request->hasFlash('message');   // Check flash data
+$hasOld = $request->hasOldInput('name');     // Check old input
+
+// Session cleanup
+$request->flushOldInput();                   // Remove old input
+$request->flushFlash();                      // Remove flash data
+
+// Pull and remove
+$message = $request->pullFromSession('temp_message', null, true);
+```
+
+#### Form Handling Example
+```php
+public function store(Request $request)
+{
+    // Validate input
+    $data = $request->validateAndTransform([
+        'name' => ['rules' => ['required'], 'transform' => fn($v) => trim($v)],
+        'email' => ['rules' => ['required', 'email'], 'transform' => fn($v) => strtolower($v)]
+    ]);
+
+    try {
+        // Save data
+        $user = User::create($data);
+
+        // Flash success message
+        $request->flashData('message', 'User created successfully!');
+
+        return redirect('/users');
+    } catch (ValidationException $e) {
+        // Flash input for form repopulation
+        $request->flashInput();
+
+        // Flash error message
+        $request->flashData('error', 'Validation failed');
+
+        return redirect()->back();
+    }
+}
+
+// In the view/template
+$oldName = $request->old('name');           // Repopulate form
+$message = $request->flash('message');      // Show flash message
+```
+
+### **Complete Feature Set**
+✅ **All Laravel methods** - Full compatibility plus enhancements
+✅ **Advanced security** - Built-in sanitization, signatures, XSS protection
+✅ **Type safety** - Comprehensive type casting and validation
+✅ **Performance optimized** - Caching, streaming, memory efficiency
+✅ **Developer friendly** - Fluent APIs, comprehensive error handling
+✅ **Enterprise ready** - Rate limiting, monitoring, batch processing
+✅ **Session management** - Complete flash, old input, and session support

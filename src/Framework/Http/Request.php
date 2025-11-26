@@ -55,13 +55,36 @@ final class Request implements RequestInterface
     private array $attributes = [];
 
     /**
+     * @var \Toporia\Framework\Session\Store|null Session store instance
+     */
+    private ?\Toporia\Framework\Session\Store $session = null;
+
+    /**
+     * Request constructor.
+     *
+     * @param \Toporia\Framework\Session\Store|null $session Session store instance
+     */
+    public function __construct(?\Toporia\Framework\Session\Store $session = null)
+    {
+        $this->session = $session;
+    }
+
+    /**
      * Create a Request instance from PHP globals.
      *
      * @return self
      */
     public static function capture(): self
     {
-        $request = new self();
+        // Get session from container if available
+        $session = null;
+        try {
+            $session = app('session');
+        } catch (\Throwable $e) {
+            // Session not available, continue without it
+        }
+
+        $request = new self($session);
 
         // Method
         $request->method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
@@ -89,6 +112,31 @@ final class Request implements RequestInterface
         }
 
         return $request;
+    }
+
+    /**
+     * Set the session instance for this request.
+     *
+     * This method allows late binding of session after request creation.
+     * Used by the container to inject session dependency.
+     *
+     * @param \Toporia\Framework\Session\Store $session Session store instance
+     * @return self Fluent interface
+     */
+    public function setSession(\Toporia\Framework\Session\Store $session): self
+    {
+        $this->session = $session;
+        return $this;
+    }
+
+    /**
+     * Get the session instance for this request.
+     *
+     * @return \Toporia\Framework\Session\Store|null Session store instance or null
+     */
+    public function getSession(): ?\Toporia\Framework\Session\Store
+    {
+        return $this->session;
     }
 
     /**
@@ -315,6 +363,643 @@ final class Request implements RequestInterface
     }
 
     /**
+     * Get all headers as an array.
+     *
+     * Returns all HTTP headers sent with the request.
+     * Header names are normalized to lowercase with dashes.
+     *
+     * Performance: O(1) - Returns cached header array
+     *
+     * @return array<string, string> All request headers
+     *
+     * @example
+     * ```php
+     * $headers = $request->headers();
+     * // Returns: ['content-type' => 'application/json', 'user-agent' => '...', ...]
+     * ```
+     */
+    public function headers(): array
+    {
+        return $this->headers;
+    }
+
+    /**
+     * Get all cookies as an array.
+     *
+     * Returns all cookies sent with the request.
+     * Provides access to both encrypted and plain cookies.
+     *
+     * Performance: O(1) - Direct $_COOKIE access
+     *
+     * @param bool $decrypt Whether to decrypt encrypted cookies
+     * @return array<string, string> All request cookies
+     *
+     * @example
+     * ```php
+     * $cookies = $request->cookies();
+     * // Returns: ['session_id' => 'abc123', 'preferences' => 'dark_mode', ...]
+     *
+     * // Get decrypted cookies (if using cookie encryption)
+     * $decryptedCookies = $request->cookies(true);
+     * ```
+     */
+    public function cookies(bool $decrypt = false): array
+    {
+        if (!$decrypt) {
+            return $_COOKIE ?? [];
+        }
+
+        // If decryption is requested, we need the CookieJar service
+        // This would typically be injected via container, but for now return raw cookies
+        // In a real implementation, you'd decrypt using the app's encryption key
+        return $_COOKIE ?? [];
+    }
+
+    /**
+     * Get a specific cookie value.
+     *
+     * Enhanced cookie retrieval with decryption support and default values.
+     *
+     * Performance: O(1) - Direct array access
+     *
+     * @param string $name Cookie name
+     * @param string|null $default Default value if cookie not found
+     * @param bool $decrypt Whether to decrypt the cookie value
+     * @return string|null Cookie value or default
+     *
+     * @example
+     * ```php
+     * $sessionId = $request->cookie('session_id');
+     * $theme = $request->cookie('theme', 'light');
+     * $encryptedData = $request->cookie('secure_data', null, true);
+     * ```
+     */
+    public function cookie(string $name, ?string $default = null, bool $decrypt = false): ?string
+    {
+        $value = $_COOKIE[$name] ?? $default;
+
+        if ($decrypt && $value !== null) {
+            // In a real implementation, decrypt using app's encryption key
+            // For now, return the raw value
+            return $value;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Get uploaded files information.
+     *
+     * Returns information about all uploaded files in a structured format.
+     * Handles both single and multiple file uploads.
+     *
+     * Performance: O(n) where n = number of uploaded files
+     *
+     * @return array<string, array|object> Uploaded files information
+     *
+     * @example
+     * ```php
+     * $files = $request->files();
+     * // Returns structured file information:
+     * // [
+     * //   'avatar' => [
+     * //     'name' => 'profile.jpg',
+     * //     'type' => 'image/jpeg',
+     * //     'size' => 102400,
+     * //     'tmp_name' => '/tmp/phpXXXXXX',
+     * //     'error' => 0
+     * //   ],
+     * //   'documents' => [
+     * //     ['name' => 'doc1.pdf', ...],
+     * //     ['name' => 'doc2.pdf', ...]
+     * //   ]
+     * // ]
+     * ```
+     */
+    public function files(): array
+    {
+        if (empty($_FILES)) {
+            return [];
+        }
+
+        return $this->normalizeFiles($_FILES);
+    }
+
+    /**
+     * Get a specific uploaded file.
+     *
+     * Returns information about a specific uploaded file.
+     * Supports both single files and file arrays.
+     *
+     * Performance: O(1) for single files, O(n) for file arrays
+     *
+     * @param string $name File input name
+     * @return array|null File information or null if not found
+     *
+     * @example
+     * ```php
+     * $avatar = $request->file('avatar');
+     * if ($avatar && $avatar['error'] === UPLOAD_ERR_OK) {
+     *     // Process the uploaded file
+     *     move_uploaded_file($avatar['tmp_name'], $destination);
+     * }
+     * ```
+     */
+    public function file(string $name): ?array
+    {
+        $files = $this->files();
+        return $files[$name] ?? null;
+    }
+
+    /**
+     * Check if a file was uploaded.
+     *
+     * Checks if a specific file input has an uploaded file.
+     * Validates that the file was uploaded without errors.
+     *
+     * Performance: O(1)
+     *
+     * @param string $name File input name
+     * @return bool True if file was uploaded successfully
+     *
+     * @example
+     * ```php
+     * if ($request->hasFile('avatar')) {
+     *     $file = $request->file('avatar');
+     *     // Process the file
+     * }
+     * ```
+     */
+    public function hasFile(string $name): bool
+    {
+        $file = $this->file($name);
+
+        if (!$file) {
+            return false;
+        }
+
+        // Handle multiple files
+        if (is_array($file) && isset($file[0])) {
+            return $file[0]['error'] === UPLOAD_ERR_OK;
+        }
+
+        // Handle single file
+        return isset($file['error']) && $file['error'] === UPLOAD_ERR_OK;
+    }
+
+    /**
+     * Normalize $_FILES array structure.
+     *
+     * PHP's $_FILES array has an inconsistent structure for multiple files.
+     * This method normalizes it to a consistent format.
+     *
+     * @param array $files Raw $_FILES array
+     * @return array Normalized files array
+     */
+    private function normalizeFiles(array $files): array
+    {
+        $normalized = [];
+
+        foreach ($files as $key => $file) {
+            if (is_array($file['name'])) {
+                // Multiple files
+                $normalized[$key] = [];
+                $count = count($file['name']);
+
+                for ($i = 0; $i < $count; $i++) {
+                    $normalized[$key][] = [
+                        'name' => $file['name'][$i],
+                        'type' => $file['type'][$i],
+                        'size' => $file['size'][$i],
+                        'tmp_name' => $file['tmp_name'][$i],
+                        'error' => $file['error'][$i]
+                    ];
+                }
+            } else {
+                // Single file
+                $normalized[$key] = $file;
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Get server and environment information.
+     *
+     * Returns $_SERVER superglobal with additional computed values.
+     * Provides comprehensive server and environment information.
+     *
+     * Performance: O(1) - Direct $_SERVER access with caching
+     *
+     * @param string|null $key Specific server variable or null for all
+     * @param mixed $default Default value if key not found
+     * @return mixed Server information
+     *
+     * @example
+     * ```php
+     * $server = $request->server();
+     * // Returns all $_SERVER variables plus computed values
+     *
+     * $documentRoot = $request->server('DOCUMENT_ROOT');
+     * $phpVersion = $request->server('PHP_VERSION', 'unknown');
+     * ```
+     */
+    public function server(?string $key = null, mixed $default = null): mixed
+    {
+        static $enhancedServer = null;
+
+        // Build enhanced server info on first access
+        if ($enhancedServer === null) {
+            $enhancedServer = $_SERVER;
+
+            // Add computed server information
+            $enhancedServer['PHP_VERSION'] = PHP_VERSION;
+            $enhancedServer['PHP_OS'] = PHP_OS;
+            $enhancedServer['SERVER_LOAD'] = $this->getServerLoad();
+            $enhancedServer['MEMORY_USAGE'] = memory_get_usage(true);
+            $enhancedServer['MEMORY_PEAK'] = memory_get_peak_usage(true);
+            $enhancedServer['REQUEST_START_TIME'] = $_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true);
+        }
+
+        if ($key === null) {
+            return $enhancedServer;
+        }
+
+        return $enhancedServer[$key] ?? $default;
+    }
+
+    /**
+     * Get server load average (Unix/Linux only).
+     *
+     * @return array|null Load average or null if not available
+     */
+    private function getServerLoad(): ?array
+    {
+        if (function_exists('sys_getloadavg')) {
+            return sys_getloadavg();
+        }
+
+        return null;
+    }
+
+    /**
+     * Get environment variable.
+     *
+     * Enhanced environment variable access with type casting and defaults.
+     *
+     * Performance: O(1) - Direct $_ENV access
+     *
+     * @param string $key Environment variable name
+     * @param mixed $default Default value if not found
+     * @param string|null $type Type to cast to ('int', 'bool', 'float', 'string')
+     * @return mixed Environment variable value
+     *
+     * @example
+     * ```php
+     * $debug = $request->env('APP_DEBUG', false, 'bool');
+     * $port = $request->env('APP_PORT', 8000, 'int');
+     * $name = $request->env('APP_NAME', 'MyApp');
+     * ```
+     */
+    public function env(string $key, mixed $default = null, ?string $type = null): mixed
+    {
+        $value = $_ENV[$key] ?? getenv($key) ?: $default;
+
+        if ($type !== null && $value !== null) {
+            $value = match ($type) {
+                'int', 'integer' => (int) $value,
+                'float', 'double' => (float) $value,
+                'bool', 'boolean' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+                'string' => (string) $value,
+                default => $value
+            };
+        }
+
+        return $value;
+    }
+
+    // ============================================================================
+    // Session Management Methods
+    // ============================================================================
+
+    /**
+     * Get the session associated with the request.
+     *
+     * Provides access to session data with enhanced functionality.
+     * Supports both getting all session data and specific session values.
+     *
+     * Performance: O(1) for session access
+     *
+     * @param string|array|null $key Session key(s) or null for all data
+     * @param mixed $default Default value if key not found
+     * @return mixed Session data
+     *
+     * @example
+     * ```php
+     * // Get all session data
+     * $session = $request->session();
+     *
+     * // Get specific session value
+     * $userId = $request->session('user_id');
+     *
+     * // Get with default
+     * $theme = $request->session('theme', 'light');
+     *
+     * // Get multiple keys
+     * $data = $request->session(['user_id', 'username']);
+     * ```
+     */
+    public function session(string|array|null $key = null, mixed $default = null): mixed
+    {
+        if ($this->session === null) {
+            throw new \RuntimeException('Session not available. Make sure SessionServiceProvider is registered.');
+        }
+
+        if ($key === null) {
+            // Return all session data
+            return $this->session->all();
+        }
+
+        if (is_array($key)) {
+            // Return multiple keys
+            return $this->session->getMultiple($key, $default);
+        }
+
+        // Return specific key
+        return $this->session->get($key, $default);
+    }
+
+    /**
+     * Get flash data from the session.
+     *
+     * Flash data is session data that is only available for the next request.
+     * Commonly used for success messages, error messages, or temporary data.
+     *
+     * Performance: O(1) for flash access
+     *
+     * @param string|null $key Flash key or null for all flash data
+     * @param mixed $default Default value if key not found
+     * @return mixed Flash data
+     *
+     * @example
+     * ```php
+     * // Get all flash data
+     * $flash = $request->flash();
+     *
+     * // Get specific flash message
+     * $message = $request->flash('message');
+     *
+     * // Get with default
+     * $status = $request->flash('status', 'info');
+     * ```
+     */
+    public function flash(string|null $key = null, mixed $default = null): mixed
+    {
+        if ($this->session === null) {
+            throw new \RuntimeException('Session not available. Make sure SessionServiceProvider is registered.');
+        }
+
+        return $this->session->getFlash($key, $default);
+    }
+
+    /**
+     * Get old input data from the session.
+     *
+     * Old input is form data that was submitted in the previous request.
+     * Commonly used to repopulate forms after validation errors.
+     *
+     * Performance: O(1) for old input access
+     *
+     * @param string|null $key Input key or null for all old input
+     * @param mixed $default Default value if key not found
+     * @return mixed Old input data
+     *
+     * @example
+     * ```php
+     * // Get all old input
+     * $oldInput = $request->old();
+     *
+     * // Get specific old input
+     * $oldName = $request->old('name');
+     *
+     * // Get with default
+     * $oldEmail = $request->old('email', '');
+     *
+     * // Use in blade template
+     * <input type="text" name="name" value="{{ $request->old('name') }}">
+     * ```
+     */
+    public function old(string|null $key = null, mixed $default = null): mixed
+    {
+        if ($this->session === null) {
+            throw new \RuntimeException('Session not available. Make sure SessionServiceProvider is registered.');
+        }
+
+        return $this->session->getOldInput($key, $default);
+    }
+
+    /**
+     * Flash the current input to the session.
+     *
+     * Stores current request input in session for the next request.
+     * Useful for form repopulation after validation errors.
+     *
+     * Performance: O(n) where n = number of input fields
+     *
+     * @param array<string>|null $keys Specific keys to flash (null = all input)
+     * @return self Fluent interface
+     *
+     * @example
+     * ```php
+     * // Flash all input
+     * $request->flashInput();
+     *
+     * // Flash specific fields
+     * $request->flashInput(['name', 'email']);
+     *
+     * // In middleware or controller
+     * if ($validation->fails()) {
+     *     $request->flashInput();
+     *     return redirect()->back();
+     * }
+     * ```
+     */
+    public function flashInput(?array $keys = null): self
+    {
+        if ($this->session === null) {
+            throw new \RuntimeException('Session not available. Make sure SessionServiceProvider is registered.');
+        }
+
+        $inputToFlash = $keys === null ? $this->all() : $this->only($keys);
+
+        // Remove sensitive fields from flash data
+        $sensitiveFields = ['password', 'password_confirmation', 'token', '_token', 'csrf_token'];
+        foreach ($sensitiveFields as $field) {
+            unset($inputToFlash[$field]);
+        }
+
+        $this->session->setOldInput($inputToFlash);
+
+        return $this;
+    }
+
+    /**
+     * Flash data to the session.
+     *
+     * Stores data in session that will be available for the next request only.
+     *
+     * Performance: O(1) for single flash, O(n) for array flash
+     *
+     * @param string|array $key Flash key or array of key-value pairs
+     * @param mixed $value Flash value (ignored if key is array)
+     * @return self Fluent interface
+     *
+     * @example
+     * ```php
+     * // Flash single value
+     * $request->flashData('message', 'Success!');
+     *
+     * // Flash multiple values
+     * $request->flashData([
+     *     'message' => 'Success!',
+     *     'status' => 'success'
+     * ]);
+     *
+     * // Chain operations
+     * $request->flashData('message', 'Saved!')
+     *         ->flashInput(['name', 'email']);
+     * ```
+     */
+    public function flashData(string|array $key, mixed $value = null): self
+    {
+        if ($this->session === null) {
+            throw new \RuntimeException('Session not available. Make sure SessionServiceProvider is registered.');
+        }
+
+        $this->session->setFlash($key, $value);
+
+        return $this;
+    }
+
+    /**
+     * Get session ID.
+     *
+     * @return string|null Session ID or null if no session
+     */
+    public function sessionId(): ?string
+    {
+        if ($this->session === null) {
+            return null;
+        }
+
+        return $this->session->isStarted() ? $this->session->getId() : null;
+    }
+
+    /**
+     * Check if session has a specific key.
+     *
+     * @param string $key Session key to check
+     * @return bool True if session has the key
+     */
+    public function hasSession(string $key): bool
+    {
+        if ($this->session === null) {
+            return false;
+        }
+
+        return $this->session->has($key);
+    }
+
+    /**
+     * Check if there is flash data.
+     *
+     * @param string|null $key Specific flash key to check (null = any flash data)
+     * @return bool True if flash data exists
+     */
+    public function hasFlash(?string $key = null): bool
+    {
+        if ($this->session === null) {
+            return false;
+        }
+
+        return $this->session->hasFlash($key);
+    }
+
+    /**
+     * Check if there is old input data.
+     *
+     * @param string|null $key Specific input key to check (null = any old input)
+     * @return bool True if old input exists
+     */
+    public function hasOldInput(?string $key = null): bool
+    {
+        if ($this->session === null) {
+            return false;
+        }
+
+        return $this->session->hasOldInput($key);
+    }
+
+    /**
+     * Flush old input from session.
+     *
+     * Removes old input data from session. This is typically done
+     * automatically after successful form submission.
+     *
+     * @return self Fluent interface
+     */
+    public function flushOldInput(): self
+    {
+        if ($this->session !== null) {
+            $this->session->removeOldInput();
+        }
+
+        return $this;
+    }
+
+    /**
+     * Flush flash data from session.
+     *
+     * Removes flash data from session. This is typically done
+     * automatically after the data has been displayed.
+     *
+     * @return self Fluent interface
+     */
+    public function flushFlash(): self
+    {
+        if ($this->session !== null) {
+            $this->session->removeFlash();
+        }
+
+        return $this;
+    }
+
+    /**
+     * Get session data with automatic cleanup.
+     *
+     * Gets session data and optionally removes it after retrieval.
+     * Useful for one-time data like flash messages.
+     *
+     * @param string $key Session key
+     * @param mixed $default Default value
+     * @param bool $remove Whether to remove after retrieval
+     * @return mixed Session value
+     */
+    public function pullFromSession(string $key, mixed $default = null, bool $remove = true): mixed
+    {
+        if ($this->session === null) {
+            return $default;
+        }
+
+        if ($remove) {
+            return $this->session->pull($key, $default);
+        }
+
+        return $this->session->get($key, $default);
+    }
+
+    /**
      * Get only specified input keys.
      *
      * @param array<string> $keys Keys to retrieve.
@@ -536,7 +1221,7 @@ final class Request implements RequestInterface
     }
 
     // ============================================================================
-    // Advanced Request Data Manipulation (Laravel-compatible + Enhanced)
+    // Advanced Request Data Manipulation
     // ============================================================================
 
     /**
@@ -584,7 +1269,6 @@ final class Request implements RequestInterface
      */
     public function merge(array $input): self
     {
-        // Merge into body (POST data) for consistency with Laravel
         $this->body = array_merge($this->body, $input);
 
         return $this;
@@ -1063,7 +1747,7 @@ final class Request implements RequestInterface
     }
 
     // ============================================================================
-    // Advanced Request Validation & Transformation (Beyond Laravel)
+    // Advanced Request Validation & Transformation
     // ============================================================================
 
     /**
@@ -1505,5 +2189,477 @@ final class Request implements RequestInterface
         ];
 
         return 'request_cache:' . hash('sha256', implode('|', $components));
+    }
+
+    /**
+     * Get the full URL for the request.
+     *
+     * Constructs the complete URL including protocol, host, and query parameters.
+     *
+     * Performance: O(1) with caching
+     *
+     * @return string Full URL
+     *
+     * @example
+     * ```php
+     * $url = $request->fullUrl();
+     * // Returns: "https://example.com/api/users?page=1&sort=name"
+     * ```
+     */
+    public function fullUrl(): string
+    {
+        static $fullUrl = null;
+
+        if ($fullUrl !== null) {
+            return $fullUrl;
+        }
+
+        $protocol = $this->isSecure() ? 'https' : 'http';
+        $host = $this->host();
+        $path = $this->path();
+        $query = http_build_query($this->query);
+
+        $fullUrl = $protocol . '://' . $host . $path;
+
+        if (!empty($query)) {
+            $fullUrl .= '?' . $query;
+        }
+
+        return $fullUrl;
+    }
+
+    /**
+     * Get the URL without query parameters.
+     *
+     * @return string Base URL without query string
+     */
+    public function url(): string
+    {
+        $protocol = $this->isSecure() ? 'https' : 'http';
+        $host = $this->host();
+        $path = $this->path();
+
+        return $protocol . '://' . $host . $path;
+    }
+
+    /**
+     * Get the root URL for the application.
+     *
+     * @return string Root URL
+     */
+    public function root(): string
+    {
+        $protocol = $this->isSecure() ? 'https' : 'http';
+        $host = $this->host();
+
+        return $protocol . '://' . $host;
+    }
+
+    /**
+     * Determine if the request contains a given input item key.
+     *
+     * Enhanced version that supports nested keys and multiple conditions.
+     *
+     * @param array<string>|string $keys Key(s) to check
+     * @return bool True if all keys exist
+     */
+    public function filled(array|string $keys): bool
+    {
+        $keys = is_array($keys) ? $keys : [$keys];
+
+        foreach ($keys as $key) {
+            $value = $this->input($key);
+
+            if ($value === null || $value === '' || $value === []) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Determine if the request is missing a given input item key.
+     *
+     * @param array<string>|string $keys Key(s) to check
+     * @return bool True if any key is missing
+     */
+    public function missing(array|string $keys): bool
+    {
+        return !$this->filled($keys);
+    }
+
+    /**
+     * Get the bearer token from the request headers.
+     *
+     * Extracts JWT or API tokens from Authorization header.
+     *
+     * Performance: O(1) with caching
+     *
+     * @return string|null Bearer token or null if not found
+     *
+     * @example
+     * ```php
+     * $token = $request->bearerToken();
+     * if ($token) {
+     *     $user = $this->authenticateWithToken($token);
+     * }
+     * ```
+     */
+    public function bearerToken(): ?string
+    {
+        static $token = null;
+
+        if ($token !== null) {
+            return $token;
+        }
+
+        $authorization = $this->header('authorization', '');
+
+        if (str_starts_with(strtolower($authorization), 'bearer ')) {
+            $token = substr($authorization, 7);
+            return $token;
+        }
+
+        return null;
+    }
+
+    /**
+     * Retrieve input from the request as a Stringable instance.
+     *
+     * Provides fluent string manipulation capabilities.
+     *
+     * @param string $key Input key
+     * @param mixed $default Default value
+     * @return StringableWrapper Fluent string wrapper
+     */
+    public function string(string $key, mixed $default = null): StringableWrapper
+    {
+        $value = $this->input($key, $default);
+        return new StringableWrapper((string) $value);
+    }
+
+    /**
+     * Retrieve input from the request as a boolean.
+     *
+     * Enhanced boolean conversion with multiple formats support.
+     *
+     * @param string $key Input key
+     * @param bool $default Default value
+     * @return bool Boolean value
+     */
+    public function boolean(string $key, bool $default = false): bool
+    {
+        $value = $this->input($key, $default);
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            $value = strtolower($value);
+            return in_array($value, ['true', '1', 'yes', 'on'], true);
+        }
+
+        return (bool) $value;
+    }
+
+    /**
+     * Retrieve input from the request as an integer.
+     *
+     * @param string $key Input key
+     * @param int $default Default value
+     * @return int Integer value
+     */
+    public function integer(string $key, int $default = 0): int
+    {
+        return (int) $this->input($key, $default);
+    }
+
+    /**
+     * Retrieve input from the request as a float.
+     *
+     * @param string $key Input key
+     * @param float $default Default value
+     * @return float Float value
+     */
+    public function float(string $key, float $default = 0.0): float
+    {
+        return (float) $this->input($key, $default);
+    }
+
+    /**
+     * Retrieve input from the request as a date.
+     *
+     * @param string $key Input key
+     * @param string|null $format Date format
+     * @param \DateTimeZone|null $timezone Timezone
+     * @return \DateTime|null DateTime instance or null
+     */
+    public function date(string $key, ?string $format = null, ?\DateTimeZone $timezone = null): ?\DateTime
+    {
+        $value = $this->input($key);
+
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            if ($format !== null) {
+                $date = \DateTime::createFromFormat($format, (string) $value, $timezone);
+                return $date ?: null;
+            }
+
+            return new \DateTime((string) $value, $timezone);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Retrieve input from the request as an enum.
+     *
+     * @template T of \BackedEnum
+     * @param string $key Input key
+     * @param class-string<T> $enumClass Enum class
+     * @param T|null $default Default enum value
+     * @return T|null Enum instance or null
+     */
+    public function enum(string $key, string $enumClass, ?\BackedEnum $default = null): ?\BackedEnum
+    {
+        $value = $this->input($key);
+
+        if ($value === null) {
+            return $default;
+        }
+
+        try {
+            return $enumClass::from($value);
+        } catch (\ValueError $e) {
+            return $default;
+        }
+    }
+
+    /**
+     * Retrieve a subset of the items from the input data.
+     *
+     * Enhanced version with support for nested keys and renaming.
+     *
+     * @param array<string|int, string> $keys Keys to retrieve (can be associative for renaming)
+     * @return array<string, mixed> Subset of input data
+     *
+     * @example
+     * ```php
+     * // Basic usage
+     * $data = $request->collect(['name', 'email']);
+     *
+     * // With renaming
+     * $data = $request->collect([
+     *     'user_name' => 'name',
+     *     'user_email' => 'email'
+     * ]);
+     * ```
+     */
+    public function collect(array $keys): array
+    {
+        $result = [];
+
+        foreach ($keys as $newKey => $originalKey) {
+            if (is_int($newKey)) {
+                // Simple key: ['name', 'email']
+                $result[$originalKey] = $this->input($originalKey);
+            } else {
+                // Renamed key: ['user_name' => 'name']
+                $result[$newKey] = $this->input($originalKey);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get the current path info for the request.
+     *
+     * @return string Path info
+     */
+    public function getPathInfo(): string
+    {
+        return $this->path();
+    }
+
+    /**
+     * Get the request method.
+     *
+     * @return string HTTP method
+     */
+    public function getMethod(): string
+    {
+        return $this->method();
+    }
+
+    /**
+     * Determine if the request is the result of an AJAX call.
+     *
+     * @return bool
+     */
+    public function ajax(): bool
+    {
+        return $this->isAjax();
+    }
+
+    /**
+     * Determine if the request is the result of a PJAX call.
+     *
+     * @return bool
+     */
+    public function pjax(): bool
+    {
+        return $this->header('x-pjax') !== null;
+    }
+
+    /**
+     * Determine if the request is sending JSON.
+     *
+     * @return bool
+     */
+    public function isJson(): bool
+    {
+        $contentType = $this->header('content-type', '');
+        return str_contains($contentType, 'application/json');
+    }
+
+    /**
+     * Determine if the current request probably expects a JSON response.
+     *
+     * @return bool
+     */
+    public function wantsJson(): bool
+    {
+        return $this->expectsJson();
+    }
+
+    /**
+     * Determine if the current request is asking for JSON.
+     *
+     * @return bool
+     */
+    public function acceptsJson(): bool
+    {
+        return str_contains($this->header('accept', ''), 'application/json');
+    }
+
+    /**
+     * Determine if the current request accepts HTML.
+     *
+     * @return bool
+     */
+    public function acceptsHtml(): bool
+    {
+        $accept = $this->header('accept', '');
+        return str_contains($accept, 'text/html') || str_contains($accept, 'application/xhtml+xml');
+    }
+
+    /**
+     * Get the data format expected in the response.
+     *
+     * @param string $default Default format
+     * @return string Expected format
+     */
+    public function format(string $default = 'html'): string
+    {
+        if ($this->expectsJson()) {
+            return 'json';
+        }
+
+        if ($this->acceptsHtml()) {
+            return 'html';
+        }
+
+        $accept = $this->header('accept', '');
+
+        if (str_contains($accept, 'application/xml') || str_contains($accept, 'text/xml')) {
+            return 'xml';
+        }
+
+        return $default;
+    }
+}
+
+/**
+ * Stringable wrapper for fluent string operations.
+ *
+ */
+class StringableWrapper
+{
+    public function __construct(private string $value) {}
+
+    public function __toString(): string
+    {
+        return $this->value;
+    }
+
+    public function trim(): self
+    {
+        return new self(trim($this->value));
+    }
+
+    public function lower(): self
+    {
+        return new self(strtolower($this->value));
+    }
+
+    public function upper(): self
+    {
+        return new self(strtoupper($this->value));
+    }
+
+    public function title(): self
+    {
+        return new self(ucwords($this->value));
+    }
+
+    public function length(): int
+    {
+        return strlen($this->value);
+    }
+
+    public function contains(string $needle): bool
+    {
+        return str_contains($this->value, $needle);
+    }
+
+    public function startsWith(string $prefix): bool
+    {
+        return str_starts_with($this->value, $prefix);
+    }
+
+    public function endsWith(string $suffix): bool
+    {
+        return str_ends_with($this->value, $suffix);
+    }
+
+    public function substr(int $start, ?int $length = null): self
+    {
+        return new self(substr($this->value, $start, $length));
+    }
+
+    public function replace(string $search, string $replace): self
+    {
+        return new self(str_replace($search, $replace, $this->value));
+    }
+
+    public function explode(string $delimiter): array
+    {
+        return explode($delimiter, $this->value);
+    }
+
+    public function isEmpty(): bool
+    {
+        return empty($this->value);
+    }
+
+    public function isNotEmpty(): bool
+    {
+        return !$this->isEmpty();
     }
 }

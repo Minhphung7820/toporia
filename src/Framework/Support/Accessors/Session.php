@@ -63,6 +63,18 @@ use Toporia\Framework\Session\Store;
  * @method static void setId(string $id)
  * @method static string getName()
  * @method static bool save()
+ * @method static mixed getFlash(?string $key = null, mixed $default = null)
+ * @method static void setFlash(string|array $key, mixed $value = null)
+ * @method static bool hasFlash(?string $key = null)
+ * @method static void removeFlash(?string $key = null)
+ * @method static mixed getOldInput(?string $key = null, mixed $default = null)
+ * @method static void setOldInput(array $input)
+ * @method static bool hasOldInput(?string $key = null)
+ * @method static void removeOldInput()
+ * @method static array getMultiple(array $keys, mixed $default = null)
+ * @method static void setMultiple(array $values)
+ * @method static mixed pull(string $key, mixed $default = null)
+ * @method static bool isStarted()
  */
 final class Session extends ServiceAccessor
 {
