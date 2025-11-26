@@ -263,20 +263,16 @@ class ModelQueryBuilder extends QueryBuilder
             $callback($relationQuery);
         }
 
-        // Get foreign and local keys for the EXISTS subquery
-        $foreignKey = $relationInstance->getForeignKey();
-        $localKey = $relationInstance->getLocalKey();
+        // Handle different relationship types properly
+        if (
+            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
+            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+        ) {
 
-        // Get relation table
-        $relationTable = $relationQuery->getTable();
-
-        // Use alias for self-referencing relationships
-        $relationAlias = $table === $relationTable ? "{$relationTable}_relation" : $relationTable;
-
-        // Build EXISTS subquery with proper aliasing
-        // Example: SELECT COUNT(*) FROM products AS products_relation WHERE products_relation.parent_id = products.id
-        $fromClause = $table === $relationTable ? "{$relationTable} AS {$relationAlias}" : $relationTable;
-        $subquerySql = "SELECT COUNT(*) FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$table}.{$localKey}";
+            $subquerySql = $this->buildPivotWhereHasSubquery($relationInstance, $table, $relationQuery);
+        } else {
+            $subquerySql = $this->buildSimpleWhereHasSubquery($relationInstance, $table, $relationQuery);
+        }
 
         // Add relation query wheres to subquery
         // Important: Inject bindings directly into SQL (same approach as withCount)
@@ -303,6 +299,85 @@ class ModelQueryBuilder extends QueryBuilder
         $this->whereRaw("({$subquerySql}) {$operator} ?", [$count]);
 
         return $this;
+    }
+
+    /**
+     * Build subquery for pivot relationships (BelongsToMany, MorphToMany).
+     *
+     * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
+     * @param string $parentTable Parent table name
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
+     * @return string Subquery SQL
+     */
+    protected function buildPivotWhereHasSubquery($relation, string $parentTable, $relationQuery): string
+    {
+        $reflectionService = app()->make(\Toporia\Framework\Support\ReflectionService::class);
+
+        if ($relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany) {
+            // Get pivot table and keys for BelongsToMany
+            $pivotTable = $reflectionService->getPropertyValue($relation, 'pivotTable');
+            $foreignPivotKey = $reflectionService->getPropertyValue($relation, 'foreignPivotKey');
+            $relatedPivotKey = $reflectionService->getPropertyValue($relation, 'relatedPivotKey');
+            $parentKey = $reflectionService->getPropertyValue($relation, 'parentKey');
+            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+
+            // Get related table
+            $relatedTable = $relationQuery->getTable();
+
+            // Build subquery with proper JOIN
+            // SELECT COUNT(*) FROM pivot_table
+            // INNER JOIN related_table ON pivot_table.related_key = related_table.id
+            // WHERE pivot_table.parent_key = parent_table.id
+            $subquerySql = "SELECT COUNT(*) FROM {$pivotTable} " .
+                "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
+                "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
+        } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany) {
+            // Similar logic for MorphToMany
+            $pivotTable = $reflectionService->getPropertyValue($relation, 'pivotTable');
+            $morphType = $reflectionService->getPropertyValue($relation, 'morphType');
+            $morphId = $reflectionService->getPropertyValue($relation, 'foreignKey');
+            $relatedPivotKey = $reflectionService->getPropertyValue($relation, 'relatedPivotKey');
+            $parentKey = $reflectionService->getPropertyValue($relation, 'localKey');
+            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+
+            // Get related table and morph class
+            $relatedTable = $relationQuery->getTable();
+            $morphClass = get_class($relation->getParent());
+
+            $subquerySql = "SELECT COUNT(*) FROM {$pivotTable} " .
+                "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
+                "WHERE {$pivotTable}.{$morphId} = {$parentTable}.{$parentKey} " .
+                "AND {$pivotTable}.{$morphType} = '{$morphClass}'";
+        }
+
+        return $subquerySql;
+    }
+
+    /**
+     * Build subquery for simple relationships (HasOne, HasMany, BelongsTo, etc.).
+     *
+     * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
+     * @param string $parentTable Parent table name
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
+     * @return string Subquery SQL
+     */
+    protected function buildSimpleWhereHasSubquery($relation, string $parentTable, $relationQuery): string
+    {
+        // Get foreign and local keys for simple relationships
+        $foreignKey = $relation->getForeignKey();
+        $localKey = $relation->getLocalKey();
+
+        // Get relation table
+        $relationTable = $relationQuery->getTable();
+
+        // Use alias for self-referencing relationships
+        $relationAlias = $parentTable === $relationTable ? "{$relationTable}_relation" : $relationTable;
+
+        // Build EXISTS subquery with proper aliasing
+        $fromClause = $parentTable === $relationTable ? "{$relationTable} AS {$relationAlias}" : $relationTable;
+        $subquerySql = "SELECT COUNT(*) FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
+
+        return $subquerySql;
     }
 
     /**
