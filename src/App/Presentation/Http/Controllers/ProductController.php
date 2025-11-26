@@ -58,50 +58,17 @@ final class ProductController extends BaseController
      *
      * GET /api/products?page=1&per_page=20&category_id=1&min_price=100&max_price=500&search=laptop
      */
-    public function index(Request $request): void
+    public function index(Request $request)
     {
-        // Comprehensive test of whereHas with BelongsToMany relationship
-        $testCases = [
-            // Test 1: whereHas with callback
-            'whereHas_with_callback' => ProductModel::with('categories:id,name')
-                ->whereHas('categories', function ($query) {
-                    $query->where('name', 'LIKE', '%Vel%');
-                })->first(),
+        // Test both single model and collection
+        $singleProduct = ProductModel::with('categories:id,name')->first();
+        $productCollection = ProductModel::with('categories:id,name')->limit(3)->get();
 
-            // Test 2: whereHas without callback (just check existence)
-            'whereHas_existence' => ProductModel::with('categories:id,name')
-                ->whereHas('categories')
-                ->first(),
-
-            // Test 3: whereHas with count
-            'whereHas_with_count' => ProductModel::with('categories:id,name')
-                ->whereHas('categories', null, '>=', 1)
-                ->first(),
-        ];
-
-        // Return the first successful result
-        $result = null;
-        $testUsed = null;
-
-        foreach ($testCases as $testName => $query) {
-            if ($query) {
-                $result = $query;
-                $testUsed = $testName;
-                break;
-            }
-        }
-
-        // Fallback: just get any product with categories
-        if (!$result) {
-            $result = ProductModel::with('categories:id,name')->first();
-            $testUsed = 'fallback';
-        }
-
-        $this->json([
+        return response()->json([
             'success' => true,
-            'data' => $result ? $result->toArray() : null,
-            'test_used' => $testUsed,
-            'message' => $result ? 'whereHas working perfectly!' : 'No products found',
+            'single_product' => $singleProduct, // Laravel-style: no need to call toArray()
+            'product_collection' => $productCollection, // Test collection serialization
+            'message' => 'Laravel-style JSON serialization working!'
         ]);
     }
 

@@ -23,7 +23,7 @@ use Toporia\Framework\Support\Collection\Collection;
  *
  * @link        https://github.com/Minhphung7820/toporia
  */
-class ModelCollection extends Collection
+class ModelCollection extends Collection implements \JsonSerializable
 {
   /**
    * Return the array of primary keys for all models in the collection.
@@ -75,5 +75,17 @@ class ModelCollection extends Collection
     return $this->map(
       fn(Model $m) => method_exists($m, 'toArray') ? $m->toArray() : get_object_vars($m)
     )->values()->all();
+  }
+
+  /**
+   * Convert the collection to an array for JSON serialization.
+   *
+   * Laravel compatibility: implements JsonSerializable interface.
+   *
+   * @return array
+   */
+  public function jsonSerialize(): array
+  {
+    return $this->toArray();
   }
 }

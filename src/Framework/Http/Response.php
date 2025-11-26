@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http;
 
 use Toporia\Framework\Http\Contracts\ResponseInterface;
+
 /**
  * HTTP Response implementation.
  *
@@ -78,7 +79,13 @@ final class Response implements ResponseInterface
         $this->setStatus($status);
         $this->header('Content-Type', 'application/json');
 
-        $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        // Laravel-style JSON encoding with proper object handling
+        $processedData = $this->prepareDataForJson($data);
+
+        $json = json_encode(
+            $processedData,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION
+        );
 
         if ($json === false) {
             $this->setStatus(500);
@@ -89,6 +96,46 @@ final class Response implements ResponseInterface
         }
 
         $this->send($json);
+    }
+
+    /**
+     * Prepare data for JSON encoding (Laravel-style).
+     *
+     * Handles JsonSerializable, Arrayable objects, and collections properly.
+     *
+     * @param mixed $data
+     * @return mixed
+     */
+    private function prepareDataForJson(mixed $data): mixed
+    {
+        if ($data instanceof \JsonSerializable) {
+            return $data->jsonSerialize();
+        }
+
+        if (is_object($data) && method_exists($data, 'toArray')) {
+            return $data->toArray();
+        }
+
+        if (is_array($data)) {
+            return array_map([$this, 'prepareDataForJson'], $data);
+        }
+
+        if (is_object($data)) {
+            // Convert objects to arrays, but preserve stdClass as objects
+            if ($data instanceof \stdClass) {
+                return $data;
+            }
+
+            // For other objects, try to convert to array
+            if (method_exists($data, '__toArray')) {
+                return $data->__toArray();
+            }
+
+            // Fallback: convert public properties to array
+            return get_object_vars($data);
+        }
+
+        return $data;
     }
 
     /**

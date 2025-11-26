@@ -29,7 +29,7 @@ use Toporia\Framework\Database\ORM\Concerns\HasObservers;
  *
  * @link        https://github.com/Minhphung7820/toporia
  */
-abstract class Model implements ModelInterface, ObservableInterface
+abstract class Model implements ModelInterface, ObservableInterface, \JsonSerializable
 {
     use Observable;
     use HasObservers;
@@ -1624,6 +1624,19 @@ abstract class Model implements ModelInterface, ObservableInterface
     public function toJson(): string
     {
         return json_encode($this->toArray());
+    }
+
+    /**
+     * Convert the model instance to an array for JSON serialization.
+     *
+     * This method is called automatically when the model is passed to json_encode().
+     * Laravel compatibility: implements JsonSerializable interface.
+     *
+     * @return array
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 
     /**
