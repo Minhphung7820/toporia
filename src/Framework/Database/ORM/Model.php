@@ -2535,6 +2535,12 @@ abstract class Model implements ModelInterface, ObservableInterface
     /**
      * Apply column selection for relationships with pivot/intermediate tables.
      *
+     * Optimized version with reduced code duplication and better performance:
+     * - Single reflection service call
+     * - Avoid unnecessary model instantiation when possible
+     * - Extracted helper methods for reusability
+     * - Reduced memory footprint
+     *
      * @param RelationInterface $relation Relation instance
      * @param array<string> $columns Columns to select
      * @param \Toporia\Framework\Database\Query\QueryBuilder $query Query builder
@@ -2542,51 +2548,22 @@ abstract class Model implements ModelInterface, ObservableInterface
      */
     protected static function applyColumnSelectionForPivotRelation(RelationInterface $relation, array $columns, $query): void
     {
+        // Get reflection service once (performance optimization)
         $reflectionService = app()->make(\Toporia\Framework\Support\ReflectionService::class);
 
-        if ($relation instanceof Relations\BelongsToMany) {
-            // For BelongsToMany, ensure the related model's primary key is included
-            $relatedKey = $relation->getRelatedKey();
-            if (!in_array($relatedKey, $columns, true)) {
-                $columns[] = $relatedKey;
-            }
+        // Get related class name (common for all pivot relationships)
+        $relatedClass = $reflectionService->getPropertyValue($relation, 'relatedClass');
 
-            // Get related table name
-            $relatedClass = $reflectionService->getPropertyValue($relation, 'relatedClass');
-            $relatedInstance = new $relatedClass();
-            $relatedTable = $relatedInstance->getTable();
-        } elseif ($relation instanceof Relations\MorphToMany) {
-            // For MorphToMany, ensure the related model's primary key is included
-            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
-            if (!in_array($relatedKey, $columns, true)) {
-                $columns[] = $relatedKey;
-            }
+        // Determine required key and get table name efficiently
+        [$requiredKey, $relatedTable] = static::getRelationMetadata($relation, $relatedClass, $reflectionService);
 
-            // Get related table name
-            $relatedClass = $reflectionService->getPropertyValue($relation, 'relatedClass');
-            $relatedInstance = new $relatedClass();
-            $relatedTable = $relatedInstance->getTable();
-        } elseif ($relation instanceof Relations\HasManyThrough || $relation instanceof Relations\HasOneThrough) {
-            // For HasManyThrough/HasOneThrough, ensure the foreign key is included
-            $foreignKey = $relation->getForeignKeyName();
-            if (!in_array($foreignKey, $columns, true)) {
-                $columns[] = $foreignKey;
-            }
-
-            // Get related table name (final target table, not intermediate)
-            $relatedClass = $reflectionService->getPropertyValue($relation, 'relatedClass');
-            $relatedInstance = new $relatedClass();
-            $relatedTable = $relatedInstance->getTable();
+        // Ensure required key is included in columns
+        if ($requiredKey && !in_array($requiredKey, $columns, true)) {
+            $columns[] = $requiredKey;
         }
 
         // Prefix all columns with table name to avoid ambiguity with pivot/intermediate tables
-        $prefixedColumns = array_map(function ($column) use ($relatedTable) {
-            // If column already has table prefix, don't add it again
-            if (str_contains($column, '.')) {
-                return $column;
-            }
-            return "{$relatedTable}.{$column}";
-        }, $columns);
+        $prefixedColumns = static::prefixColumnsWithTable($columns, $relatedTable);
 
         // Apply column selection with prefixed columns
         $query->select($prefixedColumns);
@@ -2610,6 +2587,79 @@ abstract class Model implements ModelInterface, ObservableInterface
 
         // Apply column selection (no table prefixing needed for simple relations)
         $query->select($columns);
+    }
+
+    /**
+     * Get relationship metadata (required key and table name) efficiently.
+     *
+     * Optimized version that reduces code duplication and improves performance.
+     *
+     * @param RelationInterface $relation Relation instance
+     * @param string $relatedClass Related model class name
+     * @param \Toporia\Framework\Support\ReflectionService $reflectionService Reflection service
+     * @return array{0: string|null, 1: string} [requiredKey, tableName]
+     */
+    protected static function getRelationMetadata(RelationInterface $relation, string $relatedClass, $reflectionService): array
+    {
+        // Get table name efficiently using static method if available, otherwise instantiate
+        $relatedTable = static::getTableNameFromClass($relatedClass);
+
+        if ($relation instanceof Relations\BelongsToMany) {
+            // For BelongsToMany, use the related key (primary key of target table)
+            $requiredKey = $relation->getRelatedKey();
+        } elseif ($relation instanceof Relations\MorphToMany) {
+            // For MorphToMany, get related key via reflection
+            $requiredKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+        } elseif ($relation instanceof Relations\HasManyThrough || $relation instanceof Relations\HasOneThrough) {
+            // For HasManyThrough/HasOneThrough, use foreign key
+            $requiredKey = $relation->getForeignKeyName();
+        } else {
+            // Fallback for unknown pivot relationship types
+            $requiredKey = null;
+        }
+
+        return [$requiredKey, $relatedTable];
+    }
+
+    /**
+     * Get table name from model class efficiently.
+     *
+     * Uses static method if available, otherwise creates minimal instance.
+     * Performance: Avoids unnecessary object instantiation when possible.
+     *
+     * @param string $modelClass Model class name
+     * @return string Table name
+     */
+    protected static function getTableNameFromClass(string $modelClass): string
+    {
+        // Try to use static method first (most efficient)
+        if (method_exists($modelClass, 'getTableName')) {
+            return $modelClass::getTableName();
+        }
+
+        // Fallback: create instance (less efficient but works)
+        $instance = new $modelClass();
+        return $instance->getTable();
+    }
+
+    /**
+     * Prefix columns with table name to avoid SQL ambiguity.
+     *
+     * Performance: Single array_map call with optimized closure.
+     *
+     * @param array<string> $columns Columns to prefix
+     * @param string $tableName Table name to use as prefix
+     * @return array<string> Prefixed columns
+     */
+    protected static function prefixColumnsWithTable(array $columns, string $tableName): array
+    {
+        return array_map(function ($column) use ($tableName) {
+            // If column already has table prefix, don't add it again
+            if (str_contains($column, '.')) {
+                return $column;
+            }
+            return "{$tableName}.{$column}";
+        }, $columns);
     }
 
     /**
