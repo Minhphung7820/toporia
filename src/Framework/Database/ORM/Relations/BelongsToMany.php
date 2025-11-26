@@ -186,7 +186,35 @@ class BelongsToMany extends Relation
             'value' => $value
         ];
 
+        // Apply constraint immediately to current query
+        $this->applyPivotWhere($column, $operator, $value);
+
         return $this;
+    }
+
+    /**
+     * Apply a single pivot where constraint to the query.
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param mixed $value Value to compare
+     * @return void
+     */
+    protected function applyPivotWhere(string $column, string $operator, mixed $value): void
+    {
+        $column = "{$this->pivotTable}.{$column}";
+
+        if ($operator === 'BETWEEN' && is_array($value)) {
+            $this->query->whereBetween($column, $value);
+        } elseif ($operator === 'NOT BETWEEN' && is_array($value)) {
+            $this->query->whereNotBetween($column, $value);
+        } elseif ($operator === 'IS' && $value === null) {
+            $this->query->whereNull($column);
+        } elseif ($operator === 'IS NOT' && $value === null) {
+            $this->query->whereNotNull($column);
+        } else {
+            $this->query->where($column, $operator, $value);
+        }
     }
 
     /**
@@ -207,6 +235,9 @@ class BelongsToMany extends Relation
             'column' => $column,
             'values' => $values
         ];
+
+        // Apply constraint immediately to current query
+        $this->query->whereIn("{$this->pivotTable}.{$column}", $values);
 
         return $this;
     }
@@ -231,6 +262,9 @@ class BelongsToMany extends Relation
             'not' => true
         ];
 
+        // Apply constraint immediately to current query
+        $this->query->whereNotIn("{$this->pivotTable}.{$column}", $values);
+
         return $this;
     }
 
@@ -248,10 +282,15 @@ class BelongsToMany extends Relation
      */
     public function orderByPivot(string $column, string $direction = 'asc'): static
     {
+        $direction = strtolower($direction);
+
         $this->pivotOrderBy[] = [
             'column' => $column,
-            'direction' => strtolower($direction)
+            'direction' => $direction
         ];
+
+        // Apply order immediately to current query
+        $this->query->orderBy("{$this->pivotTable}.{$column}", $direction);
 
         return $this;
     }
@@ -325,7 +364,17 @@ class BelongsToMany extends Relation
      */
     public function wherePivotDate(string $column, string $operator, string $value): static
     {
-        return $this->wherePivot("DATE({$column})", $operator, $value);
+        // Apply function directly to avoid double prefixing
+        $this->query->whereRaw("DATE({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+
+        // Store for eager loading
+        $this->pivotWheres[] = [
+            'column' => "DATE({$column})",
+            'operator' => $operator,
+            'value' => $value
+        ];
+
+        return $this;
     }
 
     /**
@@ -343,7 +392,17 @@ class BelongsToMany extends Relation
      */
     public function wherePivotMonth(string $column, string $operator, int $value): static
     {
-        return $this->wherePivot("MONTH({$column})", $operator, $value);
+        // Apply function directly to avoid double prefixing
+        $this->query->whereRaw("MONTH({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+
+        // Store for eager loading
+        $this->pivotWheres[] = [
+            'column' => "MONTH({$column})",
+            'operator' => $operator,
+            'value' => $value
+        ];
+
+        return $this;
     }
 
     /**
@@ -361,7 +420,17 @@ class BelongsToMany extends Relation
      */
     public function wherePivotYear(string $column, string $operator, int $value): static
     {
-        return $this->wherePivot("YEAR({$column})", $operator, $value);
+        // Apply function directly to avoid double prefixing
+        $this->query->whereRaw("YEAR({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+
+        // Store for eager loading
+        $this->pivotWheres[] = [
+            'column' => "YEAR({$column})",
+            'operator' => $operator,
+            'value' => $value
+        ];
+
+        return $this;
     }
 
     /**
@@ -379,7 +448,17 @@ class BelongsToMany extends Relation
      */
     public function wherePivotTime(string $column, string $operator, string $value): static
     {
-        return $this->wherePivot("TIME({$column})", $operator, $value);
+        // Apply function directly to avoid double prefixing
+        $this->query->whereRaw("TIME({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+
+        // Store for eager loading
+        $this->pivotWheres[] = [
+            'column' => "TIME({$column})",
+            'operator' => $operator,
+            'value' => $value
+        ];
+
+        return $this;
     }
 
     /**
@@ -401,7 +480,18 @@ class BelongsToMany extends Relation
     public function wherePivotJsonContains(string $column, mixed $value, string $path = '$'): static
     {
         $jsonValue = is_string($value) ? "\"$value\"" : json_encode($value);
-        return $this->wherePivot("JSON_CONTAINS({$column}, '{$jsonValue}', '{$path}')", '=', 1);
+
+        // Apply function directly to avoid double prefixing
+        $this->query->whereRaw("JSON_CONTAINS({$this->pivotTable}.{$column}, ?, ?)", [$jsonValue, $path]);
+
+        // Store for eager loading
+        $this->pivotWheres[] = [
+            'column' => "JSON_CONTAINS({$column}, '{$jsonValue}', '{$path}')",
+            'operator' => '=',
+            'value' => 1
+        ];
+
+        return $this;
     }
 
     /**
@@ -420,7 +510,17 @@ class BelongsToMany extends Relation
      */
     public function wherePivotJsonLength(string $column, string $operator, int $value, string $path = '$'): static
     {
-        return $this->wherePivot("JSON_LENGTH({$column}, '{$path}')", $operator, $value);
+        // Apply function directly to avoid double prefixing
+        $this->query->whereRaw("JSON_LENGTH({$this->pivotTable}.{$column}, ?) {$operator} ?", [$path, $value]);
+
+        // Store for eager loading
+        $this->pivotWheres[] = [
+            'column' => "JSON_LENGTH({$column}, '{$path}')",
+            'operator' => $operator,
+            'value' => $value
+        ];
+
+        return $this;
     }
 
     /**
@@ -544,11 +644,12 @@ class BelongsToMany extends Relation
      *
      * Match eagerly loaded results to their parent models.
      *
-     * For BelongsToMany, we need to query the pivot table to determine
-     * which related models belong to which parent models.
+     * PERFORMANCE OPTIMIZATION: Two strategies available
+     * 1. Current: 2 queries (main + pivot lookup) - safer, works with complex pivot constraints
+     * 2. Future: 1 query (select parent_id from pivot in main query) - faster for simple cases
      *
      * Performance: O(n + m) where n = parents, m = results
-     * - Single query to get pivot mappings
+     * - Single query to get pivot mappings (or could be optimized to 0 extra queries)
      * - Dictionary-based matching with O(1) lookups
      */
     public function match(array $models, mixed $results, string $relationName): array
@@ -561,6 +662,85 @@ class BelongsToMany extends Relation
             return $models;
         }
 
+        // PERFORMANCE NOTE: If pivot constraints are simple and performance is critical,
+        // we could optimize this by selecting parent_id directly in the main eager query
+        // This would eliminate the need for a separate pivot query
+        if ($this->shouldUseOptimizedMatching()) {
+            return $this->matchOptimized($models, $results, $relationName);
+        }
+
+        // Standard matching with separate pivot query (current implementation)
+        return $this->matchWithPivotQuery($models, $results, $relationName);
+    }
+
+    /**
+     * Check if we can use optimized matching (single query).
+     *
+     * Optimized matching works when:
+     * - No complex pivot constraints (JSON functions, date functions, etc.)
+     * - Simple WHERE/IN constraints only
+     * - Parent ID is available in the result set
+     *
+     * @return bool
+     */
+    protected function shouldUseOptimizedMatching(): bool
+    {
+        // Check if we have complex pivot constraints that require separate pivot query
+        foreach ($this->pivotWheres as $where) {
+            // If column contains SQL functions, we need separate pivot query
+            if (str_contains($where['column'], '(') || str_contains($where['column'], ')')) {
+                return false;
+            }
+        }
+
+        // For now, disable optimized matching to avoid column not found errors
+        // TODO: Re-enable after proper column validation is implemented
+        return false;
+    }
+
+    /**
+     * Optimized matching using parent_id from main query (1 query total).
+     *
+     * @param array $models Parent models
+     * @param ModelCollection $results Related models with parent_id
+     * @param string $relationName Relation name
+     * @return array
+     */
+    protected function matchOptimized(array $models, ModelCollection $results, string $relationName): array
+    {
+        // Build dictionary: parent_id => [related_models]
+        $dictionary = [];
+        foreach ($results as $result) {
+            // Parent ID should be available from the main query's SELECT
+            $parentId = $result->getAttribute("pivot_{$this->foreignPivotKey}");
+            if ($parentId !== null) {
+                if (!isset($dictionary[$parentId])) {
+                    $dictionary[$parentId] = [];
+                }
+                $dictionary[$parentId][] = $result;
+            }
+        }
+
+        // Match to parents
+        foreach ($models as $model) {
+            $parentId = $model->getAttribute($this->parentKey);
+            $matched = $dictionary[$parentId] ?? [];
+            $model->setRelation($relationName, new ModelCollection($matched));
+        }
+
+        return $models;
+    }
+
+    /**
+     * Standard matching with separate pivot query (2 queries total).
+     *
+     * @param array $models Parent models
+     * @param ModelCollection $results Related models
+     * @param string $relationName Relation name
+     * @return array
+     */
+    protected function matchWithPivotQuery(array $models, ModelCollection $results, string $relationName): array
+    {
         // Step 1: Collect parent and related IDs
         $parentIds = [];
         foreach ($models as $model) {
@@ -590,11 +770,15 @@ class BelongsToMany extends Relation
         // SELECT foreign_key, related_key FROM pivot_table
         // WHERE foreign_key IN (...) AND related_key IN (...)
         $qb = new QueryBuilder($this->query->getConnection());
-        $pivotRows = $qb->table($this->pivotTable)
+        $pivotQuery = $qb->table($this->pivotTable)
             ->select($this->foreignPivotKey, $this->relatedPivotKey)
             ->whereIn($this->foreignPivotKey, array_unique($parentIds))
-            ->whereIn($this->relatedPivotKey, array_unique($relatedIds))
-            ->get();
+            ->whereIn($this->relatedPivotKey, array_unique($relatedIds));
+
+        // Apply pivot constraints to the pivot query
+        $this->applyPivotConstraintsToQuery($pivotQuery);
+
+        $pivotRows = $pivotQuery->get();
 
         // Step 3: Build dictionary mapping parent IDs to arrays of related IDs
         // Example: [1 => [10, 20, 30], 2 => [20, 40], ...]
@@ -643,6 +827,66 @@ class BelongsToMany extends Relation
         }
 
         return $models;
+    }
+
+    /**
+     * Apply pivot constraints to a separate pivot query.
+     *
+     * @param QueryBuilder $query Pivot query builder
+     * @return void
+     */
+    protected function applyPivotConstraintsToQuery(QueryBuilder $query): void
+    {
+        // Apply pivot where constraints
+        foreach ($this->pivotWheres as $where) {
+            $column = $where['column'];
+
+            // Handle function-based columns
+            if (str_contains($column, '(') && str_contains($column, ')')) {
+                // Extract function and apply as raw where
+                $operator = $where['operator'];
+                $value = $where['value'];
+
+                if (str_starts_with($column, 'DATE(')) {
+                    $actualColumn = str_replace(['DATE(', ')'], '', $column);
+                    $query->whereRaw("DATE({$actualColumn}) {$operator} ?", [$value]);
+                } elseif (str_starts_with($column, 'MONTH(')) {
+                    $actualColumn = str_replace(['MONTH(', ')'], '', $column);
+                    $query->whereRaw("MONTH({$actualColumn}) {$operator} ?", [$value]);
+                } elseif (str_starts_with($column, 'YEAR(')) {
+                    $actualColumn = str_replace(['YEAR(', ')'], '', $column);
+                    $query->whereRaw("YEAR({$actualColumn}) {$operator} ?", [$value]);
+                } elseif (str_starts_with($column, 'TIME(')) {
+                    $actualColumn = str_replace(['TIME(', ')'], '', $column);
+                    $query->whereRaw("TIME({$actualColumn}) {$operator} ?", [$value]);
+                } else {
+                    // Generic function handling
+                    $query->whereRaw("{$column} {$where['operator']} ?", [$where['value']]);
+                }
+            } else {
+                // Regular column
+                if ($where['operator'] === 'BETWEEN' && is_array($where['value'])) {
+                    $query->whereBetween($column, $where['value']);
+                } elseif ($where['operator'] === 'NOT BETWEEN' && is_array($where['value'])) {
+                    $query->whereNotBetween($column, $where['value']);
+                } elseif ($where['operator'] === 'IS' && $where['value'] === null) {
+                    $query->whereNull($column);
+                } elseif ($where['operator'] === 'IS NOT' && $where['value'] === null) {
+                    $query->whereNotNull($column);
+                } else {
+                    $query->where($column, $where['operator'], $where['value']);
+                }
+            }
+        }
+
+        // Apply pivot whereIn constraints
+        foreach ($this->pivotWhereIns as $whereIn) {
+            if (isset($whereIn['not']) && $whereIn['not']) {
+                $query->whereNotIn($whereIn['column'], $whereIn['values']);
+            } else {
+                $query->whereIn($whereIn['column'], $whereIn['values']);
+            }
+        }
     }
 
     /**
@@ -754,6 +998,9 @@ class BelongsToMany extends Relation
     /**
      * Sync the pivot table with the given IDs.
      *
+     * PERFORMANCE NOTE: For very large relationships, this method loads all current
+     * pivot IDs into memory. Consider using syncChunked() for large datasets.
+     *
      * @param array<int|string> $ids Related model IDs or associative array with pivot data
      * @param bool $detaching Whether to detach missing records
      * @return array Sync results with attached, detached, and updated arrays
@@ -814,6 +1061,112 @@ class BelongsToMany extends Relation
     }
 
     /**
+     * Sync the pivot table with chunked processing for large datasets.
+     *
+     * Performance: O(n/chunk_size) - Memory-efficient sync for large relationships
+     * Recommended for relationships with >5000 records
+     *
+     * @param array $ids Related model IDs or associative array with pivot data
+     * @param bool $detaching Whether to detach missing records
+     * @param int $chunkSize Number of records to process per chunk
+     * @return array Sync results with attached, detached, and updated arrays
+     *
+     * @example
+     * ```php
+     * // For large datasets
+     * $user->roles()->syncChunked($roleIds, true, 1000);
+     * ```
+     */
+    public function syncChunked(array $ids, bool $detaching = true, int $chunkSize = 1000): array
+    {
+        $changes = [
+            'attached' => [],
+            'detached' => [],
+            'updated' => []
+        ];
+
+        // Normalize input IDs
+        $records = $this->formatSyncRecords($ids);
+        $syncIds = array_keys($records);
+
+        if ($detaching) {
+            // Process detachment in chunks
+            $this->processDetachmentChunked($syncIds, $chunkSize, $changes);
+        }
+
+        // Process attachment/updates in chunks
+        $this->processAttachmentChunked($records, $chunkSize, $changes);
+
+        $this->touchParent();
+
+        return $changes;
+    }
+
+    /**
+     * Process detachment in chunks.
+     *
+     * @param array $syncIds IDs to keep
+     * @param int $chunkSize Chunk size
+     * @param array &$changes Changes array to update
+     * @return void
+     */
+    protected function processDetachmentChunked(array $syncIds, int $chunkSize, array &$changes): void
+    {
+        $qb = new QueryBuilder($this->query->getConnection());
+
+        // Get current IDs in chunks and detach those not in sync list
+        $qb->table($this->pivotTable)
+            ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey))
+            ->chunk($chunkSize, function ($pivotChunk) use ($syncIds, &$changes) {
+                $currentChunk = [];
+                foreach ($pivotChunk as $pivot) {
+                    $currentChunk[] = $pivot[$this->relatedPivotKey];
+                }
+
+                $toDetach = array_diff($currentChunk, $syncIds);
+                if (!empty($toDetach)) {
+                    $this->detachMany($toDetach);
+                    $changes['detached'] = array_merge($changes['detached'], $toDetach);
+                }
+
+                return true; // Continue processing
+            });
+    }
+
+    /**
+     * Process attachment/updates in chunks.
+     *
+     * @param array $records Records to attach/update
+     * @param int $chunkSize Chunk size
+     * @param array &$changes Changes array to update
+     * @return void
+     */
+    protected function processAttachmentChunked(array $records, int $chunkSize, array &$changes): void
+    {
+        $recordChunks = array_chunk($records, $chunkSize, true);
+
+        foreach ($recordChunks as $chunk) {
+            // Get current IDs for this chunk
+            $chunkIds = array_keys($chunk);
+            $current = $this->getCurrentPivotIds(count($chunkIds) * 2); // Safety limit
+
+            foreach ($chunk as $id => $pivotData) {
+                if (in_array($id, $current)) {
+                    // Update existing pivot record
+                    if (!empty($pivotData)) {
+                        $this->updateExistingPivot($id, $pivotData);
+                        $changes['updated'][] = $id;
+                    }
+                } else {
+                    // Attach new record
+                    $this->attach($id, $pivotData, false);
+                    $changes['attached'][] = $id;
+                }
+            }
+        }
+    }
+
+    /**
      * Toggle the attachment of related models.
      *
      * @param array|int|string $ids Related model IDs
@@ -869,16 +1222,41 @@ class BelongsToMany extends Relation
     /**
      * Get current pivot IDs for the parent model.
      *
+     * PERFORMANCE WARNING: Loads all pivot IDs into memory.
+     * For very large relationships (>10k records), consider:
+     * 1. Using chunked operations
+     * 2. Implementing streaming sync operations
+     * 3. Using database-level operations
+     *
+     * @param int|null $limit Optional limit for safety (null = no limit)
      * @return array
      */
-    protected function getCurrentPivotIds(): array
+    protected function getCurrentPivotIds(?int $limit = null): array
     {
         $qb = new QueryBuilder($this->query->getConnection());
-        $results = $qb->table($this->pivotTable)
-            ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey))
-            ->pluck($this->relatedPivotKey);
+        $query = $qb->table($this->pivotTable)
+            ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey));
 
-        return $results->toArray();
+        // Apply limit if specified for safety
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        $results = $query->pluck($this->relatedPivotKey);
+        $ids = $results->toArray();
+
+        // Warn about potential performance issues
+        if (count($ids) > 5000) {
+            trigger_error(
+                sprintf(
+                    'Large relationship detected (%d records). Consider using chunked operations for better performance.',
+                    count($ids)
+                ),
+                E_USER_NOTICE
+            );
+        }
+
+        return $ids;
     }
 
     /**
@@ -981,9 +1359,14 @@ class BelongsToMany extends Relation
 
         // Build SELECT clause with pivot columns
         $selectColumns = ["{$relatedTable}.*"];
+
+        // Add additional pivot columns
         foreach ($this->pivotColumns as $column) {
             $selectColumns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
         }
+
+        // TODO: Add parent_id selection for optimized matching after proper validation
+        // For now, we'll use standard matching to avoid column not found errors
 
         // Create a fresh query from the related model (this ensures table name is set)
         $cleanQuery = call_user_func([$this->relatedClass, 'query'])
@@ -1219,7 +1602,10 @@ class BelongsToMany extends Relation
     /**
      * Process records in chunks to optimize memory usage.
      *
-     * Performance: O(n/chunk_size) - Memory-efficient processing of large datasets
+     * PERFORMANCE WARNING: Uses OFFSET/LIMIT which can be slow on large tables.
+     * For better performance on large datasets, use chunkById() instead.
+     *
+     * Performance: O(n/chunk_size) but OFFSET becomes slower as offset increases
      * Clean Architecture: Callback pattern for flexible processing
      *
      * @param int $count Number of records per chunk
@@ -1228,15 +1614,29 @@ class BelongsToMany extends Relation
      *
      * @example
      * ```php
+     * // For small to medium datasets
      * $user->roles()->chunk(100, function($roles) {
      *     foreach ($roles as $role) {
      *         // Process each role
      *     }
      * });
+     *
+     * // For large datasets, prefer chunkById():
+     * $user->roles()->chunkById(100, function($roles) {
+     *     // Much faster on large tables
+     * });
      * ```
      */
     public function chunk(int $count, callable $callback): bool
     {
+        // Warn about performance implications for large datasets
+        if ($count > 1000) {
+            trigger_error(
+                'chunk() with large chunk sizes may be slow on large tables. Consider using chunkById() for better performance.',
+                E_USER_NOTICE
+            );
+        }
+
         $page = 1;
 
         do {
@@ -1634,5 +2034,43 @@ class BelongsToMany extends Relation
     public function getPivotClass(): ?string
     {
         return $this->pivotClass;
+    }
+
+    /**
+     * Validate pivot table structure and column names.
+     *
+     * This method helps debug column not found errors by checking
+     * if the expected columns exist in the pivot table.
+     *
+     * @return array Validation results
+     */
+    public function validatePivotStructure(): array
+    {
+        $connection = $this->query->getConnection();
+
+        try {
+            // Get table columns
+            $columns = $connection->select("SHOW COLUMNS FROM `{$this->pivotTable}`");
+            $columnNames = array_column($columns, 'Field');
+
+            return [
+                'table' => $this->pivotTable,
+                'exists' => true,
+                'columns' => $columnNames,
+                'foreign_key_exists' => in_array($this->foreignPivotKey, $columnNames),
+                'related_key_exists' => in_array($this->relatedPivotKey, $columnNames),
+                'foreign_key' => $this->foreignPivotKey,
+                'related_key' => $this->relatedPivotKey,
+                'pivot_columns_exist' => array_intersect($this->pivotColumns, $columnNames) === $this->pivotColumns
+            ];
+        } catch (\Exception $e) {
+            return [
+                'table' => $this->pivotTable,
+                'exists' => false,
+                'error' => $e->getMessage(),
+                'foreign_key' => $this->foreignPivotKey,
+                'related_key' => $this->relatedPivotKey
+            ];
+        }
     }
 }
