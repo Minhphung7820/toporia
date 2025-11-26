@@ -214,9 +214,25 @@ final class Router implements RouterInterface
         // Execute pipeline and get result
         $result = $pipeline($this->request, $this->response);
 
-        // Send response if result is a string (HTML content)
-        if (is_string($result)) {
+        // Handle different result types
+        if ($result instanceof \Toporia\Framework\Http\Contracts\JsonResponseInterface) {
+            // JSON Response object - send it directly
+            $result->sendResponse();
+        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\RedirectResponseInterface) {
+            // Redirect Response object - send it directly
+            $result->sendResponse();
+        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\StreamedResponseInterface) {
+            // Streamed Response object - send content directly
+            $result->sendContent();
+        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\ResponseInterface) {
+            // Generic Response object - send it directly
+            $result->send($result->getContent());
+        } elseif (is_string($result)) {
+            // String result - send as HTML
             $this->response->html($result);
+        } elseif (is_array($result) || is_object($result)) {
+            // Array/Object result - send as JSON
+            $this->response->json($result);
         }
     }
 

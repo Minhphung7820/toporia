@@ -29,6 +29,7 @@ final class FrameworkServiceProvider extends ServiceProvider
             // Core services (order matters!)
             \Toporia\Framework\Providers\ConfigServiceProvider::class,
             \Toporia\Framework\Providers\HttpServiceProvider::class,
+            \Toporia\Framework\Providers\ResponseServiceProvider::class,
             \Toporia\Framework\Providers\EventServiceProvider::class,
             \Toporia\Framework\Providers\RoutingServiceProvider::class,
             \Toporia\Framework\Providers\UrlServiceProvider::class,

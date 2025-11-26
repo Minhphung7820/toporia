@@ -14,7 +14,7 @@ use Toporia\Framework\Http\Contracts\ResponseInterface;
  * - Headers
  * - Content output (HTML, JSON, redirects)
  */
-final class Response implements ResponseInterface
+class Response implements ResponseInterface
 {
     use \Toporia\Framework\Support\Macroable;
     /**
@@ -32,9 +32,60 @@ final class Response implements ResponseInterface
      */
     private bool $headersSent = false;
 
-    public function __construct()
+    /**
+     * @var string Response content.
+     */
+    private string $content = '';
+
+    public function __construct(string $content = '', int $status = 200, array $headers = [])
     {
-        $this->headers['Content-Type'] = 'text/html; charset=UTF-8';
+        $this->content = $content;
+        $this->status = $status;
+        $this->headers = array_merge([
+            'Content-Type' => 'text/html; charset=UTF-8'
+        ], $headers);
+    }
+
+    /**
+     * Get response content.
+     *
+     * @return string Response content
+     */
+    public function getContent(): string
+    {
+        return $this->content;
+    }
+
+    /**
+     * Set response content.
+     *
+     * @param string $content Response content
+     * @return $this
+     */
+    public function setContent(string $content): self
+    {
+        $this->content = $content;
+        return $this;
+    }
+
+    /**
+     * Get response status code.
+     *
+     * @return int Status code
+     */
+    public function getStatusCode(): int
+    {
+        return $this->status;
+    }
+
+    /**
+     * Get response headers.
+     *
+     * @return array<string, string> Headers
+     */
+    public function getHeaders(): array
+    {
+        return $this->headers;
     }
 
     /**
@@ -68,6 +119,7 @@ final class Response implements ResponseInterface
     {
         $this->setStatus($status);
         $this->header('Content-Type', 'text/html; charset=UTF-8');
+        $this->setContent($content);
         $this->send($content);
     }
 
@@ -190,15 +242,6 @@ final class Response implements ResponseInterface
         $this->send('');
     }
 
-    /**
-     * Get all response headers.
-     *
-     * @return array<string, string>
-     */
-    public function getHeaders(): array
-    {
-        return $this->headers;
-    }
 
     /**
      * Get the current status code.

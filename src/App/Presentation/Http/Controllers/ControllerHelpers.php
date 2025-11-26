@@ -70,11 +70,11 @@ trait ControllerHelpers
      *
      * @param mixed $data Data to encode as JSON
      * @param int $status HTTP status code
-     * @return void
+     * @return \Toporia\Framework\Http\Contracts\JsonResponseInterface
      */
-    protected function json(mixed $data, int $status = 200): void
+    protected function json(mixed $data, int $status = 200): \Toporia\Framework\Http\Contracts\JsonResponseInterface
     {
-        response()->json($data, $status);
+        return response()->json($data, $status);
     }
 
     /**
@@ -82,11 +82,11 @@ trait ControllerHelpers
      *
      * @param string $content HTML content
      * @param int $status HTTP status code
-     * @return void
+     * @return \Toporia\Framework\Http\Contracts\ResponseInterface
      */
-    protected function html(string $content, int $status = 200): void
+    protected function html(string $content, int $status = 200): \Toporia\Framework\Http\Contracts\ResponseInterface
     {
-        response()->html($content, $status);
+        return response()->make($content, $status, ['Content-Type' => 'text/html; charset=UTF-8']);
     }
 
     /**
@@ -94,11 +94,49 @@ trait ControllerHelpers
      *
      * @param string $path Redirect path
      * @param int $status HTTP status code (default 302)
-     * @return void
+     * @return \Toporia\Framework\Http\Contracts\RedirectResponseInterface
      */
-    protected function redirect(string $path, int $status = 302): void
+    protected function redirect(string $path, int $status = 302): \Toporia\Framework\Http\Contracts\RedirectResponseInterface
     {
-        response()->redirect($path, $status);
+        return response()->redirectTo($path, $status);
+    }
+
+    /**
+     * Return success JSON response.
+     *
+     * @param mixed $data Response data
+     * @param string $message Success message
+     * @param int $status HTTP status code
+     * @return \Toporia\Framework\Http\Contracts\JsonResponseInterface
+     */
+    protected function success(mixed $data = null, string $message = 'Success', int $status = 200): \Toporia\Framework\Http\Contracts\JsonResponseInterface
+    {
+        return response()->success($data, $message, $status);
+    }
+
+    /**
+     * Return error JSON response.
+     *
+     * @param string $message Error message
+     * @param mixed $errors Error details
+     * @param int $status HTTP status code
+     * @return \Toporia\Framework\Http\Contracts\JsonResponseInterface
+     */
+    protected function error(string $message = 'Error', mixed $errors = null, int $status = 400): \Toporia\Framework\Http\Contracts\JsonResponseInterface
+    {
+        return response()->error($message, $errors, $status);
+    }
+
+    /**
+     * Return created JSON response.
+     *
+     * @param mixed $data Response data
+     * @param string $message Success message
+     * @return \Toporia\Framework\Http\Contracts\JsonResponseInterface
+     */
+    protected function created(mixed $data = null, string $message = 'Resource created successfully'): \Toporia\Framework\Http\Contracts\JsonResponseInterface
+    {
+        return response()->created($data, $message);
     }
 
     /**
@@ -113,7 +151,7 @@ trait ControllerHelpers
      */
     protected function validate(array $rules): array
     {
-        $request = request();
+        $request = $this->request;
         $errors = [];
 
         foreach ($rules as $field => $rule) {

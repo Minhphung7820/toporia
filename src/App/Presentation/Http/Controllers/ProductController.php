@@ -60,16 +60,126 @@ final class ProductController extends BaseController
      */
     public function index(Request $request)
     {
-        // Test both single model and collection
+        // Test enterprise Response system with different response types
         $singleProduct = ProductModel::with('categories:id,name')->first();
         $productCollection = ProductModel::with('categories:id,name')->limit(3)->get();
 
-        return response()->json([
-            'success' => true,
-            'single_product' => $singleProduct, // Laravel-style: no need to call toArray()
-            'product_collection' => $productCollection, // Test collection serialization
-            'message' => 'Laravel-style JSON serialization working!'
-        ]);
+        // Use enterprise ResponseFactory with macros
+
+
+        // Test different response formats
+        $testParam = $this->request->get('test', 'success');
+
+        switch ($testParam) {
+            case 'created':
+                $response = response()->created($singleProduct, 'Product created successfully');
+                break;
+
+            case 'error':
+                $response = response()->validationError(['name' => 'Name is required'], 'Validation failed');
+                break;
+
+            case 'api':
+                $response = response()->api([
+                    'products' => $productCollection,
+                    'total' => count($productCollection)
+                ], 'API response with timestamp');
+                break;
+
+            case 'collection':
+                $response = response()->collection($productCollection, [
+                    'total' => count($productCollection),
+                    'per_page' => 3,
+                    'current_page' => 1
+                ]);
+                break;
+
+            case 'redirect':
+                $response = response()->redirectTo('https://google.com', 302)
+                    ->with('success', 'Redirecting to Google!')
+                    ->withInput(['search' => 'Toporia Framework']);
+                break;
+
+            case 'stream':
+                $response = response()->stream(function () {
+                    echo "data: " . json_encode([
+                        'message' => 'Streaming response test',
+                        'timestamp' => date('c'),
+                        'chunk' => 1
+                    ]) . "\n\n";
+
+                    flush();
+                    sleep(1);
+
+                    echo "data: " . json_encode([
+                        'message' => 'Second chunk',
+                        'timestamp' => date('c'),
+                        'chunk' => 2
+                    ]) . "\n\n";
+
+                    flush();
+                    sleep(1);
+
+                    echo "data: " . json_encode([
+                        'message' => 'Final chunk',
+                        'timestamp' => date('c'),
+                        'chunk' => 3,
+                        'status' => 'completed'
+                    ]) . "\n\n";
+                }, 200, [
+                    'Content-Type' => 'text/plain',
+                    'Cache-Control' => 'no-cache'
+                ]);
+                break;
+
+            case 'download':
+                // Create a test file for download
+                $testContent = json_encode([
+                    'products' => $productCollection,
+                    'exported_at' => date('c'),
+                    'format' => 'json'
+                ], JSON_PRETTY_PRINT);
+
+                $tempFile = tempnam(sys_get_temp_dir(), 'toporia_export_');
+                file_put_contents($tempFile, $testContent);
+
+                $response = response()->download($tempFile, 'products_export.json', [
+                    'X-Export-Type' => 'Products'
+                ]);
+                break;
+
+            default:
+                $response = response()->success([
+                    'single_product' => $singleProduct,
+                    'product_collection' => $productCollection,
+                    'response_system' => 'Enterprise Response Factory',
+                    'available_tests' => [
+                        '?test=success' => 'Default success response',
+                        '?test=created' => 'Created response (201)',
+                        '?test=error' => 'Validation error response',
+                        '?test=api' => 'API response with timestamp',
+                        '?test=collection' => 'Collection response format',
+                        '?test=redirect' => 'Redirect response with flash data',
+                        '?test=stream' => 'Streamed response (real-time)',
+                        '?test=download' => 'File download response'
+                    ],
+                    'features' => [
+                        'Laravel-compatible API',
+                        'Advanced JSON serialization',
+                        'Performance optimizations',
+                        'Clean Architecture compliance',
+                        'SOLID principles',
+                        'High reusability',
+                        'Response macros',
+                        'Multiple response formats',
+                        'Redirect responses with flash data',
+                        'Streamed responses',
+                        'File download responses'
+                    ]
+                ], 'Enterprise Response System working perfectly!');
+        }
+
+        return $response;
     }
 
     /**
