@@ -24,6 +24,6 @@ final class AppController extends BaseController
      */
     public function index(): string
     {
-        return $this->view('app');
+        return view('app');
     }
 }

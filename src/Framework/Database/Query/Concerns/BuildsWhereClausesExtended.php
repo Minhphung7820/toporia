@@ -485,3 +485,4 @@ trait BuildsWhereClausesExtended
         return $this->whereFullText($columns, $term, 'OR');
     }
 }
+

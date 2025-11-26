@@ -1418,3 +1418,41 @@ if (!function_exists('response')) {
         return $response;
     }
 }
+
+if (!function_exists('view')) {
+    /**
+     * Render a view template.
+     *
+     * @param string $path View path relative to Views directory (without .php extension)
+     * @param array $data Data to extract into view scope
+     * @return string Rendered HTML content
+     */
+    function view(string $path, array $data = []): string
+    {
+        // Get the views directory path
+        $viewsPath = base_path('resources/views');
+
+        // Convert dot notation to directory separator
+        $viewPath = str_replace('.', DIRECTORY_SEPARATOR, $path);
+        $fullPath = $viewsPath . DIRECTORY_SEPARATOR . $viewPath . '.php';
+
+        // Check if view file exists
+        if (!file_exists($fullPath)) {
+            throw new \InvalidArgumentException("View file not found: {$fullPath}");
+        }
+
+        // Extract data into current scope
+        extract($data, EXTR_SKIP);
+
+        // Start output buffering
+        ob_start();
+
+        // Include the view file
+        include $fullPath;
+
+        // Get the rendered content
+        $content = ob_get_clean();
+
+        return $content ?: '';
+    }
+}
