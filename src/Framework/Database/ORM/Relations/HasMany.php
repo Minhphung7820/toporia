@@ -276,4 +276,519 @@ class HasMany extends Relation
 
         return $instance;
     }
+
+    /**
+     * Create a new related model.
+     *
+     * Performance: O(1) - Single INSERT operation
+     * Clean Architecture: Factory method with automatic foreign key assignment
+     * SOLID: Single Responsibility - Creates and associates model
+     *
+     * @param array $attributes Model attributes
+     * @return Model Created model instance
+     *
+     * @example
+     * ```php
+     * $post = $user->posts()->create(['title' => 'New Post', 'content' => 'Content']);
+     * ```
+     */
+    public function create(array $attributes = []): Model
+    {
+        $parentKey = $this->parent->getAttribute($this->localKey);
+
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot create related model: parent model does not have a key');
+        }
+
+        // Set foreign key to parent's local key
+        $attributes[$this->foreignKey] = $parentKey;
+
+        return call_user_func([$this->relatedClass, 'create'], $attributes);
+    }
+
+    /**
+     * Save a related model.
+     *
+     * Performance: O(1) - Single UPDATE operation
+     * Clean Architecture: Automatic foreign key management
+     *
+     * @param Model $model Model to save
+     * @return Model Saved model instance
+     *
+     * @example
+     * ```php
+     * $post = new Post(['title' => 'New Post']);
+     * $user->posts()->save($post);
+     * ```
+     */
+    public function save(Model $model): Model
+    {
+        $parentKey = $this->parent->getAttribute($this->localKey);
+
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot save related model: parent model does not have a key');
+        }
+
+        // Set foreign key to parent's local key
+        $model->setAttribute($this->foreignKey, $parentKey);
+        $model->save();
+
+        return $model;
+    }
+
+    /**
+     * Update all related models.
+     *
+     * Performance: O(1) - Single UPDATE operation with WHERE constraint
+     * Clean Architecture: Bulk update operation
+     *
+     * @param array $attributes Attributes to update
+     * @return int Number of affected rows
+     *
+     * @example
+     * ```php
+     * $user->posts()->update(['status' => 'published']);
+     * ```
+     */
+    public function update(array $attributes): int
+    {
+        if ($this->parent->exists()) {
+            return $this->query->update($attributes);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Delete all related models.
+     *
+     * Performance: O(1) - Single DELETE operation
+     * Clean Architecture: Bulk deletion operation
+     *
+     * @return int Number of deleted rows
+     *
+     * @example
+     * ```php
+     * $user->posts()->delete();
+     * ```
+     */
+    public function delete(): int
+    {
+        if ($this->parent->exists()) {
+            return $this->query->delete();
+        }
+
+        return 0;
+    }
+
+    /**
+     * Get the first related model or create a new one.
+     *
+     * Performance: O(1) - Single SELECT, potential INSERT
+     * Clean Architecture: Atomic find-or-create operation
+     *
+     * @param array $attributes Attributes for new model if not found
+     * @return Model Found or created model
+     *
+     * @example
+     * ```php
+     * $post = $user->posts()->firstOrCreate(['title' => 'Default Post']);
+     * ```
+     */
+    public function firstOrCreate(array $attributes = []): Model
+    {
+        $instance = $this->query->first();
+
+        if ($instance === null) {
+            $instance = $this->create($attributes);
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Get the first related model or instantiate a new one.
+     *
+     * Performance: O(1) - Single SELECT operation
+     * Clean Architecture: Non-persistent find-or-new operation
+     *
+     * @param array $attributes Attributes for new model if not found
+     * @return Model Found or new model instance
+     *
+     * @example
+     * ```php
+     * $post = $user->posts()->firstOrNew(['title' => 'Draft Post']);
+     * ```
+     */
+    public function firstOrNew(array $attributes = []): Model
+    {
+        $instance = $this->query->first();
+
+        if ($instance === null) {
+            $parentKey = $this->parent->getAttribute($this->localKey);
+            $attributes[$this->foreignKey] = $parentKey;
+            $instance = new $this->relatedClass($attributes);
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Update or create a related model.
+     *
+     * Performance: O(1) - Single SELECT, potential INSERT/UPDATE
+     * Clean Architecture: Atomic upsert operation
+     *
+     * @param array $attributes Attributes to search by
+     * @param array $values Additional values for creation
+     * @return Model Updated or created model
+     *
+     * @example
+     * ```php
+     * $post = $user->posts()->updateOrCreate(
+     *     ['slug' => 'my-post'],
+     *     ['title' => 'Updated Title']
+     * );
+     * ```
+     */
+    public function updateOrCreate(array $attributes, array $values = []): Model
+    {
+        $query = clone $this->query;
+
+        // Apply where conditions for each attribute
+        foreach ($attributes as $column => $value) {
+            $query->where($column, $value);
+        }
+
+        $instance = $query->first();
+
+        if ($instance instanceof Model) {
+            foreach (array_merge($attributes, $values) as $key => $value) {
+                $instance->setAttribute($key, $value);
+            }
+            $instance->save();
+            return $instance;
+        } else {
+            return $this->create(array_merge($attributes, $values));
+        }
+    }
+
+    /**
+     * Process records in chunks to optimize memory usage.
+     *
+     * Performance: O(n/chunk_size) - Memory-efficient processing of large datasets
+     * Clean Architecture: Callback pattern for flexible processing
+     *
+     * @param int $count Number of records per chunk
+     * @param callable $callback Function to process each chunk
+     * @return bool True if all chunks processed successfully
+     *
+     * @example
+     * ```php
+     * $user->posts()->chunk(100, function($posts) {
+     *     foreach ($posts as $post) {
+     *         // Process each post
+     *     }
+     * });
+     * ```
+     */
+    public function chunk(int $count, callable $callback): bool
+    {
+        $page = 1;
+
+        do {
+            $results = $this->query->limit($count)->offset(($page - 1) * $count)->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+
+            // Call the callback with the current chunk
+            if ($callback($models, $page) === false) {
+                return false;
+            }
+
+            $page++;
+        } while ($results->count() === $count);
+
+        return true;
+    }
+
+    /**
+     * Process records in chunks ordered by ID for consistent results.
+     *
+     * Performance: O(n/chunk_size) - Consistent ordering prevents missed records
+     * Clean Architecture: ID-based chunking ensures reliable pagination
+     *
+     * @param int $count Number of records per chunk
+     * @param callable $callback Function to process each chunk
+     * @param string $column Column to order by (default: 'id')
+     * @param string $alias Optional column alias
+     * @return bool True if all chunks processed successfully
+     *
+     * @example
+     * ```php
+     * $user->posts()->chunkById(50, function($posts) {
+     *     // Process posts in consistent order
+     * });
+     * ```
+     */
+    public function chunkById(int $count, callable $callback, string $column = 'id', string $alias = null): bool
+    {
+        $alias = $alias ?: $column;
+        $lastId = null;
+
+        do {
+            $clone = clone $this->query;
+
+            if ($lastId !== null) {
+                $clone->where($column, '>', $lastId);
+            }
+
+            $results = $clone->orderBy($column)->limit($count)->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+
+            // Call the callback with the current chunk
+            if ($callback($models) === false) {
+                return false;
+            }
+
+            // Get the last ID for the next iteration
+            $lastModel = $models->last();
+            $lastId = $lastModel->getAttribute($alias);
+        } while ($results->count() === $count);
+
+        return true;
+    }
+
+    /**
+     * Get the count of related models.
+     *
+     * Performance: O(1) - Single COUNT query
+     * Clean Architecture: Expressive counting method
+     *
+     * @return int Count of related models
+     *
+     * @example
+     * ```php
+     * $postCount = $user->posts()->count();
+     * ```
+     */
+    public function count(): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        return $this->query->count();
+    }
+
+    /**
+     * Check if any related models exist.
+     *
+     * Performance: O(1) - Single EXISTS query with early termination
+     * Clean Architecture: Expressive existence check
+     *
+     * @return bool True if related models exist
+     *
+     * @example
+     * ```php
+     * if ($user->posts()->exists()) {
+     *     // User has posts
+     * }
+     * ```
+     */
+    public function exists(): bool
+    {
+        if (!$this->parent->exists()) {
+            return false;
+        }
+
+        return $this->query->exists();
+    }
+
+    /**
+     * Get the sum of a column.
+     *
+     * Performance: O(1) - Single aggregation query
+     * Clean Architecture: Expressive aggregation method
+     *
+     * @param string $column Column name
+     * @return float|int
+     *
+     * @example
+     * ```php
+     * $totalViews = $user->posts()->sum('views');
+     * ```
+     */
+    public function sum(string $column): float|int
+    {
+        return $this->query->sum($column) ?? 0;
+    }
+
+    /**
+     * Get the average of a column.
+     *
+     * @param string $column Column name
+     * @return float|int
+     *
+     * @example
+     * ```php
+     * $avgViews = $user->posts()->avg('views');
+     * ```
+     */
+    public function avg(string $column): float|int
+    {
+        return $this->query->avg($column) ?? 0;
+    }
+
+    /**
+     * Get the minimum value of a column.
+     *
+     * @param string $column Column name
+     * @return mixed
+     *
+     * @example
+     * ```php
+     * $minViews = $user->posts()->min('views');
+     * ```
+     */
+    public function min(string $column): mixed
+    {
+        return $this->query->min($column);
+    }
+
+    /**
+     * Get the maximum value of a column.
+     *
+     * @param string $column Column name
+     * @return mixed
+     *
+     * @example
+     * ```php
+     * $maxViews = $user->posts()->max('views');
+     * ```
+     */
+    public function max(string $column): mixed
+    {
+        return $this->query->max($column);
+    }
+
+    /**
+     * Paginate the results.
+     *
+     * Performance: O(1) - Single query with LIMIT/OFFSET
+     * Clean Architecture: Consistent pagination interface
+     *
+     * @param int $perPage Items per page
+     * @param int $page Current page
+     * @return array Pagination results
+     *
+     * @example
+     * ```php
+     * $posts = $user->posts()->paginate(10, 2);
+     * ```
+     */
+    public function paginate(int $perPage = 15, int $page = 1): array
+    {
+        $total = $this->count();
+        $offset = ($page - 1) * $perPage;
+
+        $items = $this->query->limit($perPage)->offset($offset)->get();
+        $models = call_user_func([$this->relatedClass, 'hydrate'], $items->toArray());
+
+        return [
+            'data' => $models,
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'last_page' => (int) ceil($total / $perPage),
+            'from' => $offset + 1,
+            'to' => min($offset + $perPage, $total)
+        ];
+    }
+
+    /**
+     * Find a related model by its primary key.
+     *
+     * Performance: O(log n) - Indexed primary key lookup
+     * Clean Architecture: Expressive finder method
+     *
+     * @param mixed $id Primary key value
+     * @param array $columns Columns to select
+     * @return Model|null
+     *
+     * @example
+     * ```php
+     * $post = $user->posts()->find(1);
+     * ```
+     */
+    public function find(mixed $id, array $columns = ['*']): ?Model
+    {
+        return $this->query->where('id', $id)->select($columns)->first();
+    }
+
+    /**
+     * Find multiple related models by their primary keys.
+     *
+     * Performance: O(log n) - Indexed primary key lookup with IN clause
+     * Clean Architecture: Bulk finder method
+     *
+     * @param array $ids Array of primary key values
+     * @param array $columns Columns to select
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $posts = $user->posts()->findMany([1, 2, 3]);
+     * ```
+     */
+    public function findMany(array $ids, array $columns = ['*']): ModelCollection
+    {
+        if (empty($ids)) {
+            return new ModelCollection([]);
+        }
+
+        $results = $this->query->whereIn('id', $ids)->select($columns)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Magic method to delegate calls to the underlying query builder.
+     *
+     * Performance: O(1) - Direct method delegation
+     * Clean Architecture: Proxy pattern for query builder methods
+     * SOLID: Interface Segregation - Expose only relevant query methods
+     *
+     * @param string $method Method name
+     * @param array $parameters Method parameters
+     * @return mixed
+     *
+     * @throws \BadMethodCallException If method doesn't exist on query builder
+     */
+    public function __call(string $method, array $parameters): mixed
+    {
+        // Delegate to query builder for standard query methods
+        if (method_exists($this->query, $method)) {
+            $result = $this->query->{$method}(...$parameters);
+
+            // Return $this for fluent interface on builder methods that return QueryBuilder
+            if ($result instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                return $this;
+            }
+
+            return $result;
+        }
+
+        throw new \BadMethodCallException(
+            sprintf('Method %s::%s does not exist.', static::class, $method)
+        );
+    }
 }

@@ -174,4 +174,335 @@ class HasOneThrough extends Relation
     {
         return $this->foreignKey;
     }
+
+    /**
+     * Check if the related model exists.
+     *
+     * Performance: O(1) - Single EXISTS query with JOIN
+     * Clean Architecture: Expressive existence check
+     *
+     * @return bool True if related model exists
+     *
+     * @example
+     * ```php
+     * if ($country->phone()->exists()) {
+     *     // Country has a phone through user
+     * }
+     * ```
+     */
+    public function exists(): bool
+    {
+        if (!$this->parent->exists()) {
+            return false;
+        }
+
+        return $this->query->exists();
+    }
+
+    /**
+     * Get the count of related models (always 0 or 1 for HasOneThrough).
+     *
+     * Performance: O(1) - Single COUNT query with JOIN
+     * Clean Architecture: Consistent interface with other relations
+     *
+     * @return int Count of related models
+     *
+     * @example
+     * ```php
+     * $count = $country->phone()->count(); // 0 or 1
+     * ```
+     */
+    public function count(): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        return $this->query->count();
+    }
+
+    /**
+     * Update the related model through the intermediate relationship.
+     *
+     * Performance: O(1) - Single UPDATE with JOIN constraint
+     * Clean Architecture: Expressive update method
+     *
+     * @param array $attributes Attributes to update
+     * @return int Number of affected rows
+     *
+     * @example
+     * ```php
+     * $country->phone()->update(['number' => '+1-555-0123']);
+     * ```
+     */
+    public function update(array $attributes): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        return $this->query->update($attributes);
+    }
+
+    /**
+     * Delete the related model through the intermediate relationship.
+     *
+     * Performance: O(1) - Single DELETE with JOIN constraint
+     * Clean Architecture: Expressive deletion method
+     *
+     * @return int Number of deleted rows
+     *
+     * @example
+     * ```php
+     * $country->phone()->delete();
+     * ```
+     */
+    public function delete(): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        return $this->query->delete();
+    }
+
+    /**
+     * Get the first related model or fail.
+     *
+     * Performance: O(1) - Single SELECT with JOIN
+     * Clean Architecture: Expressive finder with exception
+     *
+     * @return Model Found model
+     * @throws \RuntimeException If no model found
+     *
+     * @example
+     * ```php
+     * $phone = $country->phone()->firstOrFail();
+     * ```
+     */
+    public function firstOrFail(): Model
+    {
+        $result = $this->getResults();
+
+        if ($result === null) {
+            throw new \RuntimeException('No related model found through intermediate relationship');
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get the sum of a column through the relationship.
+     *
+     * Performance: O(1) - Single aggregation query with JOIN
+     * Clean Architecture: Expressive aggregation method
+     *
+     * @param string $column Column name
+     * @return float|int
+     *
+     * @example
+     * ```php
+     * $totalMinutes = $country->phone()->sum('minutes_used');
+     * ```
+     */
+    public function sum(string $column): float|int
+    {
+        return $this->query->sum($column) ?? 0;
+    }
+
+    /**
+     * Get the average of a column through the relationship.
+     *
+     * @param string $column Column name
+     * @return float|int
+     */
+    public function avg(string $column): float|int
+    {
+        return $this->query->avg($column) ?? 0;
+    }
+
+    /**
+     * Get the minimum value of a column through the relationship.
+     *
+     * @param string $column Column name
+     * @return mixed
+     */
+    public function min(string $column): mixed
+    {
+        return $this->query->min($column);
+    }
+
+    /**
+     * Get the maximum value of a column through the relationship.
+     *
+     * @param string $column Column name
+     * @return mixed
+     */
+    public function max(string $column): mixed
+    {
+        return $this->query->max($column);
+    }
+
+    /**
+     * Get the through model class name.
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return class-string<Model> Through model class
+     *
+     * @example
+     * ```php
+     * $throughClass = $country->phone()->getThroughClass(); // User::class
+     * ```
+     */
+    public function getThroughClass(): string
+    {
+        return $this->throughClass;
+    }
+
+    /**
+     * Get the related model class name.
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return class-string<Model> Related model class
+     *
+     * @example
+     * ```php
+     * $relatedClass = $country->phone()->getRelatedClass(); // Phone::class
+     * ```
+     */
+    public function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
+    /**
+     * Get the first key (foreign key on through table).
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string First key name
+     *
+     * @example
+     * ```php
+     * $firstKey = $country->phone()->getFirstKey(); // 'country_id'
+     * ```
+     */
+    public function getFirstKey(): string
+    {
+        return $this->firstKey;
+    }
+
+    /**
+     * Get the second local key (local key on through table).
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string Second local key name
+     *
+     * @example
+     * ```php
+     * $secondLocalKey = $country->phone()->getSecondLocalKey(); // 'id'
+     * ```
+     */
+    public function getSecondLocalKey(): string
+    {
+        return $this->secondLocalKey;
+    }
+
+    /**
+     * Add constraints on the through table.
+     *
+     * Performance: O(1) - Direct query modification
+     * Clean Architecture: Fluent interface for additional constraints
+     *
+     * @param string $column Through table column name
+     * @param mixed $operator Operator or value
+     * @param mixed $value Value (optional)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $phone = $country->phone()->whereThrough('status', 'active')->first();
+     * ```
+     */
+    public function whereThrough(string $column, mixed $operator, mixed $value = null): static
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+        $this->query->where("{$throughTable}.{$column}", $operator, $value);
+
+        return $this;
+    }
+
+    /**
+     * Add whereIn constraint on the through table.
+     *
+     * @param string $column Through table column name
+     * @param array $values Array of values
+     * @return $this
+     */
+    public function whereThroughIn(string $column, array $values): static
+    {
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+        $this->query->whereIn("{$throughTable}.{$column}", $values);
+
+        return $this;
+    }
+
+    /**
+     * Add order by clause on the through table.
+     *
+     * @param string $column Through table column name
+     * @param string $direction Sort direction (asc|desc)
+     * @return $this
+     */
+    public function orderByThrough(string $column, string $direction = 'asc'): static
+    {
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+        $this->query->orderBy("{$throughTable}.{$column}", $direction);
+
+        return $this;
+    }
+
+    /**
+     * Magic method to delegate calls to the underlying query builder.
+     *
+     * Performance: O(1) - Direct method delegation
+     * Clean Architecture: Proxy pattern for query builder methods
+     * SOLID: Interface Segregation - Expose only relevant query methods
+     *
+     * @param string $method Method name
+     * @param array $parameters Method parameters
+     * @return mixed
+     *
+     * @throws \BadMethodCallException If method doesn't exist on query builder
+     */
+    public function __call(string $method, array $parameters): mixed
+    {
+        // Delegate to query builder for standard query methods
+        if (method_exists($this->query, $method)) {
+            $result = $this->query->{$method}(...$parameters);
+
+            // Return $this for fluent interface on builder methods that return QueryBuilder
+            if ($result instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                return $this;
+            }
+
+            return $result;
+        }
+
+        throw new \BadMethodCallException(
+            sprintf('Method %s::%s does not exist.', static::class, $method)
+        );
+    }
 }

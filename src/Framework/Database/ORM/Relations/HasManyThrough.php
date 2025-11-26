@@ -190,4 +190,544 @@ class HasManyThrough extends Relation
     {
         return $this->foreignKey;
     }
+
+    /**
+     * Check if any related models exist.
+     *
+     * Performance: O(1) - Single EXISTS query with JOIN and early termination
+     * Clean Architecture: Expressive existence check
+     *
+     * @return bool True if related models exist
+     *
+     * @example
+     * ```php
+     * if ($country->posts()->exists()) {
+     *     // Country has posts through users
+     * }
+     * ```
+     */
+    public function exists(): bool
+    {
+        if (!$this->parent->exists()) {
+            return false;
+        }
+
+        return $this->query->exists();
+    }
+
+    /**
+     * Get the count of related models.
+     *
+     * Performance: O(1) - Single COUNT query with JOIN
+     * Clean Architecture: Expressive counting method
+     *
+     * @return int Count of related models
+     *
+     * @example
+     * ```php
+     * $postCount = $country->posts()->count();
+     * ```
+     */
+    public function count(): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        return $this->query->count();
+    }
+
+    /**
+     * Update all related models through the intermediate relationship.
+     *
+     * Performance: O(1) - Single UPDATE with JOIN constraint
+     * Clean Architecture: Bulk update operation
+     *
+     * @param array $attributes Attributes to update
+     * @return int Number of affected rows
+     *
+     * @example
+     * ```php
+     * $country->posts()->update(['status' => 'published']);
+     * ```
+     */
+    public function update(array $attributes): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        return $this->query->update($attributes);
+    }
+
+    /**
+     * Delete all related models through the intermediate relationship.
+     *
+     * Performance: O(1) - Single DELETE with JOIN constraint
+     * Clean Architecture: Bulk deletion operation
+     *
+     * @return int Number of deleted rows
+     *
+     * @example
+     * ```php
+     * $country->posts()->delete();
+     * ```
+     */
+    public function delete(): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        return $this->query->delete();
+    }
+
+    /**
+     * Get the first related model or fail.
+     *
+     * Performance: O(1) - Single SELECT with JOIN
+     * Clean Architecture: Expressive finder with exception
+     *
+     * @return Model Found model
+     * @throws \RuntimeException If no model found
+     *
+     * @example
+     * ```php
+     * $post = $country->posts()->firstOrFail();
+     * ```
+     */
+    public function firstOrFail(): Model
+    {
+        $results = $this->getResults();
+
+        if ($results->isEmpty()) {
+            throw new \RuntimeException('No related models found through intermediate relationship');
+        }
+
+        $first = $results->first();
+        if (!$first instanceof Model) {
+            throw new \RuntimeException('No related models found through intermediate relationship');
+        }
+
+        return $first;
+    }
+
+    /**
+     * Process records in chunks to optimize memory usage.
+     *
+     * Performance: O(n/chunk_size) - Memory-efficient processing of large datasets
+     * Clean Architecture: Callback pattern for flexible processing
+     *
+     * @param int $count Number of records per chunk
+     * @param callable $callback Function to process each chunk
+     * @return bool True if all chunks processed successfully
+     *
+     * @example
+     * ```php
+     * $country->posts()->chunk(100, function($posts) {
+     *     foreach ($posts as $post) {
+     *         // Process each post
+     *     }
+     * });
+     * ```
+     */
+    public function chunk(int $count, callable $callback): bool
+    {
+        $page = 1;
+
+        do {
+            $results = $this->query->limit($count)->offset(($page - 1) * $count)->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+
+            if ($callback($models, $page) === false) {
+                return false;
+            }
+
+            $page++;
+        } while ($results->count() === $count);
+
+        return true;
+    }
+
+    /**
+     * Process records in chunks ordered by ID for consistent results.
+     *
+     * Performance: O(n/chunk_size) - Consistent ordering prevents missed records
+     * Clean Architecture: ID-based chunking ensures reliable pagination
+     *
+     * @param int $count Number of records per chunk
+     * @param callable $callback Function to process each chunk
+     * @param string $column Column to order by (default: 'id')
+     * @param string $alias Optional column alias
+     * @return bool True if all chunks processed successfully
+     *
+     * @example
+     * ```php
+     * $country->posts()->chunkById(50, function($posts) {
+     *     // Process posts in consistent order
+     * });
+     * ```
+     */
+    public function chunkById(int $count, callable $callback, string $column = 'id', string $alias = null): bool
+    {
+        $alias = $alias ?: $column;
+        $lastId = null;
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+
+        do {
+            $clone = clone $this->query;
+
+            if ($lastId !== null) {
+                $clone->where("{$relatedTable}.{$column}", '>', $lastId);
+            }
+
+            $results = $clone->orderBy("{$relatedTable}.{$column}")->limit($count)->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+
+            if ($callback($models) === false) {
+                return false;
+            }
+
+            // Get the last ID for the next iteration
+            $lastModel = $models->last();
+            $lastId = $lastModel->getAttribute($alias);
+        } while ($results->count() === $count);
+
+        return true;
+    }
+
+    /**
+     * Get the sum of a column through the relationship.
+     *
+     * Performance: O(1) - Single aggregation query with JOIN
+     * Clean Architecture: Expressive aggregation method
+     *
+     * @param string $column Column name
+     * @return float|int
+     *
+     * @example
+     * ```php
+     * $totalViews = $country->posts()->sum('views');
+     * ```
+     */
+    public function sum(string $column): float|int
+    {
+        return $this->query->sum($column) ?? 0;
+    }
+
+    /**
+     * Get the average of a column through the relationship.
+     *
+     * @param string $column Column name
+     * @return float|int
+     */
+    public function avg(string $column): float|int
+    {
+        return $this->query->avg($column) ?? 0;
+    }
+
+    /**
+     * Get the minimum value of a column through the relationship.
+     *
+     * @param string $column Column name
+     * @return mixed
+     */
+    public function min(string $column): mixed
+    {
+        return $this->query->min($column);
+    }
+
+    /**
+     * Get the maximum value of a column through the relationship.
+     *
+     * @param string $column Column name
+     * @return mixed
+     */
+    public function max(string $column): mixed
+    {
+        return $this->query->max($column);
+    }
+
+    /**
+     * Paginate the results.
+     *
+     * Performance: O(1) - Single query with LIMIT/OFFSET and JOIN
+     * Clean Architecture: Consistent pagination interface
+     *
+     * @param int $perPage Items per page
+     * @param int $page Current page
+     * @return array Pagination results
+     *
+     * @example
+     * ```php
+     * $posts = $country->posts()->paginate(10, 2);
+     * ```
+     */
+    public function paginate(int $perPage = 15, int $page = 1): array
+    {
+        $total = $this->count();
+        $offset = ($page - 1) * $perPage;
+
+        $items = $this->query->limit($perPage)->offset($offset)->get();
+        $models = call_user_func([$this->relatedClass, 'hydrate'], $items->toArray());
+
+        return [
+            'data' => $models,
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'last_page' => (int) ceil($total / $perPage),
+            'from' => $offset + 1,
+            'to' => min($offset + $perPage, $total)
+        ];
+    }
+
+    /**
+     * Find a related model by its primary key.
+     *
+     * Performance: O(log n) - Indexed primary key lookup with JOIN
+     * Clean Architecture: Expressive finder method
+     *
+     * @param mixed $id Primary key value
+     * @param array $columns Columns to select
+     * @return Model|null
+     *
+     * @example
+     * ```php
+     * $post = $country->posts()->find(1);
+     * ```
+     */
+    public function find(mixed $id, array $columns = ['*']): ?Model
+    {
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        return $this->query->where("{$relatedTable}.id", $id)->select($columns)->first();
+    }
+
+    /**
+     * Find multiple related models by their primary keys.
+     *
+     * Performance: O(log n) - Indexed primary key lookup with IN clause and JOIN
+     * Clean Architecture: Bulk finder method
+     *
+     * @param array $ids Array of primary key values
+     * @param array $columns Columns to select
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $posts = $country->posts()->findMany([1, 2, 3]);
+     * ```
+     */
+    public function findMany(array $ids, array $columns = ['*']): ModelCollection
+    {
+        if (empty($ids)) {
+            return new ModelCollection([]);
+        }
+
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        $results = $this->query->whereIn("{$relatedTable}.id", $ids)->select($columns)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get the through model class name.
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return class-string<Model> Through model class
+     *
+     * @example
+     * ```php
+     * $throughClass = $country->posts()->getThroughClass(); // User::class
+     * ```
+     */
+    public function getThroughClass(): string
+    {
+        return $this->throughClass;
+    }
+
+    /**
+     * Get the related model class name.
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return class-string<Model> Related model class
+     *
+     * @example
+     * ```php
+     * $relatedClass = $country->posts()->getRelatedClass(); // Post::class
+     * ```
+     */
+    public function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
+    /**
+     * Get the first key (foreign key on through table).
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string First key name
+     *
+     * @example
+     * ```php
+     * $firstKey = $country->posts()->getFirstKey(); // 'country_id'
+     * ```
+     */
+    public function getFirstKey(): string
+    {
+        return $this->firstKey;
+    }
+
+    /**
+     * Get the second local key (local key on through table).
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string Second local key name
+     *
+     * @example
+     * ```php
+     * $secondLocalKey = $country->posts()->getSecondLocalKey(); // 'id'
+     * ```
+     */
+    public function getSecondLocalKey(): string
+    {
+        return $this->secondLocalKey;
+    }
+
+    /**
+     * Add constraints on the through table.
+     *
+     * Performance: O(1) - Direct query modification
+     * Clean Architecture: Fluent interface for additional constraints
+     *
+     * @param string $column Through table column name
+     * @param mixed $operator Operator or value
+     * @param mixed $value Value (optional)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $posts = $country->posts()->whereThrough('status', 'active')->get();
+     * ```
+     */
+    public function whereThrough(string $column, mixed $operator, mixed $value = null): static
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+        $this->query->where("{$throughTable}.{$column}", $operator, $value);
+
+        return $this;
+    }
+
+    /**
+     * Add whereIn constraint on the through table.
+     *
+     * @param string $column Through table column name
+     * @param array $values Array of values
+     * @return $this
+     */
+    public function whereThroughIn(string $column, array $values): static
+    {
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+        $this->query->whereIn("{$throughTable}.{$column}", $values);
+
+        return $this;
+    }
+
+    /**
+     * Add order by clause on the through table.
+     *
+     * @param string $column Through table column name
+     * @param string $direction Sort direction (asc|desc)
+     * @return $this
+     */
+    public function orderByThrough(string $column, string $direction = 'asc'): static
+    {
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+        $this->query->orderBy("{$throughTable}.{$column}", $direction);
+
+        return $this;
+    }
+
+    /**
+     * Select additional columns from the through table.
+     *
+     * Performance: O(1) - Direct query modification
+     * Clean Architecture: Fluent interface for column selection
+     *
+     * @param string ...$columns Through table column names
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $posts = $country->posts()->selectThrough('created_at', 'status')->get();
+     * ```
+     */
+    public function selectThrough(string ...$columns): static
+    {
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+
+        $selectColumns = ["{$relatedTable}.*"];
+        foreach ($columns as $column) {
+            $selectColumns[] = "{$throughTable}.{$column} as through_{$column}";
+        }
+
+        $this->query->select($selectColumns);
+
+        return $this;
+    }
+
+    /**
+     * Magic method to delegate calls to the underlying query builder.
+     *
+     * Performance: O(1) - Direct method delegation
+     * Clean Architecture: Proxy pattern for query builder methods
+     * SOLID: Interface Segregation - Expose only relevant query methods
+     *
+     * @param string $method Method name
+     * @param array $parameters Method parameters
+     * @return mixed
+     *
+     * @throws \BadMethodCallException If method doesn't exist on query builder
+     */
+    public function __call(string $method, array $parameters): mixed
+    {
+        // Delegate to query builder for standard query methods
+        if (method_exists($this->query, $method)) {
+            $result = $this->query->{$method}(...$parameters);
+
+            // Return $this for fluent interface on builder methods that return QueryBuilder
+            if ($result instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                return $this;
+            }
+
+            return $result;
+        }
+
+        throw new \BadMethodCallException(
+            sprintf('Method %s::%s does not exist.', static::class, $method)
+        );
+    }
 }

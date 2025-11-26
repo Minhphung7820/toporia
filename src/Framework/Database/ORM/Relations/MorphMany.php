@@ -145,19 +145,19 @@ class MorphMany extends Relation
 
         // Build nested WHERE with closures
         // WHERE (type='Post' AND id IN (...)) OR (type='Video' AND id IN (...))
-        $this->query->where(function($q) use ($types) {
+        $this->query->where(function ($q) use ($types) {
             $first = true;
             foreach ($types as $type => $ids) {
                 if ($first) {
-                    $q->where(function($subQ) use ($type, $ids) {
+                    $q->where(function ($subQ) use ($type, $ids) {
                         $subQ->where($this->morphType, $type)
-                             ->whereIn($this->foreignKey, $ids);
+                            ->whereIn($this->foreignKey, $ids);
                     });
                     $first = false;
                 } else {
-                    $q->orWhere(function($subQ) use ($type, $ids) {
+                    $q->orWhere(function ($subQ) use ($type, $ids) {
                         $subQ->where($this->morphType, $type)
-                             ->whereIn($this->foreignKey, $ids);
+                            ->whereIn($this->foreignKey, $ids);
                     });
                 }
             }
@@ -211,4 +211,560 @@ class MorphMany extends Relation
      * Store morphType for access
      */
     protected string $morphType;
+
+    /**
+     * Create a new related model.
+     *
+     * Performance: O(1) - Single INSERT operation
+     * Clean Architecture: Factory method with automatic morph key assignment
+     * SOLID: Single Responsibility - Creates and associates model
+     *
+     * @param array $attributes Model attributes
+     * @return Model Created model instance
+     *
+     * @example
+     * ```php
+     * $comment = $post->comments()->create(['content' => 'Great post!', 'author' => 'John']);
+     * ```
+     */
+    public function create(array $attributes = []): Model
+    {
+        $parentKey = $this->parent->getAttribute($this->localKey);
+
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot create related model: parent model does not have a key');
+        }
+
+        // Set morph keys
+        $attributes[$this->foreignKey] = $parentKey;
+        $attributes[$this->morphType] = $this->getMorphClass();
+
+        return call_user_func([$this->relatedClass, 'create'], $attributes);
+    }
+
+    /**
+     * Save a related model.
+     *
+     * Performance: O(1) - Single UPDATE operation
+     * Clean Architecture: Automatic morph key management
+     *
+     * @param Model $model Model to save
+     * @return Model Saved model instance
+     *
+     * @example
+     * ```php
+     * $comment = new Comment(['content' => 'Nice post!']);
+     * $post->comments()->save($comment);
+     * ```
+     */
+    public function save(Model $model): Model
+    {
+        $parentKey = $this->parent->getAttribute($this->localKey);
+
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot save related model: parent model does not have a key');
+        }
+
+        // Set morph keys
+        $model->setAttribute($this->foreignKey, $parentKey);
+        $model->setAttribute($this->morphType, $this->getMorphClass());
+        $model->save();
+
+        return $model;
+    }
+
+    /**
+     * Save multiple related models.
+     *
+     * Performance: O(1) - Bulk INSERT operation
+     * Clean Architecture: Batch operation for efficiency
+     *
+     * @param array<int, array<string, mixed>> $models Array of model attributes
+     * @return ModelCollection Collection of saved models
+     *
+     * @example
+     * ```php
+     * $comments = $post->comments()->saveMany([
+     *     ['content' => 'First comment', 'author' => 'John'],
+     *     ['content' => 'Second comment', 'author' => 'Jane'],
+     * ]);
+     * ```
+     */
+    public function saveMany(array $models): ModelCollection
+    {
+        if (empty($models)) {
+            return new ModelCollection([]);
+        }
+
+        $parentKey = $this->parent->getAttribute($this->localKey);
+
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot save related models: parent model does not have a key');
+        }
+
+        $morphClass = $this->getMorphClass();
+
+        // Add morph keys to each model
+        foreach ($models as &$attributes) {
+            $attributes[$this->foreignKey] = $parentKey;
+            $attributes[$this->morphType] = $morphClass;
+        }
+
+        // Use bulk insert similar to HasMany
+        return $this->bulkInsert($models);
+    }
+
+    /**
+     * Create multiple related models.
+     *
+     * @param array<int, array<string, mixed>> $models Array of model attributes
+     * @return ModelCollection Collection of created models
+     */
+    public function createMany(array $models): ModelCollection
+    {
+        return $this->saveMany($models);
+    }
+
+    /**
+     * Bulk insert models for performance.
+     *
+     * @param array $models Array of model attributes
+     * @return ModelCollection
+     */
+    protected function bulkInsert(array $models): ModelCollection
+    {
+        // Create temporary model instance to get table name
+        $tempModel = new $this->relatedClass([]);
+        $table = $tempModel->getTableName();
+
+        // Prepare data with timestamps
+        $preparedModels = [];
+        $now = date('Y-m-d H:i:s');
+
+        foreach ($models as $attributes) {
+            // Add timestamps
+            $attributes['created_at'] = $attributes['created_at'] ?? $now;
+            $attributes['updated_at'] = $attributes['updated_at'] ?? $now;
+            $preparedModels[] = $attributes;
+        }
+
+        // Get all unique columns
+        $allColumns = [];
+        foreach ($preparedModels as $attributes) {
+            $allColumns = array_merge($allColumns, array_keys($attributes));
+        }
+        $columns = array_unique($allColumns);
+        sort($columns);
+
+        // Prepare bulk insert
+        $values = [];
+        $placeholders = [];
+
+        foreach ($preparedModels as $attributes) {
+            $rowValues = [];
+            foreach ($columns as $column) {
+                $rowValues[] = $attributes[$column] ?? null;
+            }
+            $placeholders[] = '(' . implode(', ', array_fill(0, count($columns), '?')) . ')';
+            $values = array_merge($values, $rowValues);
+        }
+
+        // Bulk insert
+        $sql = "INSERT INTO `{$table}` (`" . implode('`, `', $columns) . "`) VALUES " . implode(', ', $placeholders);
+        $connection = $this->query->getConnection();
+        $connection->execute($sql, $values);
+
+        // Get inserted IDs and hydrate models
+        $lastInsertId = (int) $connection->lastInsertId();
+        $insertedIds = range($lastInsertId, $lastInsertId + count($preparedModels) - 1);
+
+        $savedModels = [];
+        foreach ($insertedIds as $index => $id) {
+            $attributes = $preparedModels[$index];
+            $model = new $this->relatedClass($attributes);
+            $model->setAttribute('id', $id);
+            $savedModels[] = $model;
+        }
+
+        return new ModelCollection($savedModels);
+    }
+
+    /**
+     * Update all related models.
+     *
+     * Performance: O(1) - Single UPDATE operation with WHERE constraint
+     * Clean Architecture: Bulk update operation
+     *
+     * @param array $attributes Attributes to update
+     * @return int Number of affected rows
+     *
+     * @example
+     * ```php
+     * $post->comments()->update(['status' => 'approved']);
+     * ```
+     */
+    public function update(array $attributes): int
+    {
+        if ($this->parent->exists()) {
+            return $this->query->update($attributes);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Delete all related models.
+     *
+     * Performance: O(1) - Single DELETE operation
+     * Clean Architecture: Bulk deletion operation
+     *
+     * @return int Number of deleted rows
+     *
+     * @example
+     * ```php
+     * $post->comments()->delete();
+     * ```
+     */
+    public function delete(): int
+    {
+        if ($this->parent->exists()) {
+            return $this->query->delete();
+        }
+
+        return 0;
+    }
+
+    /**
+     * Get the first related model or create a new one.
+     *
+     * Performance: O(1) - Single SELECT, potential INSERT
+     * Clean Architecture: Atomic find-or-create operation
+     *
+     * @param array $attributes Attributes for new model if not found
+     * @return Model Found or created model
+     *
+     * @example
+     * ```php
+     * $comment = $post->comments()->firstOrCreate(['content' => 'First!']);
+     * ```
+     */
+    public function firstOrCreate(array $attributes = []): Model
+    {
+        $instance = $this->query->first();
+
+        if ($instance === null) {
+            $instance = $this->create($attributes);
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Get the first related model or instantiate a new one.
+     *
+     * Performance: O(1) - Single SELECT operation
+     * Clean Architecture: Non-persistent find-or-new operation
+     *
+     * @param array $attributes Attributes for new model if not found
+     * @return Model Found or new model instance
+     *
+     * @example
+     * ```php
+     * $comment = $post->comments()->firstOrNew(['content' => 'Draft comment']);
+     * ```
+     */
+    public function firstOrNew(array $attributes = []): Model
+    {
+        $instance = $this->query->first();
+
+        if ($instance === null) {
+            $parentKey = $this->parent->getAttribute($this->localKey);
+            $attributes[$this->foreignKey] = $parentKey;
+            $attributes[$this->morphType] = $this->getMorphClass();
+            $instance = new $this->relatedClass($attributes);
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Update or create a related model.
+     *
+     * Performance: O(1) - Single SELECT, potential INSERT/UPDATE
+     * Clean Architecture: Atomic upsert operation
+     *
+     * @param array $attributes Attributes to search by
+     * @param array $values Additional values for creation
+     * @return Model Updated or created model
+     *
+     * @example
+     * ```php
+     * $comment = $post->comments()->updateOrCreate(
+     *     ['author' => 'John'],
+     *     ['content' => 'Updated comment']
+     * );
+     * ```
+     */
+    public function updateOrCreate(array $attributes, array $values = []): Model
+    {
+        $query = clone $this->query;
+
+        // Apply where conditions for each attribute
+        foreach ($attributes as $column => $value) {
+            $query->where($column, $value);
+        }
+
+        $instance = $query->first();
+
+        if ($instance instanceof Model) {
+            foreach (array_merge($attributes, $values) as $key => $value) {
+                $instance->setAttribute($key, $value);
+            }
+            $instance->save();
+            return $instance;
+        } else {
+            return $this->create(array_merge($attributes, $values));
+        }
+    }
+
+    /**
+     * Process records in chunks to optimize memory usage.
+     *
+     * Performance: O(n/chunk_size) - Memory-efficient processing of large datasets
+     * Clean Architecture: Callback pattern for flexible processing
+     *
+     * @param int $count Number of records per chunk
+     * @param callable $callback Function to process each chunk
+     * @return bool True if all chunks processed successfully
+     *
+     * @example
+     * ```php
+     * $post->comments()->chunk(100, function($comments) {
+     *     foreach ($comments as $comment) {
+     *         // Process each comment
+     *     }
+     * });
+     * ```
+     */
+    public function chunk(int $count, callable $callback): bool
+    {
+        $page = 1;
+
+        do {
+            $results = $this->query->limit($count)->offset(($page - 1) * $count)->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+
+            if ($callback($models, $page) === false) {
+                return false;
+            }
+
+            $page++;
+        } while ($results->count() === $count);
+
+        return true;
+    }
+
+    /**
+     * Get the count of related models.
+     *
+     * Performance: O(1) - Single COUNT query
+     * Clean Architecture: Expressive counting method
+     *
+     * @return int Count of related models
+     *
+     * @example
+     * ```php
+     * $commentCount = $post->comments()->count();
+     * ```
+     */
+    public function count(): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        return $this->query->count();
+    }
+
+    /**
+     * Check if any related models exist.
+     *
+     * Performance: O(1) - Single EXISTS query with early termination
+     * Clean Architecture: Expressive existence check
+     *
+     * @return bool True if related models exist
+     *
+     * @example
+     * ```php
+     * if ($post->comments()->exists()) {
+     *     // Post has comments
+     * }
+     * ```
+     */
+    public function exists(): bool
+    {
+        if (!$this->parent->exists()) {
+            return false;
+        }
+
+        return $this->query->exists();
+    }
+
+    /**
+     * Get the sum of a column.
+     *
+     * Performance: O(1) - Single aggregation query
+     * Clean Architecture: Expressive aggregation method
+     *
+     * @param string $column Column name
+     * @return float|int
+     *
+     * @example
+     * ```php
+     * $totalLikes = $post->comments()->sum('likes');
+     * ```
+     */
+    public function sum(string $column): float|int
+    {
+        return $this->query->sum($column) ?? 0;
+    }
+
+    /**
+     * Get the average of a column.
+     *
+     * @param string $column Column name
+     * @return float|int
+     */
+    public function avg(string $column): float|int
+    {
+        return $this->query->avg($column) ?? 0;
+    }
+
+    /**
+     * Get the minimum value of a column.
+     *
+     * @param string $column Column name
+     * @return mixed
+     */
+    public function min(string $column): mixed
+    {
+        return $this->query->min($column);
+    }
+
+    /**
+     * Get the maximum value of a column.
+     *
+     * @param string $column Column name
+     * @return mixed
+     */
+    public function max(string $column): mixed
+    {
+        return $this->query->max($column);
+    }
+
+    /**
+     * Paginate the results.
+     *
+     * Performance: O(1) - Single query with LIMIT/OFFSET
+     * Clean Architecture: Consistent pagination interface
+     *
+     * @param int $perPage Items per page
+     * @param int $page Current page
+     * @return array Pagination results
+     */
+    public function paginate(int $perPage = 15, int $page = 1): array
+    {
+        $total = $this->count();
+        $offset = ($page - 1) * $perPage;
+
+        $items = $this->query->limit($perPage)->offset($offset)->get();
+        $models = call_user_func([$this->relatedClass, 'hydrate'], $items->toArray());
+
+        return [
+            'data' => $models,
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'last_page' => (int) ceil($total / $perPage),
+            'from' => $offset + 1,
+            'to' => min($offset + $perPage, $total)
+        ];
+    }
+
+    /**
+     * Get the morph type value.
+     *
+     * Performance: O(1) - Direct method call
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string Morph type value
+     */
+    public function getMorphType(): string
+    {
+        return $this->morphType;
+    }
+
+    /**
+     * Get the morph class value.
+     *
+     * Performance: O(1) - Direct method call
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string Morph class value
+     */
+    public function getMorphClassValue(): string
+    {
+        return $this->getMorphClass();
+    }
+
+    /**
+     * Check if the parent is of a specific morph type.
+     *
+     * Performance: O(1) - Direct string comparison
+     * Clean Architecture: Expressive type checking
+     *
+     * @param string $type Morph type to check
+     * @return bool True if parent is of the specified type
+     */
+    public function isType(string $type): bool
+    {
+        return $this->getMorphClass() === $type;
+    }
+
+    /**
+     * Magic method to delegate calls to the underlying query builder.
+     *
+     * Performance: O(1) - Direct method delegation
+     * Clean Architecture: Proxy pattern for query builder methods
+     * SOLID: Interface Segregation - Expose only relevant query methods
+     *
+     * @param string $method Method name
+     * @param array $parameters Method parameters
+     * @return mixed
+     *
+     * @throws \BadMethodCallException If method doesn't exist on query builder
+     */
+    public function __call(string $method, array $parameters): mixed
+    {
+        // Delegate to query builder for standard query methods
+        if (method_exists($this->query, $method)) {
+            $result = $this->query->{$method}(...$parameters);
+
+            // Return $this for fluent interface on builder methods that return QueryBuilder
+            if ($result instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                return $this;
+            }
+
+            return $result;
+        }
+
+        throw new \BadMethodCallException(
+            sprintf('Method %s::%s does not exist.', static::class, $method)
+        );
+    }
 }
