@@ -2502,6 +2502,7 @@ abstract class Model implements ModelInterface, ObservableInterface
      *
      * Modifies the relation's query to SELECT only specified columns.
      * Automatically includes the foreign key to maintain relationship integrity.
+     * Handles relationships with pivot/intermediate tables properly.
      *
      * SOLID Principles:
      * - Single Responsibility: Only handles column selection logic
@@ -2516,13 +2517,98 @@ abstract class Model implements ModelInterface, ObservableInterface
         // Get the query builder from relation
         $query = $relation->getQuery();
 
-        // Ensure foreign key is always included (maintain relationship integrity)
+        // Handle relationships with pivot/intermediate tables that require table prefixing
+        if (
+            $relation instanceof Relations\BelongsToMany ||
+            $relation instanceof Relations\MorphToMany ||
+            $relation instanceof Relations\HasManyThrough ||
+            $relation instanceof Relations\HasOneThrough
+        ) {
+
+            static::applyColumnSelectionForPivotRelation($relation, $columns, $query);
+        } else {
+            // For simple relations (HasOne, HasMany, BelongsTo, MorphOne, MorphMany, MorphTo)
+            static::applyColumnSelectionForSimpleRelation($relation, $columns, $query);
+        }
+    }
+
+    /**
+     * Apply column selection for relationships with pivot/intermediate tables.
+     *
+     * @param RelationInterface $relation Relation instance
+     * @param array<string> $columns Columns to select
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $query Query builder
+     * @return void
+     */
+    protected static function applyColumnSelectionForPivotRelation(RelationInterface $relation, array $columns, $query): void
+    {
+        $reflectionService = app()->make(\Toporia\Framework\Support\ReflectionService::class);
+
+        if ($relation instanceof Relations\BelongsToMany) {
+            // For BelongsToMany, ensure the related model's primary key is included
+            $relatedKey = $relation->getRelatedKey();
+            if (!in_array($relatedKey, $columns, true)) {
+                $columns[] = $relatedKey;
+            }
+
+            // Get related table name
+            $relatedClass = $reflectionService->getPropertyValue($relation, 'relatedClass');
+            $relatedInstance = new $relatedClass();
+            $relatedTable = $relatedInstance->getTable();
+        } elseif ($relation instanceof Relations\MorphToMany) {
+            // For MorphToMany, ensure the related model's primary key is included
+            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+            if (!in_array($relatedKey, $columns, true)) {
+                $columns[] = $relatedKey;
+            }
+
+            // Get related table name
+            $relatedClass = $reflectionService->getPropertyValue($relation, 'relatedClass');
+            $relatedInstance = new $relatedClass();
+            $relatedTable = $relatedInstance->getTable();
+        } elseif ($relation instanceof Relations\HasManyThrough || $relation instanceof Relations\HasOneThrough) {
+            // For HasManyThrough/HasOneThrough, ensure the foreign key is included
+            $foreignKey = $relation->getForeignKeyName();
+            if (!in_array($foreignKey, $columns, true)) {
+                $columns[] = $foreignKey;
+            }
+
+            // Get related table name (final target table, not intermediate)
+            $relatedClass = $reflectionService->getPropertyValue($relation, 'relatedClass');
+            $relatedInstance = new $relatedClass();
+            $relatedTable = $relatedInstance->getTable();
+        }
+
+        // Prefix all columns with table name to avoid ambiguity with pivot/intermediate tables
+        $prefixedColumns = array_map(function ($column) use ($relatedTable) {
+            // If column already has table prefix, don't add it again
+            if (str_contains($column, '.')) {
+                return $column;
+            }
+            return "{$relatedTable}.{$column}";
+        }, $columns);
+
+        // Apply column selection with prefixed columns
+        $query->select($prefixedColumns);
+    }
+
+    /**
+     * Apply column selection for simple relationships without pivot tables.
+     *
+     * @param RelationInterface $relation Relation instance
+     * @param array<string> $columns Columns to select
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $query Query builder
+     * @return void
+     */
+    protected static function applyColumnSelectionForSimpleRelation(RelationInterface $relation, array $columns, $query): void
+    {
+        // For simple relations, ensure foreign key is always included (maintain relationship integrity)
         $foreignKey = $relation->getForeignKeyName();
         if (!in_array($foreignKey, $columns, true)) {
             $columns[] = $foreignKey;
         }
 
-        // Apply column selection
+        // Apply column selection (no table prefixing needed for simple relations)
         $query->select($columns);
     }
 
