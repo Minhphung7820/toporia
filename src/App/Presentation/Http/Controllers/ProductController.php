@@ -109,7 +109,7 @@ final class ProductController extends BaseController
         // Pagination
         $perPage = (int) $request->input('per_page', 20);
         $page = (int) $request->input('page', 1);
-
+        // dd($query->categories()->get());
         $paginator = $query->paginate($perPage, $page);
 
         $items = [];
