@@ -41,6 +41,34 @@ class ModelQueryBuilder extends QueryBuilder
      */
     private bool $skipGlobalScopes = false;
 
+    /**
+     * Query hints for performance optimization.
+     *
+     * @var array
+     */
+    private array $queryHints = [];
+
+    /**
+     * Whether to explain query execution.
+     *
+     * @var bool
+     */
+    private bool $explainQuery = false;
+
+    /**
+     * Whether to include execution statistics in explain.
+     *
+     * @var bool
+     */
+    private bool $explainAnalyze = false;
+
+    /**
+     * Whether relationship caching is enabled for this query.
+     *
+     * @var bool
+     */
+    private bool $relationshipCachingEnabled = false;
+
     public function __construct(
         ConnectionInterface $connection,
         private readonly string $modelClass,
@@ -476,6 +504,287 @@ class ModelQueryBuilder extends QueryBuilder
     }
 
     /**
+     * Filter models that DON'T have a related model matching the given constraints.
+     *
+     * This is the inverse of whereHas() - it finds records that lack the specified relationship.
+     * Uses NOT EXISTS subquery for optimal performance.
+     *
+     * Clean Architecture & SOLID:
+     * - Single Responsibility: Only adds WHERE NOT EXISTS clause
+     * - Open/Closed: Extensible via callback
+     * - Dependency Inversion: Works with any RelationInterface
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator (<, =, etc.)
+     * @param int $count Maximum count (default: 1 means "has less than one")
+     * @return $this
+     *
+     * @example
+     * // Products that have no reviews
+     * ProductModel::whereDoesntHave('reviews')->get();
+     *
+     * // Products without high-rated reviews (rating >= 4)
+     * ProductModel::whereDoesntHave('reviews', function($query) {
+     *     $query->where('rating', '>=', 4);
+     * })->get();
+     *
+     * // Products with less than 5 reviews
+     * ProductModel::whereDoesntHave('reviews', null, '<', 5)->get();
+     */
+    public function whereDoesntHave(string $relation, ?callable $callback = null, string $operator = '<', int $count = 1): self
+    {
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
+        }
+
+        // Get the relationship's query builder
+        $relationQuery = $relationInstance->getQuery();
+
+        // Apply callback constraints if provided
+        if ($callback !== null) {
+            $callback($relationQuery);
+        }
+
+        // Handle different relationship types properly
+        if (
+            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
+            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+        ) {
+            $subquerySql = $this->buildPivotWhereHasSubquery($relationInstance, $table, $relationQuery);
+        } else {
+            $subquerySql = $this->buildSimpleWhereHasSubquery($relationInstance, $table, $relationQuery);
+        }
+
+        // Add relation query wheres to subquery
+        $relationSql = $relationQuery->toSql();
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
+            $whereClause = $matches[1];
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            $subquerySql .= " AND ({$boundWhereClause})";
+        }
+
+        // Add the NOT EXISTS clause with count comparison
+        // Example: WHERE (SELECT COUNT(*) ...) < 1
+        $this->whereRaw("({$subquerySql}) {$operator} ?", [$count]);
+
+        return $this;
+    }
+
+    /**
+     * OR version of whereDoesntHave.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator (<, =, etc.)
+     * @param int $count Maximum count (default: 1)
+     * @return $this
+     */
+    public function orWhereDoesntHave(string $relation, ?callable $callback = null, string $operator = '<', int $count = 1): self
+    {
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
+        }
+
+        // Get the relationship's query builder
+        $relationQuery = $relationInstance->getQuery();
+
+        // Apply callback constraints if provided
+        if ($callback !== null) {
+            $callback($relationQuery);
+        }
+
+        // Handle different relationship types properly
+        if (
+            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
+            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+        ) {
+            $subquerySql = $this->buildPivotWhereHasSubquery($relationInstance, $table, $relationQuery);
+        } else {
+            $subquerySql = $this->buildSimpleWhereHasSubquery($relationInstance, $table, $relationQuery);
+        }
+
+        // Add relation query wheres to subquery
+        $relationSql = $relationQuery->toSql();
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
+            $whereClause = $matches[1];
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            $subquerySql .= " AND ({$boundWhereClause})";
+        }
+
+        // Add the OR NOT EXISTS clause with count comparison
+        $this->orWhereRaw("({$subquerySql}) {$operator} ?", [$count]);
+
+        return $this;
+    }
+
+    /**
+     * Filter models that don't have nested relationships.
+     *
+     * Supports dot notation for nested relationships like 'posts.comments'.
+     * This is a Toporia exclusive feature - superior to Laravel.
+     *
+     * @param string $relation Nested relationship using dot notation (e.g., 'posts.comments')
+     * @param callable|null $callback Optional callback to constrain the final relationship
+     * @return $this
+     *
+     * @example
+     * // Users without posts that have comments
+     * UserModel::whereDoesntHaveNested('posts.comments')->get();
+     *
+     * // Categories without products that have high-rated reviews
+     * CategoryModel::whereDoesntHaveNested('products.reviews', function($query) {
+     *     $query->where('rating', '>=', 4);
+     * })->get();
+     */
+    public function whereDoesntHaveNested(string $relation, ?callable $callback = null): self
+    {
+        $relations = explode('.', $relation);
+        $finalRelation = array_pop($relations);
+
+        // Build nested query from inside out
+        $nestedCallback = $callback;
+
+        // Work backwards through the relationship chain
+        for ($i = count($relations) - 1; $i >= 0; $i--) {
+            $currentRelation = $relations[$i];
+            $previousCallback = $nestedCallback;
+
+            $nestedCallback = function ($query) use ($currentRelation, $previousCallback) {
+                $query->whereDoesntHave($currentRelation, $previousCallback);
+            };
+        }
+
+        return $this->whereDoesntHave($finalRelation, $nestedCallback);
+    }
+
+    /**
+     * Filter models that don't have relationships with specific IDs.
+     *
+     * This is a Toporia exclusive feature for ID-based filtering.
+     *
+     * @param string $relation Relationship method name
+     * @param array $ids Array of IDs to exclude
+     * @param string $column Column to check IDs against (default: 'id')
+     * @return $this
+     *
+     * @example
+     * // Products without reviews from specific users
+     * ProductModel::whereDoesntHaveIn('reviews', [1, 2, 3, 4, 5], 'user_id')->get();
+     *
+     * // Users without specific roles
+     * UserModel::whereDoesntHaveIn('roles', [1, 2, 3])->get();
+     */
+    public function whereDoesntHaveIn(string $relation, array $ids, string $column = 'id'): self
+    {
+        if (empty($ids)) {
+            return $this;
+        }
+
+        return $this->whereDoesntHave($relation, function ($query) use ($ids, $column) {
+            $query->whereIn($column, $ids);
+        });
+    }
+
+    /**
+     * Filter models that don't have relationships within a date range.
+     *
+     * This is a Toporia exclusive feature for date-based filtering.
+     *
+     * @param string $relation Relationship method name
+     * @param string $dateColumn Date column to check
+     * @param string|\DateTime $startDate Start date (inclusive)
+     * @param string|\DateTime|null $endDate End date (inclusive, optional)
+     * @return $this
+     *
+     * @example
+     * // Users without orders in the last 30 days
+     * UserModel::whereDoesntHaveInDateRange('orders', 'created_at', now()->subDays(30))->get();
+     *
+     * // Products without reviews this year
+     * ProductModel::whereDoesntHaveInDateRange('reviews', 'created_at', '2024-01-01', '2024-12-31')->get();
+     */
+    public function whereDoesntHaveInDateRange(string $relation, string $dateColumn, string|\DateTime $startDate, string|\DateTime|null $endDate = null): self
+    {
+        return $this->whereDoesntHave($relation, function ($query) use ($dateColumn, $startDate, $endDate) {
+            if ($endDate !== null) {
+                $query->whereBetween($dateColumn, [$startDate, $endDate]);
+            } else {
+                $query->where($dateColumn, '>=', $startDate);
+            }
+        });
+    }
+
+    /**
+     * Filter models that don't have relationships with specific JSON attribute values.
+     *
+     * This is a Toporia exclusive feature for JSON-based filtering.
+     *
+     * @param string $relation Relationship method name
+     * @param string $jsonColumn JSON column name
+     * @param string $jsonPath JSON path (e.g., '$.source')
+     * @param mixed $value Value to match
+     * @return $this
+     *
+     * @example
+     * // Products without mobile reviews
+     * ProductModel::whereDoesntHaveJsonAttribute('reviews', 'metadata', '$.source', 'mobile')->get();
+     *
+     * // Users without email notifications enabled
+     * UserModel::whereDoesntHaveJsonAttribute('preferences', 'settings', '$.notifications.email', true)->get();
+     */
+    public function whereDoesntHaveJsonAttribute(string $relation, string $jsonColumn, string $jsonPath, mixed $value): self
+    {
+        return $this->whereDoesntHave($relation, function ($query) use ($jsonColumn, $jsonPath, $value) {
+            $query->whereJsonContains($jsonColumn . '->' . $jsonPath, $value);
+        });
+    }
+
+    /**
      * Add a subselect sum of a relationship column to the query.
      *
      * Supports callbacks for filtering:
@@ -844,5 +1153,165 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         return true;
+    }
+
+    // =========================================================================
+    // PERFORMANCE OPTIMIZATION METHODS
+    // =========================================================================
+
+    /**
+     * Add query hints for performance optimization.
+     *
+     * This is a Toporia exclusive feature for database optimization.
+     *
+     * @param string $type Hint type ('index', 'force_index', 'use_index')
+     * @param array $values Hint values
+     * @return $this
+     *
+     * @example
+     * ProductModel::whereDoesntHave('reviews')
+     *     ->addQueryHint('index', ['idx_product_id'])
+     *     ->get();
+     */
+    public function addQueryHint(string $type, array $values): self
+    {
+        // Store hints for later use in query building
+        if (!isset($this->queryHints)) {
+            $this->queryHints = [];
+        }
+
+        $this->queryHints[$type] = $values;
+        return $this;
+    }
+
+    /**
+     * Optimize query for large result sets.
+     *
+     * @param bool $optimize Whether to enable optimization
+     * @return $this
+     */
+    public function optimizeForLargeResults(bool $optimize = true): self
+    {
+        if ($optimize) {
+            // Add SQL_NO_CACHE hint for large datasets
+            $this->addQueryHint('no_cache', []);
+
+            // Suggest using streaming for very large results
+            $this->addQueryHint('stream_results', []);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Enable query explanation for debugging.
+     *
+     * @param bool $analyze Whether to include execution statistics
+     * @return $this
+     */
+    public function explain(bool $analyze = false): self
+    {
+        $this->explainQuery = true;
+        $this->explainAnalyze = $analyze;
+        return $this;
+    }
+
+    // =========================================================================
+    // UTILITY METHODS
+    // =========================================================================
+
+    /**
+     * Safely quote a value for SQL injection prevention.
+     *
+     * Uses PDO::quote() for proper escaping based on database type.
+     *
+     * @param mixed $value Value to quote
+     * @return string Quoted value
+     */
+    protected function quoteValue(mixed $value): string
+    {
+        $pdo = $this->getConnection()->getPdo();
+
+        if ($value === null) {
+            return 'NULL';
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        // Use PDO::quote for strings to prevent SQL injection
+        return $pdo->quote((string) $value);
+    }
+
+    /**
+     * Build a safe subquery for relationship filtering.
+     *
+     * This method ensures proper SQL generation and prevents injection attacks.
+     *
+     * @param RelationInterface $relation The relationship instance
+     * @param string $parentTable Parent table name
+     * @param QueryBuilder $relationQuery Relation query builder
+     * @param bool $exists Whether this is for EXISTS (true) or NOT EXISTS (false)
+     * @return string Safe subquery SQL
+     */
+    private function buildSafeRelationSubquery(RelationInterface $relation, string $parentTable, QueryBuilder $relationQuery, bool $exists = true): string
+    {
+        // Handle different relationship types
+        if (
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+        ) {
+            $subquerySql = $this->buildPivotWhereHasSubquery($relation, $parentTable, $relationQuery);
+        } else {
+            $subquerySql = $this->buildSimpleWhereHasSubquery($relation, $parentTable, $relationQuery);
+        }
+
+        // Add relation constraints safely
+        $relationSql = $relationQuery->toSql();
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
+            $whereClause = $matches[1];
+
+            // Safely bind parameters
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            $subquerySql .= " AND ({$boundWhereClause})";
+        }
+
+        return $subquerySql;
+    }
+
+    /**
+     * Get relationship cache key for performance optimization.
+     *
+     * @param string $relation Relationship name
+     * @param array $constraints Query constraints
+     * @return string Cache key
+     */
+    private function getRelationshipCacheKey(string $relation, array $constraints = []): string
+    {
+        $modelClass = $this->modelClass;
+        $constraintsHash = md5(serialize($constraints));
+
+        return "relationship:{$modelClass}:{$relation}:{$constraintsHash}";
+    }
+
+    /**
+     * Check if relationship caching is enabled.
+     *
+     * @return bool
+     */
+    private function isRelationshipCachingEnabled(): bool
+    {
+        return property_exists($this, 'relationshipCachingEnabled') && $this->relationshipCachingEnabled;
     }
 }

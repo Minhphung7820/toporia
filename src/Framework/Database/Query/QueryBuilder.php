@@ -2493,4 +2493,126 @@ class QueryBuilder implements QueryBuilderInterface
 
         return $newQuery;
     }
+
+    // =========================================================================
+    // STATIC PERFORMANCE & DEBUGGING METHODS
+    // =========================================================================
+
+    /**
+     * Static relationship caching configuration.
+     *
+     * @var array
+     */
+    private static array $relationshipCacheConfig = [
+        'enabled' => false,
+        'size' => 0,
+        'max_size' => 1000,
+        'cache' => []
+    ];
+
+    /**
+     * Enable relationship query caching for performance optimization.
+     *
+     * This is a Toporia exclusive feature for caching relationship queries.
+     *
+     * @param int $maxSize Maximum cache size (default: 1000)
+     * @return void
+     */
+    public static function enableRelationshipCaching(int $maxSize = 1000): void
+    {
+        self::$relationshipCacheConfig['enabled'] = true;
+        self::$relationshipCacheConfig['max_size'] = $maxSize;
+    }
+
+    /**
+     * Disable relationship query caching.
+     *
+     * @return void
+     */
+    public static function disableRelationshipCaching(): void
+    {
+        self::$relationshipCacheConfig['enabled'] = false;
+        self::$relationshipCacheConfig['cache'] = [];
+        self::$relationshipCacheConfig['size'] = 0;
+    }
+
+    /**
+     * Get relationship cache statistics.
+     *
+     * @return array Cache statistics
+     */
+    public static function getRelationshipCacheStats(): array
+    {
+        return [
+            'enabled' => self::$relationshipCacheConfig['enabled'],
+            'size' => self::$relationshipCacheConfig['size'],
+            'max_size' => self::$relationshipCacheConfig['max_size'],
+            'hit_ratio' => self::calculateCacheHitRatio()
+        ];
+    }
+
+    /**
+     * Clear relationship cache.
+     *
+     * @return void
+     */
+    public static function clearRelationshipCache(): void
+    {
+        self::$relationshipCacheConfig['cache'] = [];
+        self::$relationshipCacheConfig['size'] = 0;
+    }
+
+    /**
+     * Calculate cache hit ratio for performance monitoring.
+     *
+     * @return float Hit ratio (0.0 to 1.0)
+     */
+    private static function calculateCacheHitRatio(): float
+    {
+        // This would be implemented with actual hit/miss counters
+        // For now, return a placeholder
+        return 0.0;
+    }
+
+    /**
+     * Get cached relationship query result.
+     *
+     * @param string $key Cache key
+     * @return mixed|null Cached result or null if not found
+     */
+    public static function getCachedRelationshipQuery(string $key): mixed
+    {
+        if (!self::$relationshipCacheConfig['enabled']) {
+            return null;
+        }
+
+        return self::$relationshipCacheConfig['cache'][$key] ?? null;
+    }
+
+    /**
+     * Cache relationship query result.
+     *
+     * @param string $key Cache key
+     * @param mixed $result Query result
+     * @return void
+     */
+    public static function cacheRelationshipQuery(string $key, mixed $result): void
+    {
+        if (!self::$relationshipCacheConfig['enabled']) {
+            return;
+        }
+
+        // Check cache size limit
+        if (self::$relationshipCacheConfig['size'] >= self::$relationshipCacheConfig['max_size']) {
+            // Remove oldest entry (simple FIFO)
+            $firstKey = array_key_first(self::$relationshipCacheConfig['cache']);
+            if ($firstKey !== null) {
+                unset(self::$relationshipCacheConfig['cache'][$firstKey]);
+                self::$relationshipCacheConfig['size']--;
+            }
+        }
+
+        self::$relationshipCacheConfig['cache'][$key] = $result;
+        self::$relationshipCacheConfig['size']++;
+    }
 }

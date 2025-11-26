@@ -169,6 +169,13 @@ $users = UserModel::query()
         $q->where('views', '>', 1000);
     })
     ->get();
+
+// Relationship non-existence (NEW - Toporia Exclusive)
+$users = UserModel::query()
+    ->whereDoesntHave('posts', function($q) {
+        $q->where('published', true);
+    })
+    ->get();
 ```
 
 ### Aggregate Methods
@@ -185,6 +192,139 @@ $users = UserModel::query()
     ->withSum('orders', 'total')
     ->get();
 // Access: $user->orders_sum_total
+
+### Advanced Relationship Filtering (NEW - Toporia Exclusive)
+
+#### `whereDoesntHave()` - Filter Records Without Relationships
+
+Find records that DON'T have related records matching constraints.
+
+```php
+// Products without any reviews
+$products = ProductModel::whereDoesntHave('reviews')->get();
+
+// Products without high-rated reviews
+$products = ProductModel::whereDoesntHave('reviews', function($q) {
+    $q->where('rating', '>=', 4);
+})->get();
+
+// Products with less than 5 reviews
+$products = ProductModel::whereDoesntHave('reviews', null, '<', 5)->get();
+
+// OR logic: Products inactive OR without reviews
+$products = ProductModel::where('active', false)
+    ->orWhereDoesntHave('reviews')
+    ->get();
+```
+
+#### `whereDoesntHaveNested()` - Nested Relationship Filtering
+
+Filter by nested relationships using dot notation.
+
+```php
+// Users without posts that have comments
+$users = UserModel::whereDoesntHaveNested('posts.comments')->get();
+
+// Categories without products that have high-rated reviews
+$categories = CategoryModel::whereDoesntHaveNested('products.reviews', function($q) {
+    $q->where('rating', '>=', 4);
+})->get();
+```
+
+#### `whereDoesntHaveIn()` - ID-Based Filtering
+
+Filter records that don't have relationships with specific IDs.
+
+```php
+// Products without reviews from VIP users
+$products = ProductModel::whereDoesntHaveIn('reviews', [1, 2, 3, 4, 5], 'user_id')->get();
+
+// Users without admin/moderator roles
+$users = UserModel::whereDoesntHaveIn('roles', [1, 2, 3])->get();
+```
+
+#### `whereDoesntHaveInDateRange()` - Date Range Filtering
+
+Filter records without relationships in specific date ranges.
+
+```php
+// Users without orders in the last 30 days
+$users = UserModel::whereDoesntHaveInDateRange('orders', 'created_at', now()->subDays(30))->get();
+
+// Products without reviews this year
+$products = ProductModel::whereDoesntHaveInDateRange('reviews', 'created_at', '2024-01-01', '2024-12-31')->get();
+```
+
+#### `whereDoesntHaveJsonAttribute()` - JSON Attribute Filtering
+
+Filter records without relationships having specific JSON attributes.
+
+```php
+// Products without mobile reviews
+$products = ProductModel::whereDoesntHaveJsonAttribute('reviews', 'metadata', '$.source', 'mobile')->get();
+
+// Users without email notifications enabled
+$users = UserModel::whereDoesntHaveJsonAttribute('preferences', 'settings', '$.notifications.email', true)->get();
+```
+
+### Performance Optimization (NEW - Toporia Exclusive)
+
+#### Query Hints and Optimization
+
+```php
+// Add database hints for better performance
+$products = ProductModel::whereDoesntHave('reviews')
+    ->addQueryHint('index', ['idx_product_id'])
+    ->optimizeForLargeResults(true)
+    ->get();
+
+// Enable query explanation for debugging
+$products = ProductModel::whereDoesntHave('reviews')
+    ->explain(true)
+    ->get();
+```
+
+#### Relationship Caching
+
+```php
+// Enable relationship query caching
+QueryBuilder::enableRelationshipCaching(1000);
+
+// Get cache statistics
+$stats = QueryBuilder::getRelationshipCacheStats();
+echo "Cache enabled: " . ($stats['enabled'] ? 'Yes' : 'No');
+echo "Cache size: {$stats['size']}/{$stats['max_size']}";
+
+// Clear cache
+QueryBuilder::clearRelationshipCache();
+
+// Disable caching
+QueryBuilder::disableRelationshipCaching();
+```
+
+#### Query Logging and Debugging
+
+```php
+// Enable query logging
+QueryBuilder::enableQueryLog();
+
+// Execute queries...
+$products = ProductModel::whereDoesntHave('reviews')->get();
+
+// Get execution log
+$log = QueryBuilder::getQueryLog();
+foreach ($log as $query) {
+    echo "SQL: {$query['query']}\n";
+    echo "Time: {$query['time']}ms\n";
+    echo "Bindings: " . json_encode($query['bindings']) . "\n\n";
+}
+
+// Clear log
+QueryBuilder::clearQueryLog();
+
+// Disable logging
+QueryBuilder::disableQueryLog();
+```
 
 // Average, Min, Max
 $users = UserModel::query()

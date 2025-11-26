@@ -2699,4 +2699,75 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
         // Call the method on the query builder
         return $modelQueryBuilder->$method(...$parameters);
     }
+
+    // =========================================================================
+    // STATIC WHEREDOESNTHAVE CONVENIENCE METHODS
+    // =========================================================================
+
+    /**
+     * Static convenience method for whereDoesntHave.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator (<, =, etc.)
+     * @param int $count Maximum count (default: 1)
+     * @return ModelQueryBuilder
+     */
+    public static function whereDoesntHave(string $relation, ?callable $callback = null, string $operator = '<', int $count = 1): ModelQueryBuilder
+    {
+        return static::query()->whereDoesntHave($relation, $callback, $operator, $count);
+    }
+
+    /**
+     * Static convenience method for whereDoesntHaveNested.
+     *
+     * @param string $relation Nested relationship using dot notation
+     * @param callable|null $callback Optional callback to constrain the final relationship
+     * @return ModelQueryBuilder
+     */
+    public static function whereDoesntHaveNested(string $relation, ?callable $callback = null): ModelQueryBuilder
+    {
+        return static::query()->whereDoesntHaveNested($relation, $callback);
+    }
+
+    /**
+     * Static convenience method for whereDoesntHaveIn.
+     *
+     * @param string $relation Relationship method name
+     * @param array $ids Array of IDs to exclude
+     * @param string $column Column to check IDs against (default: 'id')
+     * @return ModelQueryBuilder
+     */
+    public static function whereDoesntHaveIn(string $relation, array $ids, string $column = 'id'): ModelQueryBuilder
+    {
+        return static::query()->whereDoesntHaveIn($relation, $ids, $column);
+    }
+
+    /**
+     * Static convenience method for whereDoesntHaveInDateRange.
+     *
+     * @param string $relation Relationship method name
+     * @param string $dateColumn Date column to check
+     * @param string|\DateTime $startDate Start date (inclusive)
+     * @param string|\DateTime|null $endDate End date (inclusive, optional)
+     * @return ModelQueryBuilder
+     */
+    public static function whereDoesntHaveInDateRange(string $relation, string $dateColumn, string|\DateTime $startDate, string|\DateTime|null $endDate = null): ModelQueryBuilder
+    {
+        return static::query()->whereDoesntHaveInDateRange($relation, $dateColumn, $startDate, $endDate);
+    }
+
+    /**
+     * Static convenience method for whereDoesntHaveJsonAttribute.
+     *
+     * @param string $relation Relationship method name
+     * @param string $jsonColumn JSON column name
+     * @param string $jsonPath JSON path (e.g., '$.source')
+     * @param mixed $value Value to match
+     * @return ModelQueryBuilder
+     */
+    public static function whereDoesntHaveJsonAttribute(string $relation, string $jsonColumn, string $jsonPath, mixed $value): ModelQueryBuilder
+    {
+        return static::query()->whereDoesntHaveJsonAttribute($relation, $jsonColumn, $jsonPath, $value);
+    }
 }

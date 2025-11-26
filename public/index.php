@@ -36,6 +36,9 @@ require __DIR__ . '/../vendor/autoload.php';
 /** @var \Toporia\Framework\Foundation\Application $app */
 $app = require __DIR__ . '/../bootstrap/app.php';
 
+// Set application instance for helper functions
+app(null, $app);
+
 /*
 |--------------------------------------------------------------------------
 | Run The Application

@@ -2,6 +2,54 @@
 
 declare(strict_types=1);
 
+if (!function_exists('app')) {
+    /**
+     * Get the application instance or resolve a service from the container.
+     *
+     * @param string|null $abstract Service identifier to resolve
+     * @param \Toporia\Framework\Foundation\Application|null $instance Set application instance
+     * @return mixed Application instance or resolved service
+     */
+    function app(?string $abstract = null, ?\Toporia\Framework\Foundation\Application $instance = null): mixed
+    {
+        static $application = null;
+
+        // Set application instance if provided
+        if ($instance !== null) {
+            $application = $instance;
+        }
+
+        // Try to get from static variable first
+        if ($application === null) {
+            // Try to get from global variable as fallback
+            $application = $GLOBALS['app'] ?? null;
+
+            if ($application === null) {
+                throw new \RuntimeException('Application instance not found. Make sure the application is properly bootstrapped.');
+            }
+        }
+
+        if ($abstract === null) {
+            return $application;
+        }
+
+        return $application->make($abstract);
+    }
+}
+
+if (!function_exists('container')) {
+    /**
+     * Get a service from the container.
+     *
+     * @param string $abstract Service identifier
+     * @return mixed Resolved service
+     */
+    function container(string $abstract): mixed
+    {
+        return app($abstract);
+    }
+}
+
 if (!function_exists('reflection')) {
     /**
      * Get ReflectionService instance from container.
@@ -94,11 +142,14 @@ if (!function_exists('abort')) {
     {
         $message = $message ?: "HTTP {$code} Error";
 
-        // Send error response
-        response()->json([
+        // Create JSON response
+        $jsonResponse = response()->json([
             'error' => $message,
             'status' => $code
-        ], $code, $headers)->send();
+        ], $code, $headers);
+
+        // Send error response with content
+        $jsonResponse->send($jsonResponse->getContent());
 
         exit($code);
     }
