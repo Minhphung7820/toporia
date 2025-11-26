@@ -476,7 +476,10 @@ class HasMany extends Relation
     /**
      * Process records in chunks to optimize memory usage.
      *
-     * Performance: O(n/chunk_size) - Memory-efficient processing of large datasets
+     * PERFORMANCE WARNING: Uses OFFSET/LIMIT which can be slow on large tables.
+     * For better performance on large datasets, use chunkById() instead.
+     *
+     * Performance: O(n/chunk_size) but OFFSET becomes slower as offset increases
      * Clean Architecture: Callback pattern for flexible processing
      *
      * @param int $count Number of records per chunk
@@ -485,10 +488,16 @@ class HasMany extends Relation
      *
      * @example
      * ```php
+     * // For small to medium datasets
      * $user->posts()->chunk(100, function($posts) {
      *     foreach ($posts as $post) {
      *         // Process each post
      *     }
+     * });
+     *
+     * // For large datasets, prefer chunkById():
+     * $user->posts()->chunkById(100, function($posts) {
+     *     // Much faster on large tables
      * });
      * ```
      */
@@ -790,5 +799,228 @@ class HasMany extends Relation
         throw new \BadMethodCallException(
             sprintf('Method %s::%s does not exist.', static::class, $method)
         );
+    }
+
+    /**
+     * Get related models with specific attributes.
+     *
+     * Performance: O(n) - Single query with WHERE constraints
+     * Clean Architecture: Expressive finder method
+     *
+     * @param array $attributes Attributes to search by
+     * @param array $columns Columns to select
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $publishedPosts = $user->posts()->getBy(['status' => 'published']);
+     * ```
+     */
+    public function getBy(array $attributes, array $columns = ['*']): ModelCollection
+    {
+        $query = clone $this->query;
+
+        foreach ($attributes as $column => $value) {
+            $query->where($column, $value);
+        }
+
+        $results = $query->select($columns)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get the latest related models.
+     *
+     * Performance: O(log n) - Uses ORDER BY with LIMIT
+     * Clean Architecture: Expressive temporal method
+     *
+     * @param int $limit Number of records to get
+     * @param string $column Column to order by (default: 'created_at')
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $latestPosts = $user->posts()->latest(5);
+     * ```
+     */
+    public function latest(int $limit = 10, string $column = 'created_at'): ModelCollection
+    {
+        $results = $this->query->orderBy($column, 'desc')->limit($limit)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get the oldest related models.
+     *
+     * Performance: O(log n) - Uses ORDER BY with LIMIT
+     * Clean Architecture: Expressive temporal method
+     *
+     * @param int $limit Number of records to get
+     * @param string $column Column to order by (default: 'created_at')
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $oldestPosts = $user->posts()->oldest(5);
+     * ```
+     */
+    public function oldest(int $limit = 10, string $column = 'created_at'): ModelCollection
+    {
+        $results = $this->query->orderBy($column, 'asc')->limit($limit)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get random related models.
+     *
+     * Performance: O(n) - Database-dependent random ordering
+     * Clean Architecture: Expressive randomization method
+     *
+     * @param int $limit Number of records to get
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $randomPosts = $user->posts()->random(3);
+     * ```
+     */
+    public function random(int $limit = 1): ModelCollection
+    {
+        $results = $this->query->orderByRaw('RAND()')->limit($limit)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Sync related models (for HasMany with unique constraints).
+     *
+     * Performance: O(n) - Batch operations when possible
+     * Clean Architecture: Atomic sync operation
+     *
+     * @param array $models Array of model data or IDs
+     * @param string $uniqueColumn Column to use for uniqueness check
+     * @return array Sync results
+     *
+     * @example
+     * ```php
+     * $user->posts()->syncBy([
+     *     ['title' => 'Post 1', 'content' => 'Content 1'],
+     *     ['title' => 'Post 2', 'content' => 'Content 2']
+     * ], 'title');
+     * ```
+     */
+    public function syncBy(array $models, string $uniqueColumn): array
+    {
+        $changes = ['created' => [], 'updated' => [], 'deleted' => []];
+
+        if (empty($models)) {
+            return $changes;
+        }
+
+        $parentKey = $this->parent->getAttribute($this->localKey);
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot sync related models: parent model does not have a key');
+        }
+
+        // Get existing models
+        $existing = $this->query->get();
+        $existingByUnique = [];
+        foreach ($existing as $model) {
+            $key = $model->getAttribute($uniqueColumn);
+            if ($key !== null) {
+                $existingByUnique[$key] = $model;
+            }
+        }
+
+        // Process new models
+        $processedKeys = [];
+        foreach ($models as $modelData) {
+            if (is_array($modelData)) {
+                $uniqueValue = $modelData[$uniqueColumn] ?? null;
+                if ($uniqueValue === null) continue;
+
+                $processedKeys[] = $uniqueValue;
+
+                if (isset($existingByUnique[$uniqueValue])) {
+                    // Update existing
+                    $existingModel = $existingByUnique[$uniqueValue];
+                    foreach ($modelData as $key => $value) {
+                        $existingModel->setAttribute($key, $value);
+                    }
+                    $existingModel->save();
+                    $changes['updated'][] = $existingModel;
+                } else {
+                    // Create new
+                    $modelData[$this->foreignKey] = $parentKey;
+                    $newModel = call_user_func([$this->relatedClass, 'create'], $modelData);
+                    $changes['created'][] = $newModel;
+                }
+            }
+        }
+
+        // Delete models not in the new set
+        foreach ($existingByUnique as $key => $model) {
+            if (!in_array($key, $processedKeys)) {
+                $model->delete();
+                $changes['deleted'][] = $model;
+            }
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Get the related model class name.
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return class-string<Model> Related model class
+     */
+    public function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
+    /**
+     * Get models created within a date range.
+     *
+     * Performance: O(log n) - Uses indexed date column
+     * Clean Architecture: Expressive temporal filtering
+     *
+     * @param string $startDate Start date (Y-m-d format)
+     * @param string $endDate End date (Y-m-d format)
+     * @param string $column Date column (default: 'created_at')
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $recentPosts = $user->posts()->createdBetween('2024-01-01', '2024-01-31');
+     * ```
+     */
+    public function createdBetween(string $startDate, string $endDate, string $column = 'created_at'): ModelCollection
+    {
+        $results = $this->query->whereBetween($column, [$startDate, $endDate])->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get models created today.
+     *
+     * Performance: O(log n) - Uses DATE function with index
+     * Clean Architecture: Expressive temporal method
+     *
+     * @param string $column Date column (default: 'created_at')
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $todaysPosts = $user->posts()->createdToday();
+     * ```
+     */
+    public function createdToday(string $column = 'created_at'): ModelCollection
+    {
+        $today = date('Y-m-d');
+        $results = $this->query->whereRaw("DATE({$column}) = ?", [$today])->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
     }
 }

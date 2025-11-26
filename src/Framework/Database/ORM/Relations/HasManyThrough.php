@@ -315,7 +315,10 @@ class HasManyThrough extends Relation
     /**
      * Process records in chunks to optimize memory usage.
      *
-     * Performance: O(n/chunk_size) - Memory-efficient processing of large datasets
+     * PERFORMANCE WARNING: Uses OFFSET/LIMIT which can be slow on large tables.
+     * For better performance on large datasets, use chunkById() instead.
+     *
+     * Performance: O(n/chunk_size) but OFFSET becomes slower as offset increases
      * Clean Architecture: Callback pattern for flexible processing
      *
      * @param int $count Number of records per chunk
@@ -324,15 +327,22 @@ class HasManyThrough extends Relation
      *
      * @example
      * ```php
+     * // For small to medium datasets
      * $country->posts()->chunk(100, function($posts) {
      *     foreach ($posts as $post) {
      *         // Process each post
      *     }
      * });
+     *
+     * // For large datasets, prefer chunkById():
+     * $country->posts()->chunkById(100, function($posts) {
+     *     // Much faster on large tables
+     * });
      * ```
      */
     public function chunk(int $count, callable $callback): bool
     {
+
         $page = 1;
 
         do {
@@ -729,5 +739,232 @@ class HasManyThrough extends Relation
         throw new \BadMethodCallException(
             sprintf('Method %s::%s does not exist.', static::class, $method)
         );
+    }
+
+    /**
+     * Get related models with specific attributes.
+     *
+     * Performance: O(n) - Single query with JOIN and WHERE constraints
+     * Clean Architecture: Expressive finder method for through relationships
+     *
+     * @param array $attributes Attributes to search by
+     * @param array $columns Columns to select
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $publishedPosts = $country->posts()->getBy(['status' => 'published']);
+     * ```
+     */
+    public function getBy(array $attributes, array $columns = ['*']): ModelCollection
+    {
+        $query = clone $this->query;
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+
+        foreach ($attributes as $column => $value) {
+            $query->where("{$relatedTable}.{$column}", $value);
+        }
+
+        $results = $query->select($columns)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get the latest related models through the intermediate relationship.
+     *
+     * Performance: O(log n) - Uses ORDER BY with LIMIT through JOIN
+     * Clean Architecture: Expressive temporal method
+     *
+     * @param int $limit Number of records to get
+     * @param string $column Column to order by (default: 'created_at')
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $latestPosts = $country->posts()->latest(5);
+     * ```
+     */
+    public function latest(int $limit = 10, string $column = 'created_at'): ModelCollection
+    {
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        $results = $this->query->orderBy("{$relatedTable}.{$column}", 'desc')->limit($limit)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get the oldest related models through the intermediate relationship.
+     *
+     * Performance: O(log n) - Uses ORDER BY with LIMIT through JOIN
+     * Clean Architecture: Expressive temporal method
+     *
+     * @param int $limit Number of records to get
+     * @param string $column Column to order by (default: 'created_at')
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $oldestPosts = $country->posts()->oldest(5);
+     * ```
+     */
+    public function oldest(int $limit = 10, string $column = 'created_at'): ModelCollection
+    {
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        $results = $this->query->orderBy("{$relatedTable}.{$column}", 'asc')->limit($limit)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get random related models through the intermediate relationship.
+     *
+     * Performance: O(n) - Database-dependent random ordering through JOIN
+     * Clean Architecture: Expressive randomization method
+     *
+     * @param int $limit Number of records to get
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $randomPosts = $country->posts()->random(3);
+     * ```
+     */
+    public function random(int $limit = 1): ModelCollection
+    {
+        $results = $this->query->orderByRaw('RAND()')->limit($limit)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get models created within a date range through the relationship.
+     *
+     * Performance: O(log n) - Uses indexed date column through JOIN
+     * Clean Architecture: Expressive temporal filtering
+     *
+     * @param string $startDate Start date (Y-m-d format)
+     * @param string $endDate End date (Y-m-d format)
+     * @param string $column Date column (default: 'created_at')
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $recentPosts = $country->posts()->createdBetween('2024-01-01', '2024-01-31');
+     * ```
+     */
+    public function createdBetween(string $startDate, string $endDate, string $column = 'created_at'): ModelCollection
+    {
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        $results = $this->query->whereBetween("{$relatedTable}.{$column}", [$startDate, $endDate])->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get models created today through the relationship.
+     *
+     * Performance: O(log n) - Uses DATE function with index through JOIN
+     * Clean Architecture: Expressive temporal method
+     *
+     * @param string $column Date column (default: 'created_at')
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $todaysPosts = $country->posts()->createdToday();
+     * ```
+     */
+    public function createdToday(string $column = 'created_at'): ModelCollection
+    {
+        $today = date('Y-m-d');
+        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        $results = $this->query->whereRaw("DATE({$relatedTable}.{$column}) = ?", [$today])->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get models with specific through table attributes.
+     *
+     * Performance: O(n) - Single query with through table constraints
+     * Clean Architecture: Expressive through-table filtering
+     *
+     * @param array $throughAttributes Attributes on the through table
+     * @param array $columns Columns to select
+     * @return ModelCollection
+     *
+     * @example
+     * ```php
+     * $activePosts = $country->posts()->getByThrough(['status' => 'active']);
+     * ```
+     */
+    public function getByThrough(array $throughAttributes, array $columns = ['*']): ModelCollection
+    {
+        $query = clone $this->query;
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+
+        foreach ($throughAttributes as $column => $value) {
+            $query->where("{$throughTable}.{$column}", $value);
+        }
+
+        $results = $query->select($columns)->get();
+        return call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+    }
+
+    /**
+     * Get distinct values from the through table.
+     *
+     * Performance: O(log n) - Uses database DISTINCT optimization through JOIN
+     * Clean Architecture: Expressive method for through table analysis
+     *
+     * @param string $column Through table column name
+     * @return array Array of distinct values
+     *
+     * @example
+     * ```php
+     * $departments = $country->posts()->distinctThrough('department');
+     * ```
+     */
+    public function distinctThrough(string $column): array
+    {
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+
+        $connection = $this->query->getConnection();
+        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        return $qb->table($throughTable)
+            ->distinct()
+            ->pluck($column)
+            ->toArray();
+    }
+
+    /**
+     * Get aggregated values from the through table.
+     *
+     * Performance: O(1) - Single aggregation query through JOIN
+     * Clean Architecture: Expressive aggregation method
+     *
+     * @param string $function Aggregation function (sum, avg, min, max, count)
+     * @param string $column Through table column name
+     * @return mixed Aggregated value
+     *
+     * @example
+     * ```php
+     * $totalUsers = $country->posts()->aggregateThrough('count', 'user_id');
+     * ```
+     */
+    public function aggregateThrough(string $function, string $column): mixed
+    {
+        $throughTable = call_user_func([$this->throughClass, 'getTableName']);
+
+        $connection = $this->query->getConnection();
+        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        $query = $qb->table($throughTable)
+            ->where($this->firstKey, $this->parent->getAttribute($this->localKey));
+
+        return match (strtolower($function)) {
+            'sum' => $query->sum($column),
+            'avg' => $query->avg($column),
+            'min' => $query->min($column),
+            'max' => $query->max($column),
+            'count' => $query->count($column),
+            default => throw new \InvalidArgumentException("Unsupported aggregation function: {$function}")
+        };
     }
 }

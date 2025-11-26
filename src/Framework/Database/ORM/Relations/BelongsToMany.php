@@ -1136,6 +1136,10 @@ class BelongsToMany extends Relation
     /**
      * Process attachment/updates in chunks.
      *
+     * FIXED: Now correctly filters current pivot IDs by chunk to avoid:
+     * 1. Performance issue: O(n²) complexity from repeated full scans
+     * 2. Correctness issue: Missing IDs beyond limit causing duplicate attachments
+     *
      * @param array $records Records to attach/update
      * @param int $chunkSize Chunk size
      * @param array &$changes Changes array to update
@@ -1146,12 +1150,14 @@ class BelongsToMany extends Relation
         $recordChunks = array_chunk($records, $chunkSize, true);
 
         foreach ($recordChunks as $chunk) {
-            // Get current IDs for this chunk
             $chunkIds = array_keys($chunk);
-            $current = $this->getCurrentPivotIds(count($chunkIds) * 2); // Safety limit
+
+            // FIXED: Only get current pivot IDs for this specific chunk
+            // This prevents both performance and correctness issues
+            $current = $this->getCurrentPivotIdsFor($chunkIds);
 
             foreach ($chunk as $id => $pivotData) {
-                if (in_array($id, $current)) {
+                if (in_array($id, $current, true)) {
                     // Update existing pivot record
                     if (!empty($pivotData)) {
                         $this->updateExistingPivot($id, $pivotData);
@@ -1224,12 +1230,18 @@ class BelongsToMany extends Relation
      *
      * PERFORMANCE WARNING: Loads all pivot IDs into memory.
      * For very large relationships (>10k records), consider:
-     * 1. Using chunked operations
+     * 1. Using chunked operations (syncChunked)
      * 2. Implementing streaming sync operations
      * 3. Using database-level operations
      *
+     * IMPORTANT: This method should NOT be used in chunked operations as it
+     * doesn't filter by specific IDs, leading to correctness issues.
+     * Use targeted queries with whereIn() instead.
+     *
      * @param int|null $limit Optional limit for safety (null = no limit)
      * @return array
+     *
+     * @deprecated Use targeted queries in chunked operations instead
      */
     protected function getCurrentPivotIds(?int $limit = null): array
     {
@@ -1245,18 +1257,31 @@ class BelongsToMany extends Relation
         $results = $query->pluck($this->relatedPivotKey);
         $ids = $results->toArray();
 
-        // Warn about potential performance issues
-        if (count($ids) > 5000) {
-            trigger_error(
-                sprintf(
-                    'Large relationship detected (%d records). Consider using chunked operations for better performance.',
-                    count($ids)
-                ),
-                E_USER_NOTICE
-            );
+        return $ids;
+    }
+
+    /**
+     * Get current pivot IDs for specific related IDs only.
+     *
+     * Performance: O(log n) - Uses indexed lookup with whereIn
+     * Clean Architecture: Targeted query for chunked operations
+     *
+     * @param array $relatedIds Array of related IDs to check
+     * @return array Array of existing pivot IDs from the given set
+     */
+    protected function getCurrentPivotIdsFor(array $relatedIds): array
+    {
+        if (empty($relatedIds)) {
+            return [];
         }
 
-        return $ids;
+        $qb = new QueryBuilder($this->query->getConnection());
+        $results = $qb->table($this->pivotTable)
+            ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey))
+            ->whereIn($this->relatedPivotKey, $relatedIds)
+            ->pluck($this->relatedPivotKey);
+
+        return $results->toArray();
     }
 
     /**
@@ -1629,14 +1654,6 @@ class BelongsToMany extends Relation
      */
     public function chunk(int $count, callable $callback): bool
     {
-        // Warn about performance implications for large datasets
-        if ($count > 1000) {
-            trigger_error(
-                'chunk() with large chunk sizes may be slow on large tables. Consider using chunkById() for better performance.',
-                E_USER_NOTICE
-            );
-        }
-
         $page = 1;
 
         do {

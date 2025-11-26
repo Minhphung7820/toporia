@@ -500,7 +500,35 @@ class MorphToMany extends Relation
             'value' => $value
         ];
 
+        // Apply constraint immediately to current query
+        $this->applyPivotWhere($column, $operator, $value);
+
         return $this;
+    }
+
+    /**
+     * Apply a single pivot where constraint to the query.
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param mixed $value Value to compare
+     * @return void
+     */
+    protected function applyPivotWhere(string $column, string $operator, mixed $value): void
+    {
+        $column = "{$this->pivotTable}.{$column}";
+
+        if ($operator === 'BETWEEN' && is_array($value)) {
+            $this->query->whereBetween($column, $value);
+        } elseif ($operator === 'NOT BETWEEN' && is_array($value)) {
+            $this->query->whereNotBetween($column, $value);
+        } elseif ($operator === 'IS' && $value === null) {
+            $this->query->whereNull($column);
+        } elseif ($operator === 'IS NOT' && $value === null) {
+            $this->query->whereNotNull($column);
+        } else {
+            $this->query->where($column, $operator, $value);
+        }
     }
 
     /**
@@ -516,6 +544,9 @@ class MorphToMany extends Relation
             'column' => $column,
             'values' => $values
         ];
+
+        // Apply constraint immediately to current query
+        $this->query->whereIn("{$this->pivotTable}.{$column}", $values);
 
         return $this;
     }
@@ -535,6 +566,9 @@ class MorphToMany extends Relation
             'not' => true
         ];
 
+        // Apply constraint immediately to current query
+        $this->query->whereNotIn("{$this->pivotTable}.{$column}", $values);
+
         return $this;
     }
 
@@ -547,10 +581,15 @@ class MorphToMany extends Relation
      */
     public function orderByPivot(string $column, string $direction = 'asc'): static
     {
+        $direction = strtolower($direction);
+
         $this->pivotOrderBy[] = [
             'column' => $column,
-            'direction' => strtolower($direction)
+            'direction' => $direction
         ];
+
+        // Apply order immediately to current query
+        $this->query->orderBy("{$this->pivotTable}.{$column}", $direction);
 
         return $this;
     }
@@ -829,7 +868,10 @@ class MorphToMany extends Relation
     /**
      * Process records in chunks to optimize memory usage.
      *
-     * Performance: O(n/chunk_size) - Memory-efficient processing
+     * PERFORMANCE WARNING: Uses OFFSET/LIMIT which can be slow on large tables.
+     * For better performance on large datasets, use chunkById() instead.
+     *
+     * Performance: O(n/chunk_size) but OFFSET becomes slower as offset increases
      * Clean Architecture: Callback pattern for flexible processing
      *
      * @param int $count Number of records per chunk
@@ -838,6 +880,7 @@ class MorphToMany extends Relation
      */
     public function chunk(int $count, callable $callback): bool
     {
+
         $page = 1;
 
         do {
@@ -854,6 +897,59 @@ class MorphToMany extends Relation
             }
 
             $page++;
+        } while ($results->count() === $count);
+
+        return true;
+    }
+
+    /**
+     * Process records in chunks ordered by ID for consistent results.
+     *
+     * Performance: O(n/chunk_size) - Consistent ordering prevents missed records
+     * Clean Architecture: ID-based chunking ensures reliable pagination
+     *
+     * @param int $count Number of records per chunk
+     * @param callable $callback Function to process each chunk
+     * @param string $column Column to order by (default: related model's primary key)
+     * @param string $alias Optional column alias
+     * @return bool True if all chunks processed successfully
+     *
+     * @example
+     * ```php
+     * $post->tags()->chunkById(50, function($tags) {
+     *     // Process tags in consistent order
+     * });
+     * ```
+     */
+    public function chunkById(int $count, callable $callback, string $column = null, string $alias = null): bool
+    {
+        $column = $column ?: $this->relatedKey;
+        $alias = $alias ?: $column;
+        $lastId = null;
+
+        do {
+            $clone = clone $this->query;
+
+            if ($lastId !== null) {
+                $clone->where($column, '>', $lastId);
+            }
+
+            $results = $clone->orderBy($column)->limit($count)->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+
+            // Call the callback with the current chunk
+            if ($callback($models) === false) {
+                return false;
+            }
+
+            // Get the last ID for the next iteration
+            $lastModel = $models->last();
+            $lastId = $lastModel->getAttribute($alias);
         } while ($results->count() === $count);
 
         return true;
@@ -930,5 +1026,301 @@ class MorphToMany extends Relation
         throw new \BadMethodCallException(
             sprintf('Method %s::%s does not exist.', static::class, $method)
         );
+    }
+
+    /**
+     * Add date-based pivot constraints.
+     *
+     * Performance: O(1) - Direct SQL date function usage
+     * Clean Architecture: Expressive domain-specific method
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param string $value Date value (Y-m-d format)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $post->tags()->wherePivotDate('assigned_at', '>=', '2024-01-01')->get();
+     * ```
+     */
+    public function wherePivotDate(string $column, string $operator, string $value): static
+    {
+        // Apply function directly to avoid double prefixing
+        $this->query->whereRaw("DATE({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+
+        // Store for eager loading
+        $this->pivotWheres[] = [
+            'column' => "DATE({$column})",
+            'operator' => $operator,
+            'value' => $value
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Add month-based pivot constraints.
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param int $value Month value (1-12)
+     * @return $this
+     */
+    public function wherePivotMonth(string $column, string $operator, int $value): static
+    {
+        $this->query->whereRaw("MONTH({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+
+        $this->pivotWheres[] = [
+            'column' => "MONTH({$column})",
+            'operator' => $operator,
+            'value' => $value
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Add year-based pivot constraints.
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param int $value Year value
+     * @return $this
+     */
+    public function wherePivotYear(string $column, string $operator, int $value): static
+    {
+        $this->query->whereRaw("YEAR({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+
+        $this->pivotWheres[] = [
+            'column' => "YEAR({$column})",
+            'operator' => $operator,
+            'value' => $value
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Get pivot aggregations.
+     *
+     * Performance: O(1) - Single aggregation query
+     * Clean Architecture: Expressive aggregation methods
+     *
+     * @param string $column Pivot column name
+     * @return float|int
+     */
+    public function sumPivot(string $column): float|int
+    {
+        $connection = $this->query->getConnection();
+        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        return $qb->table($this->pivotTable)
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->where($this->morphType, $this->getMorphClass())
+            ->sum($column) ?? 0;
+    }
+
+    /**
+     * Get average of a pivot column.
+     *
+     * @param string $column Pivot column name
+     * @return float|int
+     */
+    public function avgPivot(string $column): float|int
+    {
+        $connection = $this->query->getConnection();
+        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        return $qb->table($this->pivotTable)
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->where($this->morphType, $this->getMorphClass())
+            ->avg($column) ?? 0;
+    }
+
+    /**
+     * Get minimum value of a pivot column.
+     *
+     * @param string $column Pivot column name
+     * @return mixed
+     */
+    public function minPivot(string $column): mixed
+    {
+        $connection = $this->query->getConnection();
+        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        return $qb->table($this->pivotTable)
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->where($this->morphType, $this->getMorphClass())
+            ->min($column);
+    }
+
+    /**
+     * Get maximum value of a pivot column.
+     *
+     * @param string $column Pivot column name
+     * @return mixed
+     */
+    public function maxPivot(string $column): mixed
+    {
+        $connection = $this->query->getConnection();
+        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        return $qb->table($this->pivotTable)
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->where($this->morphType, $this->getMorphClass())
+            ->max($column);
+    }
+
+    /**
+     * Get the pivot table query builder.
+     *
+     * Performance: O(1) - Direct query builder access
+     * Clean Architecture: Exposes pivot table for advanced queries
+     *
+     * @return \Toporia\Framework\Database\Query\QueryBuilder
+     */
+    public function pivotQuery(): \Toporia\Framework\Database\Query\QueryBuilder
+    {
+        $connection = $this->query->getConnection();
+        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        return $qb->table($this->pivotTable)
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->where($this->morphType, $this->getMorphClass());
+    }
+
+    /**
+     * Get distinct values from a pivot column.
+     *
+     * Performance: O(log n) - Uses database DISTINCT optimization
+     * Clean Architecture: Expressive method for pivot column analysis
+     *
+     * @param string $column Pivot column name
+     * @return array Array of distinct values
+     */
+    public function distinctPivot(string $column): array
+    {
+        return $this->pivotQuery()
+            ->distinct()
+            ->pluck($column)
+            ->toArray();
+    }
+
+    /**
+     * Check if a specific pivot relationship exists.
+     *
+     * Performance: O(log n) - Indexed lookup with early termination
+     * Clean Architecture: Expressive existence check
+     *
+     * @param int|string $id Related model ID
+     * @param array $pivotConstraints Additional pivot constraints
+     * @return bool
+     */
+    public function pivotExists(int|string $id, array $pivotConstraints = []): bool
+    {
+        $query = $this->pivotQuery()->where($this->relatedPivotKey, $id);
+
+        foreach ($pivotConstraints as $column => $value) {
+            $query->where($column, $value);
+        }
+
+        return $query->exists();
+    }
+
+    /**
+     * Find a related model by its pivot attributes.
+     *
+     * Performance: O(log n) - Indexed pivot table lookup
+     * Clean Architecture: Expressive finder method for pivot-based queries
+     *
+     * @param array $pivotAttributes Pivot attributes to search by
+     * @param array $columns Columns to select
+     * @return Model|null
+     */
+    public function findByPivot(array $pivotAttributes, array $columns = ['*']): ?Model
+    {
+        foreach ($pivotAttributes as $column => $value) {
+            $this->wherePivot($column, $value);
+        }
+
+        return $this->select($columns)->first();
+    }
+
+    /**
+     * Get all related models with specific pivot attributes.
+     *
+     * @param array $pivotAttributes Pivot attributes to search by
+     * @param array $columns Columns to select
+     * @return ModelCollection
+     */
+    public function getByPivot(array $pivotAttributes, array $columns = ['*']): ModelCollection
+    {
+        foreach ($pivotAttributes as $column => $value) {
+            $this->wherePivot($column, $value);
+        }
+
+        return $this->select($columns)->get();
+    }
+
+    /**
+     * Sync with additional pivot values for all records.
+     *
+     * Performance: O(n) - Batch operations with single transaction
+     * Clean Architecture: Atomic sync operation with consistent state
+     *
+     * @param array $ids Related model IDs
+     * @param array $pivotValues Additional pivot data for all records
+     * @param bool $detaching Whether to detach missing records
+     * @return array Sync results
+     */
+    public function syncWithPivotValues(array $ids, array $pivotValues, bool $detaching = true): array
+    {
+        // Add pivot values to each ID
+        $records = [];
+        foreach ($ids as $id) {
+            $records[$id] = $pivotValues;
+        }
+
+        return $this->sync($records, $detaching);
+    }
+
+    /**
+     * Get the morph name.
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string Morph name
+     */
+    public function getMorphName(): string
+    {
+        return $this->morphName;
+    }
+
+    /**
+     * Get the pivot table name.
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string Pivot table name
+     */
+    public function getPivotTable(): string
+    {
+        return $this->pivotTable;
+    }
+
+    /**
+     * Get the related pivot key.
+     *
+     * Performance: O(1) - Direct property access
+     * Clean Architecture: Expressive getter method
+     *
+     * @return string Related pivot key
+     */
+    public function getRelatedPivotKey(): string
+    {
+        return $this->relatedPivotKey;
     }
 }
