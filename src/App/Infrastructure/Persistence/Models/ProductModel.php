@@ -111,6 +111,73 @@ class ProductModel extends Model
     }
 
     /**
+     * Tags associated with this product (many-to-many).
+     */
+    public function tags()
+    {
+        return $this->belongsToMany(
+            TagModel::class,
+            'product_tags',
+            'product_id',
+            'tag_id'
+        )->withPivot('created_at', 'created_by')
+            ->withTimestamps();
+    }
+
+    /**
+     * Users who favorited this product (many-to-many).
+     */
+    public function favoritedBy()
+    {
+        return $this->belongsToMany(
+            UserModel::class,
+            'user_favorites',
+            'product_id',
+            'user_id'
+        )->withTimestamps();
+    }
+
+    /**
+     * Related products (many-to-many self-referencing).
+     */
+    public function relatedProducts()
+    {
+        return $this->belongsToMany(
+            ProductModel::class,
+            'product_relations',
+            'product_id',
+            'related_product_id'
+        )->withPivot('relation_type', 'strength')
+            ->withTimestamps();
+    }
+
+    /**
+     * Products related to this one (inverse).
+     */
+    public function relatedToProducts()
+    {
+        return $this->belongsToMany(
+            ProductModel::class,
+            'product_relations',
+            'related_product_id',
+            'product_id'
+        )->withPivot('relation_type', 'strength')
+            ->withTimestamps();
+    }
+
+    /**
+     * All tags (polymorphic many-to-many).
+     */
+    public function allTags()
+    {
+        return $this->morphToMany(
+            TagModel::class,
+            'taggable',
+            'taggables'
+        );
+    }
+
+    /**
      * Get final price (sale_price if available, otherwise price).
      */
     public function getFinalPriceAttribute(): float

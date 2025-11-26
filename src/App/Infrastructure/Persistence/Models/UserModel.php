@@ -5,88 +5,123 @@ declare(strict_types=1);
 namespace App\Infrastructure\Persistence\Models;
 
 use Toporia\Framework\Database\ORM\Model;
-use Toporia\Framework\Notification\Contracts\NotifiableInterface;
-use Toporia\Framework\Notification\Notifiable;
 
 /**
- * User ORM Model (Infrastructure Layer).
- *
- * This is the Active Record implementation for database persistence.
- * Located in Infrastructure layer as it depends on framework components.
- *
- * Clean Architecture:
- * - This class belongs to Infrastructure layer
- * - Should NOT be used directly by controllers
- * - Should be accessed through Repository implementations
- *
- * This model demonstrates convention over configuration:
- * - NO $table property -> auto-inferred as "users" (from UserModel)
- * - NO $fillable property -> ALL fields are fillable
- * - NO $guarded property -> inherits empty array (auto-fillable)
- *
- * Features:
- * - Notifiable: Can send/receive notifications via email, database, etc.
+ * User ORM Model.
  *
  * @property int $id
  * @property string $name
  * @property string $email
- * @property string|null $password
- * @property string|null $remember_token
+ * @property string|null $email_verified_at
+ * @property string $password
+ * @property string|null $avatar
+ * @property string|null $phone
+ * @property string|null $address
+ * @property string|null $city
+ * @property string|null $country
+ * @property string|null $postal_code
+ * @property string $role
+ * @property bool $is_active
+ * @property string|null $last_login_at
  * @property string $created_at
  * @property string $updated_at
  */
-class UserModel extends Model implements NotifiableInterface
+class UserModel extends Model
 {
-    use Notifiable;
-    // =========================================================================
-    // NO CONFIGURATION NEEDED!
-    // =========================================================================
+    protected static string $table = 'users';
 
-    // Table name auto-inferred: UserModel -> users
-    // protected static string $table = 'users'; // <- Not needed!
+    protected static array $fillable = [
+        'name',
+        'email',
+        'email_verified_at',
+        'password',
+        'avatar',
+        'phone',
+        'address',
+        'city',
+        'country',
+        'postal_code',
+        'role',
+        'is_active',
+        'last_login_at',
+    ];
 
-    // Auto-fillable: All fields are fillable by default
-    // protected static array $fillable = []; // <- Not needed!
+    protected static array $hidden = [
+        'password',
+    ];
 
-    // No guarded fields by default
-    // protected static array $guarded = []; // <- Already inherited!
-
-    /**
-     * {@inheritdoc}
-     */
     protected static array $casts = [
+        'is_active' => 'bool',
         'email_verified_at' => 'datetime',
+        'last_login_at' => 'datetime',
     ];
 
     /**
-     * Hide sensitive attributes from JSON output.
-     *
-     * Security best practice: Always hide passwords and tokens!
+     * Reviews written by this user.
      */
-    protected static array $hidden = ['password', 'remember_token'];
-
-    /**
-     * Check if user's email is verified.
-     *
-     * @return bool
-     */
-    public function isVerified(): bool
+    public function reviews()
     {
-        return !empty($this->email_verified_at);
+        return $this->hasMany(ReviewModel::class);
     }
 
     /**
-     * Route notification to specific channel.
-     *
-     * @param string $channel Notification channel (mail, sms, slack, database)
-     * @return mixed Channel-specific routing data
+     * Orders placed by this user.
      */
-    public function routeNotificationFor(string $channel): mixed
+    public function orders()
     {
-        return match ($channel) {
-            'mail' => $this->email,
-            'database' => $this->id,
-            default => null
-        };
+        return $this->hasMany(OrderModel::class);
+    }
+
+    /**
+     * Products favorited by this user (many-to-many).
+     */
+    public function favoriteProducts()
+    {
+        return $this->belongsToMany(
+            ProductModel::class,
+            'user_favorites',
+            'user_id',
+            'product_id'
+        )->withTimestamps();
+    }
+
+    /**
+     * User's profile (one-to-one).
+     */
+    public function profile()
+    {
+        return $this->hasOne(UserProfileModel::class);
+    }
+
+    /**
+     * Check if user is admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is verified.
+     */
+    public function isVerified(): bool
+    {
+        return $this->email_verified_at !== null;
+    }
+
+    /**
+     * Scope: Active users.
+     */
+    public static function active()
+    {
+        return static::query()->where('is_active', true);
+    }
+
+    /**
+     * Scope: Admin users.
+     */
+    public static function admins()
+    {
+        return static::query()->where('role', 'admin');
     }
 }

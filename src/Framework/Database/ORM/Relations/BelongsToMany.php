@@ -1809,7 +1809,8 @@ class BelongsToMany extends Relation
      */
     public function sumPivot(string $column): float|int
     {
-        return $this->query->sum("{$this->pivotTable}.{$column}") ?? 0;
+        $result = $this->query->sum("{$this->pivotTable}.{$column}");
+        return is_numeric($result) ? (float) $result : 0;
     }
 
     /**
@@ -1825,7 +1826,8 @@ class BelongsToMany extends Relation
      */
     public function avgPivot(string $column): float|int
     {
-        return $this->query->avg("{$this->pivotTable}.{$column}") ?? 0;
+        $result = $this->query->avg("{$this->pivotTable}.{$column}");
+        return is_numeric($result) ? (float) $result : 0;
     }
 
     /**

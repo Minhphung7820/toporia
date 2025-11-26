@@ -773,21 +773,6 @@ abstract class Model implements ModelInterface, ObservableInterface
         return static::query()->paginate($perPage, $page, $path);
     }
 
-    /**
-     * Get the first record or null.
-     *
-     * @return static|null
-     */
-    public static function first(): ?static
-    {
-        $row = static::query()->limit(1)->first();
-        if (!$row) return null;
-
-        $m = new static($row);
-        $m->exists = true;
-        $m->syncOriginal();
-        return $m;
-    }
 
     /**
      * Create a new instance and immediately persist it.
@@ -2539,5 +2524,30 @@ abstract class Model implements ModelInterface, ObservableInterface
 
         // Apply column selection
         $query->select($columns);
+    }
+
+    /**
+     * Handle dynamic static method calls to the model.
+     *
+     * This allows calling QueryBuilder methods directly on the Model class
+     * like Laravel: ProductModel::where('id', 1)->first()
+     *
+     * @param string $method
+     * @param array $parameters
+     * @return mixed
+     */
+    public static function __callStatic(string $method, array $parameters)
+    {
+        // Get connection
+        $connection = app()->make(\Toporia\Framework\Database\Connection::class);
+
+        // Create model query builder
+        $modelQueryBuilder = new \Toporia\Framework\Database\ORM\ModelQueryBuilder($connection, static::class);
+
+        // Set the table
+        $modelQueryBuilder->table(static::getTableName());
+
+        // Call the method on the query builder
+        return $modelQueryBuilder->$method(...$parameters);
     }
 }

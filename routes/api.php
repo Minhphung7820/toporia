@@ -47,4 +47,13 @@ Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/products/{id}/reviews', [ProductController::class, 'reviews']);
 Route::get('/categories', [ProductController::class, 'categories']);
 
+// Complex Relationship Testing Routes
+Route::get('/products/test-belongs-to-many', [ProductController::class, 'testBelongsToMany']);
+Route::get('/products/test-has-relationships', [ProductController::class, 'testHasRelationships']);
+Route::get('/products/test-belongs-to', [ProductController::class, 'testBelongsTo']);
+Route::get('/products/test-complex-queries', [ProductController::class, 'testComplexQueries']);
+Route::post('/products/test-sync-operations', [ProductController::class, 'testSyncOperations']);
+Route::get('/products/test-performance', [ProductController::class, 'testPerformance']);
+Route::get('/products/test-pivot-validation', [ProductController::class, 'testPivotValidation']);
+
 /** @var Router $router */

@@ -7,40 +7,42 @@ namespace App\Infrastructure\Persistence\Models;
 use Toporia\Framework\Database\ORM\Model;
 
 /**
- * Order Item ORM Model.
+ * OrderItem ORM Model.
  *
  * @property int $id
  * @property int $order_id
  * @property int $product_id
  * @property string $product_name
  * @property string|null $product_sku
+ * @property float $price
  * @property int $quantity
- * @property float $unit_price
- * @property float $total_price
- * @property array|null $product_data
+ * @property float $total
+ * @property array|null $product_options
  * @property string $created_at
  * @property string $updated_at
  */
 class OrderItemModel extends Model
 {
+    protected static string $table = 'order_items';
+
     protected static array $fillable = [
         'order_id',
         'product_id',
         'product_name',
         'product_sku',
+        'price',
         'quantity',
-        'unit_price',
-        'total_price',
-        'product_data',
+        'total',
+        'product_options',
     ];
 
     protected static array $casts = [
         'order_id' => 'int',
         'product_id' => 'int',
+        'price' => 'float',
         'quantity' => 'int',
-        'unit_price' => 'float',
-        'total_price' => 'float',
-        'product_data' => 'array',
+        'total' => 'float',
+        'product_options' => 'array',
     ];
 
     /**
@@ -52,10 +54,42 @@ class OrderItemModel extends Model
     }
 
     /**
-     * Product this item references.
+     * Product this item represents.
      */
     public function product()
     {
         return $this->belongsTo(ProductModel::class);
+    }
+
+    /**
+     * Calculate total price.
+     */
+    public function calculateTotal(): float
+    {
+        return $this->price * $this->quantity;
+    }
+
+    /**
+     * Get subtotal (alias for total).
+     */
+    public function getSubtotalAttribute(): float
+    {
+        return $this->total;
+    }
+
+    /**
+     * Scope: Items for specific order.
+     */
+    public static function forOrder(int $orderId)
+    {
+        return static::query()->where('order_id', $orderId);
+    }
+
+    /**
+     * Scope: Items for specific product.
+     */
+    public static function forProduct(int $productId)
+    {
+        return static::query()->where('product_id', $productId);
     }
 }

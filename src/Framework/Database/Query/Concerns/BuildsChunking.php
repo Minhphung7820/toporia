@@ -371,4 +371,3 @@ trait BuildsChunking
         return $this->offset(($page - 1) * $perPage)->limit($perPage);
     }
 }
-
