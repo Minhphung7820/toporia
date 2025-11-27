@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM;
 
-use Toporia\Framework\Support\Collection\Collection;
+use Toporia\Framework\Database\DatabaseCollection;
 
 
 /**
@@ -23,7 +23,7 @@ use Toporia\Framework\Support\Collection\Collection;
  *
  * @link        https://github.com/Minhphung7820/toporia
  */
-class ModelCollection extends Collection implements \JsonSerializable
+class ModelCollection extends DatabaseCollection implements \JsonSerializable
 {
   /**
    * Return the array of primary keys for all models in the collection.

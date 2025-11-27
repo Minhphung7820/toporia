@@ -74,11 +74,11 @@ final class ProductController extends BaseController
         $actualData = ProductModel::where('category_id', 1)->first();
 
         // Option 3: Performance testing with query hints
-        $optimizedQuery = ProductModel::with(['categories'])
+        $optimizedQuery = ProductModel::query()->with(['categories'])
             ->optimizeForLargeResults()
-            ->limit(10)
+            ->limit(1000)
             ->orderBy('id', 'ASC')
-            ->getModels();
+            ->get();
 
         $singleProduct = [
             'sql_info' => $sqlInfo,

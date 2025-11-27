@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Contracts;
 
-use Toporia\Framework\Database\Query\RowCollection;
+use Toporia\Framework\Database\DatabaseCollection;
 
 
 /**
@@ -122,9 +122,9 @@ interface QueryBuilderInterface
     /**
      * Execute query and get all results.
      *
-     * @return RowCollection<int, array<string,mixed>>
+     * @return BaseCollection<int, array<string,mixed>>
      */
-    public function get(): RowCollection;
+    public function get(): DatabaseCollection;
 
     /**
      * Execute query and get first result.

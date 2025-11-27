@@ -702,7 +702,7 @@ trait HasRelationships
      * @param array $relations Raw relations input
      * @return array<string, callable|null> Normalized relations
      */
-    protected static function normalizeWithRelations(array $relations): array
+    public static function normalizeWithRelations(array $relations): array
     {
         $normalized = [];
 

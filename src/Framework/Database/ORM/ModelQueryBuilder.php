@@ -8,6 +8,7 @@ use Closure;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Contracts\RelationInterface;
+use Toporia\Framework\Database\DatabaseCollection;
 
 
 /**
@@ -733,12 +734,10 @@ class ModelQueryBuilder extends QueryBuilder
     {
         // Delegate to Model's static method for normalization
         /** @var callable $normalizeMethod */
-        $normalizeMethod = [$this->modelClass, 'normalizeEagerLoadRelations'];
+        $normalizeMethod = [$this->modelClass, 'normalizeWithRelations'];
         $normalized = $normalizeMethod($relations);
-
-        // Merge with existing eager load configuration
-        $existing = $this->getEagerLoad();
-        $this->setEagerLoad(array_merge($existing, $normalized));
+        // Set eager load
+        $this->setEagerLoad($normalized);
 
         return $this;
     }
@@ -1965,5 +1964,17 @@ class ModelQueryBuilder extends QueryBuilder
     public function getEagerLoad(): array
     {
         return $this->eagerLoad;
+    }
+
+    /**
+     * Execute the query and return a DatabaseCollection (ModelCollection).
+     *
+     * Overrides parent get() method with same return type for compatibility.
+     *
+     * @return DatabaseCollection
+     */
+    public function get(): DatabaseCollection
+    {
+        return $this->getModels();
     }
 }

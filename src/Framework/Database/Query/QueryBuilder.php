@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\Query;
 
 use Toporia\Framework\Database\Contracts\{ConnectionInterface, QueryBuilderInterface};
 use Toporia\Framework\Database\Query\{Expression, RowCollection};
+use Toporia\Framework\Database\DatabaseCollection;
 
 
 /**
@@ -1081,9 +1082,9 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Execute the built SELECT and return rows.
      *
-     * @return RowCollection<int, array<string,mixed>>
+     * @return DatabaseCollection<int, array<string,mixed>>
      */
-    public function get(): RowCollection
+    public function get(): DatabaseCollection
     {
         $sql = $this->toSql();
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Query;
 
-use Toporia\Framework\Support\Collection\Collection;
+use Toporia\Framework\Database\DatabaseCollection;
 
 
 /**
@@ -23,7 +23,7 @@ use Toporia\Framework\Support\Collection\Collection;
  *
  * @link        https://github.com/Minhphung7820/toporia
  */
-class RowCollection extends Collection
+class RowCollection extends DatabaseCollection implements \JsonSerializable
 {
   /**
    * Return a collection of a given column's values (like pluck).
@@ -99,5 +99,15 @@ class RowCollection extends Collection
     /** @var array<int, array<string,mixed>> $items */
     $items = parent::values()->all();
     return $items;
+  }
+
+  /**
+   * Specify data which should be serialized to JSON.
+   *
+   * @return array<int, array<string,mixed>>
+   */
+  public function jsonSerialize(): array
+  {
+    return $this->toArray();
   }
 }
