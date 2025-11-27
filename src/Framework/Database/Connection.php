@@ -464,7 +464,6 @@ class Connection implements ConnectionInterface
             while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
                 yield $row;
             }
-
         } catch (PDOException $e) {
             throw new QueryException(
                 "Streaming query execution failed: {$e->getMessage()}",
