@@ -424,6 +424,80 @@ class Connection implements ConnectionInterface
     }
 
     /**
+     * Get connection configuration.
+     *
+     * @return array<string, mixed>
+     */
+    public function getConfig(): array
+    {
+        return $this->config;
+    }
+
+    /**
+     * Execute query in streaming mode for large datasets.
+     *
+     * This method enables unbuffered queries to reduce memory usage
+     * when processing large result sets.
+     *
+     * @param string $query SQL query
+     * @param array $bindings Query bindings
+     * @return \Generator<array> Generator yielding rows one by one
+     * @throws QueryException
+     */
+    public function executeStreaming(string $query, array $bindings = []): \Generator
+    {
+        $this->ensureConnected();
+
+        $originalBuffered = null;
+
+        try {
+            // Store original buffered query setting
+            $originalBuffered = $this->pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+
+            // Enable unbuffered queries for streaming
+            $this->pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+
+            // Execute query
+            $statement = $this->execute($query, $bindings);
+
+            // Yield rows one by one
+            while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
+                yield $row;
+            }
+
+        } catch (PDOException $e) {
+            throw new QueryException(
+                "Streaming query execution failed: {$e->getMessage()}",
+                $query,
+                $bindings,
+                $e
+            );
+        } finally {
+            // Restore original buffered query setting
+            if ($originalBuffered !== null) {
+                $this->pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $originalBuffered);
+            }
+        }
+    }
+
+    /**
+     * Check if streaming is supported for current driver.
+     *
+     * @return bool
+     */
+    public function supportsStreaming(): bool
+    {
+        $driver = $this->config['driver'] ?? 'mysql';
+
+        return match ($driver) {
+            'mysql' => true,
+            'pgsql' => true,  // PostgreSQL supports cursors
+            'sqlite' => false, // SQLite doesn't benefit from streaming
+            default => false
+        };
+    }
+
+    /**
      * Execute a SELECT query and return all results.
      *
      * @param string $query SQL query.

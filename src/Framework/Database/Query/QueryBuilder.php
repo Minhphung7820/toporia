@@ -151,6 +151,13 @@ class QueryBuilder implements QueryBuilderInterface
     private static array $queryLog = [];
 
     /**
+     * Query hints for performance optimization.
+     *
+     * @var array<string, array>
+     */
+    private array $queryHints = [];
+
+    /**
      * @param ConnectionInterface $connection Database connection used to execute statements.
      */
     public function __construct(
@@ -1632,6 +1639,9 @@ class QueryBuilder implements QueryBuilderInterface
             $compiledSql = $cteSql . ' ' . $compiledSql;
         }
 
+        // Apply query hints for performance optimization
+        $compiledSql = $this->applyQueryHints($compiledSql);
+
         // Cache if enabled
         if (self::$cachingEnabled) {
             $this->cachedSql = $compiledSql;
@@ -2614,5 +2624,238 @@ class QueryBuilder implements QueryBuilderInterface
 
         self::$relationshipCacheConfig['cache'][$key] = $result;
         self::$relationshipCacheConfig['size']++;
+    }
+
+    // =========================================================================
+    // QUERY HINTS & PERFORMANCE OPTIMIZATION
+    // =========================================================================
+
+    /**
+     * Add query hint for database optimization.
+     *
+     * @param string $type Hint type (index, no_cache, stream_results, etc.)
+     * @param array $values Hint values
+     * @return $this
+     */
+    public function addQueryHint(string $type, array $values = []): self
+    {
+        $this->queryHints[$type] = $values;
+        $this->invalidateCache();
+        return $this;
+    }
+
+    /**
+     * Disable query result caching for this query.
+     *
+     * @return $this
+     */
+    public function disableQueryCaching(): self
+    {
+        // This is a placeholder for disabling query result caching
+        // Implementation would depend on the caching layer
+        return $this;
+    }
+
+    /**
+     * Get all query hints.
+     *
+     * @return array<string, array>
+     */
+    public function getQueryHints(): array
+    {
+        return $this->queryHints;
+    }
+
+    /**
+     * Apply query hints to SQL string based on database driver.
+     *
+     * @param string $sql Base SQL query
+     * @return string SQL with hints applied
+     */
+    protected function applyQueryHints(string $sql): string
+    {
+        if (empty($this->queryHints)) {
+            return $sql;
+        }
+
+        $driver = $this->connection->getConfig()['driver'] ?? 'mysql';
+
+        return match ($driver) {
+            'mysql' => $this->applyMySQLHints($sql),
+            'pgsql' => $this->applyPostgreSQLHints($sql),
+            'sqlite' => $this->applySQLiteHints($sql),
+            default => $sql
+        };
+    }
+
+    /**
+     * Apply MySQL-specific query hints.
+     *
+     * @param string $sql Base SQL query
+     * @return string SQL with MySQL hints
+     */
+    private function applyMySQLHints(string $sql): string
+    {
+        // Apply SQL_NO_CACHE hint
+        if (isset($this->queryHints['no_cache'])) {
+            $sql = preg_replace('/^SELECT\s+/i', 'SELECT SQL_NO_CACHE ', $sql);
+        }
+
+        // Apply index hints
+        if (isset($this->queryHints['index']) && !empty($this->queryHints['index'])) {
+            $indexes = implode(', ', $this->queryHints['index']);
+            $tableName = $this->table ?? 'table';
+
+            // Add USE INDEX hint
+            $sql = str_replace(
+                "FROM `{$tableName}`",
+                "FROM `{$tableName}` USE INDEX ({$indexes})",
+                $sql
+            );
+
+            // Also handle unquoted table names
+            $sql = str_replace(
+                "FROM {$tableName}",
+                "FROM {$tableName} USE INDEX ({$indexes})",
+                $sql
+            );
+        }
+
+        // Apply force index hints
+        if (isset($this->queryHints['force_index']) && !empty($this->queryHints['force_index'])) {
+            $indexes = implode(', ', $this->queryHints['force_index']);
+            $tableName = $this->table ?? 'table';
+
+            $sql = str_replace(
+                "FROM `{$tableName}`",
+                "FROM `{$tableName}` FORCE INDEX ({$indexes})",
+                $sql
+            );
+
+            $sql = str_replace(
+                "FROM {$tableName}",
+                "FROM {$tableName} FORCE INDEX ({$indexes})",
+                $sql
+            );
+        }
+
+        // Apply optimizer hints (MySQL 8.0+)
+        if (isset($this->queryHints['optimizer']) && !empty($this->queryHints['optimizer'])) {
+            $hints = implode(' ', $this->queryHints['optimizer']);
+            $sql = preg_replace('/^SELECT\s+/i', "SELECT /*+ {$hints} */ ", $sql);
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Apply PostgreSQL-specific query hints.
+     *
+     * @param string $sql Base SQL query
+     * @return string SQL with PostgreSQL hints
+     */
+    private function applyPostgreSQLHints(string $sql): string
+    {
+        // PostgreSQL doesn't have traditional hints, but we can add comments
+        // and use SET statements for session-level optimizations
+
+        if (isset($this->queryHints['no_cache'])) {
+            // Add comment for PostgreSQL
+            $sql = "/* NO_CACHE */ " . $sql;
+        }
+
+        // Note: PostgreSQL hints would typically be applied via
+        // session settings or query planning hints in comments
+
+        return $sql;
+    }
+
+    /**
+     * Apply SQLite-specific query hints.
+     *
+     * @param string $sql Base SQL query
+     * @return string SQL with SQLite hints
+     */
+    private function applySQLiteHints(string $sql): string
+    {
+        // SQLite has limited hint support
+        // Most optimizations are handled by the query planner
+
+        if (isset($this->queryHints['no_cache'])) {
+            // Add comment for documentation
+            $sql = "/* NO_CACHE */ " . $sql;
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Execute query in streaming mode for large datasets.
+     *
+     * Returns a Generator that yields rows one by one to minimize memory usage.
+     * Ideal for processing millions of records without running out of memory.
+     *
+     * @return \Generator<array> Generator yielding database rows
+     * @throws \RuntimeException If streaming is not supported
+     */
+    public function stream(): \Generator
+    {
+        if (!$this->connection->supportsStreaming()) {
+            throw new \RuntimeException(
+                "Streaming is not supported for driver: " .
+                    ($this->connection->getConfig()['driver'] ?? 'unknown')
+            );
+        }
+
+        $sql = $this->toSql();
+        $bindings = $this->getBindings();
+
+        yield from $this->connection->executeStreaming($sql, $bindings);
+    }
+
+    /**
+     * Process large datasets in chunks using streaming.
+     *
+     * This method combines chunking with streaming for optimal memory usage
+     * when processing very large datasets.
+     *
+     * @param int $chunkSize Number of records per chunk
+     * @param callable $callback Callback to process each chunk
+     * @return bool True if all chunks processed successfully
+     */
+    public function streamChunk(int $chunkSize, callable $callback): bool
+    {
+        if ($chunkSize < 1) {
+            throw new \InvalidArgumentException('Chunk size must be at least 1');
+        }
+
+        $chunk = [];
+        $count = 0;
+
+        foreach ($this->stream() as $row) {
+            $chunk[] = $row;
+            $count++;
+
+            if ($count >= $chunkSize) {
+                // Process chunk
+                $result = $callback(new RowCollection($chunk), $count);
+
+                // If callback returns false, stop processing
+                if ($result === false) {
+                    return false;
+                }
+
+                // Reset for next chunk
+                $chunk = [];
+                $count = 0;
+            }
+        }
+
+        // Process remaining records
+        if (!empty($chunk)) {
+            $callback(new RowCollection($chunk), $count);
+        }
+
+        return true;
     }
 }

@@ -41,26 +41,7 @@ class ModelQueryBuilder extends QueryBuilder
      */
     private bool $skipGlobalScopes = false;
 
-    /**
-     * Query hints for performance optimization.
-     *
-     * @var array
-     */
-    private array $queryHints = [];
 
-    /**
-     * Whether to explain query execution.
-     *
-     * @var bool
-     */
-    private bool $explainQuery = false;
-
-    /**
-     * Whether to include execution statistics in explain.
-     *
-     * @var bool
-     */
-    private bool $explainAnalyze = false;
 
     /**
      * Whether relationship caching is enabled for this query.
@@ -1558,14 +1539,10 @@ class ModelQueryBuilder extends QueryBuilder
      *     ->addQueryHint('index', ['idx_product_id'])
      *     ->get();
      */
-    public function addQueryHint(string $type, array $values): self
+    public function addQueryHint(string $type, array $values = []): self
     {
-        // Store hints for later use in query building
-        if (!isset($this->queryHints)) {
-            $this->queryHints = [];
-        }
-
-        $this->queryHints[$type] = $values;
+        // Delegate to parent QueryBuilder
+        parent::addQueryHint($type, $values);
         return $this;
     }
 
@@ -1579,13 +1556,92 @@ class ModelQueryBuilder extends QueryBuilder
     {
         if ($optimize) {
             // Add SQL_NO_CACHE hint for large datasets
-            $this->addQueryHint('no_cache', []);
+            $this->addQueryHint('no_cache');
 
-            // Suggest using streaming for very large results
-            $this->addQueryHint('stream_results', []);
+            // Enable streaming mode flag
+            $this->addQueryHint('stream_results');
+
+            // Disable query result caching
+            $this->disableQueryCaching();
         }
 
         return $this;
+    }
+
+    /**
+     * Execute query in streaming mode for large datasets.
+     *
+     * @return \Generator<static> Generator yielding Model instances
+     */
+    public function stream(): \Generator
+    {
+        foreach (parent::stream() as $row) {
+            // Hydrate each row into model instance
+            $model = new $this->modelClass([]);
+
+            // Set attributes directly (bypass mass assignment)
+            foreach ($row as $key => $value) {
+                $model->setAttribute($key, $value);
+            }
+
+            $model->exists = true;
+            $model->syncOriginal();
+
+            yield $model;
+        }
+    }
+
+    /**
+     * Process large model datasets in chunks using streaming.
+     *
+     * @param int $chunkSize Number of models per chunk
+     * @param callable $callback Callback to process each chunk
+     * @return bool
+     */
+    public function streamChunk(int $chunkSize, callable $callback): bool
+    {
+        $chunk = [];
+        $count = 0;
+
+        foreach ($this->stream() as $model) {
+            $chunk[] = $model;
+            $count++;
+
+            if ($count >= $chunkSize) {
+                // Create ModelCollection for chunk
+                $collection = $this->newCollection($chunk);
+
+                // Process chunk
+                $result = $callback($collection);
+
+                if ($result === false) {
+                    return false;
+                }
+
+                // Reset for next chunk
+                $chunk = [];
+                $count = 0;
+            }
+        }
+
+        // Process remaining models
+        if (!empty($chunk)) {
+            $collection = $this->newCollection($chunk);
+            $callback($collection);
+        }
+
+        return true;
+    }
+
+    /**
+     * Create a new model collection.
+     *
+     * @param array $models
+     * @return ModelCollection
+     */
+    private function newCollection(array $models = []): ModelCollection
+    {
+        return new ModelCollection($models);
     }
 
     /**
@@ -1594,11 +1650,182 @@ class ModelQueryBuilder extends QueryBuilder
      * @param bool $analyze Whether to include execution statistics
      * @return $this
      */
-    public function explain(bool $analyze = false): self
+    public function explain(bool $analyze = false): array
     {
-        $this->explainQuery = true;
-        $this->explainAnalyze = $analyze;
-        return $this;
+        $sql = $this->toSql();
+        $bindings = $this->getBindings();
+
+        return $this->executeExplain($sql, $bindings, $analyze);
+    }
+
+    /**
+     * Execute EXPLAIN query and return results.
+     *
+     * @param string $sql Base SQL query
+     * @param array $bindings Query bindings
+     * @param bool $analyze Whether to include execution statistics
+     * @return array Explain results
+     */
+    private function executeExplain(string $sql, array $bindings, bool $analyze = false): array
+    {
+        $connection = $this->getConnection();
+        $driver = $connection->getConfig()['driver'] ?? 'mysql';
+
+        $explainSql = match ($driver) {
+            'mysql' => $analyze ? "EXPLAIN ANALYZE {$sql}" : "EXPLAIN {$sql}",
+            'pgsql' => $analyze ? "EXPLAIN (ANALYZE, BUFFERS) {$sql}" : "EXPLAIN {$sql}",
+            'sqlite' => "EXPLAIN QUERY PLAN {$sql}",
+            default => "EXPLAIN {$sql}"
+        };
+
+        try {
+            $results = $connection->select($explainSql, $bindings);
+
+            return [
+                'driver' => $driver,
+                'analyze' => $analyze,
+                'original_sql' => $sql,
+                'explain_sql' => $explainSql,
+                'bindings' => $bindings,
+                'results' => $results,
+                'formatted' => $this->formatExplainResults($results, $driver, $analyze)
+            ];
+        } catch (\Exception $e) {
+            return [
+                'error' => true,
+                'message' => $e->getMessage(),
+                'driver' => $driver,
+                'sql' => $explainSql
+            ];
+        }
+    }
+
+    /**
+     * Format explain results for better readability.
+     *
+     * @param array $results Raw explain results
+     * @param string $driver Database driver
+     * @param bool $analyze Whether analysis was performed
+     * @return array Formatted results
+     */
+    private function formatExplainResults(array $results, string $driver, bool $analyze): array
+    {
+        if (empty($results)) {
+            return ['message' => 'No explain results returned'];
+        }
+
+        return match ($driver) {
+            'mysql' => $this->formatMySQLExplain($results, $analyze),
+            'pgsql' => $this->formatPostgreSQLExplain($results, $analyze),
+            'sqlite' => $this->formatSQLiteExplain($results),
+            default => $results
+        };
+    }
+
+    /**
+     * Format MySQL explain results.
+     *
+     * @param array $results
+     * @param bool $analyze
+     * @return array
+     */
+    private function formatMySQLExplain(array $results, bool $analyze): array
+    {
+        $formatted = [];
+
+        foreach ($results as $row) {
+            $formatted[] = [
+                'id' => $row['id'] ?? null,
+                'select_type' => $row['select_type'] ?? null,
+                'table' => $row['table'] ?? null,
+                'type' => $row['type'] ?? null,
+                'possible_keys' => $row['possible_keys'] ?? null,
+                'key' => $row['key'] ?? null,
+                'key_len' => $row['key_len'] ?? null,
+                'ref' => $row['ref'] ?? null,
+                'rows' => $row['rows'] ?? null,
+                'filtered' => $row['filtered'] ?? null,
+                'extra' => $row['Extra'] ?? null,
+                'performance_analysis' => $this->analyzeMySQLPerformance($row)
+            ];
+        }
+
+        return $formatted;
+    }
+
+    /**
+     * Analyze MySQL performance from explain results.
+     *
+     * @param array $row
+     * @return array
+     */
+    private function analyzeMySQLPerformance(array $row): array
+    {
+        $analysis = [];
+
+        // Analyze access type
+        $type = $row['type'] ?? '';
+        $analysis['access_type'] = match ($type) {
+            'const' => ['status' => 'excellent', 'message' => 'Constant time lookup'],
+            'eq_ref' => ['status' => 'excellent', 'message' => 'Unique index lookup'],
+            'ref' => ['status' => 'good', 'message' => 'Non-unique index lookup'],
+            'range' => ['status' => 'acceptable', 'message' => 'Index range scan'],
+            'index' => ['status' => 'poor', 'message' => 'Full index scan'],
+            'ALL' => ['status' => 'bad', 'message' => 'Full table scan - consider adding index'],
+            default => ['status' => 'unknown', 'message' => 'Unknown access type']
+        };
+
+        // Analyze rows examined
+        $rows = (int)($row['rows'] ?? 0);
+        $analysis['rows_examined'] = [
+            'count' => $rows,
+            'status' => match (true) {
+                $rows <= 100 => 'excellent',
+                $rows <= 1000 => 'good',
+                $rows <= 10000 => 'acceptable',
+                default => 'poor'
+            }
+        ];
+
+        // Check for key usage
+        $key = $row['key'] ?? null;
+        $analysis['index_usage'] = [
+            'using_index' => !empty($key),
+            'index_name' => $key,
+            'status' => empty($key) ? 'bad' : 'good'
+        ];
+
+        return $analysis;
+    }
+
+    /**
+     * Format PostgreSQL explain results.
+     *
+     * @param array $results
+     * @param bool $analyze
+     * @return array
+     */
+    private function formatPostgreSQLExplain(array $results, bool $analyze): array
+    {
+        // PostgreSQL EXPLAIN returns text format
+        return [
+            'raw_output' => $results,
+            'note' => 'PostgreSQL explain output is in text format'
+        ];
+    }
+
+    /**
+     * Format SQLite explain results.
+     *
+     * @param array $results
+     * @return array
+     */
+    private function formatSQLiteExplain(array $results): array
+    {
+        return [
+            'query_plan' => $results,
+            'note' => 'SQLite query plan output'
+        ];
     }
 
     // =========================================================================

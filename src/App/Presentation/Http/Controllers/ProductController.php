@@ -61,8 +61,32 @@ final class ProductController extends BaseController
     public function index(Request $request)
     {
         // Test enterprise Response system with different response types
-        $singleProduct = ProductModel::whereDoesntHave('categories')->first();
-        return $this->json([
+        // Test different approaches for explain functionality
+
+        // Option 1: Get SQL string for debugging
+        $query = ProductModel::query()->where('category_id', 1);
+        $sqlInfo = [
+            'sql' => $query->toSql(),
+            'bindings' => $query->getBindings()
+        ];
+
+        // Option 2: Execute query and get actual data
+        $actualData = ProductModel::where('category_id', 1)->first();
+
+        // Option 3: Performance testing with query hints
+        $optimizedQuery = ProductModel::query()
+            ->optimizeForLargeResults()
+            ->limit(1000)
+            ->orderBy('id', 'ASC')
+            ->get();
+
+        $singleProduct = [
+            'sql_info' => $sqlInfo,
+            'actual_data' => $actualData,
+            'optimized_result' => $optimizedQuery,
+            'performance_note' => 'explain() needs proper implementation in framework'
+        ];
+        return response()->json([
             'success' => true,
             'data' => $singleProduct,
         ]);

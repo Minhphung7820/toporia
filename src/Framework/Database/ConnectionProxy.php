@@ -54,6 +54,38 @@ class ConnectionProxy implements ConnectionInterface
     }
 
     /**
+     * Get connection configuration.
+     *
+     * @return array<string, mixed>
+     */
+    public function getConfig(): array
+    {
+        return $this->connection->getConfig();
+    }
+
+    /**
+     * Execute query in streaming mode for large datasets.
+     *
+     * @param string $query SQL query
+     * @param array $bindings Query bindings
+     * @return \Generator<array>
+     */
+    public function executeStreaming(string $query, array $bindings = []): \Generator
+    {
+        return $this->connection->executeStreaming($query, $bindings);
+    }
+
+    /**
+     * Check if streaming is supported for current driver.
+     *
+     * @return bool
+     */
+    public function supportsStreaming(): bool
+    {
+        return $this->connection->supportsStreaming();
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function getPdo(): \PDO
