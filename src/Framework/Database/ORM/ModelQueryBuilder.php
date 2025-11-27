@@ -50,6 +50,13 @@ class ModelQueryBuilder extends QueryBuilder
      */
     private bool $relationshipCachingEnabled = false;
 
+    /**
+     * Eager loaded relationships configuration (ORM layer).
+     *
+     * @var array<string, callable|null>
+     */
+    private array $eagerLoad = [];
+
     public function __construct(
         ConnectionInterface $connection,
         private readonly string $modelClass,
@@ -1932,5 +1939,31 @@ class ModelQueryBuilder extends QueryBuilder
     private function isRelationshipCachingEnabled(): bool
     {
         return property_exists($this, 'relationshipCachingEnabled') && $this->relationshipCachingEnabled;
+    }
+
+    // =========================================================================
+    // EAGER LOADING METHODS (ORM LAYER - NOT IN QUERY BUILDER)
+    // =========================================================================
+
+    /**
+     * Set the relationships that should be eager loaded (ORM layer).
+     *
+     * @param array<string, callable|null> $relations
+     * @return $this
+     */
+    public function setEagerLoad(array $relations): self
+    {
+        $this->eagerLoad = $relations;
+        return $this;
+    }
+
+    /**
+     * Get the relationships that should be eager loaded (ORM layer).
+     *
+     * @return array<string, callable|null>
+     */
+    public function getEagerLoad(): array
+    {
+        return $this->eagerLoad;
     }
 }

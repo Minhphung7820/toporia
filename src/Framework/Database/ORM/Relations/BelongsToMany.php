@@ -1218,7 +1218,7 @@ class BelongsToMany extends Relation
         $instance->setQuery($cleanQuery);
 
         // Apply pivot constraints to the eager query
-        $instance->applyPivotConstraints();
+        $instance->applyPivotConstraintsToQuery($instance->getQuery());
 
         return $instance;
     }

@@ -224,13 +224,13 @@ trait HasEagerLoading
         }
 
         // Add eager constraints to query (this will add WHERE IN clause for multiple models)
-        $eagerRelation->addEagerConstraints($models->toArray());
+        $eagerRelation->addEagerConstraints($models->all());
 
         // Execute query to get all related models
         $results = $eagerRelation->getResults();
 
         // Match results to parent models (this already sets relations on models)
-        $eagerRelation->match($models->toArray(), $results, $relationName);
+        $eagerRelation->match($models->all(), $results, $relationName);
 
         // Set eagerLoaded flag on models (match() already set the relation)
         foreach ($models as $model) {

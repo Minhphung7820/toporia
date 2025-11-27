@@ -114,12 +114,6 @@ class QueryBuilder implements QueryBuilderInterface
      */
     private array $bindings = [];
 
-    /**
-     * Relationships to eager load.
-     *
-     * @var array<string>
-     */
-    private array $eagerLoad = [];
 
     /**
      * Cached SQL string to avoid recompilation.
@@ -1720,27 +1714,6 @@ class QueryBuilder implements QueryBuilderInterface
         return $this->bindings;
     }
 
-    /**
-     * Set relationships to eager load.
-     *
-     * @param array<string> $relations
-     * @return $this
-     */
-    public function setEagerLoad(array $relations): self
-    {
-        $this->eagerLoad = $relations;
-        return $this;
-    }
-
-    /**
-     * Get relationships to eager load.
-     *
-     * @return array<string>
-     */
-    public function getEagerLoad(): array
-    {
-        return $this->eagerLoad;
-    }
 
     /**
      * Get the database connection.
@@ -2494,7 +2467,6 @@ class QueryBuilder implements QueryBuilderInterface
         $newQuery->offset = $this->offset;
         $newQuery->distinct = $this->distinct;
         $newQuery->bindings = $this->bindings;
-        $newQuery->eagerLoad = $this->eagerLoad;
         $newQuery->unions = $this->unions;
         $newQuery->lock = $this->lock;
 
