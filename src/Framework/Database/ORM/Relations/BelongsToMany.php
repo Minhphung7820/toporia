@@ -4,87 +4,49 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM\Relations;
 
-use Toporia\Framework\Database\ORM\{Model, ModelCollection};
+use Toporia\Framework\Database\ORM\{Model, ModelCollection, Pivot};
 use Toporia\Framework\Database\Query\QueryBuilder;
 
-
 /**
- * Class BelongsToMany
+ * BelongsToMany Relationship
  *
- * Core class for the Relations layer providing essential functionality for
- * the Toporia Framework.
+ * Handles many-to-many relationships through a pivot table.
+ * Optimized for performance and follows Clean Architecture principles.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
- * @version     1.0.0
+ * @version     1.1.0
  * @package     toporia/framework
  * @subpackage  Relations
  * @since       2025-01-10
- *
- * @link        https://github.com/Minhphung7820/toporia
  */
 class BelongsToMany extends Relation
 {
-    /**
-     * Additional pivot columns to select.
-     *
-     * @var array<string>
-     */
+    /** @var array<string> Additional pivot columns to select */
     protected array $pivotColumns = [];
 
-    /**
-     * Whether to include timestamps in pivot table.
-     *
-     * @var bool
-     */
+    /** @var bool Whether to include timestamps in pivot table */
     protected bool $withTimestamps = false;
 
-    /**
-     * Custom pivot accessor name.
-     *
-     * @var string
-     */
+    /** @var string Custom pivot accessor name */
     protected string $pivotAccessor = 'pivot';
 
-    /**
-     * Pivot where constraints.
-     *
-     * @var array<array{column: string, operator: string, value: mixed}>
-     */
+    /** @var array<array{column: string, operator: string, value: mixed, type?: string}> Pivot where constraints */
     protected array $pivotWheres = [];
 
-    /**
-     * Pivot whereIn constraints.
-     *
-     * @var array<array{column: string, values: array}>
-     */
+    /** @var array<array{column: string, values: array, not?: bool}> Pivot whereIn constraints */
     protected array $pivotWhereIns = [];
 
-    /**
-     * Pivot order by clauses.
-     *
-     * @var array<array{column: string, direction: string}>
-     */
+    /** @var array<array{column: string, direction: string}> Pivot order by clauses */
     protected array $pivotOrderBy = [];
 
-    /**
-     * Custom pivot model class.
-     *
-     * @var class-string|null
-     */
+    /** @var class-string<Pivot>|null Custom pivot model class */
     protected ?string $pivotClass = null;
 
-    /**
-     * @param QueryBuilder $query Query builder for related model
-     * @param Model $parent Parent model instance
-     * @param class-string<Model> $relatedClass Related model class name
-     * @param string $pivotTable Pivot table name
-     * @param string $foreignPivotKey Foreign key in pivot table for parent
-     * @param string $relatedPivotKey Foreign key in pivot table for related
-     * @param string $parentKey Parent's primary key
-     * @param string $relatedKey Related model's primary key
-     */
+    /** @var string|null Cached related table name */
+    private ?string $relatedTableCache = null;
+
     public function __construct(
         QueryBuilder $query,
         Model $parent,
@@ -96,43 +58,27 @@ class BelongsToMany extends Relation
         protected string $relatedKey
     ) {
         parent::__construct($query, $parent, $foreignPivotKey, $parentKey);
-        $this->addPivotConstraints();
+        $this->initializePivotJoin();
     }
+
+    // =========================================================================
+    // FLUENT CONFIGURATION METHODS
+    // =========================================================================
 
     /**
      * Specify additional pivot columns to include in query results.
      *
-     * These columns will be selected from the pivot table and made available
-     * on the related model (e.g., $role->pivot->created_at).
-     *
-     * Performance: O(1) - Array merge operation
-     * Clean Architecture: Fluent interface for readability
-     *
      * @param string ...$columns Pivot column names to select
      * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->withPivot('expires_at', 'created_by')->get();
-     * // Access: $role->pivot->expires_at
-     * ```
      */
     public function withPivot(string ...$columns): static
     {
-        $this->pivotColumns = array_merge($this->pivotColumns, $columns);
+        $this->pivotColumns = [...$this->pivotColumns, ...$columns];
         return $this;
     }
 
     /**
      * Include created_at and updated_at timestamps in pivot table.
-     *
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->withTimestamps()->get();
-     * // Access: $role->pivot->created_at, $role->pivot->updated_at
-     * ```
      */
     public function withTimestamps(): static
     {
@@ -142,15 +88,6 @@ class BelongsToMany extends Relation
 
     /**
      * Customize the pivot accessor name.
-     *
-     * @param string $accessor Custom accessor name
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->podcasts()->as('subscription')->withTimestamps()->get();
-     * // Access: $podcast->subscription->created_at
-     * ```
      */
     public function as(string $accessor): static
     {
@@ -159,464 +96,279 @@ class BelongsToMany extends Relation
     }
 
     /**
+     * Specify a custom pivot model class to use.
+     *
+     * @param class-string<Pivot> $class Custom pivot model class
+     */
+    public function using(string $class): static
+    {
+        $this->pivotClass = $class;
+        return $this;
+    }
+
+    // =========================================================================
+    // PIVOT CONSTRAINT METHODS
+    // =========================================================================
+
+    /**
      * Add a where constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param mixed $operator Operator or value if no operator provided
-     * @param mixed $value Value to compare (optional)
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivot('status', 'active')->get();
-     * $user->roles()->wherePivot('priority', '>', 5)->get();
-     * ```
      */
     public function wherePivot(string $column, mixed $operator, mixed $value = null): static
     {
-        // Handle case where only column and value are provided (operator defaults to '=')
-        if ($value === null) {
-            $value = $operator;
-            $operator = '=';
-        }
+        [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
 
-        $this->pivotWheres[] = [
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        // Apply constraint immediately to current query
-        $this->applyPivotWhere($column, $operator, $value);
+        $this->pivotWheres[] = compact('column', 'operator', 'value');
+        $this->applyWhereToQuery($this->qualifyPivotColumn($column), $operator, $value);
 
         return $this;
     }
 
     /**
-     * Apply a single pivot where constraint to the query.
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param mixed $value Value to compare
-     * @return void
-     */
-    protected function applyPivotWhere(string $column, string $operator, mixed $value): void
-    {
-        $column = "{$this->pivotTable}.{$column}";
-
-        if ($operator === 'BETWEEN' && is_array($value)) {
-            $this->query->whereBetween($column, $value);
-        } elseif ($operator === 'NOT BETWEEN' && is_array($value)) {
-            $this->query->whereNotBetween($column, $value);
-        } elseif ($operator === 'IS' && $value === null) {
-            $this->query->whereNull($column);
-        } elseif ($operator === 'IS NOT' && $value === null) {
-            $this->query->whereNotNull($column);
-        } else {
-            $this->query->where($column, $operator, $value);
-        }
-    }
-
-    /**
      * Add a whereIn constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param array $values Array of values
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotIn('priority', [1, 2, 3])->get();
-     * ```
      */
     public function wherePivotIn(string $column, array $values): static
     {
-        $this->pivotWhereIns[] = [
-            'column' => $column,
-            'values' => $values
-        ];
-
-        // Apply constraint immediately to current query
-        $this->query->whereIn("{$this->pivotTable}.{$column}", $values);
+        $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false];
+        $this->query->whereIn($this->qualifyPivotColumn($column), $values);
 
         return $this;
     }
 
     /**
      * Add a whereNotIn constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param array $values Array of values
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotNotIn('status', ['inactive', 'banned'])->get();
-     * ```
      */
     public function wherePivotNotIn(string $column, array $values): static
     {
-        $this->pivotWhereIns[] = [
-            'column' => $column,
-            'values' => $values,
-            'not' => true
-        ];
-
-        // Apply constraint immediately to current query
-        $this->query->whereNotIn("{$this->pivotTable}.{$column}", $values);
+        $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => true];
+        $this->query->whereNotIn($this->qualifyPivotColumn($column), $values);
 
         return $this;
     }
 
     /**
      * Add an order by clause on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param string $direction Sort direction (asc|desc)
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->orderByPivot('created_at', 'desc')->get();
-     * ```
      */
     public function orderByPivot(string $column, string $direction = 'asc'): static
     {
         $direction = strtolower($direction);
-
-        $this->pivotOrderBy[] = [
-            'column' => $column,
-            'direction' => $direction
-        ];
-
-        // Apply order immediately to current query
-        $this->query->orderBy("{$this->pivotTable}.{$column}", $direction);
+        $this->pivotOrderBy[] = compact('column', 'direction');
+        $this->query->orderBy($this->qualifyPivotColumn($column), $direction);
 
         return $this;
     }
 
-    /**
-     * Add a wherePivotNull constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @return $this
-     */
     public function wherePivotNull(string $column): static
     {
         return $this->wherePivot($column, 'IS', null);
     }
 
-    /**
-     * Add a wherePivotNotNull constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @return $this
-     */
     public function wherePivotNotNull(string $column): static
     {
         return $this->wherePivot($column, 'IS NOT', null);
     }
 
-    /**
-     * Add a wherePivotBetween constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param array $values Array with two values [min, max]
-     * @return $this
-     */
     public function wherePivotBetween(string $column, array $values): static
     {
         return $this->wherePivot($column, 'BETWEEN', $values);
     }
 
-    /**
-     * Add a wherePivotNotBetween constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param array $values Array with two values [min, max]
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotNotBetween('priority', [1, 5])->get();
-     * ```
-     */
     public function wherePivotNotBetween(string $column, array $values): static
     {
         return $this->wherePivot($column, 'NOT BETWEEN', $values);
     }
 
     /**
-     * Add a wherePivotDate constraint on the pivot table.
-     *
-     * Performance: O(1) - Direct SQL date function usage
-     * Clean Architecture: Expressive domain-specific method
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param string $value Date value (Y-m-d format)
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotDate('assigned_at', '>=', '2024-01-01')->get();
-     * ```
+     * Add date-based constraints on pivot columns.
      */
     public function wherePivotDate(string $column, string $operator, string $value): static
     {
-        // Apply function directly to avoid double prefixing
-        $this->query->whereRaw("DATE({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-
-        // Store for eager loading
-        $this->pivotWheres[] = [
-            'column' => "DATE({$column})",
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        return $this;
+        return $this->addPivotFunctionConstraint('DATE', $column, $operator, $value);
     }
 
-    /**
-     * Add a wherePivotMonth constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param int $value Month value (1-12)
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotMonth('assigned_at', '=', 12)->get();
-     * ```
-     */
     public function wherePivotMonth(string $column, string $operator, int $value): static
     {
-        // Apply function directly to avoid double prefixing
-        $this->query->whereRaw("MONTH({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-
-        // Store for eager loading
-        $this->pivotWheres[] = [
-            'column' => "MONTH({$column})",
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        return $this;
+        return $this->addPivotFunctionConstraint('MONTH', $column, $operator, $value);
     }
 
-    /**
-     * Add a wherePivotYear constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param int $value Year value
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotYear('assigned_at', '=', 2024)->get();
-     * ```
-     */
     public function wherePivotYear(string $column, string $operator, int $value): static
     {
-        // Apply function directly to avoid double prefixing
-        $this->query->whereRaw("YEAR({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-
-        // Store for eager loading
-        $this->pivotWheres[] = [
-            'column' => "YEAR({$column})",
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        return $this;
+        return $this->addPivotFunctionConstraint('YEAR', $column, $operator, $value);
     }
 
-    /**
-     * Add a wherePivotTime constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param string $value Time value (H:i:s format)
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotTime('assigned_at', '>=', '09:00:00')->get();
-     * ```
-     */
     public function wherePivotTime(string $column, string $operator, string $value): static
     {
-        // Apply function directly to avoid double prefixing
-        $this->query->whereRaw("TIME({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-
-        // Store for eager loading
-        $this->pivotWheres[] = [
-            'column' => "TIME({$column})",
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        return $this;
+        return $this->addPivotFunctionConstraint('TIME', $column, $operator, $value);
     }
 
     /**
-     * Add a wherePivotJsonContains constraint on the pivot table.
-     *
-     * Performance: O(log n) - Uses database JSON indexing when available
-     * Clean Architecture: Database-agnostic JSON querying
-     *
-     * @param string $column Pivot JSON column name
-     * @param mixed $value Value to search for in JSON
-     * @param string $path Optional JSON path (default: '$')
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotJsonContains('metadata', 'admin', '$.permissions')->get();
-     * ```
+     * Add JSON constraints on pivot columns.
      */
     public function wherePivotJsonContains(string $column, mixed $value, string $path = '$'): static
     {
-        $jsonValue = is_string($value) ? "\"$value\"" : json_encode($value);
+        $jsonValue = is_string($value) ? '"' . $value . '"' : json_encode($value);
+        $qualifiedColumn = $this->qualifyPivotColumn($column);
 
-        // Apply function directly to avoid double prefixing
-        $this->query->whereRaw("JSON_CONTAINS({$this->pivotTable}.{$column}, ?, ?)", [$jsonValue, $path]);
-
-        // Store for eager loading
+        $this->query->whereRaw("JSON_CONTAINS({$qualifiedColumn}, ?, ?)", [$jsonValue, $path]);
         $this->pivotWheres[] = [
             'column' => "JSON_CONTAINS({$column}, '{$jsonValue}', '{$path}')",
             'operator' => '=',
-            'value' => 1
+            'value' => 1,
+            'type' => 'raw'
         ];
 
         return $this;
     }
 
-    /**
-     * Add a wherePivotJsonLength constraint on the pivot table.
-     *
-     * @param string $column Pivot JSON column name
-     * @param string $operator Comparison operator
-     * @param int $value Length value
-     * @param string $path Optional JSON path (default: '$')
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->wherePivotJsonLength('permissions', '>', 3)->get();
-     * ```
-     */
     public function wherePivotJsonLength(string $column, string $operator, int $value, string $path = '$'): static
     {
-        // Apply function directly to avoid double prefixing
-        $this->query->whereRaw("JSON_LENGTH({$this->pivotTable}.{$column}, ?) {$operator} ?", [$path, $value]);
+        $qualifiedColumn = $this->qualifyPivotColumn($column);
 
-        // Store for eager loading
+        $this->query->whereRaw("JSON_LENGTH({$qualifiedColumn}, ?) {$operator} ?", [$path, $value]);
         $this->pivotWheres[] = [
             'column' => "JSON_LENGTH({$column}, '{$path}')",
             'operator' => $operator,
-            'value' => $value
+            'value' => $value,
+            'type' => 'raw'
+        ];
+
+        return $this;
+    }
+
+    // =========================================================================
+    // INTERNAL QUERY BUILDING
+    // =========================================================================
+
+    /**
+     * Initialize the pivot table join and constraints.
+     */
+    protected function initializePivotJoin(): void
+    {
+        if (!$this->parent->exists()) {
+            return;
+        }
+
+        $relatedTable = $this->getRelatedTableName();
+        $selectColumns = $this->buildSelectColumns($relatedTable);
+
+        $this->query
+            ->join(
+                $this->pivotTable,
+                "{$relatedTable}.{$this->relatedKey}",
+                '=',
+                "{$this->pivotTable}.{$this->relatedPivotKey}"
+            )
+            ->where(
+                $this->qualifyPivotColumn($this->foreignPivotKey),
+                $this->parent->getAttribute($this->parentKey)
+            )
+            ->select($selectColumns);
+    }
+
+    /**
+     * Build the SELECT columns array including pivot columns.
+     */
+    protected function buildSelectColumns(string $relatedTable): array
+    {
+        $columns = ["{$relatedTable}.*"];
+
+        foreach ($this->pivotColumns as $column) {
+            $columns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
+        }
+
+        return $columns;
+    }
+
+    /**
+     * Qualify a column name with the pivot table prefix.
+     */
+    protected function qualifyPivotColumn(string $column): string
+    {
+        return "{$this->pivotTable}.{$column}";
+    }
+
+    /**
+     * Get the related table name with caching.
+     */
+    protected function getRelatedTableName(): string
+    {
+        return $this->relatedTableCache ??= $this->relatedClass::getTableName();
+    }
+
+    /**
+     * Normalize operator and value for where clauses.
+     *
+     * @return array{0: string, 1: mixed}
+     */
+    protected function normalizeOperatorValue(mixed $operator, mixed $value): array
+    {
+        if ($value === null && !in_array($operator, ['IS', 'IS NOT', 'BETWEEN', 'NOT BETWEEN'], true)) {
+            return ['=', $operator];
+        }
+
+        return [$operator, $value];
+    }
+
+    /**
+     * Apply a where constraint to the query.
+     */
+    protected function applyWhereToQuery(string $column, string $operator, mixed $value): void
+    {
+        match (true) {
+            $operator === 'BETWEEN' && is_array($value) => $this->query->whereBetween($column, $value),
+            $operator === 'NOT BETWEEN' && is_array($value) => $this->query->whereNotBetween($column, $value),
+            $operator === 'IS' && $value === null => $this->query->whereNull($column),
+            $operator === 'IS NOT' && $value === null => $this->query->whereNotNull($column),
+            default => $this->query->where($column, $operator, $value),
+        };
+    }
+
+    /**
+     * Add a SQL function constraint on a pivot column.
+     */
+    protected function addPivotFunctionConstraint(string $function, string $column, string $operator, mixed $value): static
+    {
+        $qualifiedColumn = $this->qualifyPivotColumn($column);
+        $this->query->whereRaw("{$function}({$qualifiedColumn}) {$operator} ?", [$value]);
+
+        $this->pivotWheres[] = [
+            'column' => "{$function}({$column})",
+            'operator' => $operator,
+            'value' => $value,
+            'type' => 'function'
         ];
 
         return $this;
     }
 
     /**
-     * Add JOIN and WHERE constraints for the pivot table.
-     *
-     * @return $this
+     * Apply stored pivot constraints to a query builder.
      */
-    protected function addPivotConstraints(): static
+    protected function applyStoredConstraintsToQuery(QueryBuilder $query): void
     {
-        if ($this->parent->exists()) {
-            $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
-
-            // Build SELECT clause with pivot columns
-            $selectColumns = ["{$relatedTable}.*"];
-
-            // Add pivot columns if specified
-            foreach ($this->pivotColumns as $column) {
-                $selectColumns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
+        foreach ($this->pivotWheres as $where) {
+            if (isset($where['type']) && $where['type'] === 'raw') {
+                $query->whereRaw("{$where['column']} {$where['operator']} ?", [$where['value']]);
+            } elseif (isset($where['type']) && $where['type'] === 'function') {
+                $query->whereRaw("{$where['column']} {$where['operator']} ?", [$where['value']]);
+            } elseif (!$this->isRawColumn($where['column'])) {
+                $this->applyWhereToQuery($where['column'], $where['operator'], $where['value']);
             }
-
-            // TODO: Add parent ID for optimized eager loading matching
-            // Only add when optimized matching is properly validated and enabled
-            // $selectColumns[] = "{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}";
-
-            $this->query
-                ->join(
-                    $this->pivotTable,
-                    "{$relatedTable}.{$this->relatedKey}",
-                    '=',
-                    "{$this->pivotTable}.{$this->relatedPivotKey}"
-                )
-                ->where(
-                    "{$this->pivotTable}.{$this->foreignPivotKey}",
-                    $this->parent->getAttribute($this->parentKey)
-                )
-                ->select($selectColumns);
-
-            // Apply pivot where constraints
-            $this->applyPivotConstraints();
         }
 
-        return $this;
+        foreach ($this->pivotWhereIns as $whereIn) {
+            $column = $whereIn['column'];
+            $whereIn['not']
+                ? $query->whereNotIn($column, $whereIn['values'])
+                : $query->whereIn($column, $whereIn['values']);
+        }
     }
 
     /**
-     * Apply pivot where constraints and order by clauses.
-     *
-     * FIXED: Handle function-based columns consistently with separate pivot queries
-     *
-     * @return void
+     * Check if a column contains SQL functions.
      */
-    protected function applyPivotConstraints(): void
+    protected function isRawColumn(string $column): bool
     {
-        // Apply pivot where constraints
-        foreach ($this->pivotWheres as $where) {
-            $column = $where['column'];
-
-            // Handle function-based columns (already processed by wherePivot* methods)
-            if (str_contains($column, '(') && str_contains($column, ')')) {
-                // Function-based columns are already applied via whereRaw in wherePivot* methods
-                // Skip re-applying to avoid double constraints
-                continue;
-            } else {
-                // Regular columns - add table prefix
-                $fullColumn = "{$this->pivotTable}.{$column}";
-
-                if ($where['operator'] === 'BETWEEN' && is_array($where['value'])) {
-                    $this->query->whereBetween($fullColumn, $where['value']);
-                } elseif ($where['operator'] === 'NOT BETWEEN' && is_array($where['value'])) {
-                    $this->query->whereNotBetween($fullColumn, $where['value']);
-                } elseif ($where['operator'] === 'IS' && $where['value'] === null) {
-                    $this->query->whereNull($fullColumn);
-                } elseif ($where['operator'] === 'IS NOT' && $where['value'] === null) {
-                    $this->query->whereNotNull($fullColumn);
-                } else {
-                    $this->query->where($fullColumn, $where['operator'], $where['value']);
-                }
-            }
-        }
-
-        // Apply pivot whereIn constraints
-        foreach ($this->pivotWhereIns as $whereIn) {
-            $column = "{$this->pivotTable}.{$whereIn['column']}";
-
-            if (isset($whereIn['not']) && $whereIn['not']) {
-                $this->query->whereNotIn($column, $whereIn['values']);
-            } else {
-                $this->query->whereIn($column, $whereIn['values']);
-            }
-        }
-
-        // Apply pivot order by clauses
-        foreach ($this->pivotOrderBy as $orderBy) {
-            $column = "{$this->pivotTable}.{$orderBy['column']}";
-            $this->query->orderBy($column, $orderBy['direction']);
-        }
+        return str_contains($column, '(') && str_contains($column, ')');
     }
 
     /**
@@ -633,7 +385,7 @@ class BelongsToMany extends Relation
         }
 
         // Convert RowCollection to array for hydrate method
-        return call_user_func([$this->relatedClass, 'hydrate'], $rows->toArray());
+        return $this->relatedClass::hydrate($rows->toArray());
     }
 
     /**
@@ -1443,7 +1195,7 @@ class BelongsToMany extends Relation
         $instance->pivotClass = $this->pivotClass;
 
         // Set up the query with proper JOIN but without parent WHERE constraints
-        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        $relatedTable = $this->relatedClass::getTableName();
 
         // Build SELECT clause with pivot columns
         $selectColumns = ["{$relatedTable}.*"];
@@ -1453,12 +1205,8 @@ class BelongsToMany extends Relation
             $selectColumns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
         }
 
-        // TODO: Add parent ID for optimized eager loading matching
-        // Only add when optimized matching is properly validated and enabled
-        // $selectColumns[] = "{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}";
-
         // Create a fresh query from the related model (this ensures table name is set)
-        $cleanQuery = call_user_func([$this->relatedClass, 'query'])
+        $cleanQuery = $this->relatedClass::query()
             ->join(
                 $this->pivotTable,
                 "{$relatedTable}.{$this->relatedKey}",
@@ -1480,50 +1228,15 @@ class BelongsToMany extends Relation
      *
      * @param array $attributes Pivot attributes
      * @param bool $exists Whether the pivot exists in database
-     * @return object Pivot model instance
+     * @return Pivot Pivot model instance
      */
-    public function newPivot(array $attributes = [], bool $exists = false): object
+    public function newPivot(array $attributes = [], bool $exists = false): Pivot
     {
-        // Create a simple pivot object
-        $pivot = new class($attributes, $this->pivotAccessor, $exists) {
-            public function __construct(
-                protected array $attributes,
-                protected string $accessor,
-                protected bool $exists
-            ) {}
+        if ($this->pivotClass !== null) {
+            return new ($this->pivotClass)($attributes, $this->pivotTable, $exists);
+        }
 
-            public function __get(string $key): mixed
-            {
-                return $this->attributes[$key] ?? null;
-            }
-
-            public function __set(string $key, mixed $value): void
-            {
-                $this->attributes[$key] = $value;
-            }
-
-            public function __isset(string $key): bool
-            {
-                return isset($this->attributes[$key]);
-            }
-
-            public function getAttribute(string $key): mixed
-            {
-                return $this->attributes[$key] ?? null;
-            }
-
-            public function getAttributes(): array
-            {
-                return $this->attributes;
-            }
-
-            public function exists(): bool
-            {
-                return $this->exists;
-            }
-        };
-
-        return $pivot;
+        return new Pivot($attributes, $this->pivotTable, $exists);
     }
 
     /**
@@ -1608,7 +1321,7 @@ class BelongsToMany extends Relation
         $instance = $this->where($attributes)->first();
 
         if ($instance === null) {
-            $instance = call_user_func([$this->relatedClass, 'create'], $attributes);
+            $instance = $this->relatedClass::create($attributes);
             $this->attach($instance->getAttribute($this->relatedKey), $pivotData);
         }
 
@@ -1624,7 +1337,7 @@ class BelongsToMany extends Relation
      */
     public function create(array $attributes = [], array $pivotData = []): Model
     {
-        $instance = call_user_func([$this->relatedClass, 'create'], $attributes);
+        $instance = $this->relatedClass::create($attributes);
         $this->attach($instance->getAttribute($this->relatedKey), $pivotData);
         return $instance;
     }
@@ -1654,13 +1367,13 @@ class BelongsToMany extends Relation
     }
 
     /**
-     * Check if any related models exist.
+     * Check if any related models exist using EXISTS query.
      *
-     * @return bool
+     * Performance: O(1) - Uses EXISTS instead of COUNT for efficiency.
      */
     public function exists(): bool
     {
-        return $this->count() > 0;
+        return $this->query->exists();
     }
 
     /**
@@ -1678,7 +1391,7 @@ class BelongsToMany extends Relation
         $items = $this->query->limit($perPage)->offset($offset)->get();
 
         return [
-            'data' => call_user_func([$this->relatedClass, 'hydrate'], $items->toArray()),
+            'data' => $this->relatedClass::hydrate($items->toArray()),
             'current_page' => $page,
             'per_page' => $perPage,
             'total' => $total,
@@ -1727,7 +1440,7 @@ class BelongsToMany extends Relation
                 break;
             }
 
-            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+            $models = $this->relatedClass::hydrate($results->toArray());
 
             // Call the callback with the current chunk
             if ($callback($models, $page) === false) {
@@ -1778,7 +1491,7 @@ class BelongsToMany extends Relation
                 break;
             }
 
-            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+            $models = $this->relatedClass::hydrate($results->toArray());
 
             // Call the callback with the current chunk
             if ($callback($models) === false) {
@@ -1860,27 +1573,6 @@ class BelongsToMany extends Relation
     public function maxPivot(string $column): mixed
     {
         return $this->query->max("{$this->pivotTable}.{$column}");
-    }
-
-    /**
-     * Specify a custom pivot model class to use.
-     *
-     * Performance: O(1) - Class name storage for later instantiation
-     * Clean Architecture: Strategy pattern for pivot model customization
-     * SOLID: Open/Closed - Extensible without modifying core logic
-     *
-     * @param class-string $class Custom pivot model class
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $user->roles()->using(RoleUser::class)->get();
-     * ```
-     */
-    public function using(string $class): static
-    {
-        $this->pivotClass = $class;
-        return $this;
     }
 
     /**
@@ -2194,7 +1886,7 @@ class BelongsToMany extends Relation
 
         // Get related table columns to check for conflicts
         try {
-            $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+            $relatedTable = $this->relatedClass::getTableName();
             $connection = $this->query->getConnection();
             $relatedColumns = $connection->select("SHOW COLUMNS FROM `{$relatedTable}`");
             $relatedColumnNames = array_column($relatedColumns, 'Field');
