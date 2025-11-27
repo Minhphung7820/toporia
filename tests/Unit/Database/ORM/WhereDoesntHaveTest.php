@@ -289,3 +289,4 @@ class TestRoleModel extends Model
         return $this->belongsToMany(TestUserModel::class, 'user_roles', 'role_id', 'user_id');
     }
 }
+

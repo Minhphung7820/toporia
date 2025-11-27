@@ -265,6 +265,24 @@ class ModelQueryBuilder extends QueryBuilder
      */
     public function whereHas(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): self
     {
+        // For count-based queries (count != 1), use the count approach
+        if ($count !== 1 || $operator !== '>=') {
+            return $this->whereHasWithCount($relation, $callback, $operator, $count);
+        }
+
+        // For simple existence check, use optimized EXISTS
+        return $this->whereHasExists($relation, $callback);
+    }
+
+    /**
+     * Optimized whereHas using EXISTS (fastest approach).
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @return $this
+     */
+    private function whereHasExists(string $relation, ?callable $callback = null): self
+    {
         // Get table name from model
         /** @var callable $getTableName */
         $getTableName = [$this->modelClass, 'getTableName'];
@@ -291,40 +309,167 @@ class ModelQueryBuilder extends QueryBuilder
             $callback($relationQuery);
         }
 
-        // Handle different relationship types properly
-        if (
-            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
-            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
-        ) {
+        // Build EXISTS subquery
+        $existsSubquery = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
 
-            $subquerySql = $this->buildPivotWhereHasSubquery($relationInstance, $table, $relationQuery);
-        } else {
-            $subquerySql = $this->buildSimpleWhereHasSubquery($relationInstance, $table, $relationQuery);
+        // Add EXISTS clause - much faster than COUNT(*)
+        $this->whereRaw("EXISTS ({$existsSubquery})");
+
+        return $this;
+    }
+
+    /**
+     * whereHas with count comparison (for count != 1 cases).
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator
+     * @param int $count Count threshold
+     * @return $this
+     */
+    private function whereHasWithCount(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): self
+    {
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
         }
 
-        // Add relation query wheres to subquery
-        // Important: Inject bindings directly into SQL (same approach as withCount)
-        // to avoid binding order issues
-        $relationSql = $relationQuery->toSql();
-        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
-            $whereClause = $matches[1];
+        $relationInstance = $model->$relation();
 
-            // Replace placeholders with actual values (safely quoted)
-            // Security: Use PDO::quote() instead of addslashes() to prevent SQL injection
-            $relationBindings = $relationQuery->getBindings();
-            $boundWhereClause = $whereClause;
-            foreach ($relationBindings as $binding) {
-                // Safely quote value using PDO::quote() (prevents SQL injection)
-                $quoted = $this->quoteValue($binding);
-                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
-            }
-
-            $subquerySql .= " AND ({$boundWhereClause})";
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
         }
 
-        // Add the EXISTS clause with count comparison
-        // Example: WHERE (SELECT COUNT(*) ...) >= 1
-        $this->whereRaw("({$subquerySql}) {$operator} ?", [$count]);
+        // Get the relationship's query builder
+        $relationQuery = $relationInstance->getQuery();
+
+        // Apply callback constraints if provided
+        if ($callback !== null) {
+            $callback($relationQuery);
+        }
+
+        // Build COUNT subquery (only when count comparison is needed)
+        $countSubquery = $this->buildCountSubquery($relationInstance, $table, $relationQuery);
+
+        // Add count comparison clause
+        $this->whereRaw("({$countSubquery}) {$operator} ?", [$count]);
+
+        return $this;
+    }
+
+    /**
+     * OR version of whereHas using EXISTS for optimal performance.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator (>=, =, etc.)
+     * @param int $count Count threshold (default: 1)
+     * @return $this
+     */
+    public function orWhereHas(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): self
+    {
+        // For count-based queries (count != 1), use the count approach
+        if ($count !== 1 || $operator !== '>=') {
+            return $this->orWhereHasWithCount($relation, $callback, $operator, $count);
+        }
+
+        // For simple existence check, use optimized OR EXISTS
+        return $this->orWhereHasExists($relation, $callback);
+    }
+
+    /**
+     * OR version of optimized whereHas using EXISTS.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @return $this
+     */
+    private function orWhereHasExists(string $relation, ?callable $callback = null): self
+    {
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
+        }
+
+        // Get the relationship's query builder
+        $relationQuery = $relationInstance->getQuery();
+
+        // Apply callback constraints if provided
+        if ($callback !== null) {
+            $callback($relationQuery);
+        }
+
+        // Build EXISTS subquery
+        $existsSubquery = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+
+        // Add OR EXISTS clause - much faster than COUNT(*)
+        $this->orWhereRaw("EXISTS ({$existsSubquery})");
+
+        return $this;
+    }
+
+    /**
+     * OR version of whereHas with count comparison.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator
+     * @param int $count Count threshold
+     * @return $this
+     */
+    private function orWhereHasWithCount(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): self
+    {
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
+        }
+
+        // Get the relationship's query builder
+        $relationQuery = $relationInstance->getQuery();
+
+        // Apply callback constraints if provided
+        if ($callback !== null) {
+            $callback($relationQuery);
+        }
+
+        // Build COUNT subquery (only when count comparison is needed)
+        $countSubquery = $this->buildCountSubquery($relationInstance, $table, $relationQuery);
+
+        // Add OR count comparison clause
+        $this->orWhereRaw("({$countSubquery}) {$operator} ?", [$count]);
 
         return $this;
     }
@@ -382,6 +527,162 @@ class ModelQueryBuilder extends QueryBuilder
     }
 
     /**
+     * Build EXISTS subquery for optimal performance (no counting).
+     *
+     * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
+     * @param string $parentTable Parent table name
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
+     * @return string EXISTS subquery SQL
+     */
+    protected function buildExistsSubquery($relation, string $parentTable, $relationQuery): string
+    {
+        // Handle different relationship types
+        if (
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+        ) {
+            return $this->buildPivotExistsSubquery($relation, $parentTable, $relationQuery);
+        } else {
+            return $this->buildSimpleExistsSubquery($relation, $parentTable, $relationQuery);
+        }
+    }
+
+    /**
+     * Build EXISTS subquery for simple relationships (HasOne, HasMany, BelongsTo, etc.).
+     *
+     * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
+     * @param string $parentTable Parent table name
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
+     * @return string EXISTS subquery SQL
+     */
+    protected function buildSimpleExistsSubquery($relation, string $parentTable, $relationQuery): string
+    {
+        // Get foreign and local keys for simple relationships
+        $foreignKey = $relation->getForeignKey();
+        $localKey = $relation->getLocalKey();
+
+        // Get relation table
+        $relationTable = $relationQuery->getTable();
+
+        // Use alias for self-referencing relationships
+        $relationAlias = $parentTable === $relationTable ? "{$relationTable}_relation" : $relationTable;
+
+        // Build EXISTS subquery - SELECT 1 is faster than SELECT COUNT(*)
+        $fromClause = $parentTable === $relationTable ? "{$relationTable} AS {$relationAlias}" : $relationTable;
+        $subquerySql = "SELECT 1 FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
+
+        // Add relation constraints
+        $relationSql = $relationQuery->toSql();
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
+            $whereClause = $matches[1];
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            $subquerySql .= " AND ({$boundWhereClause})";
+        }
+
+        // Add LIMIT 1 for maximum performance
+        $subquerySql .= " LIMIT 1";
+
+        return $subquerySql;
+    }
+
+    /**
+     * Build EXISTS subquery for pivot relationships (BelongsToMany, MorphToMany).
+     *
+     * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
+     * @param string $parentTable Parent table name
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
+     * @return string EXISTS subquery SQL
+     */
+    protected function buildPivotExistsSubquery($relation, string $parentTable, $relationQuery): string
+    {
+        $reflectionService = app()->make(\Toporia\Framework\Support\ReflectionService::class);
+
+        if ($relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany) {
+            // Get pivot table and keys for BelongsToMany
+            $pivotTable = $reflectionService->getPropertyValue($relation, 'pivotTable');
+            $foreignPivotKey = $reflectionService->getPropertyValue($relation, 'foreignPivotKey');
+            $relatedPivotKey = $reflectionService->getPropertyValue($relation, 'relatedPivotKey');
+            $parentKey = $reflectionService->getPropertyValue($relation, 'parentKey');
+            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+
+            // Get related table
+            $relatedTable = $relationQuery->getTable();
+
+            // Build EXISTS subquery with proper JOIN - SELECT 1 is faster
+            $subquerySql = "SELECT 1 FROM {$pivotTable} " .
+                "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
+                "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
+        } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany) {
+            // Similar logic for MorphToMany
+            $pivotTable = $reflectionService->getPropertyValue($relation, 'pivotTable');
+            $morphType = $reflectionService->getPropertyValue($relation, 'morphType');
+            $morphId = $reflectionService->getPropertyValue($relation, 'foreignKey');
+            $relatedPivotKey = $reflectionService->getPropertyValue($relation, 'relatedPivotKey');
+            $parentKey = $reflectionService->getPropertyValue($relation, 'localKey');
+            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+
+            // Get related table and morph class
+            $relatedTable = $relationQuery->getTable();
+            $morphClass = get_class($relation->getParent());
+
+            $subquerySql = "SELECT 1 FROM {$pivotTable} " .
+                "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
+                "WHERE {$pivotTable}.{$morphId} = {$parentTable}.{$parentKey} " .
+                "AND {$pivotTable}.{$morphType} = '{$morphClass}'";
+        }
+
+        // Add relation constraints
+        $relationSql = $relationQuery->toSql();
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
+            $whereClause = $matches[1];
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            $subquerySql .= " AND ({$boundWhereClause})";
+        }
+
+        // Add LIMIT 1 for maximum performance
+        $subquerySql .= " LIMIT 1";
+
+        return $subquerySql;
+    }
+
+    /**
+     * Build COUNT subquery (only when count comparison is needed).
+     *
+     * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
+     * @param string $parentTable Parent table name
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
+     * @return string COUNT subquery SQL
+     */
+    protected function buildCountSubquery($relation, string $parentTable, $relationQuery): string
+    {
+        // Handle different relationship types
+        if (
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+        ) {
+            return $this->buildPivotWhereHasSubquery($relation, $parentTable, $relationQuery);
+        } else {
+            return $this->buildSimpleWhereHasSubquery($relation, $parentTable, $relationQuery);
+        }
+    }
+
+    /**
      * Build subquery for simple relationships (HasOne, HasMany, BelongsTo, etc.).
      *
      * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
@@ -401,7 +702,7 @@ class ModelQueryBuilder extends QueryBuilder
         // Use alias for self-referencing relationships
         $relationAlias = $parentTable === $relationTable ? "{$relationTable}_relation" : $relationTable;
 
-        // Build EXISTS subquery with proper aliasing
+        // Build COUNT subquery (only used when count comparison is needed)
         $fromClause = $parentTable === $relationTable ? "{$relationTable} AS {$relationAlias}" : $relationTable;
         $subquerySql = "SELECT COUNT(*) FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
 
@@ -534,75 +835,23 @@ class ModelQueryBuilder extends QueryBuilder
      */
     public function whereDoesntHave(string $relation, ?callable $callback = null, string $operator = '<', int $count = 1): self
     {
-        // Get table name from model
-        /** @var callable $getTableName */
-        $getTableName = [$this->modelClass, 'getTableName'];
-        $table = $getTableName();
-
-        // Create a dummy model to get the relationship
-        $model = new $this->modelClass([]);
-
-        if (!method_exists($model, $relation)) {
-            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        // For count-based queries (count != 1), use the count approach
+        if ($count !== 1 || $operator !== '<') {
+            return $this->whereDoesntHaveWithCount($relation, $callback, $operator, $count);
         }
 
-        $relationInstance = $model->$relation();
-
-        if (!$relationInstance instanceof RelationInterface) {
-            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
-        }
-
-        // Get the relationship's query builder
-        $relationQuery = $relationInstance->getQuery();
-
-        // Apply callback constraints if provided
-        if ($callback !== null) {
-            $callback($relationQuery);
-        }
-
-        // Handle different relationship types properly
-        if (
-            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
-            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
-        ) {
-            $subquerySql = $this->buildPivotWhereHasSubquery($relationInstance, $table, $relationQuery);
-        } else {
-            $subquerySql = $this->buildSimpleWhereHasSubquery($relationInstance, $table, $relationQuery);
-        }
-
-        // Add relation query wheres to subquery
-        $relationSql = $relationQuery->toSql();
-        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
-            $whereClause = $matches[1];
-
-            // Replace placeholders with actual values (safely quoted)
-            $relationBindings = $relationQuery->getBindings();
-            $boundWhereClause = $whereClause;
-            foreach ($relationBindings as $binding) {
-                $quoted = $this->quoteValue($binding);
-                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
-            }
-
-            $subquerySql .= " AND ({$boundWhereClause})";
-        }
-
-        // Add the NOT EXISTS clause with count comparison
-        // Example: WHERE (SELECT COUNT(*) ...) < 1
-        $this->whereRaw("({$subquerySql}) {$operator} ?", [$count]);
-
-        return $this;
+        // For simple existence check, use optimized NOT EXISTS
+        return $this->whereDoesntHaveExists($relation, $callback);
     }
 
     /**
-     * OR version of whereDoesntHave.
+     * Optimized whereDoesntHave using NOT EXISTS (fastest approach).
      *
      * @param string $relation Relationship method name
      * @param callable|null $callback Optional callback to constrain the relationship query
-     * @param string $operator Comparison operator (<, =, etc.)
-     * @param int $count Maximum count (default: 1)
      * @return $this
      */
-    public function orWhereDoesntHave(string $relation, ?callable $callback = null, string $operator = '<', int $count = 1): self
+    protected function whereDoesntHaveExists(string $relation, ?callable $callback = null): self
     {
         // Get table name from model
         /** @var callable $getTableName */
@@ -630,34 +879,167 @@ class ModelQueryBuilder extends QueryBuilder
             $callback($relationQuery);
         }
 
-        // Handle different relationship types properly
-        if (
-            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
-            $relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
-        ) {
-            $subquerySql = $this->buildPivotWhereHasSubquery($relationInstance, $table, $relationQuery);
-        } else {
-            $subquerySql = $this->buildSimpleWhereHasSubquery($relationInstance, $table, $relationQuery);
+        // Build NOT EXISTS subquery
+        $existsSubquery = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+
+        // Add NOT EXISTS clause - much faster than COUNT(*)
+        $this->whereRaw("NOT EXISTS ({$existsSubquery})");
+
+        return $this;
+    }
+
+    /**
+     * whereDoesntHave with count comparison (for count != 1 cases).
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator
+     * @param int $count Count threshold
+     * @return $this
+     */
+    private function whereDoesntHaveWithCount(string $relation, ?callable $callback = null, string $operator = '<', int $count = 1): self
+    {
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
         }
 
-        // Add relation query wheres to subquery
-        $relationSql = $relationQuery->toSql();
-        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
-            $whereClause = $matches[1];
+        $relationInstance = $model->$relation();
 
-            // Replace placeholders with actual values (safely quoted)
-            $relationBindings = $relationQuery->getBindings();
-            $boundWhereClause = $whereClause;
-            foreach ($relationBindings as $binding) {
-                $quoted = $this->quoteValue($binding);
-                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
-            }
-
-            $subquerySql .= " AND ({$boundWhereClause})";
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
         }
 
-        // Add the OR NOT EXISTS clause with count comparison
-        $this->orWhereRaw("({$subquerySql}) {$operator} ?", [$count]);
+        // Get the relationship's query builder
+        $relationQuery = $relationInstance->getQuery();
+
+        // Apply callback constraints if provided
+        if ($callback !== null) {
+            $callback($relationQuery);
+        }
+
+        // Build COUNT subquery (only when count comparison is needed)
+        $countSubquery = $this->buildCountSubquery($relationInstance, $table, $relationQuery);
+
+        // Add count comparison clause
+        $this->whereRaw("({$countSubquery}) {$operator} ?", [$count]);
+
+        return $this;
+    }
+
+    /**
+     * OR version of whereDoesntHave.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator (<, =, etc.)
+     * @param int $count Maximum count (default: 1)
+     * @return $this
+     */
+    public function orWhereDoesntHave(string $relation, ?callable $callback = null, string $operator = '<', int $count = 1): self
+    {
+        // For count-based queries (count != 1), use the count approach
+        if ($count !== 1 || $operator !== '<') {
+            return $this->orWhereDoesntHaveWithCount($relation, $callback, $operator, $count);
+        }
+
+        // For simple existence check, use optimized OR NOT EXISTS
+        return $this->orWhereDoesntHaveExists($relation, $callback);
+    }
+
+    /**
+     * OR version of optimized whereDoesntHave using NOT EXISTS.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @return $this
+     */
+    private function orWhereDoesntHaveExists(string $relation, ?callable $callback = null): self
+    {
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
+        }
+
+        // Get the relationship's query builder
+        $relationQuery = $relationInstance->getQuery();
+
+        // Apply callback constraints if provided
+        if ($callback !== null) {
+            $callback($relationQuery);
+        }
+
+        // Build NOT EXISTS subquery
+        $existsSubquery = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+
+        // Add OR NOT EXISTS clause - much faster than COUNT(*)
+        $this->orWhereRaw("NOT EXISTS ({$existsSubquery})");
+
+        return $this;
+    }
+
+    /**
+     * OR version of whereDoesntHave with count comparison.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator
+     * @param int $count Count threshold
+     * @return $this
+     */
+    private function orWhereDoesntHaveWithCount(string $relation, ?callable $callback = null, string $operator = '<', int $count = 1): self
+    {
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
+        }
+
+        // Get the relationship's query builder
+        $relationQuery = $relationInstance->getQuery();
+
+        // Apply callback constraints if provided
+        if ($callback !== null) {
+            $callback($relationQuery);
+        }
+
+        // Build COUNT subquery (only when count comparison is needed)
+        $countSubquery = $this->buildCountSubquery($relationInstance, $table, $relationQuery);
+
+        // Add OR count comparison clause
+        $this->orWhereRaw("({$countSubquery}) {$operator} ?", [$count]);
 
         return $this;
     }
@@ -667,6 +1049,7 @@ class ModelQueryBuilder extends QueryBuilder
      *
      * Supports dot notation for nested relationships like 'posts.comments'.
      * This is a Toporia exclusive feature - superior to Laravel.
+     * Uses optimized EXISTS/NOT EXISTS for maximum performance.
      *
      * @param string $relation Nested relationship using dot notation (e.g., 'posts.comments')
      * @param callable|null $callback Optional callback to constrain the final relationship
@@ -686,7 +1069,7 @@ class ModelQueryBuilder extends QueryBuilder
         $relations = explode('.', $relation);
         $finalRelation = array_pop($relations);
 
-        // Build nested query from inside out
+        // Build nested query from inside out using EXISTS for optimal performance
         $nestedCallback = $callback;
 
         // Work backwards through the relationship chain
@@ -695,10 +1078,12 @@ class ModelQueryBuilder extends QueryBuilder
             $previousCallback = $nestedCallback;
 
             $nestedCallback = function ($query) use ($currentRelation, $previousCallback) {
+                // Use standard whereDoesntHave which will automatically use EXISTS for simple cases
                 $query->whereDoesntHave($currentRelation, $previousCallback);
             };
         }
 
+        // Use EXISTS-based whereDoesntHave for the final relationship
         return $this->whereDoesntHave($finalRelation, $nestedCallback);
     }
 

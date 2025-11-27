@@ -61,9 +61,12 @@ final class ProductController extends BaseController
     public function index(Request $request)
     {
         // Test enterprise Response system with different response types
-        $singleProduct = ProductModel::with('categories:id,name')->first();
+        $singleProduct = ProductModel::whereDoesntHave('categories')->first();
         $productCollection = ProductModel::with('categories:id,name')->limit(3)->get();
-
+        return $this->json([
+            'success' => true,
+            'data' => $singleProduct,
+        ]);
         // Use enterprise ResponseFactory with macros
 
 

@@ -2770,4 +2770,18 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
     {
         return static::query()->whereDoesntHaveJsonAttribute($relation, $jsonColumn, $jsonPath, $value);
     }
+
+    /**
+     * Static convenience method for orWhereHas.
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @param string $operator Comparison operator (>=, =, etc.)
+     * @param int $count Count threshold (default: 1)
+     * @return ModelQueryBuilder
+     */
+    public static function orWhereHas(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): ModelQueryBuilder
+    {
+        return static::query()->orWhereHas($relation, $callback, $operator, $count);
+    }
 }
