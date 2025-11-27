@@ -1594,12 +1594,19 @@ class ModelQueryBuilder extends QueryBuilder
     /**
      * Process large model datasets in chunks using streaming.
      *
+     * Overrides parent to work with ModelCollection instead of RowCollection.
+     * Provides same signature as parent for consistency.
+     *
      * @param int $chunkSize Number of models per chunk
      * @param callable $callback Callback to process each chunk
      * @return bool
      */
     public function streamChunk(int $chunkSize, callable $callback): bool
     {
+        if ($chunkSize < 1) {
+            throw new \InvalidArgumentException('Chunk size must be at least 1');
+        }
+
         $chunk = [];
         $count = 0;
 
@@ -1611,8 +1618,8 @@ class ModelQueryBuilder extends QueryBuilder
                 // Create ModelCollection for chunk
                 $collection = $this->newCollection($chunk);
 
-                // Process chunk
-                $result = $callback($collection);
+                // Process chunk - same signature as parent (collection, count)
+                $result = $callback($collection, $count);
 
                 if ($result === false) {
                     return false;
@@ -1627,7 +1634,7 @@ class ModelQueryBuilder extends QueryBuilder
         // Process remaining models
         if (!empty($chunk)) {
             $collection = $this->newCollection($chunk);
-            $callback($collection);
+            $callback($collection, $count);
         }
 
         return true;
