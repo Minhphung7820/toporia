@@ -83,4 +83,12 @@ interface RelationInterface
      * @return string Foreign key column name
      */
     public function getForeignKeyName(): string;
+
+    /**
+     * Create a new instance for eager loading without parent constraints.
+     *
+     * @param QueryBuilder $freshQuery Fresh query builder without constraints
+     * @return static New relation instance ready for eager loading
+     */
+    public function newEagerInstance(QueryBuilder $freshQuery): static;
 }

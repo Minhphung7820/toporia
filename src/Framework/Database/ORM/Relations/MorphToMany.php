@@ -5,28 +5,62 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
-
+use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
 
 /**
- * Class MorphToMany
+ * MorphToMany Relationship
  *
- * Core class for the Relations layer providing essential functionality for
- * the Toporia Framework.
+ * Handles polymorphic many-to-many relationships.
+ * Example: Post/Video morphToMany Tags
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
- * @version     1.0.0
+ * @version     1.1.0
  * @package     toporia/framework
  * @subpackage  Relations
  * @since       2025-01-10
- *
- * @link        https://github.com/Minhphung7820/toporia
  */
 class MorphToMany extends Relation
 {
+    /** @var string Pivot table name */
+    protected string $pivotTable;
+
+    /** @var string Morph type column */
+    protected string $morphType;
+
+    /** @var string Related pivot key */
+    protected string $relatedPivotKey;
+
+    /** @var string Related key */
+    protected string $relatedKey;
+
+    /** @var array<string> Additional pivot columns to select */
+    protected array $pivotColumns = [];
+
+    /** @var bool Whether to include timestamps in pivot table */
+    protected bool $withTimestamps = false;
+
+    /** @var string Custom pivot accessor name */
+    protected string $pivotAccessor = 'pivot';
+
+    /** @var array<array{column: string, operator: string, value: mixed}> Pivot where constraints */
+    protected array $pivotWheres = [];
+
+    /** @var array<array{column: string, values: array}> Pivot whereIn constraints */
+    protected array $pivotWhereIns = [];
+
+    /** @var array<array{column: string, direction: string}> Pivot order by clauses */
+    protected array $pivotOrderBy = [];
+
+    /** @var class-string|null Custom pivot model class */
+    protected ?string $pivotClass = null;
+
+    /** @var string|null Cached related table name */
+    private ?string $relatedTableCache = null;
+
     /**
-     * @param \Toporia\Framework\Database\Query\QueryBuilder $query Query builder
+     * @param QueryBuilder $query Query builder
      * @param Model $parent Parent model (Post or Video)
      * @param class-string<Model> $relatedClass Related model class (Tag)
      * @param string $morphName Morph name ('taggable')
@@ -38,7 +72,7 @@ class MorphToMany extends Relation
      * @param string|null $relatedPrimaryKey Related primary key (id)
      */
     public function __construct(
-        \Toporia\Framework\Database\Query\QueryBuilder $query,
+        QueryBuilder $query,
         Model $parent,
         protected string $relatedClass,
         protected string $morphName,
@@ -54,58 +88,94 @@ class MorphToMany extends Relation
         $this->foreignKey = $morphId ?? "{$morphName}_id";
         $this->relatedPivotKey = $relatedKey ?? $this->guessRelatedKey();
         $this->localKey = $parentKey ?? $parent::getPrimaryKey();
-        $this->relatedKey = $relatedPrimaryKey ?? call_user_func([$relatedClass, 'getPrimaryKey']);
+        $this->relatedKey = $relatedPrimaryKey ?? $this->relatedClass::getPrimaryKey();
 
         parent::__construct($query, $parent, $this->foreignKey, $this->localKey);
 
         $this->performJoin();
     }
 
+    // =========================================================================
+    // TABLE NAME HELPERS (with caching)
+    // =========================================================================
+
+    /**
+     * Get cached related table name.
+     */
+    protected function getRelatedTable(): string
+    {
+        return $this->relatedTableCache ??= $this->relatedClass::getTableName();
+    }
+
     /**
      * Guess pivot table name.
-     *
-     * @return string
      */
     protected function guessPivotTable(): string
     {
-        // Use morph name + 's' (taggable -> taggables)
         return $this->morphName . 's';
     }
 
     /**
      * Guess related key name.
-     *
-     * @return string
      */
     protected function guessRelatedKey(): string
     {
         $parts = explode('\\', $this->relatedClass);
-        $className = strtolower(end($parts));
-        return "{$className}_id";
+        return strtolower(end($parts)) . '_id';
     }
 
     /**
      * Get morph class name for parent.
-     *
-     * @return string
      */
     protected function getMorphClass(): string
     {
-        // Use full class name to match database storage
         return get_class($this->parent);
     }
 
+    // =========================================================================
+    // INTERNAL HELPERS
+    // =========================================================================
+
+    /**
+     * Create a new pivot query builder.
+     */
+    protected function newPivotQuery(): QueryBuilder
+    {
+        return (new QueryBuilder($this->query->getConnection()))
+            ->table($this->pivotTable)
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->where($this->morphType, $this->getMorphClass());
+    }
+
+    /**
+     * Build dictionary for eager loading matching.
+     *
+     * @return array<string, array<Model>>
+     */
+    protected function buildDictionary(ModelCollection $results): array
+    {
+        $dictionary = [];
+
+        foreach ($results as $result) {
+            $type = $result->getAttribute($this->morphType);
+            $id = $result->getAttribute($this->foreignKey);
+            $dictionary["{$type}:{$id}"][] = $result;
+        }
+
+        return $dictionary;
+    }
+
+    // =========================================================================
+    // CORE RELATION METHODS
+    // =========================================================================
+
     /**
      * Perform join with pivot table.
-     *
-     * @return void
      */
     protected function performJoin(): void
     {
-        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        $relatedTable = $this->getRelatedTable();
 
-        // Join pivot table to related table
-        // INNER JOIN taggables ON tags.id = taggables.tag_id
         $this->query->join(
             $this->pivotTable,
             "{$relatedTable}.{$this->relatedKey}",
@@ -113,37 +183,22 @@ class MorphToMany extends Relation
             "{$this->pivotTable}.{$this->relatedPivotKey}"
         );
 
-        // Add morph constraints
         if ($this->parent->exists()) {
-            // WHERE taggables.taggable_type = 'Post'
-            $this->query->where(
-                "{$this->pivotTable}.{$this->morphType}",
-                $this->getMorphClass()
-            );
-
-            // AND taggables.taggable_id = ?
-            $this->query->where(
-                "{$this->pivotTable}.{$this->foreignKey}",
-                $this->parent->getAttribute($this->localKey)
-            );
+            $this->query->where("{$this->pivotTable}.{$this->morphType}", $this->getMorphClass());
+            $this->query->where("{$this->pivotTable}.{$this->foreignKey}", $this->parent->getAttribute($this->localKey));
         }
     }
 
     /**
      * {@inheritdoc}
-     *
-     * @return ModelCollection
      */
     public function getResults(): ModelCollection
     {
-        // Ensure constraints are applied if parent exists now but didn't at construction
-        if ($this->parent->exists()) {
-            // Create fresh query to avoid conflicts with query modifications
-            $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
-            $freshQuery = $this->query->newQuery();
-            $freshQuery->table($relatedTable);
+        $relatedTable = $this->getRelatedTable();
 
-            // Re-add join
+        if ($this->parent->exists()) {
+            $freshQuery = $this->query->newQuery()->table($relatedTable);
+
             $freshQuery->join(
                 $this->pivotTable,
                 "{$relatedTable}.{$this->relatedKey}",
@@ -151,61 +206,36 @@ class MorphToMany extends Relation
                 "{$this->pivotTable}.{$this->relatedPivotKey}"
             );
 
-            // Apply morph constraints
             $freshQuery->where("{$this->pivotTable}.{$this->morphType}", $this->getMorphClass());
             $freshQuery->where("{$this->pivotTable}.{$this->foreignKey}", $this->parent->getAttribute($this->localKey));
-
-            // Select related table columns
             $freshQuery->select("{$relatedTable}.*");
 
             $rowCollection = $freshQuery->get();
         } else {
-            $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
             $this->query->select("{$relatedTable}.*");
             $rowCollection = $this->query->get();
         }
 
-        $rows = $rowCollection instanceof \Toporia\Framework\Database\Query\RowCollection
-            ? $rowCollection->all()
-            : $rowCollection;
+        $rows = $rowCollection instanceof RowCollection ? $rowCollection->all() : $rowCollection;
 
-        if (empty($rows)) {
-            return new ModelCollection([]);
-        }
-
-        return call_user_func([$this->relatedClass, 'hydrate'], $rows);
+        return empty($rows) ? new ModelCollection([]) : $this->relatedClass::hydrate($rows);
     }
 
     /**
      * {@inheritdoc}
-     *
-     * Eager loading optimization:
-     * Groups by type and loads in minimal queries.
-     *
-     * Example: 50 Posts and 30 Videos with Tags
-     * - Query 1: Load tags for Posts (WHERE type='Post' AND id IN (...))
-     * - Query 2: Load tags for Videos (WHERE type='Video' AND id IN (...))
-     * Total: 2 queries instead of 80!
      */
     public function addEagerConstraints(array $models): void
     {
-        $relatedTable = call_user_func([$this->relatedClass, 'getTableName']);
+        $relatedTable = $this->getRelatedTable();
 
-        // Group models by type (full class name)
         $types = [];
         foreach ($models as $model) {
             $type = get_class($model);
-
-            if (!isset($types[$type])) {
-                $types[$type] = [];
-            }
             $types[$type][] = $model->getAttribute($this->localKey);
         }
 
-        // Clear existing where (from performJoin)
         $this->query = $this->query->newQuery()->table($relatedTable);
 
-        // Re-add join
         $this->query->join(
             $this->pivotTable,
             "{$relatedTable}.{$this->relatedKey}",
@@ -213,8 +243,6 @@ class MorphToMany extends Relation
             "{$this->pivotTable}.{$this->relatedPivotKey}"
         );
 
-        // Add constraints for all types using closures
-        // WHERE (type='Post' AND id IN (?,...)) OR (type='Video' AND id IN (?,...))
         $pivotTable = $this->pivotTable;
         $morphType = $this->morphType;
         $foreignKey = $this->foreignKey;
@@ -222,22 +250,14 @@ class MorphToMany extends Relation
         $this->query->where(function ($q) use ($types, $pivotTable, $morphType, $foreignKey) {
             $first = true;
             foreach ($types as $type => $ids) {
-                if ($first) {
-                    $q->where(function ($subQ) use ($type, $ids, $pivotTable, $morphType, $foreignKey) {
-                        $subQ->where("{$pivotTable}.{$morphType}", $type)
-                            ->whereIn("{$pivotTable}.{$foreignKey}", $ids);
-                    });
-                    $first = false;
-                } else {
-                    $q->orWhere(function ($subQ) use ($type, $ids, $pivotTable, $morphType, $foreignKey) {
-                        $subQ->where("{$pivotTable}.{$morphType}", $type)
-                            ->whereIn("{$pivotTable}.{$foreignKey}", $ids);
-                    });
-                }
+                $callback = fn($subQ) => $subQ->where("{$pivotTable}.{$morphType}", $type)
+                    ->whereIn("{$pivotTable}.{$foreignKey}", $ids);
+
+                $first ? $q->where($callback) : $q->orWhere($callback);
+                $first = false;
             }
         });
 
-        // Select with pivot columns for matching
         $this->query->select(
             "{$relatedTable}.*",
             "{$this->pivotTable}.{$this->morphType}",
@@ -254,27 +274,11 @@ class MorphToMany extends Relation
             return $models;
         }
 
-        // Build dictionary: type:id => [related_models]
-        $dictionary = [];
-        foreach ($results as $result) {
-            $type = $result->getAttribute($this->morphType);
-            $id = $result->getAttribute($this->foreignKey);
-            $key = "{$type}:{$id}";
+        $dictionary = $this->buildDictionary($results);
 
-            if (!isset($dictionary[$key])) {
-                $dictionary[$key] = [];
-            }
-            $dictionary[$key][] = $result;
-        }
-
-        // Match to parents
         foreach ($models as $model) {
-            $type = get_class($model);
-            $id = $model->getAttribute($this->localKey);
-            $key = "{$type}:{$id}";
-
-            $related = $dictionary[$key] ?? [];
-            $model->setRelation($relationName, new ModelCollection($related));
+            $key = get_class($model) . ':' . $model->getAttribute($this->localKey);
+            $model->setRelation($relationName, new ModelCollection($dictionary[$key] ?? []));
         }
 
         return $models;
@@ -289,43 +293,274 @@ class MorphToMany extends Relation
     }
 
     /**
-     * Attach models to the relationship (original implementation).
-     *
-     * @param mixed $ids Model IDs or models to attach
-     * @return bool
+     * {@inheritdoc}
      */
-    public function attachOriginal(mixed $ids): bool
+    public function newEagerInstance(QueryBuilder $freshQuery): static
     {
-        $ids = is_array($ids) ? $ids : [$ids];
+        $instance = new static(
+            $freshQuery,
+            $this->parent,
+            $this->relatedClass,
+            $this->morphName,
+            $this->pivotTable,
+            $this->morphType,
+            $this->foreignKey,
+            $this->relatedPivotKey,
+            $this->localKey,
+            $this->relatedKey
+        );
 
-        foreach ($ids as $id) {
-            $connection = $this->query->getConnection();
-            $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+        $instance->pivotColumns = $this->pivotColumns;
+        $instance->withTimestamps = $this->withTimestamps;
+        $instance->pivotAccessor = $this->pivotAccessor;
+        $instance->setQuery($freshQuery->newQuery());
 
-            $query->table($this->pivotTable)->insert([
-                $this->relatedPivotKey => $id,
-                $this->foreignKey => $this->parent->getAttribute($this->localKey),
-                $this->morphType => $this->getMorphClass()
-            ]);
+        return $instance;
+    }
+
+    // =========================================================================
+    // PIVOT CONFIGURATION METHODS
+    // =========================================================================
+
+    /**
+     * Specify additional pivot columns to include.
+     */
+    public function withPivot(string ...$columns): static
+    {
+        $this->pivotColumns = [...$this->pivotColumns, ...$columns];
+        return $this;
+    }
+
+    /**
+     * Include timestamps in pivot table.
+     */
+    public function withTimestamps(): static
+    {
+        $this->withTimestamps = true;
+        return $this->withPivot('created_at', 'updated_at');
+    }
+
+    /**
+     * Customize the pivot accessor name.
+     */
+    public function as(string $accessor): static
+    {
+        $this->pivotAccessor = $accessor;
+        return $this;
+    }
+
+    /**
+     * Specify a custom pivot model class.
+     */
+    public function using(string $class): static
+    {
+        $this->pivotClass = $class;
+        return $this;
+    }
+
+    // =========================================================================
+    // PIVOT CONSTRAINT METHODS
+    // =========================================================================
+
+    /**
+     * Add a where constraint on the pivot table.
+     */
+    public function wherePivot(string $column, mixed $operator, mixed $value = null): static
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
         }
+
+        $this->pivotWheres[] = ['column' => $column, 'operator' => $operator, 'value' => $value];
+        $this->applyPivotWhere($column, $operator, $value);
+
+        return $this;
+    }
+
+    /**
+     * Apply a pivot where constraint to the query.
+     */
+    protected function applyPivotWhere(string $column, string $operator, mixed $value): void
+    {
+        $qualifiedColumn = "{$this->pivotTable}.{$column}";
+
+        match (true) {
+            $operator === 'BETWEEN' && is_array($value) => $this->query->whereBetween($qualifiedColumn, $value),
+            $operator === 'NOT BETWEEN' && is_array($value) => $this->query->whereNotBetween($qualifiedColumn, $value),
+            $operator === 'IS' && $value === null => $this->query->whereNull($qualifiedColumn),
+            $operator === 'IS NOT' && $value === null => $this->query->whereNotNull($qualifiedColumn),
+            default => $this->query->where($qualifiedColumn, $operator, $value)
+        };
+    }
+
+    /**
+     * Add a whereIn constraint on the pivot table.
+     */
+    public function wherePivotIn(string $column, array $values): static
+    {
+        $this->pivotWhereIns[] = ['column' => $column, 'values' => $values];
+        $this->query->whereIn("{$this->pivotTable}.{$column}", $values);
+
+        return $this;
+    }
+
+    /**
+     * Add a whereNotIn constraint on the pivot table.
+     */
+    public function wherePivotNotIn(string $column, array $values): static
+    {
+        $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => true];
+        $this->query->whereNotIn("{$this->pivotTable}.{$column}", $values);
+
+        return $this;
+    }
+
+    /**
+     * Add an order by clause on the pivot table.
+     */
+    public function orderByPivot(string $column, string $direction = 'asc'): static
+    {
+        $direction = strtolower($direction);
+        $this->pivotOrderBy[] = ['column' => $column, 'direction' => $direction];
+        $this->query->orderBy("{$this->pivotTable}.{$column}", $direction);
+
+        return $this;
+    }
+
+    /**
+     * Add date-based pivot constraint.
+     */
+    public function wherePivotDate(string $column, string $operator, string $value): static
+    {
+        $this->query->whereRaw("DATE({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+        $this->pivotWheres[] = ['column' => "DATE({$column})", 'operator' => $operator, 'value' => $value];
+
+        return $this;
+    }
+
+    /**
+     * Add month-based pivot constraint.
+     */
+    public function wherePivotMonth(string $column, string $operator, int $value): static
+    {
+        $this->query->whereRaw("MONTH({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+        $this->pivotWheres[] = ['column' => "MONTH({$column})", 'operator' => $operator, 'value' => $value];
+
+        return $this;
+    }
+
+    /**
+     * Add year-based pivot constraint.
+     */
+    public function wherePivotYear(string $column, string $operator, int $value): static
+    {
+        $this->query->whereRaw("YEAR({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+        $this->pivotWheres[] = ['column' => "YEAR({$column})", 'operator' => $operator, 'value' => $value];
+
+        return $this;
+    }
+
+    // =========================================================================
+    // CRUD OPERATIONS
+    // =========================================================================
+
+    /**
+     * Create a new related model and attach it.
+     */
+    public function create(array $attributes = [], array $pivotData = []): Model
+    {
+        $instance = $this->relatedClass::create($attributes);
+        $this->attach($instance->getAttribute($this->relatedKey), $pivotData);
+
+        return $instance;
+    }
+
+    /**
+     * Save a related model and attach it.
+     */
+    public function save(Model $model, array $pivotData = []): Model
+    {
+        $model->save();
+        $this->attach($model->getAttribute($this->relatedKey), $pivotData);
+
+        return $model;
+    }
+
+    /**
+     * Attach models to the relationship.
+     */
+    public function attach(int|string|array $id, array $pivotData = []): array|bool
+    {
+        if (is_array($id)) {
+            return $this->attachMany($id);
+        }
+
+        $data = [
+            $this->relatedPivotKey => $id,
+            $this->foreignKey => $this->parent->getAttribute($this->localKey),
+            $this->morphType => $this->getMorphClass(),
+            ...$pivotData
+        ];
+
+        if ($this->withTimestamps) {
+            $now = date('Y-m-d H:i:s');
+            $data['created_at'] = $now;
+            $data['updated_at'] = $now;
+        }
+
+        (new QueryBuilder($this->query->getConnection()))
+            ->table($this->pivotTable)
+            ->insert($data);
 
         return true;
     }
 
     /**
+     * Attach multiple related models.
+     */
+    protected function attachMany(array $ids): array
+    {
+        $attached = [];
+        $insertData = [];
+        $now = $this->withTimestamps ? date('Y-m-d H:i:s') : null;
+
+        foreach ($ids as $key => $value) {
+            [$relatedId, $pivotData] = is_numeric($key)
+                ? [$value, []]
+                : [$key, is_array($value) ? $value : []];
+
+            $data = [
+                $this->relatedPivotKey => $relatedId,
+                $this->foreignKey => $this->parent->getAttribute($this->localKey),
+                $this->morphType => $this->getMorphClass(),
+                ...$pivotData
+            ];
+
+            if ($now) {
+                $data['created_at'] = $now;
+                $data['updated_at'] = $now;
+            }
+
+            $insertData[] = $data;
+            $attached[] = $relatedId;
+        }
+
+        if ($insertData !== []) {
+            (new QueryBuilder($this->query->getConnection()))
+                ->table($this->pivotTable)
+                ->insert($insertData);
+        }
+
+        return $attached;
+    }
+
+    /**
      * Detach models from the relationship.
-     *
-     * @param mixed $ids Model IDs to detach (null = detach all)
-     * @return int Number of rows deleted
      */
     public function detach(mixed $ids = null): int
     {
-        $connection = $this->query->getConnection();
-        $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        $query->table($this->pivotTable)
-            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
-            ->where($this->morphType, $this->getMorphClass());
+        $query = $this->newPivotQuery();
 
         if ($ids !== null) {
             $ids = is_array($ids) ? $ids : [$ids];
@@ -336,437 +571,30 @@ class MorphToMany extends Relation
     }
 
     /**
-     * Sync the relationship with the given IDs (original implementation).
-     *
-     * @param mixed $ids Model IDs to sync
-     * @return void
-     */
-    public function syncOriginal(mixed $ids): void
-    {
-        $ids = is_array($ids) ? $ids : [$ids];
-
-        // Detach all existing
-        $this->detach();
-
-        // Attach new ones
-        $this->attachOriginal($ids);
-    }
-
-    /**
-     * Store pivot table name
-     */
-    protected string $pivotTable;
-
-    /**
-     * Store morph type column
-     */
-    protected string $morphType;
-
-    /**
-     * Store related pivot key
-     */
-    protected string $relatedPivotKey;
-
-    /**
-     * Store related key
-     */
-    protected string $relatedKey;
-
-    /**
-     * Additional pivot columns to select.
-     *
-     * @var array<string>
-     */
-    protected array $pivotColumns = [];
-
-    /**
-     * Whether to include timestamps in pivot table.
-     *
-     * @var bool
-     */
-    protected bool $withTimestamps = false;
-
-    /**
-     * Custom pivot accessor name.
-     *
-     * @var string
-     */
-    protected string $pivotAccessor = 'pivot';
-
-    /**
-     * Pivot where constraints.
-     *
-     * @var array<array{column: string, operator: string, value: mixed}>
-     */
-    protected array $pivotWheres = [];
-
-    /**
-     * Pivot whereIn constraints.
-     *
-     * @var array<array{column: string, values: array}>
-     */
-    protected array $pivotWhereIns = [];
-
-    /**
-     * Pivot order by clauses.
-     *
-     * @var array<array{column: string, direction: string}>
-     */
-    protected array $pivotOrderBy = [];
-
-    /**
-     * Custom pivot model class.
-     *
-     * @var class-string|null
-     */
-    protected ?string $pivotClass = null;
-
-    /**
-     * Specify additional pivot columns to include in query results.
-     *
-     * Performance: O(1) - Array merge operation
-     * Clean Architecture: Fluent interface for readability
-     *
-     * @param string ...$columns Pivot column names to select
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $post->tags()->withPivot('created_at', 'priority')->get();
-     * ```
-     */
-    public function withPivot(string ...$columns): static
-    {
-        $this->pivotColumns = array_merge($this->pivotColumns, $columns);
-        return $this;
-    }
-
-    /**
-     * Include created_at and updated_at timestamps in pivot table.
-     *
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $post->tags()->withTimestamps()->get();
-     * ```
-     */
-    public function withTimestamps(): static
-    {
-        $this->withTimestamps = true;
-        return $this->withPivot('created_at', 'updated_at');
-    }
-
-    /**
-     * Customize the pivot accessor name.
-     *
-     * @param string $accessor Custom accessor name
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $post->tags()->as('tagging')->withTimestamps()->get();
-     * ```
-     */
-    public function as(string $accessor): static
-    {
-        $this->pivotAccessor = $accessor;
-        return $this;
-    }
-
-    /**
-     * Add a where constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param mixed $operator Operator or value if no operator provided
-     * @param mixed $value Value to compare (optional)
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $post->tags()->wherePivot('status', 'active')->get();
-     * ```
-     */
-    public function wherePivot(string $column, mixed $operator, mixed $value = null): static
-    {
-        if ($value === null) {
-            $value = $operator;
-            $operator = '=';
-        }
-
-        $this->pivotWheres[] = [
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        // Apply constraint immediately to current query
-        $this->applyPivotWhere($column, $operator, $value);
-
-        return $this;
-    }
-
-    /**
-     * Apply a single pivot where constraint to the query.
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param mixed $value Value to compare
-     * @return void
-     */
-    protected function applyPivotWhere(string $column, string $operator, mixed $value): void
-    {
-        $column = "{$this->pivotTable}.{$column}";
-
-        if ($operator === 'BETWEEN' && is_array($value)) {
-            $this->query->whereBetween($column, $value);
-        } elseif ($operator === 'NOT BETWEEN' && is_array($value)) {
-            $this->query->whereNotBetween($column, $value);
-        } elseif ($operator === 'IS' && $value === null) {
-            $this->query->whereNull($column);
-        } elseif ($operator === 'IS NOT' && $value === null) {
-            $this->query->whereNotNull($column);
-        } else {
-            $this->query->where($column, $operator, $value);
-        }
-    }
-
-    /**
-     * Add a whereIn constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param array $values Array of values
-     * @return $this
-     */
-    public function wherePivotIn(string $column, array $values): static
-    {
-        $this->pivotWhereIns[] = [
-            'column' => $column,
-            'values' => $values
-        ];
-
-        // Apply constraint immediately to current query
-        $this->query->whereIn("{$this->pivotTable}.{$column}", $values);
-
-        return $this;
-    }
-
-    /**
-     * Add a whereNotIn constraint on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param array $values Array of values
-     * @return $this
-     */
-    public function wherePivotNotIn(string $column, array $values): static
-    {
-        $this->pivotWhereIns[] = [
-            'column' => $column,
-            'values' => $values,
-            'not' => true
-        ];
-
-        // Apply constraint immediately to current query
-        $this->query->whereNotIn("{$this->pivotTable}.{$column}", $values);
-
-        return $this;
-    }
-
-    /**
-     * Add an order by clause on the pivot table.
-     *
-     * @param string $column Pivot column name
-     * @param string $direction Sort direction (asc|desc)
-     * @return $this
-     */
-    public function orderByPivot(string $column, string $direction = 'asc'): static
-    {
-        $direction = strtolower($direction);
-
-        $this->pivotOrderBy[] = [
-            'column' => $column,
-            'direction' => $direction
-        ];
-
-        // Apply order immediately to current query
-        $this->query->orderBy("{$this->pivotTable}.{$column}", $direction);
-
-        return $this;
-    }
-
-    /**
-     * Specify a custom pivot model class to use.
-     *
-     * @param class-string $class Custom pivot model class
-     * @return $this
-     */
-    public function using(string $class): static
-    {
-        $this->pivotClass = $class;
-        return $this;
-    }
-
-    /**
-     * Create a new related model and attach it.
-     *
-     * Performance: O(1) - Single INSERT operations
-     * Clean Architecture: Atomic create-and-attach operation
-     *
-     * @param array $attributes Model attributes
-     * @param array $pivotData Additional pivot data
-     * @return Model Created and attached model
-     *
-     * @example
-     * ```php
-     * $tag = $post->tags()->create(['name' => 'Laravel'], ['priority' => 1]);
-     * ```
-     */
-    public function create(array $attributes = [], array $pivotData = []): Model
-    {
-        $instance = call_user_func([$this->relatedClass, 'create'], $attributes);
-        $this->attach($instance->getAttribute($this->relatedKey), $pivotData);
-        return $instance;
-    }
-
-    /**
-     * Save a related model and attach it.
-     *
-     * @param Model $model Model to save and attach
-     * @param array $pivotData Additional pivot data
-     * @return Model Saved and attached model
-     */
-    public function save(Model $model, array $pivotData = []): Model
-    {
-        $model->save();
-        $this->attach($model->getAttribute($this->relatedKey), $pivotData);
-        return $model;
-    }
-
-    /**
-     * Enhanced attach method with pivot data support.
-     *
-     * Performance: O(n) - Batch operations when possible
-     * Clean Architecture: Flexible attachment with pivot data
-     *
-     * @param int|string|array $id Related model ID or array of IDs with pivot data
-     * @param array<string, mixed> $pivotData Additional pivot data
-     * @return array|bool Array of attached IDs or boolean for single attach
-     */
-    public function attach(int|string|array $id, array $pivotData = []): array|bool
-    {
-        if (is_array($id)) {
-            return $this->attachMany($id);
-        }
-
-        $data = array_merge([
-            $this->relatedPivotKey => $id,
-            $this->foreignKey => $this->parent->getAttribute($this->localKey),
-            $this->morphType => $this->getMorphClass(),
-        ], $pivotData);
-
-        // Add timestamps if enabled
-        if ($this->withTimestamps) {
-            $now = date('Y-m-d H:i:s');
-            $data['created_at'] = $now;
-            $data['updated_at'] = $now;
-        }
-
-        $connection = $this->query->getConnection();
-        $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-        $query->table($this->pivotTable)->insert($data);
-
-        return true;
-    }
-
-    /**
-     * Attach multiple related models with individual pivot data.
-     *
-     * @param array $ids Array of IDs or associative array with pivot data
-     * @return array Array of attached IDs
-     */
-    protected function attachMany(array $ids): array
-    {
-        $attached = [];
-        $insertData = [];
-
-        foreach ($ids as $key => $value) {
-            if (is_numeric($key)) {
-                $relatedId = $value;
-                $pivotData = [];
-            } else {
-                $relatedId = $key;
-                $pivotData = is_array($value) ? $value : [];
-            }
-
-            $data = array_merge([
-                $this->relatedPivotKey => $relatedId,
-                $this->foreignKey => $this->parent->getAttribute($this->localKey),
-                $this->morphType => $this->getMorphClass(),
-            ], $pivotData);
-
-            if ($this->withTimestamps) {
-                $now = date('Y-m-d H:i:s');
-                $data['created_at'] = $now;
-                $data['updated_at'] = $now;
-            }
-
-            $insertData[] = $data;
-            $attached[] = $relatedId;
-        }
-
-        if (!empty($insertData)) {
-            $connection = $this->query->getConnection();
-            $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-            $query->table($this->pivotTable)->insert($insertData);
-        }
-
-        return $attached;
-    }
-
-    /**
-     * Enhanced sync method with pivot data support.
-     *
-     * Performance: O(n) - Batch operations with single transaction
-     * Clean Architecture: Atomic sync operation with consistent state
-     *
-     * @param array $ids Related model IDs or associative array with pivot data
-     * @param bool $detaching Whether to detach missing records
-     * @return array Sync results with attached, detached, and updated arrays
+     * Sync the relationship with the given IDs.
      */
     public function sync(array $ids, bool $detaching = true): array
     {
-        $changes = [
-            'attached' => [],
-            'detached' => [],
-            'updated' => []
-        ];
-
-        // Get current pivot records
+        $changes = ['attached' => [], 'detached' => [], 'updated' => []];
         $current = $this->getCurrentPivotIds();
-
-        // Normalize input IDs
         $records = $this->formatSyncRecords($ids);
         $syncIds = array_keys($records);
 
         if ($detaching) {
-            // Determine what to detach
             $detach = array_diff($current, $syncIds);
-            if (!empty($detach)) {
+            if ($detach !== []) {
                 $this->detach($detach);
-                $changes['detached'] = $detach;
+                $changes['detached'] = array_values($detach);
             }
         }
 
-        // Determine what to attach or update
         foreach ($records as $id => $pivotData) {
             if (in_array($id, $current)) {
-                // Update existing pivot record
-                if (!empty($pivotData)) {
+                if ($pivotData !== []) {
                     $this->updateExistingPivot($id, $pivotData);
                     $changes['updated'][] = $id;
                 }
             } else {
-                // Attach new record
                 $this->attach($id, $pivotData);
                 $changes['attached'][] = $id;
             }
@@ -777,15 +605,11 @@ class MorphToMany extends Relation
 
     /**
      * Toggle the attachment of related models.
-     *
-     * @param array|int|string $ids Related model IDs
-     * @return array Toggle results with attached and detached arrays
      */
     public function toggle(array|int|string $ids): array
     {
         $ids = is_array($ids) ? $ids : [$ids];
         $changes = ['attached' => [], 'detached' => []];
-
         $current = $this->getCurrentPivotIds();
 
         foreach ($ids as $id) {
@@ -803,10 +627,6 @@ class MorphToMany extends Relation
 
     /**
      * Update an existing pivot record.
-     *
-     * @param int|string $id Related model ID
-     * @param array $pivotData Pivot data to update
-     * @return bool
      */
     public function updateExistingPivot(int|string $id, array $pivotData): bool
     {
@@ -814,12 +634,7 @@ class MorphToMany extends Relation
             $pivotData['updated_at'] = date('Y-m-d H:i:s');
         }
 
-        $connection = $this->query->getConnection();
-        $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        $affected = $query->table($this->pivotTable)
-            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
-            ->where($this->morphType, $this->getMorphClass())
+        $affected = $this->newPivotQuery()
             ->where($this->relatedPivotKey, $id)
             ->update($pivotData);
 
@@ -827,60 +642,48 @@ class MorphToMany extends Relation
     }
 
     /**
-     * Get current pivot IDs for the parent model.
-     *
-     * @return array
+     * Sync with additional pivot values for all records.
      */
-    protected function getCurrentPivotIds(): array
+    public function syncWithPivotValues(array $ids, array $pivotValues, bool $detaching = true): array
     {
-        $connection = $this->query->getConnection();
-        $query = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+        $records = array_fill_keys($ids, $pivotValues);
 
-        $results = $query->table($this->pivotTable)
-            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
-            ->where($this->morphType, $this->getMorphClass())
-            ->pluck($this->relatedPivotKey);
+        return $this->sync($records, $detaching);
+    }
 
-        return $results->toArray();
+    // =========================================================================
+    // QUERY METHODS
+    // =========================================================================
+
+    /**
+     * Check if any related models exist.
+     */
+    public function exists(): bool
+    {
+        return $this->parent->exists() && $this->query->exists();
     }
 
     /**
-     * Format sync records from various input formats.
-     *
-     * @param array $records Input records
-     * @return array Formatted records
+     * Get the count of related models.
      */
-    protected function formatSyncRecords(array $records): array
+    public function count(): int
     {
-        $formatted = [];
-
-        foreach ($records as $key => $value) {
-            if (is_numeric($key)) {
-                $formatted[$value] = [];
-            } else {
-                $formatted[$key] = is_array($value) ? $value : [];
-            }
-        }
-
-        return $formatted;
+        return $this->parent->exists() ? $this->query->count() : 0;
     }
 
     /**
-     * Process records in chunks to optimize memory usage.
-     *
-     * PERFORMANCE WARNING: Uses OFFSET/LIMIT which can be slow on large tables.
-     * For better performance on large datasets, use chunkById() instead.
-     *
-     * Performance: O(n/chunk_size) but OFFSET becomes slower as offset increases
-     * Clean Architecture: Callback pattern for flexible processing
-     *
-     * @param int $count Number of records per chunk
-     * @param callable $callback Function to process each chunk
-     * @return bool True if all chunks processed successfully
+     * Get the first related model or create a new one.
+     */
+    public function firstOrCreate(array $attributes = [], array $pivotData = []): Model
+    {
+        return $this->query->first() ?? $this->create($attributes, $pivotData);
+    }
+
+    /**
+     * Process records in chunks.
      */
     public function chunk(int $count, callable $callback): bool
     {
-
         $page = 1;
 
         do {
@@ -890,7 +693,7 @@ class MorphToMany extends Relation
                 break;
             }
 
-            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+            $models = $this->relatedClass::hydrate($results->toArray());
 
             if ($callback($models, $page) === false) {
                 return false;
@@ -903,28 +706,12 @@ class MorphToMany extends Relation
     }
 
     /**
-     * Process records in chunks ordered by ID for consistent results.
-     *
-     * Performance: O(n/chunk_size) - Consistent ordering prevents missed records
-     * Clean Architecture: ID-based chunking ensures reliable pagination
-     *
-     * @param int $count Number of records per chunk
-     * @param callable $callback Function to process each chunk
-     * @param string $column Column to order by (default: related model's primary key)
-     * @param string $alias Optional column alias
-     * @return bool True if all chunks processed successfully
-     *
-     * @example
-     * ```php
-     * $post->tags()->chunkById(50, function($tags) {
-     *     // Process tags in consistent order
-     * });
-     * ```
+     * Process records in chunks ordered by ID.
      */
-    public function chunkById(int $count, callable $callback, string $column = null, string $alias = null): bool
+    public function chunkById(int $count, callable $callback, ?string $column = null, ?string $alias = null): bool
     {
-        $column = $column ?: $this->relatedKey;
-        $alias = $alias ?: $column;
+        $column ??= $this->relatedKey;
+        $alias ??= $column;
         $lastId = null;
 
         do {
@@ -940,286 +727,58 @@ class MorphToMany extends Relation
                 break;
             }
 
-            $models = call_user_func([$this->relatedClass, 'hydrate'], $results->toArray());
+            $models = $this->relatedClass::hydrate($results->toArray());
 
-            // Call the callback with the current chunk
             if ($callback($models) === false) {
                 return false;
             }
 
-            // Get the last ID for the next iteration
-            $lastModel = $models->last();
-            $lastId = $lastModel->getAttribute($alias);
+            $lastId = $models->last()->getAttribute($alias);
         } while ($results->count() === $count);
 
         return true;
     }
 
+    // =========================================================================
+    // PIVOT QUERY METHODS
+    // =========================================================================
+
     /**
-     * Get the count of related models.
-     *
-     * @return int Count of related models
+     * Get current pivot IDs for the parent model.
      */
-    public function count(): int
+    protected function getCurrentPivotIds(): array
     {
-        if (!$this->parent->exists()) {
-            return 0;
+        return $this->newPivotQuery()->pluck($this->relatedPivotKey)->toArray();
+    }
+
+    /**
+     * Format sync records from various input formats.
+     */
+    protected function formatSyncRecords(array $records): array
+    {
+        $formatted = [];
+
+        foreach ($records as $key => $value) {
+            $formatted[is_numeric($key) ? $value : $key] = is_numeric($key) ? [] : (is_array($value) ? $value : []);
         }
 
-        return $this->query->count();
-    }
-
-    /**
-     * Check if any related models exist.
-     *
-     * @return bool True if related models exist
-     */
-    public function exists(): bool
-    {
-        if (!$this->parent->exists()) {
-            return false;
-        }
-
-        return $this->query->exists();
-    }
-
-    /**
-     * Get the first related model or create a new one.
-     *
-     * @param array $attributes Attributes for new model if not found
-     * @param array $pivotData Additional pivot data
-     * @return Model Found or created model
-     */
-    public function firstOrCreate(array $attributes = [], array $pivotData = []): Model
-    {
-        $instance = $this->query->first();
-
-        if ($instance === null) {
-            $instance = $this->create($attributes, $pivotData);
-        }
-
-        return $instance;
-    }
-
-    /**
-     * Magic method to delegate calls to the underlying query builder.
-     *
-     * Performance: O(1) - Direct method delegation
-     * Clean Architecture: Proxy pattern for query builder methods
-     *
-     * @param string $method Method name
-     * @param array $parameters Method parameters
-     * @return mixed
-     */
-    public function __call(string $method, array $parameters): mixed
-    {
-        if (method_exists($this->query, $method)) {
-            $result = $this->query->{$method}(...$parameters);
-
-            if ($result instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                return $this;
-            }
-
-            return $result;
-        }
-
-        throw new \BadMethodCallException(
-            sprintf('Method %s::%s does not exist.', static::class, $method)
-        );
-    }
-
-    /**
-     * Add date-based pivot constraints.
-     *
-     * Performance: O(1) - Direct SQL date function usage
-     * Clean Architecture: Expressive domain-specific method
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param string $value Date value (Y-m-d format)
-     * @return $this
-     *
-     * @example
-     * ```php
-     * $post->tags()->wherePivotDate('assigned_at', '>=', '2024-01-01')->get();
-     * ```
-     */
-    public function wherePivotDate(string $column, string $operator, string $value): static
-    {
-        // Apply function directly to avoid double prefixing
-        $this->query->whereRaw("DATE({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-
-        // Store for eager loading
-        $this->pivotWheres[] = [
-            'column' => "DATE({$column})",
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        return $this;
-    }
-
-    /**
-     * Add month-based pivot constraints.
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param int $value Month value (1-12)
-     * @return $this
-     */
-    public function wherePivotMonth(string $column, string $operator, int $value): static
-    {
-        $this->query->whereRaw("MONTH({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-
-        $this->pivotWheres[] = [
-            'column' => "MONTH({$column})",
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        return $this;
-    }
-
-    /**
-     * Add year-based pivot constraints.
-     *
-     * @param string $column Pivot column name
-     * @param string $operator Comparison operator
-     * @param int $value Year value
-     * @return $this
-     */
-    public function wherePivotYear(string $column, string $operator, int $value): static
-    {
-        $this->query->whereRaw("YEAR({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-
-        $this->pivotWheres[] = [
-            'column' => "YEAR({$column})",
-            'operator' => $operator,
-            'value' => $value
-        ];
-
-        return $this;
-    }
-
-    /**
-     * Get pivot aggregations.
-     *
-     * Performance: O(1) - Single aggregation query
-     * Clean Architecture: Expressive aggregation methods
-     *
-     * @param string $column Pivot column name
-     * @return float|int
-     */
-    public function sumPivot(string $column): float|int
-    {
-        $connection = $this->query->getConnection();
-        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        return $qb->table($this->pivotTable)
-            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
-            ->where($this->morphType, $this->getMorphClass())
-            ->sum($column) ?? 0;
-    }
-
-    /**
-     * Get average of a pivot column.
-     *
-     * @param string $column Pivot column name
-     * @return float|int
-     */
-    public function avgPivot(string $column): float|int
-    {
-        $connection = $this->query->getConnection();
-        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        return $qb->table($this->pivotTable)
-            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
-            ->where($this->morphType, $this->getMorphClass())
-            ->avg($column) ?? 0;
-    }
-
-    /**
-     * Get minimum value of a pivot column.
-     *
-     * @param string $column Pivot column name
-     * @return mixed
-     */
-    public function minPivot(string $column): mixed
-    {
-        $connection = $this->query->getConnection();
-        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        return $qb->table($this->pivotTable)
-            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
-            ->where($this->morphType, $this->getMorphClass())
-            ->min($column);
-    }
-
-    /**
-     * Get maximum value of a pivot column.
-     *
-     * @param string $column Pivot column name
-     * @return mixed
-     */
-    public function maxPivot(string $column): mixed
-    {
-        $connection = $this->query->getConnection();
-        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        return $qb->table($this->pivotTable)
-            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
-            ->where($this->morphType, $this->getMorphClass())
-            ->max($column);
+        return $formatted;
     }
 
     /**
      * Get the pivot table query builder.
-     *
-     * Performance: O(1) - Direct query builder access
-     * Clean Architecture: Exposes pivot table for advanced queries
-     *
-     * @return \Toporia\Framework\Database\Query\QueryBuilder
      */
-    public function pivotQuery(): \Toporia\Framework\Database\Query\QueryBuilder
+    public function pivotQuery(): QueryBuilder
     {
-        $connection = $this->query->getConnection();
-        $qb = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        return $qb->table($this->pivotTable)
-            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
-            ->where($this->morphType, $this->getMorphClass());
-    }
-
-    /**
-     * Get distinct values from a pivot column.
-     *
-     * Performance: O(log n) - Uses database DISTINCT optimization
-     * Clean Architecture: Expressive method for pivot column analysis
-     *
-     * @param string $column Pivot column name
-     * @return array Array of distinct values
-     */
-    public function distinctPivot(string $column): array
-    {
-        return $this->pivotQuery()
-            ->distinct()
-            ->pluck($column)
-            ->toArray();
+        return $this->newPivotQuery();
     }
 
     /**
      * Check if a specific pivot relationship exists.
-     *
-     * Performance: O(log n) - Indexed lookup with early termination
-     * Clean Architecture: Expressive existence check
-     *
-     * @param int|string $id Related model ID
-     * @param array $pivotConstraints Additional pivot constraints
-     * @return bool
      */
     public function pivotExists(int|string $id, array $pivotConstraints = []): bool
     {
-        $query = $this->pivotQuery()->where($this->relatedPivotKey, $id);
+        $query = $this->newPivotQuery()->where($this->relatedPivotKey, $id);
 
         foreach ($pivotConstraints as $column => $value) {
             $query->where($column, $value);
@@ -1229,14 +788,7 @@ class MorphToMany extends Relation
     }
 
     /**
-     * Find a related model by its pivot attributes.
-     *
-     * Performance: O(log n) - Indexed pivot table lookup
-     * Clean Architecture: Expressive finder method for pivot-based queries
-     *
-     * @param array $pivotAttributes Pivot attributes to search by
-     * @param array $columns Columns to select
-     * @return Model|null
+     * Find a related model by pivot attributes.
      */
     public function findByPivot(array $pivotAttributes, array $columns = ['*']): ?Model
     {
@@ -1249,10 +801,6 @@ class MorphToMany extends Relation
 
     /**
      * Get all related models with specific pivot attributes.
-     *
-     * @param array $pivotAttributes Pivot attributes to search by
-     * @param array $columns Columns to select
-     * @return ModelCollection
      */
     public function getByPivot(array $pivotAttributes, array $columns = ['*']): ModelCollection
     {
@@ -1263,35 +811,56 @@ class MorphToMany extends Relation
         return $this->select($columns)->get();
     }
 
-    /**
-     * Sync with additional pivot values for all records.
-     *
-     * Performance: O(n) - Batch operations with single transaction
-     * Clean Architecture: Atomic sync operation with consistent state
-     *
-     * @param array $ids Related model IDs
-     * @param array $pivotValues Additional pivot data for all records
-     * @param bool $detaching Whether to detach missing records
-     * @return array Sync results
-     */
-    public function syncWithPivotValues(array $ids, array $pivotValues, bool $detaching = true): array
-    {
-        // Add pivot values to each ID
-        $records = [];
-        foreach ($ids as $id) {
-            $records[$id] = $pivotValues;
-        }
+    // =========================================================================
+    // PIVOT AGGREGATION METHODS
+    // =========================================================================
 
-        return $this->sync($records, $detaching);
+    /**
+     * Get sum of a pivot column.
+     */
+    public function sumPivot(string $column): float|int
+    {
+        return $this->newPivotQuery()->sum($column) ?? 0;
     }
 
     /**
+     * Get average of a pivot column.
+     */
+    public function avgPivot(string $column): float|int
+    {
+        return $this->newPivotQuery()->avg($column) ?? 0;
+    }
+
+    /**
+     * Get minimum value of a pivot column.
+     */
+    public function minPivot(string $column): mixed
+    {
+        return $this->newPivotQuery()->min($column);
+    }
+
+    /**
+     * Get maximum value of a pivot column.
+     */
+    public function maxPivot(string $column): mixed
+    {
+        return $this->newPivotQuery()->max($column);
+    }
+
+    /**
+     * Get distinct values from a pivot column.
+     */
+    public function distinctPivot(string $column): array
+    {
+        return $this->newPivotQuery()->distinct()->pluck($column)->toArray();
+    }
+
+    // =========================================================================
+    // GETTER METHODS
+    // =========================================================================
+
+    /**
      * Get the morph name.
-     *
-     * Performance: O(1) - Direct property access
-     * Clean Architecture: Expressive getter method
-     *
-     * @return string Morph name
      */
     public function getMorphName(): string
     {
@@ -1300,11 +869,6 @@ class MorphToMany extends Relation
 
     /**
      * Get the pivot table name.
-     *
-     * Performance: O(1) - Direct property access
-     * Clean Architecture: Expressive getter method
-     *
-     * @return string Pivot table name
      */
     public function getPivotTable(): string
     {
@@ -1313,14 +877,70 @@ class MorphToMany extends Relation
 
     /**
      * Get the related pivot key.
-     *
-     * Performance: O(1) - Direct property access
-     * Clean Architecture: Expressive getter method
-     *
-     * @return string Related pivot key
      */
     public function getRelatedPivotKey(): string
     {
         return $this->relatedPivotKey;
+    }
+
+    /**
+     * Get the morph type column name.
+     */
+    public function getMorphType(): string
+    {
+        return $this->morphType;
+    }
+
+    /**
+     * Get the related model class name.
+     *
+     * @return class-string<Model>
+     */
+    public function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
+    // =========================================================================
+    // LEGACY METHODS (for backward compatibility)
+    // =========================================================================
+
+    /**
+     * @deprecated Use attach() instead
+     */
+    public function attachOriginal(mixed $ids): bool
+    {
+        $this->attach(is_array($ids) ? $ids : [$ids]);
+
+        return true;
+    }
+
+    /**
+     * @deprecated Use sync() instead
+     */
+    public function syncOriginal(mixed $ids): void
+    {
+        $this->detach();
+        $this->attach(is_array($ids) ? $ids : [$ids]);
+    }
+
+    // =========================================================================
+    // MAGIC METHODS
+    // =========================================================================
+
+    /**
+     * Magic method to delegate calls to the query builder.
+     */
+    public function __call(string $method, array $parameters): mixed
+    {
+        if (method_exists($this->query, $method)) {
+            $result = $this->query->{$method}(...$parameters);
+
+            return $result instanceof QueryBuilder ? $this : $result;
+        }
+
+        throw new \BadMethodCallException(
+            sprintf('Method %s::%s does not exist.', static::class, $method)
+        );
     }
 }
