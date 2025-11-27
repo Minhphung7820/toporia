@@ -1805,8 +1805,8 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      */
     public static function __callStatic(string $method, array $parameters)
     {
-        // Get connection
-        $connection = app()->make(\Toporia\Framework\Database\Connection::class);
+        // Get connection - use model's specific connection configuration
+        $connection = static::getConnection();
 
         // Create model query builder
         $modelQueryBuilder = new ModelQueryBuilder($connection, static::class);
