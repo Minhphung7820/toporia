@@ -634,11 +634,9 @@ class BelongsToMany extends Relation
                 }
 
                 // Build pivot data - CRITICAL: Use the actual values from pivot row
+                // PERFORMANCE: Use array spread for faster copying (PHP 7.4+)
                 // Laravel includes both foreign keys in pivot data when using withPivot()
-                $pivotData = [];
-                foreach ($pivotRow as $key => $value) {
-                    $pivotData[$key] = $value;
-                }
+                $pivotData = [...$pivotRow];
 
                 // CRITICAL: Force set both foreign keys to ensure they match the actual pivot row values
                 // This prevents any potential issues with type conversion or data corruption
@@ -664,81 +662,76 @@ class BelongsToMany extends Relation
         // Step 5: Match related models to parents using dictionary and attach pivot data
         // CRITICAL: Clone related models for each parent to avoid pivot data being shared/reused
         // When multiple products share the same category, each product needs its own category instance with correct pivot data
+        // PERFORMANCE: Pre-normalize parent IDs to avoid repeated string conversion
         foreach ($models as $model) {
             $modelParentId = $model->getAttribute($this->parentKey);
+
+            if ($modelParentId === null) {
+                // No parent ID - set empty collection
+                $model->setRelation($relationName, new ModelCollection([]));
+                continue;
+            }
+
+            // Normalize to string for consistent comparison (cache this value)
+            $modelParentIdKey = (string) $modelParentId;
+
+            // CRITICAL: Only match if dictionary has entries for THIS specific parentId
+            if (!isset($dictionary[$modelParentIdKey])) {
+                // No pivot data for this product - set empty collection
+                $model->setRelation($relationName, new ModelCollection([]));
+                continue;
+            }
+
+            // Get related IDs with pivot data for THIS parent from dictionary
+            $relatedDataForParent = $dictionary[$modelParentIdKey];
+
+            // Initialize matched array (PHP handles dynamic growth efficiently)
             $matched = [];
 
-            if ($modelParentId !== null) {
-                // Normalize to string for consistent comparison
-                $modelParentIdKey = (string) $modelParentId;
+            // Look up actual models by ID and attach pivot data
+            // OPTIMIZED: Single loop with validation - combines validation and matching
+            foreach ($relatedDataForParent as $relatedIdStr => $pivotData) {
+                // CRITICAL: Verify pivot data has correct parentId FIRST
+                // This ensures we don't waste time on invalid pivot data
+                $pivotParentId = $pivotData[$this->foreignPivotKey] ?? null;
 
-                // CRITICAL: Only match if dictionary has entries for THIS specific parentId
-                // Double-check: Ensure the key exists and matches exactly
-                if (!isset($dictionary[$modelParentIdKey])) {
-                    // No pivot data for this product - set empty collection
-                    $model->setRelation($relationName, new ModelCollection([]));
+                // Safety check: pivot data MUST match the model's parentId
+                if ($pivotParentId === null || (string) $pivotParentId !== $modelParentIdKey) {
+                    // Dictionary corruption detected - skip invalid entry
                     continue;
                 }
 
-                // Get related IDs with pivot data for THIS parent from dictionary
-                $relatedDataForParent = $dictionary[$modelParentIdKey];
+                // Normalize to string for consistent comparison
+                $relatedIdKey = (string) $relatedIdStr;
 
-                // CRITICAL: Verify that all pivot data in this array belongs to THIS product
-                // This is a safety check to catch any dictionary building errors
-                foreach ($relatedDataForParent as $relatedIdStr => $pivotData) {
-                    $pivotParentId = $pivotData[$this->foreignPivotKey] ?? null;
-                    if ($pivotParentId === null || (string) $pivotParentId !== $modelParentIdKey) {
-                        // Dictionary corruption detected - remove invalid entry
-                        unset($relatedDataForParent[$relatedIdStr]);
-                    }
-                }
+                if (isset($relatedIndex[$relatedIdKey])) {
+                    $pivotRelatedId = $pivotData[$this->relatedPivotKey] ?? null;
 
-                // Look up actual models by ID and attach pivot data
-                foreach ($relatedDataForParent as $relatedIdStr => $pivotData) {
-                    // Normalize to string for consistent comparison
-                    $relatedIdKey = (string) $relatedIdStr;
+                    // CRITICAL: Clone the related model to avoid sharing pivot data between products
+                    // When multiple products share the same category, each needs its own instance
+                    $originalRelatedModel = $relatedIndex[$relatedIdKey];
 
-                    if (isset($relatedIndex[$relatedIdKey])) {
-                        // CRITICAL: Verify pivot data has correct parentId BEFORE cloning
-                        // This ensures we don't waste time cloning if pivot data is wrong
-                        $pivotParentId = $pivotData[$this->foreignPivotKey] ?? null;
-                        $pivotRelatedId = $pivotData[$this->relatedPivotKey] ?? null;
+                    // Clone the model to create a fresh instance for this product
+                    $relatedModel = clone $originalRelatedModel;
 
-                        // CRITICAL: pivot data MUST match the model's parentId
-                        // If it doesn't match, skip this pivot record entirely
-                        if ($pivotParentId === null || (string) $pivotParentId !== $modelParentIdKey) {
-                            // Pivot data doesn't belong to this product - skip it
-                            continue;
-                        }
+                    // Clear any existing relations on the cloned model
+                    $relatedModel->setRelation($this->pivotAccessor, null);
 
-                        // CRITICAL: Clone the related model to avoid sharing pivot data between products
-                        // When multiple products share the same category, each needs its own instance
-                        $originalRelatedModel = $relatedIndex[$relatedIdKey];
+                    // Attach pivot data to the cloned model
+                    // PERFORMANCE: Use array spread for faster copying, then override foreign keys
+                    // This creates a fresh copy to avoid reference issues while being faster than foreach
+                    $cleanPivotData = [...$pivotData];
 
-                        // Clone the model to create a fresh instance for this product
-                        $relatedModel = clone $originalRelatedModel;
+                    // CRITICAL: Force set foreign keys to match THIS product's ID
+                    // This ensures pivot data always has the correct product_id
+                    // Even though we verified above, we still force set to be absolutely sure
+                    $cleanPivotData[$this->foreignPivotKey] = $modelParentId;
+                    $cleanPivotData[$this->relatedPivotKey] = $pivotRelatedId;
 
-                        // Clear any existing relations on the cloned model
-                        $relatedModel->setRelation($this->pivotAccessor, null);
+                    $pivotModel = $this->newPivot($cleanPivotData, true);
+                    $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
 
-                        // Attach pivot data to the cloned model
-                        // Create a fresh copy of pivot data to avoid any reference issues
-                        $cleanPivotData = [];
-                        foreach ($pivotData as $key => $value) {
-                            $cleanPivotData[$key] = $value;
-                        }
-
-                        // CRITICAL: Force set foreign keys to match THIS product's ID
-                        // This ensures pivot data always has the correct product_id
-                        // Even though we verified above, we still force set to be absolutely sure
-                        $cleanPivotData[$this->foreignPivotKey] = $modelParentId;
-                        $cleanPivotData[$this->relatedPivotKey] = $pivotRelatedId;
-
-                        $pivotModel = $this->newPivot($cleanPivotData, true);
-                        $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
-
-                        $matched[] = $relatedModel;
-                    }
+                    $matched[] = $relatedModel;
                 }
             }
 
@@ -891,10 +884,12 @@ class BelongsToMany extends Relation
             return $this->attachMany($id, $touch);
         }
 
-        $data = array_merge([
+        // PERFORMANCE: Use array spread for faster merging
+        $data = [
             $this->foreignPivotKey => $this->parent->getAttribute($this->parentKey),
             $this->relatedPivotKey => $id,
-        ], $pivotData);
+            ...$pivotData,
+        ];
 
         // Add timestamps if enabled
         if ($this->withTimestamps) {
@@ -963,15 +958,12 @@ class BelongsToMany extends Relation
             }
 
             // Build data array efficiently
+            // PERFORMANCE: Use array spread for faster merging (PHP 7.4+)
             $data = [
                 $this->foreignPivotKey => $parentKeyValue,
                 $this->relatedPivotKey => $relatedId,
+                ...$pivotData, // Spread pivot data directly (empty array spreads to nothing)
             ];
-
-            // Merge pivot data if present
-            if (!empty($pivotData)) {
-                $data = array_merge($data, $pivotData);
-            }
 
             // Add timestamps if enabled (use cached timestamp)
             if ($this->withTimestamps && $timestamp !== null) {
@@ -1059,6 +1051,13 @@ class BelongsToMany extends Relation
         $records = $this->formatSyncRecords($ids);
         $syncIds = array_keys($records);
 
+        // PERFORMANCE: Convert current IDs to associative array for O(1) lookup
+        // This is much faster than in_array() which is O(n)
+        $currentLookup = [];
+        foreach ($current as $currentId) {
+            $currentLookup[$currentId] = true;
+        }
+
         if ($detaching) {
             // Determine what to detach
             $detach = array_diff($current, $syncIds);
@@ -1070,7 +1069,8 @@ class BelongsToMany extends Relation
 
         // Determine what to attach or update
         foreach ($records as $id => $pivotData) {
-            if (in_array($id, $current)) {
+            // PERFORMANCE: Use isset() for O(1) lookup instead of in_array() which is O(n)
+            if (isset($currentLookup[$id])) {
                 // Update existing pivot record
                 if (!empty($pivotData)) {
                     $this->updateExistingPivot($id, $pivotData);
@@ -1195,8 +1195,15 @@ class BelongsToMany extends Relation
             // This prevents both performance and correctness issues
             $current = $this->getCurrentPivotIdsFor($chunkIds);
 
+            // PERFORMANCE: Convert current IDs to associative array for O(1) lookup
+            $currentLookup = [];
+            foreach ($current as $currentId) {
+                $currentLookup[$currentId] = true;
+            }
+
             foreach ($chunk as $id => $pivotData) {
-                if (in_array($id, $current, true)) {
+                // PERFORMANCE: Use isset() for O(1) lookup instead of in_array() which is O(n)
+                if (isset($currentLookup[$id])) {
                     // Update existing pivot record
                     if (!empty($pivotData)) {
                         $this->updateExistingPivot($id, $pivotData);
@@ -1225,8 +1232,15 @@ class BelongsToMany extends Relation
 
         $current = $this->getCurrentPivotIds();
 
+        // PERFORMANCE: Convert current IDs to associative array for O(1) lookup
+        $currentLookup = [];
+        foreach ($current as $currentId) {
+            $currentLookup[$currentId] = true;
+        }
+
         foreach ($ids as $id) {
-            if (in_array($id, $current)) {
+            // PERFORMANCE: Use isset() for O(1) lookup instead of in_array() which is O(n)
+            if (isset($currentLookup[$id])) {
                 $this->detach($id);
                 $changes['detached'][] = $id;
             } else {
@@ -1935,7 +1949,8 @@ class BelongsToMany extends Relation
     {
         // FIXED: Use targeted existence check instead of loading all pivot IDs
         if ($this->pivotExists($id)) {
-            return $this->updateExistingPivot($id, array_merge($pivotData, $updateData));
+            // PERFORMANCE: Use array spread for faster merging
+            return $this->updateExistingPivot($id, [...$pivotData, ...$updateData]);
         } else {
             return $this->attach($id, $pivotData, false) !== false;
         }
