@@ -74,7 +74,7 @@ final class ProductController extends BaseController
         $actualData = ProductModel::where('category_id', 1)->first();
 
         // Option 3: Performance testing with query hints
-        $optimizedQuery = ProductModel::query()->withCount(['categories'])
+        $optimizedQuery = ProductModel::withSum('categories', 'sort_order')
             ->optimizeForLargeResults()
             ->limit(1000)
             ->orderBy('id', 'ASC')

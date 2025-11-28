@@ -1418,6 +1418,12 @@ class ModelQueryBuilder extends QueryBuilder
             $callback($relationQuery);
         }
 
+        // Special handling for BelongsToMany relationships (many-to-many through pivot table)
+        if ($relationInstance instanceof BelongsToMany) {
+            $this->addBelongsToManyAggregateSelect($relationInstance, $relation, $column, $function, $table, $relationQuery);
+            return $this;
+        }
+
         $foreignKey = $relationInstance->getForeignKey();
         $localKey = $relationInstance->getLocalKey();
         $relationTable = $relationQuery->getTable();
@@ -1460,6 +1466,110 @@ class ModelQueryBuilder extends QueryBuilder
         $this->selectRaw("({$subquery}) AS {$columnAlias}");
 
         return $this;
+    }
+
+    /**
+     * Add aggregate select for BelongsToMany relationships.
+     *
+     * For many-to-many relationships, the column can be:
+     * 1. A column in the pivot table (e.g., 'sort_order' in product_categories)
+     * 2. A column in the related table (e.g., 'name' in categories) - requires join
+     *
+     * By default, we assume the column is in the pivot table. If constraints exist
+     * on the related table, we join it and can aggregate on either table.
+     *
+     * @param BelongsToMany $relationInstance The BelongsToMany relation instance
+     * @param string $relation The relation name
+     * @param string $column The column to aggregate (can be pivot or related table column)
+     * @param string $function The aggregate function (SUM, AVG, MIN, MAX)
+     * @param string $table The parent table name
+     * @param QueryBuilder $relationQuery The relation query builder
+     * @return void
+     */
+    private function addBelongsToManyAggregateSelect(
+        BelongsToMany $relationInstance,
+        string $relation,
+        string $column,
+        string $function,
+        string $table,
+        QueryBuilder $relationQuery
+    ): void {
+        // Get pivot table and keys using public methods
+        $pivotTable = $relationInstance->getPivotTable();
+        $foreignPivotKey = $relationInstance->getForeignPivotKey();
+        $parentKey = $relationInstance->getParentKey();
+
+        // Check if relation query has constraints on the related table
+        $relationSql = $relationQuery->toSql();
+        $hasRelatedConstraints = preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches);
+
+        // Determine if column is in pivot table or related table
+        // By default, assume pivot table. If column contains dot (e.g., "categories.name"),
+        // it's explicitly from related table
+        $isPivotColumn = !str_contains($column, '.');
+
+        if ($hasRelatedConstraints || !$isPivotColumn) {
+            // Need to join related table
+            $relatedTable = $relationInstance->getRelatedTable();
+            $relatedPivotKey = $relationInstance->getRelatedPivotKey();
+            $relatedKey = $relationInstance->getRelatedKey();
+
+            $pivotAlias = "{$pivotTable}_pivot";
+            $relatedAlias = "{$relatedTable}_related";
+
+            // Determine which table the column belongs to
+            if (str_contains($column, '.')) {
+                // Explicit table.column format
+                [$tablePart, $columnPart] = explode('.', $column, 2);
+                if ($tablePart === $relatedTable || $tablePart === 'categories') {
+                    $aggregateColumn = "{$relatedAlias}.{$columnPart}";
+                } else {
+                    $aggregateColumn = "{$pivotAlias}.{$columnPart}";
+                }
+            } else {
+                // Default: try pivot table first, but we'll join related table for constraints
+                // If column doesn't exist in pivot, it should be in related table
+                $aggregateColumn = "{$pivotAlias}.{$column}";
+            }
+
+            $subquery = "SELECT {$function}({$aggregateColumn}) FROM {$pivotTable} AS {$pivotAlias} " .
+                "INNER JOIN {$relatedTable} AS {$relatedAlias} ON {$pivotAlias}.{$relatedPivotKey} = {$relatedAlias}.{$relatedKey} " .
+                "WHERE {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
+
+            // Add constraints from relation query
+            if ($hasRelatedConstraints) {
+                $whereClause = $matches[1];
+
+                // Replace placeholders with actual values (safely quoted)
+                $relationBindings = $relationQuery->getBindings();
+                $boundWhereClause = $whereClause;
+                foreach ($relationBindings as $binding) {
+                    $quoted = $this->quoteValue($binding);
+                    $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+                }
+
+                // Replace table references in where clause with alias
+                $boundWhereClause = preg_replace('/\b' . preg_quote($relatedTable, '/') . '\./', "{$relatedAlias}.", $boundWhereClause);
+
+                $subquery .= " AND ({$boundWhereClause})";
+            }
+        } else {
+            // Simple case: aggregate on pivot table column only
+            $pivotAlias = "{$pivotTable}_pivot";
+            $subquery = "SELECT {$function}({$pivotAlias}.{$column}) FROM {$pivotTable} AS {$pivotAlias} " .
+                "WHERE {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
+        }
+
+        $functionLower = strtolower($function);
+        $columnAlias = "{$relation}_{$functionLower}_{$column}";
+
+        // Ensure we select table.* along with the subquery (only once)
+        $columns = $this->getColumns();
+        if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+            $this->select("{$table}.*");
+        }
+
+        $this->selectRaw("({$subquery}) AS {$columnAlias}");
     }
 
     /**
