@@ -267,13 +267,24 @@ class BelongsToMany extends Relation
 
     /**
      * Build the SELECT columns array including pivot columns.
+     *
+     * OPTIMIZED: Also selects foreignPivotKey and relatedPivotKey from pivot table
+     * to avoid a separate pivot query during eager loading.
      */
     protected function buildSelectColumns(string $relatedTable): array
     {
         $columns = ["{$relatedTable}.*"];
 
+        // Always select foreignPivotKey and relatedPivotKey from pivot table
+        // This allows us to use pivot data from the main query instead of querying again
+        $columns[] = "{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}";
+        $columns[] = "{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}";
+
         foreach ($this->pivotColumns as $column) {
-            $columns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
+            // Skip if already added (foreignPivotKey or relatedPivotKey might be in pivotColumns)
+            if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
+                $columns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
+            }
         }
 
         return $columns;
@@ -539,16 +550,19 @@ class BelongsToMany extends Relation
     }
 
     /**
-     * Standard matching with separate pivot query (2 queries total).
+     * Standard matching using pivot data from main query (OPTIMIZED - 1 query instead of 2).
+     *
+     * PERFORMANCE OPTIMIZATION: Uses pivot data already selected in the main eager query
+     * instead of querying the pivot table again. This reduces queries from 2 to 1.
      *
      * @param array $models Parent models
-     * @param ModelCollection $results Related models
+     * @param ModelCollection $results Related models with pivot data in attributes
      * @param string $relationName Relation name
      * @return array
      */
     protected function matchWithPivotQuery(array $models, ModelCollection $results, string $relationName): array
     {
-        // Step 1: Collect parent and related IDs (with deduplication)
+        // Step 1: Collect parent IDs (with deduplication)
         $parentIds = [];
         foreach ($models as $model) {
             $parentId = $model->getAttribute($this->parentKey);
@@ -558,15 +572,6 @@ class BelongsToMany extends Relation
         }
         $parentIds = array_keys($parentIds);
 
-        $relatedIds = [];
-        foreach ($results as $result) {
-            $relatedId = $result->getAttribute($this->relatedKey);
-            if ($relatedId !== null) {
-                $relatedIds[$relatedId] = true; // Use associative array for O(1) deduplication
-            }
-        }
-        $relatedIds = array_keys($relatedIds);
-
         if (empty($parentIds)) {
             // No valid parent IDs - set empty collections
             foreach ($models as $model) {
@@ -575,91 +580,78 @@ class BelongsToMany extends Relation
             return $models;
         }
 
-        // Note: $relatedIds can be empty if main query didn't return any categories
-        // This is OK - we'll still query pivot table and match what we can
-
-        // Step 2: Query pivot table to get parent-to-related mappings with pivot data
-        // IMPORTANT: Only filter by parentIds and pivot constraints, NOT by relatedIds
-        // This ensures we get all valid pivot records for the parents, then match with results
-        // SELECT foreign_key, related_key, ...pivot_columns FROM pivot_table
-        // WHERE foreign_key IN (...) AND pivot_constraints
-        $qb = new QueryBuilder($this->query->getConnection());
-
-        // Build select columns: foreign key, related key, and pivot columns
-        $selectColumns = [$this->foreignPivotKey, $this->relatedPivotKey];
-        foreach ($this->pivotColumns as $column) {
-            $selectColumns[] = $column;
-        }
-
-        $pivotQuery = $qb->table($this->pivotTable)
-            ->select($selectColumns)
-            ->whereIn($this->foreignPivotKey, $parentIds);
-
-        // Apply pivot constraints to the pivot query (e.g., wherePivot('sort_order', '>=', 89))
-        $this->applyPivotConstraintsToQuery($pivotQuery);
-
-        try {
-            $pivotRows = $pivotQuery->get();
-        } catch (\Exception $e) {
-            // If query fails due to missing pivot columns, retry with only foreign keys
-            if (Str::contains($e->getMessage(), 'Unknown column')) {
-                // Rebuild query without pivot columns
-                $pivotQuery = $qb->table($this->pivotTable)
-                    ->select($this->foreignPivotKey, $this->relatedPivotKey)
-                    ->whereIn($this->foreignPivotKey, $parentIds);
-                $this->applyPivotConstraintsToQuery($pivotQuery);
-                $pivotRows = $pivotQuery->get();
-            } else {
-                throw $e;
-            }
-        }
-
-        // Step 3: Build dictionary mapping parent IDs to arrays of [relatedId => pivotData]
-        // CRITICAL: Use the actual parentId and relatedId from pivot row, NOT from variables that might be overwritten
-        // Normalize IDs to strings for consistent comparison
-        // Example: ["1" => ["10" => ['product_id' => 1, 'category_id' => 10, 'sort_order' => 1], ...], ...]
+        // Step 2: Extract pivot data from query results (OPTIMIZED - no separate query)
+        // The main query already selected pivot columns with alias "pivot_{column}"
+        // We extract this data to build the parent-to-related mapping dictionary
         $dictionary = [];
-        foreach ($pivotRows as $pivotRow) {
-            // Get parentId and relatedId directly from pivot row - these are the source of truth
-            $rowParentId = $pivotRow[$this->foreignPivotKey] ?? null;
-            $rowRelatedId = $pivotRow[$this->relatedPivotKey] ?? null;
 
-            if ($rowParentId !== null && $rowRelatedId !== null) {
-                // Normalize to string for consistent comparison
-                $parentIdKey = (string) $rowParentId;
-                $relatedIdKey = (string) $rowRelatedId;
+        foreach ($results as $result) {
+            // Get pivot data from model attributes (with prefix "pivot_")
+            $pivotForeignKey = $result->getAttribute("pivot_{$this->foreignPivotKey}");
+            $pivotRelatedKey = $result->getAttribute("pivot_{$this->relatedPivotKey}");
 
-                if (!isset($dictionary[$parentIdKey])) {
-                    $dictionary[$parentIdKey] = [];
-                }
-
-                // Build pivot data - CRITICAL: Use the actual values from pivot row
-                // PERFORMANCE: Use array spread for faster copying (PHP 7.4+)
-                // Laravel includes both foreign keys in pivot data when using withPivot()
-                $pivotData = [...$pivotRow];
-
-                // CRITICAL: Force set both foreign keys to ensure they match the actual pivot row values
-                // This prevents any potential issues with type conversion or data corruption
-                $pivotData[$this->foreignPivotKey] = $rowParentId;
-                $pivotData[$this->relatedPivotKey] = $rowRelatedId;
-
-                $dictionary[$parentIdKey][$relatedIdKey] = $pivotData;
+            if ($pivotForeignKey === null || $pivotRelatedKey === null) {
+                // Skip if pivot keys are missing (shouldn't happen in eager loading)
+                continue;
             }
+
+            // Normalize to string for consistent comparison
+            $parentIdKey = (string) $pivotForeignKey;
+            $relatedIdKey = (string) $pivotRelatedKey;
+
+            // Build pivot data from all pivot_* attributes
+            $pivotData = [
+                $this->foreignPivotKey => $pivotForeignKey,
+                $this->relatedPivotKey => $pivotRelatedKey,
+            ];
+
+            // Add other pivot columns
+            foreach ($this->pivotColumns as $column) {
+                if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
+                    $pivotValue = $result->getAttribute("pivot_{$column}");
+                    if ($pivotValue !== null) {
+                        $pivotData[$column] = $pivotValue;
+                    }
+                }
+            }
+
+            // Add timestamps if enabled
+            if ($this->withTimestamps) {
+                $createdAt = $result->getAttribute('pivot_created_at');
+                $updatedAt = $result->getAttribute('pivot_updated_at');
+                if ($createdAt !== null) {
+                    $pivotData['created_at'] = $createdAt;
+                }
+                if ($updatedAt !== null) {
+                    $pivotData['updated_at'] = $updatedAt;
+                }
+            }
+
+            // Build dictionary: parentId => [relatedId => pivotData]
+            if (!isset($dictionary[$parentIdKey])) {
+                $dictionary[$parentIdKey] = [];
+            }
+            $dictionary[$parentIdKey][$relatedIdKey] = $pivotData;
         }
 
-        // Step 4: Build index of related models by ID for O(1) lookup
+        // Step 3: Build index of related models by ID for O(1) lookup
         // Normalize IDs to strings to avoid type mismatch issues (int vs string)
+        // Note: If same related model appears multiple times (for different parents),
+        // we keep the first instance (pivot data is already extracted to dictionary)
         // Example: [10 => Model, 20 => Model, ...] or ["10" => Model, "20" => Model, ...]
         $relatedIndex = [];
         foreach ($results as $result) {
             $relatedId = $result->getAttribute($this->relatedKey);
             if ($relatedId !== null) {
-                // Normalize to string for consistent comparison
-                $relatedIndex[(string) $relatedId] = $result;
+                $relatedIdKey = (string) $relatedId;
+                // Only keep first instance if duplicate (pivot data already in dictionary)
+                if (!isset($relatedIndex[$relatedIdKey])) {
+                    $relatedIndex[$relatedIdKey] = $result;
+                }
             }
         }
 
-        // Step 5: Match related models to parents using dictionary and attach pivot data
+        // Step 4: Match related models to parents using dictionary and attach pivot data
         // CRITICAL: Clone related models for each parent to avoid pivot data being shared/reused
         // When multiple products share the same category, each product needs its own category instance with correct pivot data
         // PERFORMANCE: Pre-normalize parent IDs to avoid repeated string conversion
@@ -1435,9 +1427,6 @@ class BelongsToMany extends Relation
         // Set up the query with proper JOIN but without parent WHERE constraints
         $relatedTable = $this->relatedClass::getTableName();
 
-        // Build SELECT clause with pivot columns (only valid ones)
-        $selectColumns = $instance->buildSelectColumns($relatedTable);
-
         // Create a fresh query from the related model (this ensures table name is set)
         $cleanQuery = $this->relatedClass::query()
             ->join(
@@ -1445,8 +1434,23 @@ class BelongsToMany extends Relation
                 "{$relatedTable}.{$this->relatedKey}",
                 '=',
                 "{$this->pivotTable}.{$this->relatedPivotKey}"
-            )
-            ->select($selectColumns);
+            );
+
+        // Build SELECT clause with pivot columns using selectRaw for proper alias handling
+        // This ensures pivot columns are selected with correct aliases
+        $cleanQuery->select("{$relatedTable}.*");
+
+        // Always select foreignPivotKey and relatedPivotKey from pivot table
+        $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
+        $cleanQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
+
+        // Add other pivot columns
+        foreach ($this->pivotColumns as $column) {
+            // Skip if already added (foreignPivotKey or relatedPivotKey might be in pivotColumns)
+            if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
+                $cleanQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+            }
+        }
 
         // Copy where constraints from original query (excluding pivot and parent-specific constraints)
         // This ensures constraints like ->where('slug', 'like', '%Repellat%') are preserved
