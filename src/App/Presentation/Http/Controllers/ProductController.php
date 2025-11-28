@@ -12,6 +12,7 @@ use App\Infrastructure\Persistence\Models\UserModel;
 use App\Infrastructure\Persistence\Models\TagModel;
 use App\Infrastructure\Persistence\Models\OrderItemModel;
 use Toporia\Framework\Http\Request;
+use Toporia\Framework\Support\Accessors\DB;
 
 /**
  * Product API Controller
@@ -78,14 +79,21 @@ final class ProductController extends BaseController
         $cursor = $request->get('cursor'); // Get cursor from query parameter
         $path = $request->path();
         $baseUrl = $request->root(); // Get base URL (http://localhost:8000)
-
+        DB::enableQueryLog();
         $optimizedQuery = ProductModel::query()
             ->with('categories')
             ->optimizeForLargeResults()
             ->orderBy('id', 'ASC') // Cursor column must be ordered
-            ->cursorPaginate($perPage, $cursor, 'id', $path, $baseUrl);
-
+            ->paginate(15);
+        $queries = DB::getQueryLog();
         $singleProduct = [
+            'queries' => array_map(function ($query) {
+                return [
+                    'query' => $query['query'],
+                    'bindings' => $query['bindings'],
+                    'time' => $query['time'] . 'ms'
+                ];
+            }, $queries),
             'sql_info' => $sqlInfo,
             'actual_data' => $actualData,
             'optimized_result' => $optimizedQuery,

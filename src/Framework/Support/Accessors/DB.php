@@ -85,4 +85,72 @@ class DB extends ServiceAccessor
     {
         return 'db';
     }
+
+    /**
+     * Enable query logging.
+     *
+     * All executed queries will be logged with their SQL, bindings, and execution time.
+     *
+     * @return void
+     *
+     * @example
+     * ```php
+     * DB::enableQueryLog();
+     * $users = DB::table('users')->get();
+     * $queries = DB::getQueryLog();
+     * ```
+     */
+    public static function enableQueryLog(): void
+    {
+        QueryBuilder::enableQueryLog();
+    }
+
+    /**
+     * Disable query logging.
+     *
+     * @return void
+     */
+    public static function disableQueryLog(): void
+    {
+        QueryBuilder::disableQueryLog();
+    }
+
+    /**
+     * Get the query log.
+     *
+     * Returns array of executed queries with:
+     * - query: SQL query string
+     * - bindings: Parameter bindings
+     * - time: Execution time in milliseconds
+     *
+     * @return array<array{query: string, bindings: array, time: float}>
+     *
+     * @example
+     * ```php
+     * DB::enableQueryLog();
+     * $users = DB::table('users')->get();
+     * $queries = DB::getQueryLog();
+     * // [
+     * //     [
+     * //         'query' => 'SELECT * FROM users',
+     * //         'bindings' => [],
+     * //         'time' => 0.5
+     * //     ]
+     * // ]
+     * ```
+     */
+    public static function getQueryLog(): array
+    {
+        return QueryBuilder::getQueryLog();
+    }
+
+    /**
+     * Clear the query log.
+     *
+     * @return void
+     */
+    public static function flushQueryLog(): void
+    {
+        QueryBuilder::flushQueryLog();
+    }
 }
