@@ -1320,11 +1320,11 @@ class BelongsToMany extends Relation
     }
 
     /**
-     * Get the related table name.
+     * Get the related table name (public method).
      *
      * @return string
      */
-    public function getRelatedTableName(): string
+    public function getRelatedTable(): string
     {
         return $this->getRelatedTableName();
     }
