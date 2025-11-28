@@ -206,7 +206,15 @@ class HasOneThrough extends Relation
             $this->secondLocalKey
         );
 
-        $instance->setQuery($freshQuery->newQuery());
+        $newQuery = $freshQuery->newQuery();
+        $instance->setQuery($newQuery);
+
+        // Copy where constraints from original query (excluding parent-specific through constraints)
+        $this->copyWhereConstraints($newQuery, [
+            $this->firstKey,
+            $this->foreignKey,
+            fn($col) => $col === $this->firstKey || $col === $this->foreignKey
+        ]);
 
         return $instance;
     }

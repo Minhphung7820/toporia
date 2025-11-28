@@ -83,7 +83,7 @@ class ProductModel extends Model
             'product_categories',
             'product_id',    // Foreign key for current model (ProductModel)
             'category_id'    // Foreign key for related model (CategoryModel)
-        );
+        )->where('slug', 'like', '%Repellat%');
     }
 
     /**

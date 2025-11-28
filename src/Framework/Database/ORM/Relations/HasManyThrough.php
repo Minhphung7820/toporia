@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
+use Toporia\Framework\Support\Str;
 
 /**
  * HasManyThrough Relationship
@@ -142,6 +143,10 @@ class HasManyThrough extends Relation
 
         $keys = array_map(fn($m) => $m->getAttribute($this->localKey), $models);
 
+        // Save original query to copy constraints from it
+        $originalQuery = $this->query;
+
+        // Create new query for eager loading
         $this->query = $this->query->newQuery()->table($relatedTable);
 
         $this->query->join(
@@ -150,6 +155,24 @@ class HasManyThrough extends Relation
             '=',
             "{$relatedTable}.{$this->foreignKey}"
         );
+
+        // Temporarily set query back to original to copy constraints
+        $tempQuery = $this->query;
+        $this->query = $originalQuery;
+
+        // Copy where constraints from original query (excluding through and parent-specific constraints)
+        $this->copyWhereConstraints($tempQuery, [
+            $this->firstKey,
+            $this->foreignKey,
+            fn($col) => Str::contains($col, $throughTable . '.') ||
+                $col === $this->firstKey ||
+                $col === $this->foreignKey ||
+                Str::endsWith($col, '.' . $this->firstKey) ||
+                Str::endsWith($col, '.' . $this->foreignKey)
+        ]);
+
+        // Restore the new query
+        $this->query = $tempQuery;
 
         $this->query->whereIn("{$throughTable}.{$this->firstKey}", $keys);
         $this->query->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
@@ -196,6 +219,51 @@ class HasManyThrough extends Relation
     public function getForeignKeyName(): string
     {
         return $this->foreignKey;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function newEagerInstance(QueryBuilder $freshQuery): static
+    {
+        $instance = new static(
+            $freshQuery,
+            $this->parent,
+            $this->relatedClass,
+            $this->throughClass,
+            $this->firstKey,
+            $this->foreignKey,
+            $this->localKey,
+            $this->secondLocalKey
+        );
+
+        // Set up the query with proper JOIN but without parent WHERE constraints
+        $throughTable = $instance->getThroughTable();
+        $relatedTable = $instance->getRelatedTable();
+
+        $cleanQuery = $this->relatedClass::query()
+            ->join(
+                $throughTable,
+                "{$throughTable}.{$this->secondLocalKey}",
+                '=',
+                "{$relatedTable}.{$this->foreignKey}"
+            )
+            ->select("{$relatedTable}.*");
+
+        $instance->setQuery($cleanQuery);
+
+        // Copy where constraints from original query (excluding through and parent-specific constraints)
+        $this->copyWhereConstraints($cleanQuery, [
+            $this->firstKey,
+            $this->foreignKey,
+            fn($col) => Str::contains($col, $throughTable . '.') ||
+                $col === $this->firstKey ||
+                $col === $this->foreignKey ||
+                Str::endsWith($col, '.' . $this->firstKey) ||
+                Str::endsWith($col, '.' . $this->foreignKey)
+        ]);
+
+        return $instance;
     }
 
     // =========================================================================

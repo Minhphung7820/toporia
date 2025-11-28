@@ -7,6 +7,7 @@ namespace Toporia\Framework\Database\ORM\Relations;
 use Toporia\Framework\Database\Contracts\RelationInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\ORM\Model;
+use Toporia\Framework\Support\Str;
 
 
 /**
@@ -55,6 +56,105 @@ abstract class Relation implements RelationInterface
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
         return new static($freshQuery, $this->parent, $this->foreignKey, $this->localKey);
+    }
+
+    /**
+     * Copy where constraints from original query to new query, excluding parent-specific constraints.
+     *
+     * This ensures that constraints defined in relationship methods (like ->where('slug', 'like', '%Repellat%'))
+     * are preserved when eager loading.
+     *
+     * @param QueryBuilder $newQuery The new query builder to apply constraints to
+     * @param array $excludeColumns Columns to exclude (e.g., foreign key columns)
+     * @return void
+     */
+    protected function copyWhereConstraints(QueryBuilder $newQuery, array $excludeColumns = []): void
+    {
+        $originalWheres = $this->query->getWheres();
+
+        foreach ($originalWheres as $where) {
+            // Skip if column is in exclude list (parent-specific constraints)
+            if (isset($where['column'])) {
+                $column = $where['column'];
+
+                // Check if column should be excluded
+                $shouldExclude = false;
+                foreach ($excludeColumns as $excludePattern) {
+                    if (is_string($excludePattern)) {
+                        if ($column === $excludePattern || Str::endsWith($column, '.' . $excludePattern)) {
+                            $shouldExclude = true;
+                            break;
+                        }
+                    } elseif (is_callable($excludePattern)) {
+                        if ($excludePattern($column)) {
+                            $shouldExclude = true;
+                            break;
+                        }
+                    }
+                }
+
+                if ($shouldExclude) {
+                    continue;
+                }
+            }
+
+            // Apply the where constraint to the new query based on type
+            match ($where['type'] ?? '') {
+                'basic' => $newQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $newQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $newQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $newQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $newQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'Raw' => $newQuery->whereRaw(
+                    $where['sql'] ?? '',
+                    $where['bindings'] ?? [],
+                    $where['boolean'] ?? 'AND'
+                ),
+                'nested' => $newQuery->where(function ($q) use ($where, $excludeColumns) {
+                    // For nested queries, recursively apply constraints
+                    if (isset($where['query']) && method_exists($where['query'], 'getWheres')) {
+                        $nestedWheres = $where['query']->getWheres();
+                        foreach ($nestedWheres as $nestedWhere) {
+                            if (isset($nestedWhere['column'])) {
+                                $nestedColumn = $nestedWhere['column'];
+                                $shouldExclude = false;
+                                foreach ($excludeColumns as $excludePattern) {
+                                    if (is_string($excludePattern)) {
+                                        if ($nestedColumn === $excludePattern || Str::endsWith($nestedColumn, '.' . $excludePattern)) {
+                                            $shouldExclude = true;
+                                            break;
+                                        }
+                                    } elseif (is_callable($excludePattern)) {
+                                        if ($excludePattern($nestedColumn)) {
+                                            $shouldExclude = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if ($shouldExclude) {
+                                    continue;
+                                }
+                            }
+
+                            if ($nestedWhere['type'] === 'basic') {
+                                $q->where(
+                                    $nestedWhere['column'],
+                                    $nestedWhere['operator'] ?? '=',
+                                    $nestedWhere['value'] ?? null,
+                                    $nestedWhere['boolean'] ?? 'AND'
+                                );
+                            }
+                        }
+                    }
+                }, $where['boolean'] ?? 'AND'),
+                default => null, // Skip unknown types
+            };
+        }
     }
 
     /**

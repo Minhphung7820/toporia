@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection, Pivot};
 use Toporia\Framework\Database\Query\QueryBuilder;
+use Toporia\Framework\Support\Str;
 
 /**
  * BelongsToMany Relationship
@@ -378,7 +379,7 @@ class BelongsToMany extends Relation
      */
     protected function isRawColumn(string $column): bool
     {
-        return str_contains($column, '(') && str_contains($column, ')');
+        return Str::contains($column, '(') && Str::contains($column, ')');
     }
 
     /**
@@ -469,7 +470,7 @@ class BelongsToMany extends Relation
         // Check if we have complex pivot constraints that require separate pivot query
         foreach ($this->pivotWheres as $where) {
             // If column contains SQL functions, we need separate pivot query
-            if (str_contains($where['column'], '(') || str_contains($where['column'], ')')) {
+            if (Str::contains($where['column'], '(') || Str::contains($where['column'], ')')) {
                 return false;
             }
         }
@@ -633,27 +634,27 @@ class BelongsToMany extends Relation
             $column = $where['column'];
 
             // Handle function-based columns (synchronized with wherePivot* methods)
-            if (str_contains($column, '(') && str_contains($column, ')')) {
+            if (Str::contains($column, '(') && Str::contains($column, ')')) {
                 $operator = $where['operator'];
                 $value = $where['value'];
 
                 // FIXED: Use exact same logic as wherePivot* methods
-                if (str_starts_with($column, 'DATE(')) {
+                if (Str::startsWith($column, 'DATE(')) {
                     $actualColumn = str_replace(['DATE(', ')'], '', $column);
                     $query->whereRaw("DATE({$actualColumn}) {$operator} ?", [$value]);
-                } elseif (str_starts_with($column, 'MONTH(')) {
+                } elseif (Str::startsWith($column, 'MONTH(')) {
                     $actualColumn = str_replace(['MONTH(', ')'], '', $column);
                     $query->whereRaw("MONTH({$actualColumn}) {$operator} ?", [$value]);
-                } elseif (str_starts_with($column, 'YEAR(')) {
+                } elseif (Str::startsWith($column, 'YEAR(')) {
                     $actualColumn = str_replace(['YEAR(', ')'], '', $column);
                     $query->whereRaw("YEAR({$actualColumn}) {$operator} ?", [$value]);
-                } elseif (str_starts_with($column, 'TIME(')) {
+                } elseif (Str::startsWith($column, 'TIME(')) {
                     $actualColumn = str_replace(['TIME(', ')'], '', $column);
                     $query->whereRaw("TIME({$actualColumn}) {$operator} ?", [$value]);
-                } elseif (str_starts_with($column, 'JSON_CONTAINS(')) {
+                } elseif (Str::startsWith($column, 'JSON_CONTAINS(')) {
                     // Extract JSON_CONTAINS parameters
                     $query->whereRaw("{$column} = ?", [$value]);
-                } elseif (str_starts_with($column, 'JSON_LENGTH(')) {
+                } elseif (Str::startsWith($column, 'JSON_LENGTH(')) {
                     // Extract JSON_LENGTH parameters
                     $query->whereRaw("{$column} {$operator} ?", [$value]);
                 } else {
@@ -663,7 +664,7 @@ class BelongsToMany extends Relation
             } else {
                 // Regular column - add table prefix for pivot query
                 $fullColumn = $column;
-                if (!str_contains($column, '.')) {
+                if (!Str::contains($column, '.')) {
                     $fullColumn = $column; // Already handled in storage
                 }
 
@@ -684,7 +685,7 @@ class BelongsToMany extends Relation
         // Apply pivot whereIn constraints
         foreach ($this->pivotWhereIns as $whereIn) {
             $column = $whereIn['column'];
-            if (!str_contains($column, '.')) {
+            if (!Str::contains($column, '.')) {
                 $column = $column; // Already handled in storage
             }
 
@@ -1257,6 +1258,16 @@ class BelongsToMany extends Relation
                 "{$this->pivotTable}.{$this->relatedPivotKey}"
             )
             ->select($selectColumns);
+
+        // Copy where constraints from original query (excluding pivot and parent-specific constraints)
+        // This ensures constraints like ->where('slug', 'like', '%Repellat%') are preserved
+        $pivotTablePrefix = $this->pivotTable . '.';
+        $foreignPivotKeyQualified = $this->qualifyPivotColumn($this->foreignPivotKey);
+
+        $this->copyWhereConstraints($cleanQuery, [
+            $foreignPivotKeyQualified,
+            fn($col) => Str::startsWith($col, $pivotTablePrefix) || $col === $foreignPivotKeyQualified
+        ]);
 
         $instance->setQuery($cleanQuery);
 

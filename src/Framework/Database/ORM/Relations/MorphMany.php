@@ -264,7 +264,15 @@ class MorphMany extends Relation
             $this->localKey
         );
 
-        $instance->setQuery($freshQuery->newQuery());
+        $newQuery = $freshQuery->newQuery();
+        $instance->setQuery($newQuery);
+
+        // Copy where constraints from original query (excluding parent-specific morph constraints)
+        $this->copyWhereConstraints($newQuery, [
+            $this->morphType,
+            $this->foreignKey,
+            fn($col) => $col === $this->morphType || $col === $this->foreignKey
+        ]);
 
         return $instance;
     }

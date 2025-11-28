@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
+use Toporia\Framework\Support\Str;
 
 /**
  * MorphToMany Relationship
@@ -313,7 +314,40 @@ class MorphToMany extends Relation
         $instance->pivotColumns = $this->pivotColumns;
         $instance->withTimestamps = $this->withTimestamps;
         $instance->pivotAccessor = $this->pivotAccessor;
-        $instance->setQuery($freshQuery->newQuery());
+
+        // Set up the query with proper JOIN but without parent WHERE constraints
+        $relatedTable = $this->relatedClass::getTableName();
+        $selectColumns = ["{$relatedTable}.*"];
+
+        foreach ($this->pivotColumns as $column) {
+            $selectColumns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
+        }
+
+        $cleanQuery = $this->relatedClass::query()
+            ->join(
+                $this->pivotTable,
+                "{$relatedTable}.{$this->relatedKey}",
+                '=',
+                "{$this->pivotTable}.{$this->relatedPivotKey}"
+            )
+            ->select($selectColumns);
+
+        $instance->setQuery($cleanQuery);
+
+        // Copy where constraints from original query (excluding pivot and parent-specific constraints)
+        $pivotTablePrefix = $this->pivotTable . '.';
+        $this->copyWhereConstraints($cleanQuery, [
+            $this->morphType,
+            $this->foreignKey,
+            fn($col) => Str::startsWith($col, $pivotTablePrefix) ||
+                       $col === $this->morphType ||
+                       $col === $this->foreignKey ||
+                       Str::endsWith($col, '.' . $this->morphType) ||
+                       Str::endsWith($col, '.' . $this->foreignKey)
+        ]);
+
+        // Apply pivot constraints separately
+        $instance->applyPivotConstraintsToQuery($instance->getQuery());
 
         return $instance;
     }

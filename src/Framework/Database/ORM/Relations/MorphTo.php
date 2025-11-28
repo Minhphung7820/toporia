@@ -210,7 +210,12 @@ class MorphTo extends Relation
         );
 
         $instance->setMorphMap($this->morphMap);
-        $instance->setQuery($freshQuery->newQuery());
+
+        $newQuery = $freshQuery->newQuery();
+        $instance->setQuery($newQuery);
+
+        // Copy where constraints from original query (excluding parent-specific local key constraint)
+        $this->copyWhereConstraints($newQuery, [$this->localKey]);
 
         return $instance;
     }

@@ -93,7 +93,11 @@ class HasMany extends Relation
             $this->localKey
         );
 
-        $instance->setQuery($freshQuery->newQuery());
+        $newQuery = $freshQuery->newQuery();
+        $instance->setQuery($newQuery);
+
+        // Copy where constraints from original query (excluding parent-specific foreign key constraint)
+        $this->copyWhereConstraints($newQuery, [$this->foreignKey]);
 
         return $instance;
     }
