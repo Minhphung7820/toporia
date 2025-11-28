@@ -389,7 +389,19 @@ class BelongsToMany extends Relation
      */
     public function getResults(): ModelCollection
     {
-        $rows = $this->query->get();
+        try {
+            $rows = $this->query->get();
+        } catch (\Exception $e) {
+            // If query fails due to missing pivot columns, try without pivot columns
+            if (Str::contains($e->getMessage(), 'Unknown column') && Str::contains($e->getMessage(), 'pivot_')) {
+                // Remove pivot columns from select and retry
+                $relatedTable = $this->getRelatedTableName();
+                $this->query->select("{$relatedTable}.*");
+                $rows = $this->query->get();
+            } else {
+                throw $e;
+            }
+        }
 
         if ($rows->isEmpty()) {
             return new ModelCollection([]);
@@ -556,22 +568,43 @@ class BelongsToMany extends Relation
             return $models;
         }
 
-        // Step 2: Query pivot table to get parent-to-related mappings
-        // SELECT foreign_key, related_key FROM pivot_table
+        // Step 2: Query pivot table to get parent-to-related mappings with pivot data
+        // SELECT foreign_key, related_key, ...pivot_columns FROM pivot_table
         // WHERE foreign_key IN (...) AND related_key IN (...)
         $qb = new QueryBuilder($this->query->getConnection());
+
+        // Build select columns: foreign key, related key, and pivot columns
+        $selectColumns = [$this->foreignPivotKey, $this->relatedPivotKey];
+        foreach ($this->pivotColumns as $column) {
+            $selectColumns[] = $column;
+        }
+
         $pivotQuery = $qb->table($this->pivotTable)
-            ->select($this->foreignPivotKey, $this->relatedPivotKey)
+            ->select($selectColumns)
             ->whereIn($this->foreignPivotKey, array_unique($parentIds))
             ->whereIn($this->relatedPivotKey, array_unique($relatedIds));
 
         // Apply pivot constraints to the pivot query
         $this->applyPivotConstraintsToQuery($pivotQuery);
 
-        $pivotRows = $pivotQuery->get();
+        try {
+            $pivotRows = $pivotQuery->get();
+        } catch (\Exception $e) {
+            // If query fails due to missing pivot columns, retry with only foreign keys
+            if (Str::contains($e->getMessage(), 'Unknown column')) {
+                $pivotQuery = $qb->table($this->pivotTable)
+                    ->select($this->foreignPivotKey, $this->relatedPivotKey)
+                    ->whereIn($this->foreignPivotKey, array_unique($parentIds))
+                    ->whereIn($this->relatedPivotKey, array_unique($relatedIds));
+                $this->applyPivotConstraintsToQuery($pivotQuery);
+                $pivotRows = $pivotQuery->get();
+            } else {
+                throw $e;
+            }
+        }
 
-        // Step 3: Build dictionary mapping parent IDs to arrays of related IDs
-        // Example: [1 => [10, 20, 30], 2 => [20, 40], ...]
+        // Step 3: Build dictionary mapping parent IDs to arrays of [relatedId => pivotData]
+        // Example: [1 => [10 => ['sort_order' => 1], 20 => ['sort_order' => 2]], ...]
         $dictionary = [];
         foreach ($pivotRows as $pivot) {
             $parentId = $pivot[$this->foreignPivotKey] ?? null;
@@ -581,7 +614,16 @@ class BelongsToMany extends Relation
                 if (!isset($dictionary[$parentId])) {
                     $dictionary[$parentId] = [];
                 }
-                $dictionary[$parentId][] = $relatedId;
+
+                // Extract pivot data (exclude foreign keys)
+                $pivotData = [];
+                foreach ($pivot as $key => $value) {
+                    if ($key !== $this->foreignPivotKey && $key !== $this->relatedPivotKey) {
+                        $pivotData[$key] = $value;
+                    }
+                }
+
+                $dictionary[$parentId][$relatedId] = $pivotData;
             }
         }
 
@@ -595,19 +637,27 @@ class BelongsToMany extends Relation
             }
         }
 
-        // Step 5: Match related models to parents using dictionary
+        // Step 5: Match related models to parents using dictionary and attach pivot data
         foreach ($models as $model) {
             $parentId = $model->getAttribute($this->parentKey);
             $matched = [];
 
             if ($parentId !== null && isset($dictionary[$parentId])) {
-                // Get related IDs for this parent from dictionary
-                $relatedIdsForParent = $dictionary[$parentId];
+                // Get related IDs with pivot data for this parent from dictionary
+                $relatedDataForParent = $dictionary[$parentId];
 
-                // Look up actual models by ID
-                foreach ($relatedIdsForParent as $relatedId) {
+                // Look up actual models by ID and attach pivot data
+                foreach ($relatedDataForParent as $relatedId => $pivotData) {
                     if (isset($relatedIndex[$relatedId])) {
-                        $matched[] = $relatedIndex[$relatedId];
+                        $relatedModel = $relatedIndex[$relatedId];
+
+                        // Attach pivot data to the model
+                        if (!empty($pivotData)) {
+                            $pivotModel = $this->newPivot($pivotData, true);
+                            $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
+                        }
+
+                        $matched[] = $relatedModel;
                     }
                 }
             }
@@ -1241,13 +1291,8 @@ class BelongsToMany extends Relation
         // Set up the query with proper JOIN but without parent WHERE constraints
         $relatedTable = $this->relatedClass::getTableName();
 
-        // Build SELECT clause with pivot columns
-        $selectColumns = ["{$relatedTable}.*"];
-
-        // Add additional pivot columns
-        foreach ($this->pivotColumns as $column) {
-            $selectColumns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
-        }
+        // Build SELECT clause with pivot columns (only valid ones)
+        $selectColumns = $instance->buildSelectColumns($relatedTable);
 
         // Create a fresh query from the related model (this ensures table name is set)
         $cleanQuery = $this->relatedClass::query()
