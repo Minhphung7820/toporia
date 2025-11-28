@@ -101,7 +101,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Example: API rate limit (20 requests per 2 minutes)
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
+            return Limit::perMinute(20)->by($request->ip());
         });
 
         // Example: Strict rate limit for sensitive endpoints
