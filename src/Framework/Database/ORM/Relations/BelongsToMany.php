@@ -425,9 +425,14 @@ class BelongsToMany extends Relation
         }
 
         if (!empty($keys)) {
+            // Deduplicate keys using associative array for O(1) performance
+            $uniqueKeys = [];
+            foreach ($keys as $key) {
+                $uniqueKeys[$key] = true;
+            }
             $this->query->whereIn(
                 "{$this->pivotTable}.{$this->foreignPivotKey}",
-                array_unique($keys)
+                array_keys($uniqueKeys)
             );
         }
     }
@@ -543,22 +548,24 @@ class BelongsToMany extends Relation
      */
     protected function matchWithPivotQuery(array $models, ModelCollection $results, string $relationName): array
     {
-        // Step 1: Collect parent and related IDs
+        // Step 1: Collect parent and related IDs (with deduplication)
         $parentIds = [];
         foreach ($models as $model) {
             $parentId = $model->getAttribute($this->parentKey);
             if ($parentId !== null) {
-                $parentIds[] = $parentId;
+                $parentIds[$parentId] = true; // Use associative array for O(1) deduplication
             }
         }
+        $parentIds = array_keys($parentIds);
 
         $relatedIds = [];
         foreach ($results as $result) {
             $relatedId = $result->getAttribute($this->relatedKey);
             if ($relatedId !== null) {
-                $relatedIds[] = $relatedId;
+                $relatedIds[$relatedId] = true; // Use associative array for O(1) deduplication
             }
         }
+        $relatedIds = array_keys($relatedIds);
 
         if (empty($parentIds) || empty($relatedIds)) {
             // No valid IDs - set empty collections
@@ -581,8 +588,8 @@ class BelongsToMany extends Relation
 
         $pivotQuery = $qb->table($this->pivotTable)
             ->select($selectColumns)
-            ->whereIn($this->foreignPivotKey, array_unique($parentIds))
-            ->whereIn($this->relatedPivotKey, array_unique($relatedIds));
+            ->whereIn($this->foreignPivotKey, $parentIds)
+            ->whereIn($this->relatedPivotKey, $relatedIds);
 
         // Apply pivot constraints to the pivot query
         $this->applyPivotConstraintsToQuery($pivotQuery);
@@ -592,10 +599,11 @@ class BelongsToMany extends Relation
         } catch (\Exception $e) {
             // If query fails due to missing pivot columns, retry with only foreign keys
             if (Str::contains($e->getMessage(), 'Unknown column')) {
+                // Rebuild query without pivot columns
                 $pivotQuery = $qb->table($this->pivotTable)
                     ->select($this->foreignPivotKey, $this->relatedPivotKey)
-                    ->whereIn($this->foreignPivotKey, array_unique($parentIds))
-                    ->whereIn($this->relatedPivotKey, array_unique($relatedIds));
+                    ->whereIn($this->foreignPivotKey, $parentIds)
+                    ->whereIn($this->relatedPivotKey, $relatedIds);
                 $this->applyPivotConstraintsToQuery($pivotQuery);
                 $pivotRows = $pivotQuery->get();
             } else {
