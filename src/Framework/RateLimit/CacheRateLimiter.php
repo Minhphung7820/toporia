@@ -36,6 +36,14 @@ final class CacheRateLimiter implements RateLimiterInterface
      */
     private bool $resetOnViolation = false;
 
+    /**
+     * Request-level cache to avoid duplicate cache calls within the same request.
+     * This significantly improves performance by caching resetTime and attempts.
+     *
+     * @var array<string, array{resetTime: int|null, attempts: int|null, availableIn: int|null}>
+     */
+    private array $requestCache = [];
+
     public function __construct(
         private CacheInterface $cache,
         bool $resetOnViolation = false
@@ -45,11 +53,17 @@ final class CacheRateLimiter implements RateLimiterInterface
 
     public function attempt(string $key, int $maxAttempts, int $decaySeconds): bool
     {
+        // Check if rate limit exceeded (this will cache results in requestCache)
         if ($this->tooManyAttempts($key, $maxAttempts, $decaySeconds)) {
             return false;
         }
 
+        // Increment attempts and return true
         $this->hit($key, $decaySeconds);
+
+        // Invalidate request cache for this key since we just incremented
+        $this->clearRequestCache($key);
+
         return true;
     }
 
@@ -61,19 +75,18 @@ final class CacheRateLimiter implements RateLimiterInterface
         }
 
         $currentTime = time();
-        $resetTime = $this->cache->get($this->resetTimeKey($key));
 
-        // CRITICAL FIX: If resetTime has expired or doesn't exist, attempts should be 0
-        // This ensures rate limit resets properly when resetTime expires
-        // Check BOTH conditions: null (cache expired/deleted) OR timestamp expired
+        // Get resetTime from cache or request cache
+        $resetTime = $this->getResetTime($key);
+
+        // If resetTime has expired or doesn't exist, attempts should be 0
         if ($resetTime === null) {
             // ResetTime doesn't exist - check if attempts still exist
-            // If attempts exist but resetTime doesn't, this is an inconsistent state
-            // Reset attempts to be safe
-            $attempts = $this->attempts($key);
+            $attempts = $this->getAttempts($key);
             if ($attempts > 0) {
-                // Attempts exist without resetTime - reset to be safe
+                // Attempts exist without resetTime - inconsistent state, reset to be safe
                 $this->resetAttempts($key);
+                $this->clearRequestCache($key);
             }
             return false; // No rate limit active
         }
@@ -82,19 +95,21 @@ final class CacheRateLimiter implements RateLimiterInterface
         if ($resetTime < $currentTime) {
             // ResetTime timestamp expired - reset everything
             $this->resetAttempts($key);
+            $this->clearRequestCache($key);
             return false; // No rate limit active
         }
 
-        // resetTime is valid - check attempts
-        $attempts = $this->attempts($key);
+        // ResetTime is valid - check attempts (only once, reuse from cache)
+        $attempts = $this->getAttempts($key);
         $exceeded = $attempts >= $maxAttempts;
 
         // If rate limit exceeded, ensure resetTime is set properly
         // When limit is FIRST exceeded, reset resetTime to NOW + decaySeconds
-        // This ensures user waits the full decay period from when they exceed, not from window start
         if ($exceeded) {
             $decay = $decaySeconds ?? self::DEFAULT_DECAY_SECONDS;
             $this->ensureResetTime($key, $resetTime, $currentTime, $decay);
+            // Invalidate cache since we may have updated resetTime
+            $this->clearRequestCache($key);
         }
 
         return $exceeded;
@@ -156,19 +171,34 @@ final class CacheRateLimiter implements RateLimiterInterface
 
     public function attempts(string $key): int
     {
-        // CRITICAL: Check resetTime first - if expired or missing, attempts should be 0
-        $resetTime = $this->cache->get($this->resetTimeKey($key));
+        return $this->getAttempts($key);
+    }
+
+    /**
+     * Get attempts count with request-level caching.
+     *
+     * @param string $key
+     * @return int
+     */
+    private function getAttempts(string $key): int
+    {
+        // Check request cache first
+        if (isset($this->requestCache[$key]['attempts'])) {
+            return $this->requestCache[$key]['attempts'];
+        }
+
         $currentTime = time();
+        $resetTime = $this->getResetTime($key);
 
         // If resetTime doesn't exist, rate limit window has expired
-        // Attempts should be 0 (or cleaned up if stale)
         if ($resetTime === null) {
-            // ResetTime doesn't exist - check if attempts still exist (stale data)
+            // Check if attempts still exist (stale data)
             $attempts = (int) $this->cache->get($this->attemptsKey($key), 0);
             if ($attempts > 0) {
                 // Stale attempts exist without resetTime - clean up
                 $this->cache->delete($this->attemptsKey($key));
             }
+            $this->requestCache[$key]['attempts'] = 0;
             return 0;
         }
 
@@ -177,52 +207,89 @@ final class CacheRateLimiter implements RateLimiterInterface
             // Reset time expired - clear attempts and return 0
             $this->cache->delete($this->attemptsKey($key));
             $this->cache->delete($this->resetTimeKey($key));
+            $this->requestCache[$key]['attempts'] = 0;
             return 0;
         }
 
-        // ResetTime is valid - return attempts count
-        return (int) $this->cache->get($this->attemptsKey($key), 0);
+        // ResetTime is valid - get attempts count from cache
+        $attempts = (int) $this->cache->get($this->attemptsKey($key), 0);
+
+        // Cache in request cache
+        $this->requestCache[$key]['attempts'] = $attempts;
+
+        return $attempts;
+    }
+
+    /**
+     * Get resetTime with request-level caching.
+     *
+     * @param string $key
+     * @return int|null
+     */
+    private function getResetTime(string $key): ?int
+    {
+        // Check request cache first
+        if (isset($this->requestCache[$key]['resetTime'])) {
+            return $this->requestCache[$key]['resetTime'];
+        }
+
+        // Get from cache
+        $resetTime = $this->cache->get($this->resetTimeKey($key));
+
+        // Cache in request cache (even if null)
+        $this->requestCache[$key]['resetTime'] = $resetTime;
+
+        return $resetTime;
     }
 
     public function remaining(string $key, int $maxAttempts): int
     {
-        $attempts = $this->attempts($key);
+        $attempts = $this->getAttempts($key);
         return max(0, $maxAttempts - $attempts);
     }
 
     public function availableIn(string $key, ?int $decaySeconds = null): int
     {
-        $resetTime = $this->cache->get($this->resetTimeKey($key));
+        // Check request cache first
+        if (isset($this->requestCache[$key]['availableIn'])) {
+            return $this->requestCache[$key]['availableIn'];
+        }
+
         $currentTime = time();
+        $resetTime = $this->getResetTime($key);
 
         // If resetTime exists, check if it's still valid
         if ($resetTime !== null) {
             // Check if resetTime timestamp has expired
             if ($resetTime < $currentTime) {
                 // ResetTime expired - rate limit is no longer active
-                // Clean up stale data
                 $this->resetAttempts($key);
+                $this->clearRequestCache($key);
                 return 0;
             }
 
             // ResetTime is valid - return remaining time
             $remaining = max(0, $resetTime - $currentTime);
-            return $remaining > 0 ? $remaining : 0;
+            $result = $remaining > 0 ? $remaining : 0;
+
+            // Cache result
+            $this->requestCache[$key]['availableIn'] = $result;
+
+            return $result;
         }
 
         // ResetTime doesn't exist - check if attempts still exist
-        // This handles edge case where resetTime TTL expired but attempts TTL hasn't
-        $attempts = $this->attempts($key);
+        $attempts = $this->getAttempts($key);
 
         if ($attempts > 0) {
-            // Attempts exist but no resetTime - this is an inconsistent state
-            // This should not happen in normal flow, but if it does, we should reset
-            // to prevent infinite rate limiting
+            // Attempts exist but no resetTime - inconsistent state, reset
             $this->resetAttempts($key);
+            $this->clearRequestCache($key);
             return 0;
         }
 
         // No attempts and no reset time - rate limit is not active
+        $this->requestCache[$key]['availableIn'] = 0;
         return 0;
     }
 
@@ -236,6 +303,7 @@ final class CacheRateLimiter implements RateLimiterInterface
         $this->cache->delete($this->attemptsKey($key));
         $this->cache->delete($this->resetTimeKey($key));
         $this->cache->delete($this->resetFlagKey($key));
+        $this->clearRequestCache($key);
     }
 
     /**
@@ -251,8 +319,8 @@ final class CacheRateLimiter implements RateLimiterInterface
         $resetTimeKey = $this->resetTimeKey($key);
         $currentTime = time();
 
-        // Check if resetTime has expired - if so, reset attempts FIRST
-        $resetTime = $this->cache->get($resetTimeKey);
+        // Use getResetTime() to leverage request cache
+        $resetTime = $this->getResetTime($key);
         $needsReset = ($resetTime !== null && $resetTime < $currentTime);
 
         if ($needsReset) {
@@ -268,14 +336,16 @@ final class CacheRateLimiter implements RateLimiterInterface
             // CRITICAL: Set resetTime with TTL matching decaySeconds
             // This ensures both resetTime and attempts expire at the same time
             $this->cache->set($resetTimeKey, $newResetTime, $decaySeconds);
+            // Update request cache
+            $this->requestCache[$key]['resetTime'] = $newResetTime;
         }
 
         // If reset was needed, start fresh at 1 (don't increment from old value)
         if ($needsReset) {
             // CRITICAL: Set attempts to 1 directly with SAME TTL as resetTime
             // This ensures attempts and resetTime expire together
-            // If resetTime expires, attempts should also expire (via TTL)
             $this->cache->set($attemptsKey, 1, $decaySeconds);
+            $this->requestCache[$key]['attempts'] = 1;
             return 1;
         }
 
@@ -285,10 +355,25 @@ final class CacheRateLimiter implements RateLimiterInterface
         if ($attempts === false) {
             // Cache key doesn't exist - start fresh at 1
             $this->cache->set($attemptsKey, 1, $decaySeconds);
+            $this->requestCache[$key]['attempts'] = 1;
             return 1;
         }
 
+        // Update request cache with new attempts count
+        $this->requestCache[$key]['attempts'] = $attempts;
+
         return $attempts;
+    }
+
+    /**
+     * Clear request-level cache for a key.
+     *
+     * @param string $key
+     * @return void
+     */
+    private function clearRequestCache(string $key): void
+    {
+        unset($this->requestCache[$key]);
     }
 
     /**

@@ -59,16 +59,19 @@ final class ThrottleRequests implements MiddlewareInterface
         $maxAttempts = $limit->getMaxAttempts();
         $decaySeconds = $limit->getDecaySeconds();
 
+        // Check if rate limit exceeded (this will cache results internally)
         if ($this->limiter->tooManyAttempts($key, $maxAttempts, $decaySeconds)) {
             $this->buildRateLimitResponse($response, $key, $maxAttempts, $decaySeconds);
             return null; // Short-circuit - response already sent
         }
 
+        // Attempt to consume rate limit (will increment attempts)
+        // Note: attempt() internally calls tooManyAttempts() again, but results are cached
         $this->limiter->attempt($key, $maxAttempts, $decaySeconds);
 
         $result = $next($request, $response);
 
-        // Add rate limit headers
+        // Add rate limit headers (will reuse cached results)
         $this->addHeaders($response, $key, $maxAttempts);
 
         return $result;
@@ -148,11 +151,15 @@ final class ThrottleRequests implements MiddlewareInterface
      */
     private function addHeaders(Response $response, string $key, int $maxAttempts): void
     {
-        $response->header('X-RateLimit-Limit', (string)$maxAttempts);
-        $response->header('X-RateLimit-Remaining', (string)$this->limiter->remaining($key, $maxAttempts));
+        // Get remaining attempts (will reuse cached results from attempt())
+        $remaining = $this->limiter->remaining($key, $maxAttempts);
 
-        $resetTime = time() + $this->limiter->availableIn($key);
-        $response->header('X-RateLimit-Reset', (string)$resetTime);
+        // Get availableIn (will reuse cached results)
+        $availableIn = $this->limiter->availableIn($key);
+
+        $response->header('X-RateLimit-Limit', (string)$maxAttempts);
+        $response->header('X-RateLimit-Remaining', (string)$remaining);
+        $response->header('X-RateLimit-Reset', (string)(time() + $availableIn));
     }
 
     /**
