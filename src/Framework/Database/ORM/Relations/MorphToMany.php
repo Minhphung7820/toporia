@@ -151,6 +151,8 @@ class MorphToMany extends Relation
     /**
      * Build dictionary for eager loading matching.
      *
+     * OPTIMIZED: Uses pivot data from main query (with pivot_ prefix) instead of separate query.
+     *
      * @return array<string, array<Model>>
      */
     protected function buildDictionary(ModelCollection $results): array
@@ -158,9 +160,14 @@ class MorphToMany extends Relation
         $dictionary = [];
 
         foreach ($results as $result) {
-            $type = $result->getAttribute($this->morphType);
-            $id = $result->getAttribute($this->foreignKey);
-            $dictionary["{$type}:{$id}"][] = $result;
+            // Get morphType and foreignKey from pivot attributes (with pivot_ prefix)
+            // These are selected in newEagerInstance() with alias pivot_*
+            $type = $result->getAttribute("pivot_{$this->morphType}");
+            $id = $result->getAttribute("pivot_{$this->foreignKey}");
+
+            if ($type !== null && $id !== null) {
+                $dictionary["{$type}:{$id}"][] = $result;
+            }
         }
 
         return $dictionary;
@@ -259,11 +266,10 @@ class MorphToMany extends Relation
             }
         });
 
-        $this->query->select(
-            "{$relatedTable}.*",
-            "{$this->pivotTable}.{$this->morphType}",
-            "{$this->pivotTable}.{$this->foreignKey}"
-        );
+        // Select related table columns and pivot columns with alias for consistency
+        $this->query->select("{$relatedTable}.*");
+        $this->query->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
+        $this->query->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
     }
 
     /**
@@ -317,11 +323,6 @@ class MorphToMany extends Relation
 
         // Set up the query with proper JOIN but without parent WHERE constraints
         $relatedTable = $this->relatedClass::getTableName();
-        $selectColumns = ["{$relatedTable}.*"];
-
-        foreach ($this->pivotColumns as $column) {
-            $selectColumns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
-        }
 
         $cleanQuery = $this->relatedClass::query()
             ->join(
@@ -329,8 +330,23 @@ class MorphToMany extends Relation
                 "{$relatedTable}.{$this->relatedKey}",
                 '=',
                 "{$this->pivotTable}.{$this->relatedPivotKey}"
-            )
-            ->select($selectColumns);
+            );
+
+        // Build SELECT clause with pivot columns using selectRaw for proper alias handling
+        // This ensures pivot columns are selected with correct aliases
+        $cleanQuery->select("{$relatedTable}.*");
+
+        // Always select morphType and foreignKey from pivot table (required for matching)
+        $cleanQuery->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
+        $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
+
+        // Add other pivot columns
+        foreach ($this->pivotColumns as $column) {
+            // Skip if already added (morphType or foreignKey might be in pivotColumns)
+            if ($column !== $this->morphType && $column !== $this->foreignKey) {
+                $cleanQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+            }
+        }
 
         $instance->setQuery($cleanQuery);
 
