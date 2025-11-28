@@ -356,10 +356,10 @@ class MorphToMany extends Relation
             $this->morphType,
             $this->foreignKey,
             fn($col) => Str::startsWith($col, $pivotTablePrefix) ||
-                       $col === $this->morphType ||
-                       $col === $this->foreignKey ||
-                       Str::endsWith($col, '.' . $this->morphType) ||
-                       Str::endsWith($col, '.' . $this->foreignKey)
+                $col === $this->morphType ||
+                $col === $this->foreignKey ||
+                Str::endsWith($col, '.' . $this->morphType) ||
+                Str::endsWith($col, '.' . $this->foreignKey)
         ]);
 
         // Apply pivot constraints separately
