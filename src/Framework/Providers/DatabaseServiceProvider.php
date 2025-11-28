@@ -45,6 +45,10 @@ class DatabaseServiceProvider extends ServiceProvider
         // This allows DB::enableQueryLog(), DB::connection(), etc. to work
         $container->singleton('db', fn(ContainerInterface $c) => $c->get(DatabaseManager::class));
 
+        // QueryBuilder accessor service - returns ConnectionProxy for direct table() access
+        // This allows QueryBuilder::table('users') to work directly
+        $container->singleton('query.builder', fn(ContainerInterface $c) => $c->get(DatabaseManager::class)->connection());
+
         // Connection interface bindings (for dependency injection)
         $container->bind(ConnectionInterface::class, fn(ContainerInterface $c) => $c->get(DatabaseManager::class)->getConnection());
         $container->bind(Connection::class, fn(ContainerInterface $c) => $c->get(DatabaseManager::class)->getConnection());
