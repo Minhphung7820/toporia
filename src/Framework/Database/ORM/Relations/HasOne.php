@@ -41,6 +41,36 @@ class HasOne extends Relation
         $this->addConstraints();
     }
 
+    /**
+     * {@inheritdoc}
+     */
+    protected function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
+    /**
+     * Add basic WHERE constraint based on parent model.
+     *
+     * OPTIMIZED: Automatically applies soft delete scope if related model uses soft deletes.
+     *
+     * @return $this
+     */
+    public function addConstraints(): static
+    {
+        if ($this->parent->exists()) {
+            $this->query->where(
+                $this->foreignKey,
+                $this->parent->getAttribute($this->localKey)
+            );
+        }
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass);
+
+        return $this;
+    }
+
     // =========================================================================
     // CORE RELATION METHODS
     // =========================================================================
@@ -145,6 +175,82 @@ class HasOne extends Relation
     public function delete(): int
     {
         return $this->parent->exists() ? $this->query->delete() : 0;
+    }
+
+    /**
+     * Soft delete the related model through this relationship.
+     *
+     * If related model uses soft deletes, this will soft delete the related model.
+     * Otherwise, it will perform a hard delete.
+     *
+     * Performance: O(1) - Single UPDATE query for soft delete
+     *
+     * @return bool True if model was soft deleted
+     *
+     * @example
+     * ```php
+     * // Soft delete the profile for a user
+     * $user->profile()->softDelete();
+     * ```
+     */
+    public function softDelete(): bool
+    {
+        if (!$this->parent->exists()) {
+            return false;
+        }
+
+        $related = $this->getResults();
+        if ($related === null) {
+            return false;
+        }
+
+        // If related model uses soft deletes, call delete() which will soft delete
+        if ($this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return $related->delete();
+        }
+
+        // Otherwise, perform hard delete
+        return $related->forceDelete();
+    }
+
+    /**
+     * Restore soft-deleted related model through this relationship.
+     *
+     * Restores soft-deleted related model.
+     *
+     * Performance: O(1) - Single UPDATE query for restore
+     *
+     * @return bool True if model was restored
+     *
+     * @example
+     * ```php
+     * // Restore the soft-deleted profile for a user
+     * $user->profile()->restore();
+     * ```
+     */
+    public function restore(): bool
+    {
+        if (!$this->parent->exists()) {
+            return false;
+        }
+
+        // If related model doesn't use soft deletes, return false
+        if (!$this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return false;
+        }
+
+        // Get soft-deleted related model
+        $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
+        $related = $this->relatedClass::withTrashed()
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->whereNotNull($deletedAtColumn)
+            ->first();
+
+        if ($related === null) {
+            return false;
+        }
+
+        return $related->restore();
     }
 
     /**

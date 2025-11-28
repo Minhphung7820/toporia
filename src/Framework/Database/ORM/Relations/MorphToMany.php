@@ -96,6 +96,14 @@ class MorphToMany extends Relation
         $this->performJoin();
     }
 
+    /**
+     * {@inheritdoc}
+     */
+    protected function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
     // =========================================================================
     // TABLE NAME HELPERS (with caching)
     // =========================================================================
@@ -195,6 +203,9 @@ class MorphToMany extends Relation
             $this->query->where("{$this->pivotTable}.{$this->morphType}", $this->getMorphClass());
             $this->query->where("{$this->pivotTable}.{$this->foreignKey}", $this->parent->getAttribute($this->localKey));
         }
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
     }
 
     /**
@@ -285,10 +296,37 @@ class MorphToMany extends Relation
 
         foreach ($models as $model) {
             $key = get_class($model) . ':' . $model->getAttribute($this->localKey);
-            $model->setRelation($relationName, new ModelCollection($dictionary[$key] ?? []));
+            $matchedResults = $dictionary[$key] ?? [];
+
+            // Remove pivot_* attributes from matched results
+            foreach ($matchedResults as $matchedResult) {
+                /** @var Model $matchedResult */
+                $this->removePivotAttributes($matchedResult);
+            }
+
+            $model->setRelation($relationName, new ModelCollection($matchedResults));
         }
 
         return $models;
+    }
+
+    /**
+     * Remove pivot_* attributes from model.
+     *
+     * These attributes are only needed during matching and should not appear
+     * in the final model attributes. Pivot data should only be in the pivot relation.
+     *
+     * OPTIMIZED: Uses Model's removeAttributesByPattern() method instead of reflection
+     * for better performance.
+     *
+     * @param \Toporia\Framework\Database\ORM\Model $model Model instance to clean
+     * @return void
+     */
+    protected function removePivotAttributes(\Toporia\Framework\Database\ORM\Model $model): void
+    {
+        // Use Model's protected method to remove attributes efficiently
+        // This avoids reflection overhead and is much faster
+        $model->removeAttributesByPattern('pivot_');
     }
 
     /**
@@ -364,6 +402,9 @@ class MorphToMany extends Relation
 
         // Apply pivot constraints separately
         $instance->applyPivotConstraintsToQuery($instance->getQuery());
+
+        // Apply soft delete scope if related model uses soft deletes
+        $instance->applySoftDeleteScope($cleanQuery, $this->relatedClass, $relatedTable);
 
         return $instance;
     }
@@ -554,7 +595,7 @@ class MorphToMany extends Relation
         ];
 
         if ($this->withTimestamps) {
-            $now = date('Y-m-d H:i:s');
+            $now = now()->toDateTimeString();
             $data['created_at'] = $now;
             $data['updated_at'] = $now;
         }
@@ -573,7 +614,7 @@ class MorphToMany extends Relation
     {
         $attached = [];
         $insertData = [];
-        $now = $this->withTimestamps ? date('Y-m-d H:i:s') : null;
+        $now = $this->withTimestamps ? now()->toDateTimeString() : null;
 
         foreach ($ids as $key => $value) {
             [$relatedId, $pivotData] = is_numeric($key)
@@ -618,6 +659,118 @@ class MorphToMany extends Relation
         }
 
         return $query->delete();
+    }
+
+    /**
+     * Soft delete related models through this relationship.
+     *
+     * If related model uses soft deletes, this will soft delete the related models
+     * and detach them from the pivot table. Otherwise, it will only detach.
+     *
+     * Performance: O(n) - Single UPDATE query for soft delete + DELETE for pivot
+     *
+     * @param int|string|array|null $ids Related model ID(s) (null = soft delete all)
+     * @return int Number of models soft deleted
+     *
+     * @example
+     * ```php
+     * // Soft delete a specific tag from post
+     * $post->tags()->softDelete(1);
+     *
+     * // Soft delete multiple tags
+     * $post->tags()->softDelete([1, 2, 3]);
+     *
+     * // Soft delete all tags
+     * $post->tags()->softDelete();
+     * ```
+     */
+    public function softDelete(int|string|array|null $ids = null): int
+    {
+        // If related model doesn't use soft deletes, just detach
+        if (!$this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return $this->detach($ids);
+        }
+
+        // Get related model IDs to soft delete
+        $relatedIds = [];
+        if ($ids === null) {
+            // Get all related IDs from pivot table
+            $qb = new QueryBuilder($this->query->getConnection());
+            $pivotRows = $qb->table($this->pivotTable)
+                ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+                ->where($this->morphType, $this->getMorphClass())
+                ->pluck($this->relatedPivotKey);
+            $relatedIds = $pivotRows->toArray();
+        } else {
+            $relatedIds = is_array($ids) ? $ids : [$ids];
+        }
+
+        if (empty($relatedIds)) {
+            return 0;
+        }
+
+        // Soft delete related models
+        $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
+        $relatedKey = $this->relatedKey;
+
+        $softDeleted = $this->relatedClass::query()
+            ->whereIn($relatedKey, $relatedIds)
+            ->whereNull($deletedAtColumn) // Only soft delete non-deleted records
+            ->update([$deletedAtColumn => now()->toDateTimeString()]);
+
+        // Detach from pivot table
+        if ($softDeleted > 0) {
+            $this->detach($relatedIds);
+        }
+
+        return $softDeleted;
+    }
+
+    /**
+     * Restore soft-deleted related models through this relationship.
+     *
+     * Restores soft-deleted related models and optionally re-attaches them to pivot table.
+     *
+     * Performance: O(n) - Single UPDATE query for restore
+     *
+     * @param int|string|array $ids Related model ID(s) to restore
+     * @param bool $reattach Whether to re-attach to pivot table after restore
+     * @return int Number of models restored
+     *
+     * @example
+     * ```php
+     * // Restore a tag
+     * $post->tags()->restore(1);
+     *
+     * // Restore and re-attach
+     * $post->tags()->restore(1, true);
+     * ```
+     */
+    public function restore(int|string|array $ids, bool $reattach = false): int
+    {
+        // If related model doesn't use soft deletes, return 0
+        if (!$this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return 0;
+        }
+
+        $relatedIds = is_array($ids) ? $ids : [$ids];
+        if (empty($relatedIds)) {
+            return 0;
+        }
+
+        // Restore related models
+        $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
+        $restored = $this->relatedClass::withTrashed()
+            ->whereIn($this->relatedKey, $relatedIds)
+            ->whereNotNull($deletedAtColumn) // Only restore soft-deleted records
+            ->update([$deletedAtColumn => null]);
+
+        // Re-attach to pivot table if requested
+        if ($restored > 0 && $reattach) {
+            $this->attachMany($relatedIds);
+        }
+
+        return $restored;
     }
 
     /**
@@ -681,7 +834,7 @@ class MorphToMany extends Relation
     public function updateExistingPivot(int|string $id, array $pivotData): bool
     {
         if ($this->withTimestamps && !isset($pivotData['updated_at'])) {
-            $pivotData['updated_at'] = date('Y-m-d H:i:s');
+            $pivotData['updated_at'] = now()->toDateTimeString();
         }
 
         $affected = $this->newPivotQuery()
@@ -939,16 +1092,6 @@ class MorphToMany extends Relation
     public function getMorphType(): string
     {
         return $this->morphType;
-    }
-
-    /**
-     * Get the related model class name.
-     *
-     * @return class-string<Model>
-     */
-    public function getRelatedClass(): string
-    {
-        return $this->relatedClass;
     }
 
     // =========================================================================

@@ -10,6 +10,7 @@ use Toporia\Framework\Database\ORM\{ModelCollection, Relations};
 use Toporia\Framework\Observer\Traits\Observable;
 use Toporia\Framework\Observer\Contracts\ObservableInterface;
 use Toporia\Framework\Database\ORM\Concerns\HasObservers;
+use Toporia\Framework\Support\Str;
 
 
 /**
@@ -1260,6 +1261,26 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
     protected function getAllAttributes(): array
     {
         return $this->attributes;
+    }
+
+    /**
+     * Remove attributes by key pattern.
+     *
+     * Removes all attributes whose keys match the given pattern.
+     * This is more efficient than using reflection.
+     *
+     * Used internally by relationships to clean up pivot_* attributes.
+     *
+     * @param string $pattern Pattern to match (e.g., 'pivot_' to remove all pivot_* attributes)
+     * @return void
+     */
+    public function removeAttributesByPattern(string $pattern): void
+    {
+        foreach ($this->attributes as $key => $value) {
+            if (Str::startsWith($key, $pattern)) {
+                unset($this->attributes[$key]);
+            }
+        }
     }
 
     /**

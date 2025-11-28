@@ -41,6 +41,14 @@ class BelongsTo extends Relation
     }
 
     /**
+     * {@inheritdoc}
+     */
+    protected function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
+    /**
      * Initialize constraints in constructor.
      */
     private function initializeConstraints(): bool
@@ -55,6 +63,10 @@ class BelongsTo extends Relation
         }
 
         $this->query->where($this->localKey, $foreignKeyValue);
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass);
+
         return true;
     }
 
@@ -99,6 +111,9 @@ class BelongsTo extends Relation
         if ($keys !== []) {
             $this->query->whereIn($this->localKey, $keys);
         }
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass);
     }
 
     /**

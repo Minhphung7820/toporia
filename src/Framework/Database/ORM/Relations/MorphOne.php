@@ -53,6 +53,14 @@ class MorphOne extends Relation
         $this->addConstraints();
     }
 
+    /**
+     * {@inheritdoc}
+     */
+    protected function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
     // =========================================================================
     // INTERNAL HELPERS
     // =========================================================================
@@ -113,6 +121,10 @@ class MorphOne extends Relation
                 $this->parent->getAttribute($this->localKey)
             );
         }
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass);
+
         return $this;
     }
 
@@ -171,6 +183,9 @@ class MorphOne extends Relation
                 }
             }
         });
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass);
     }
 
     /**
@@ -275,6 +290,83 @@ class MorphOne extends Relation
     }
 
     /**
+     * Soft delete the related model through this relationship.
+     *
+     * If related model uses soft deletes, this will soft delete the related model.
+     * Otherwise, it will perform a hard delete.
+     *
+     * Performance: O(1) - Single UPDATE query for soft delete
+     *
+     * @return bool True if model was soft deleted
+     *
+     * @example
+     * ```php
+     * // Soft delete the image for a post
+     * $post->image()->softDelete();
+     * ```
+     */
+    public function softDelete(): bool
+    {
+        if (!$this->parent->exists()) {
+            return false;
+        }
+
+        $related = $this->getResults();
+        if ($related === null) {
+            return false;
+        }
+
+        // If related model uses soft deletes, call delete() which will soft delete
+        if ($this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return $related->delete();
+        }
+
+        // Otherwise, perform hard delete
+        return $related->forceDelete();
+    }
+
+    /**
+     * Restore soft-deleted related model through this relationship.
+     *
+     * Restores soft-deleted related model.
+     *
+     * Performance: O(1) - Single UPDATE query for restore
+     *
+     * @return bool True if model was restored
+     *
+     * @example
+     * ```php
+     * // Restore the soft-deleted image for a post
+     * $post->image()->restore();
+     * ```
+     */
+    public function restore(): bool
+    {
+        if (!$this->parent->exists()) {
+            return false;
+        }
+
+        // If related model doesn't use soft deletes, return false
+        if (!$this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return false;
+        }
+
+        // Get soft-deleted related model
+        $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
+        $related = $this->relatedClass::withTrashed()
+            ->where($this->morphType, $this->getMorphClass())
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->whereNotNull($deletedAtColumn)
+            ->first();
+
+        if ($related === null) {
+            return false;
+        }
+
+        return $related->restore();
+    }
+
+    /**
      * Get the first related model or create a new one.
      */
     public function firstOrCreate(array $attributes = []): Model
@@ -361,16 +453,6 @@ class MorphOne extends Relation
     public function isType(string $type): bool
     {
         return $this->getMorphClass() === $type;
-    }
-
-    /**
-     * Get the related model class name.
-     *
-     * @return class-string<Model>
-     */
-    public function getRelatedClass(): string
-    {
-        return $this->relatedClass;
     }
 
     // =========================================================================

@@ -218,6 +218,8 @@ abstract class Relation implements RelationInterface
     /**
      * Set WHERE IN constraint for eager loading.
      *
+     * OPTIMIZED: Automatically applies soft delete scope if related model uses soft deletes.
+     *
      * @param array<int, Model> $models
      * @return void
      */
@@ -234,6 +236,12 @@ abstract class Relation implements RelationInterface
         if (!empty($keys)) {
             $this->query->whereIn($this->foreignKey, array_unique($keys));
         }
+
+        // Apply soft delete scope if related model uses soft deletes
+        $relatedClass = $this->getRelatedClass();
+        if ($relatedClass !== '') {
+            $this->applySoftDeleteScope($this->query, $relatedClass);
+        }
     }
 
     /**
@@ -249,4 +257,74 @@ abstract class Relation implements RelationInterface
      * Subclasses must implement match() for specific matching logic.
      */
     abstract public function match(array $models, mixed $results, string $relationName): array;
+
+    // =========================================================================
+    // SOFT DELETE SUPPORT
+    // =========================================================================
+
+    /**
+     * Check if related model class uses soft deletes.
+     *
+     * Performance: O(1) - Single method_exists check
+     *
+     * @param string $modelClass Model class name
+     * @return bool
+     */
+    protected function relatedModelUsesSoftDeletes(string $modelClass): bool
+    {
+        return method_exists($modelClass, 'usesSoftDeletes') && $modelClass::usesSoftDeletes();
+    }
+
+    /**
+     * Get deleted_at column name from related model.
+     *
+     * Performance: O(1) - Single method call
+     *
+     * @param string $modelClass Model class name
+     * @return string
+     */
+    protected function getDeletedAtColumn(string $modelClass): string
+    {
+        if (method_exists($modelClass, 'getDeletedAtColumn')) {
+            return $modelClass::getDeletedAtColumn();
+        }
+
+        return 'deleted_at';
+    }
+
+    /**
+     * Apply soft delete scope to query if related model uses soft deletes.
+     *
+     * Performance: O(1) - Single WHERE clause addition
+     * Only adds WHERE deleted_at IS NULL if model uses soft deletes
+     *
+     * @param QueryBuilder $query Query builder
+     * @param string $modelClass Related model class name
+     * @param string|null $tableAlias Optional table alias for qualified column
+     * @return void
+     */
+    protected function applySoftDeleteScope(QueryBuilder $query, string $modelClass, ?string $tableAlias = null): void
+    {
+        if (!$this->relatedModelUsesSoftDeletes($modelClass)) {
+            return;
+        }
+
+        $deletedAtColumn = $this->getDeletedAtColumn($modelClass);
+        $qualifiedColumn = $tableAlias ? "{$tableAlias}.{$deletedAtColumn}" : $deletedAtColumn;
+
+        $query->whereNull($qualifiedColumn);
+    }
+
+    /**
+     * Get related model class name.
+     *
+     * Subclasses should override this to return the related model class.
+     *
+     * @return string
+     */
+    protected function getRelatedClass(): string
+    {
+        // Default implementation - subclasses should override
+        return '';
+    }
 }

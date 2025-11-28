@@ -62,6 +62,14 @@ class BelongsToMany extends Relation
         $this->initializePivotJoin();
     }
 
+    /**
+     * {@inheritdoc}
+     */
+    protected function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
     // =========================================================================
     // FLUENT CONFIGURATION METHODS
     // =========================================================================
@@ -263,6 +271,9 @@ class BelongsToMany extends Relation
                 $this->parent->getAttribute($this->parentKey)
             )
             ->select($selectColumns);
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
     }
 
     /**
@@ -446,6 +457,10 @@ class BelongsToMany extends Relation
                 array_keys($uniqueKeys)
             );
         }
+
+        // Apply soft delete scope if related model uses soft deletes
+        $relatedTable = $this->getRelatedTableName();
+        $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
     }
 
     /**
@@ -638,6 +653,7 @@ class BelongsToMany extends Relation
         // Normalize IDs to strings to avoid type mismatch issues (int vs string)
         // Note: If same related model appears multiple times (for different parents),
         // we keep the first instance (pivot data is already extracted to dictionary)
+        // OPTIMIZED: Remove pivot_* attributes from models to keep them clean
         // Example: [10 => Model, 20 => Model, ...] or ["10" => Model, "20" => Model, ...]
         $relatedIndex = [];
         foreach ($results as $result) {
@@ -646,6 +662,9 @@ class BelongsToMany extends Relation
                 $relatedIdKey = (string) $relatedId;
                 // Only keep first instance if duplicate (pivot data already in dictionary)
                 if (!isset($relatedIndex[$relatedIdKey])) {
+                    // Remove pivot_* attributes from the first instance to keep it clean
+                    /** @var Model $result */
+                    $this->removePivotAttributes($result);
                     $relatedIndex[$relatedIdKey] = $result;
                 }
             }
@@ -706,6 +725,11 @@ class BelongsToMany extends Relation
                     // Clone the model to create a fresh instance for this product
                     $relatedModel = clone $originalRelatedModel;
 
+                    // Remove pivot_* attributes from model (they should only be in pivot relation)
+                    // This ensures clean model attributes without pivot_ prefix pollution
+                    /** @var Model $relatedModel */
+                    $this->removePivotAttributes($relatedModel);
+
                     // Clear any existing relations on the cloned model
                     $relatedModel->setRelation($this->pivotAccessor, null);
 
@@ -732,6 +756,25 @@ class BelongsToMany extends Relation
         }
 
         return $models;
+    }
+
+    /**
+     * Remove pivot_* attributes from model.
+     *
+     * These attributes are only needed during matching and should not appear
+     * in the final model attributes. Pivot data should only be in the pivot relation.
+     *
+     * OPTIMIZED: Uses Model's removeAttributesByPattern() method instead of reflection
+     * for better performance.
+     *
+     * @param \Toporia\Framework\Database\ORM\Model $model Model instance to clean
+     * @return void
+     */
+    protected function removePivotAttributes(\Toporia\Framework\Database\ORM\Model $model): void
+    {
+        // Use Model's protected method to remove attributes efficiently
+        // This avoids reflection overhead and is much faster
+        $model->removeAttributesByPattern('pivot_');
     }
 
     /**
@@ -885,7 +928,7 @@ class BelongsToMany extends Relation
 
         // Add timestamps if enabled
         if ($this->withTimestamps) {
-            $now = date('Y-m-d H:i:s');
+            $now = now()->toDateTimeString();
             $data['created_at'] = $now;
             $data['updated_at'] = $now;
         }
@@ -998,6 +1041,118 @@ class BelongsToMany extends Relation
         }
 
         return $qb->delete();
+    }
+
+    /**
+     * Soft delete related models through this relationship.
+     *
+     * If related model uses soft deletes, this will soft delete the related models
+     * and detach them from the pivot table. Otherwise, it will only detach.
+     *
+     * Performance: O(n) - Single UPDATE query for soft delete + DELETE for pivot
+     *
+     * @param int|string|array|null $ids Related model ID(s) (null = soft delete all)
+     * @return int Number of models soft deleted
+     *
+     * @example
+     * ```php
+     * // Soft delete a specific category from product
+     * $product->categories()->softDelete(1);
+     *
+     * // Soft delete multiple categories
+     * $product->categories()->softDelete([1, 2, 3]);
+     *
+     * // Soft delete all categories
+     * $product->categories()->softDelete();
+     * ```
+     */
+    public function softDelete(int|string|array|null $ids = null): int
+    {
+        // If related model doesn't use soft deletes, just detach
+        if (!$this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return $this->detach($ids);
+        }
+
+        // Get related model IDs to soft delete
+        $relatedIds = [];
+        if ($ids === null) {
+            // Get all related IDs from pivot table
+            $qb = new QueryBuilder($this->query->getConnection());
+            $pivotRows = $qb->table($this->pivotTable)
+                ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey))
+                ->pluck($this->relatedPivotKey);
+            $relatedIds = $pivotRows->toArray();
+        } else {
+            $relatedIds = is_array($ids) ? $ids : [$ids];
+        }
+
+        if (empty($relatedIds)) {
+            return 0;
+        }
+
+        // Soft delete related models
+        $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
+        $relatedTable = $this->getRelatedTableName();
+        $relatedKey = $this->relatedKey;
+
+        $softDeleted = $this->relatedClass::query()
+            ->whereIn($relatedKey, $relatedIds)
+            ->whereNull($deletedAtColumn) // Only soft delete non-deleted records
+            ->update([$deletedAtColumn => now()->toDateTimeString()]);
+
+        // Detach from pivot table
+        if ($softDeleted > 0) {
+            $this->detachMany($relatedIds);
+        }
+
+        return $softDeleted;
+    }
+
+    /**
+     * Restore soft-deleted related models through this relationship.
+     *
+     * Restores soft-deleted related models and optionally re-attaches them to pivot table.
+     *
+     * Performance: O(n) - Single UPDATE query for restore
+     *
+     * @param int|string|array $ids Related model ID(s) to restore
+     * @param bool $reattach Whether to re-attach to pivot table after restore
+     * @return int Number of models restored
+     *
+     * @example
+     * ```php
+     * // Restore a category
+     * $product->categories()->restore(1);
+     *
+     * // Restore and re-attach
+     * $product->categories()->restore(1, true);
+     * ```
+     */
+    public function restore(int|string|array $ids, bool $reattach = false): int
+    {
+        // If related model doesn't use soft deletes, return 0
+        if (!$this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return 0;
+        }
+
+        $relatedIds = is_array($ids) ? $ids : [$ids];
+        if (empty($relatedIds)) {
+            return 0;
+        }
+
+        // Restore related models
+        $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
+        $restored = $this->relatedClass::withTrashed()
+            ->whereIn($this->relatedKey, $relatedIds)
+            ->whereNotNull($deletedAtColumn) // Only restore soft-deleted records
+            ->update([$deletedAtColumn => null]);
+
+        // Re-attach to pivot table if requested
+        if ($restored > 0 && $reattach) {
+            $this->attachMany($relatedIds, false);
+        }
+
+        return $restored;
     }
 
     /**
@@ -1258,7 +1413,7 @@ class BelongsToMany extends Relation
     public function updateExistingPivot(int|string $id, array $pivotData): bool
     {
         if ($this->withTimestamps && !isset($pivotData['updated_at'])) {
-            $pivotData['updated_at'] = date('Y-m-d H:i:s');
+            $pivotData['updated_at'] = now()->toDateTimeString();
         }
 
         $qb = new QueryBuilder($this->query->getConnection());
@@ -1466,6 +1621,9 @@ class BelongsToMany extends Relation
 
         // Apply pivot constraints to the eager query
         $instance->applyPivotConstraintsToQuery($instance->getQuery());
+
+        // Apply soft delete scope if related model uses soft deletes
+        $instance->applySoftDeleteScope($cleanQuery, $this->relatedClass, $relatedTable);
 
         return $instance;
     }

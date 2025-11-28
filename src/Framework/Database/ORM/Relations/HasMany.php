@@ -35,6 +35,36 @@ class HasMany extends Relation
         $this->addConstraints();
     }
 
+    /**
+     * {@inheritdoc}
+     */
+    protected function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
+    /**
+     * Add basic WHERE constraint based on parent model.
+     *
+     * OPTIMIZED: Automatically applies soft delete scope if related model uses soft deletes.
+     *
+     * @return $this
+     */
+    public function addConstraints(): static
+    {
+        if ($this->parent->exists()) {
+            $this->query->where(
+                $this->foreignKey,
+                $this->parent->getAttribute($this->localKey)
+            );
+        }
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass);
+
+        return $this;
+    }
+
     // =========================================================================
     // CORE RELATION METHODS
     // =========================================================================
@@ -173,6 +203,76 @@ class HasMany extends Relation
     public function delete(): int
     {
         return $this->parent->exists() ? $this->query->delete() : 0;
+    }
+
+    /**
+     * Soft delete related models through this relationship.
+     *
+     * If related model uses soft deletes, this will soft delete the related models.
+     * Otherwise, it will perform a hard delete.
+     *
+     * Performance: O(1) - Single UPDATE query for soft delete
+     *
+     * @return int Number of models soft deleted
+     *
+     * @example
+     * ```php
+     * // Soft delete all reviews for a product
+     * $product->reviews()->softDelete();
+     * ```
+     */
+    public function softDelete(): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        // If related model doesn't use soft deletes, perform hard delete
+        if (!$this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return $this->delete();
+        }
+
+        // Soft delete related models
+        $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
+
+        return $this->query
+            ->whereNull($deletedAtColumn) // Only soft delete non-deleted records
+            ->update([$deletedAtColumn => now()->toDateTimeString()]);
+    }
+
+    /**
+     * Restore soft-deleted related models through this relationship.
+     *
+     * Restores soft-deleted related models.
+     *
+     * Performance: O(1) - Single UPDATE query for restore
+     *
+     * @return int Number of models restored
+     *
+     * @example
+     * ```php
+     * // Restore all soft-deleted reviews for a product
+     * $product->reviews()->restore();
+     * ```
+     */
+    public function restore(): int
+    {
+        if (!$this->parent->exists()) {
+            return 0;
+        }
+
+        // If related model doesn't use soft deletes, return 0
+        if (!$this->relatedModelUsesSoftDeletes($this->relatedClass)) {
+            return 0;
+        }
+
+        // Restore related models
+        $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
+
+        return $this->relatedClass::withTrashed()
+            ->where($this->foreignKey, $this->parent->getAttribute($this->localKey))
+            ->whereNotNull($deletedAtColumn) // Only restore soft-deleted records
+            ->update([$deletedAtColumn => null]);
     }
 
     /**
@@ -712,19 +812,6 @@ class HasMany extends Relation
     }
 
     /**
-     * Get the related model class name.
-     *
-     * Performance: O(1) - Direct property access
-     * Clean Architecture: Expressive getter method
-     *
-     * @return class-string<Model> Related model class
-     */
-    public function getRelatedClass(): string
-    {
-        return $this->relatedClass;
-    }
-
-    /**
      * Get models created within a date range.
      *
      * Performance: O(log n) - Uses indexed date column
@@ -764,7 +851,7 @@ class HasMany extends Relation
     public function createdToday(string $column = 'created_at'): ModelCollection
     {
         return $this->relatedClass::hydrate(
-            $this->query->whereRaw("DATE({$column}) = ?", [date('Y-m-d')])->get()->toArray()
+            $this->query->whereRaw("DATE({$column}) = ?", [now()->toDateString()])->get()->toArray()
         );
     }
 }

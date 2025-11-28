@@ -58,6 +58,14 @@ class HasManyThrough extends Relation
         $this->performJoin();
     }
 
+    /**
+     * {@inheritdoc}
+     */
+    protected function getRelatedClass(): string
+    {
+        return $this->relatedClass;
+    }
+
     // =========================================================================
     // TABLE NAME HELPERS (with caching)
     // =========================================================================
@@ -176,6 +184,9 @@ class HasManyThrough extends Relation
 
         $this->query->whereIn("{$throughTable}.{$this->firstKey}", $keys);
         $this->query->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
     }
 
     /**
@@ -494,16 +505,6 @@ class HasManyThrough extends Relation
     }
 
     /**
-     * Get the related model class name.
-     *
-     * @return class-string<Model>
-     */
-    public function getRelatedClass(): string
-    {
-        return $this->relatedClass;
-    }
-
-    /**
      * Get the first key (foreign key on through table).
      */
     public function getFirstKey(): string
@@ -698,7 +699,7 @@ class HasManyThrough extends Relation
      */
     public function createdToday(string $column = 'created_at'): ModelCollection
     {
-        $today = date('Y-m-d');
+        $today = now()->toDateString();
         $relatedTable = $this->getRelatedTable();
         $results = $this->query->whereRaw("DATE({$relatedTable}.{$column}) = ?", [$today])->get();
         return $this->relatedClass::hydrate($results->toArray());
