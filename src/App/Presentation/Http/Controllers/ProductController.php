@@ -74,11 +74,16 @@ final class ProductController extends BaseController
         $actualData = ProductModel::where('category_id', 1)->first();
 
         // Option 3: Performance testing with query hints
-        $optimizedQuery = ProductModel::withSum('categories', 'sort_order')
+        $perPage = (int) ($request->get('per_page', 15));
+        $page = (int) ($request->get('page', 1));
+        $path = $request->path();
+        $baseUrl = $request->root(); // Get base URL (http://localhost:8000)
+
+        $optimizedQuery = ProductModel::query()->with('categories')
             ->optimizeForLargeResults()
             ->limit(1000)
             ->orderBy('id', 'ASC')
-            ->get();
+            ->paginate($perPage, $page, $path, $baseUrl);
 
         $singleProduct = [
             'sql_info' => $sqlInfo,

@@ -148,7 +148,7 @@ class ModelQueryBuilder extends QueryBuilder
      * @param string|null $path Base URL path for pagination links
      * @return \Toporia\Framework\Support\Pagination\Paginator<TModel>
      */
-    public function paginate(int $perPage = 15, int $page = 1, ?string $path = null): \Toporia\Framework\Support\Pagination\Paginator
+    public function paginate(int $perPage = 15, int $page = 1, ?string $path = null, ?string $baseUrl = null): \Toporia\Framework\Support\Pagination\Paginator
     {
         // Validate parameters
         if ($perPage < 1) {
@@ -171,7 +171,8 @@ class ModelQueryBuilder extends QueryBuilder
             total: $total,
             perPage: $perPage,
             currentPage: $page,
-            path: $path
+            path: $path,
+            baseUrl: $baseUrl
         );
     }
 

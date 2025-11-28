@@ -31,13 +31,15 @@ class Paginator implements \JsonSerializable
      * @param int $perPage Number of items per page
      * @param int $currentPage Current page number (1-indexed)
      * @param string|null $path Base URL path for pagination links
+     * @param string|null $baseUrl Base URL (scheme + host) for building full URLs
      */
     public function __construct(
         private readonly Collection $items,
         private readonly int $total,
         private readonly int $perPage,
         private readonly int $currentPage = 1,
-        private readonly ?string $path = null
+        private readonly ?string $path = null,
+        private readonly ?string $baseUrl = null
     ) {}
 
     /**
@@ -128,6 +130,8 @@ class Paginator implements \JsonSerializable
     /**
      * Get the URL for a given page number.
      *
+     * Returns full URL (with domain) if baseUrl is provided, otherwise returns path with query.
+     *
      * @param int $page Page number
      * @return string|null
      */
@@ -137,7 +141,16 @@ class Paginator implements \JsonSerializable
             return null;
         }
 
-        return $this->path . '?page=' . $page;
+        // Build query string with page parameter
+        $queryString = '?page=' . $page;
+
+        // If baseUrl is provided, build full URL
+        if ($this->baseUrl !== null) {
+            return rtrim($this->baseUrl, '/') . $this->path . $queryString;
+        }
+
+        // Otherwise, return path with query
+        return $this->path . $queryString;
     }
 
     /**
@@ -232,7 +245,8 @@ class Paginator implements \JsonSerializable
             $this->total,
             $this->perPage,
             $this->currentPage,
-            $this->path
+            $this->path,
+            $this->baseUrl
         );
     }
 

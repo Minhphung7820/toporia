@@ -769,9 +769,9 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      * $lastPage = $products->lastPage();
      * $hasMore = $products->hasMorePages();
      */
-    public static function paginate(int $perPage = 15, int $page = 1, ?string $path = null): \Toporia\Framework\Support\Pagination\Paginator
+    public static function paginate(int $perPage = 15, int $page = 1, ?string $path = null, ?string $baseUrl = null): \Toporia\Framework\Support\Pagination\Paginator
     {
-        return static::query()->paginate($perPage, $page, $path);
+        return static::query()->paginate($perPage, $page, $path, $baseUrl);
     }
 
 
