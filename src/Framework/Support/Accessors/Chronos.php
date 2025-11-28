@@ -45,12 +45,9 @@ final class Chronos extends ServiceAccessor
     /**
      * Forward static calls to Chronos.
      *
-     * Handles both static factory methods (now, parse, create, etc.)
-     * and instance methods from container.
-     *
-     * This override is REQUIRED because ChronosImpl has both:
-     * - Static factory methods (now, parse, create, etc.) that must be called on class
-     * - Instance methods (getDefaultTimezone, etc.) that must be called on instance
+     * This override is REQUIRED because ChronosImpl has static factory methods
+     * (now, parse, create, etc.) that must be called directly on the class,
+     * not on an instance.
      *
      * ServiceAccessor's default __callStatic() would try to call static methods
      * on instance, which would fail.
@@ -69,7 +66,17 @@ final class Chronos extends ServiceAccessor
             return ChronosImpl::$method(...$args);
         }
 
-        // Instance methods - get from container and call
-        return static::getInstance()->$method(...$args);
+        // For any other methods, try calling on class first (in case of other static methods)
+        // If method doesn't exist on class, it will throw an error
+        if (method_exists(ChronosImpl::class, $method)) {
+            return ChronosImpl::$method(...$args);
+        }
+
+        // If not found, throw clear error
+        throw new \BadMethodCallException(
+            "Method '{$method}' does not exist on " . ChronosImpl::class . ". " .
+                "Static factory methods: now, parse, create, createFromTimestamp, createFromFormat. " .
+                "Instance methods should be called on the returned instance, e.g., Chronos::now()->addDays(1)."
+        );
     }
 }
