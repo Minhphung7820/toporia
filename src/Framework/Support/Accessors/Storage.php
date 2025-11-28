@@ -12,233 +12,55 @@ use Toporia\Framework\Storage\Contracts\FilesystemInterface;
  * Storage Service Accessor
  *
  * Provides static-like access to the Storage system.
+ * All methods are automatically delegated to the underlying service via __callStatic().
  *
- * Usage:
- * ```php
- * use Toporia\Framework\Support\Accessors\Storage;
+ * @method static FilesystemInterface disk(?string $name = null) Get filesystem disk instance
+ * @method static void setDefaultDisk(string $name) Set default disk
+ * @method static string getDefaultDisk() Get default disk name
+ * @method static bool put(string $path, mixed $contents, array $options = []) Store file contents
+ * @method static string|null get(string $path) Get file contents
+ * @method static resource|null readStream(string $path) Get file as stream resource
+ * @method static bool exists(string $path) Check if file exists
+ * @method static bool delete(string|array $paths) Delete file(s)
+ * @method static bool copy(string $from, string $to) Copy file
+ * @method static bool move(string $from, string $to) Move file
+ * @method static int|null size(string $path) Get file size
+ * @method static int|null lastModified(string $path) Get last modified timestamp
+ * @method static string|null mimeType(string $path) Get MIME type
+ * @method static array files(string $directory = '', bool $recursive = false) List files in directory
+ * @method static array directories(string $directory = '', bool $recursive = false) List subdirectories
+ * @method static bool makeDirectory(string $path) Create directory
+ * @method static bool deleteDirectory(string $directory) Delete directory
+ * @method static string url(string $path) Get public URL
+ * @method static string temporaryUrl(string $path, int $expiration) Get temporary URL (signed)
  *
- * // Get default disk
- * Storage::put('file.txt', 'content');
- * $content = Storage::get('file.txt');
+ * @see StorageManager
+ *
+ * @example
+ * // Get default disk and use it
+ * Storage::disk()->put('file.txt', 'content');
+ * $content = Storage::disk()->get('file.txt');
  *
  * // Get specific disk
- * $s3 = Storage::disk('s3');
- * $s3->put('uploads/photo.jpg', $data);
+ * Storage::disk('s3')->put('uploads/photo.jpg', $data);
  *
- * // All FilesystemInterface methods available
- * Storage::exists('file.txt');
- * Storage::delete('file.txt');
- * Storage::files('uploads');
- * ```
- *
- * Performance: Zero overhead - proxies to container service
- * SOLID: Facade pattern over dependency injection
+ * // All FilesystemInterface methods available on disk
+ * Storage::disk()->exists('file.txt');
+ * Storage::disk()->delete('file.txt');
+ * Storage::disk()->files('uploads');
  */
 final class Storage extends ServiceAccessor
 {
     /**
-     * Get the service name in the container.
+     * Get the service name for this accessor.
      *
-     * @return string
+     * This is the only method needed - all other methods are automatically
+     * delegated to the underlying service via __callStatic().
+     *
+     * @return string Service name in container
      */
     protected static function getServiceName(): string
     {
         return 'storage';
-    }
-
-    /**
-     * Get a filesystem disk instance.
-     *
-     * @param string|null $name Disk name (null = default)
-     * @return FilesystemInterface
-     */
-    public static function disk(?string $name = null): FilesystemInterface
-    {
-        /** @var StorageManager $storage */
-        $storage = static::getService();
-        return $storage->disk($name);
-    }
-
-    /**
-     * Store file contents.
-     *
-     * @param string $path File path
-     * @param mixed $contents File contents (string or resource)
-     * @param array $options Options (visibility, etc.)
-     * @return bool
-     */
-    public static function put(string $path, mixed $contents, array $options = []): bool
-    {
-        return static::disk()->put($path, $contents, $options);
-    }
-
-    /**
-     * Get file contents.
-     *
-     * @param string $path File path
-     * @return string|null
-     */
-    public static function get(string $path): ?string
-    {
-        return static::disk()->get($path);
-    }
-
-    /**
-     * Get file as stream resource.
-     *
-     * @param string $path File path
-     * @return resource|null
-     */
-    public static function readStream(string $path)
-    {
-        return static::disk()->readStream($path);
-    }
-
-    /**
-     * Check if file exists.
-     *
-     * @param string $path File path
-     * @return bool
-     */
-    public static function exists(string $path): bool
-    {
-        return static::disk()->exists($path);
-    }
-
-    /**
-     * Delete file(s).
-     *
-     * @param string|array $paths File path(s)
-     * @return bool
-     */
-    public static function delete(string|array $paths): bool
-    {
-        return static::disk()->delete($paths);
-    }
-
-    /**
-     * Copy file.
-     *
-     * @param string $from Source path
-     * @param string $to Destination path
-     * @return bool
-     */
-    public static function copy(string $from, string $to): bool
-    {
-        return static::disk()->copy($from, $to);
-    }
-
-    /**
-     * Move file.
-     *
-     * @param string $from Source path
-     * @param string $to Destination path
-     * @return bool
-     */
-    public static function move(string $from, string $to): bool
-    {
-        return static::disk()->move($from, $to);
-    }
-
-    /**
-     * Get file size.
-     *
-     * @param string $path File path
-     * @return int|null
-     */
-    public static function size(string $path): ?int
-    {
-        return static::disk()->size($path);
-    }
-
-    /**
-     * Get last modified timestamp.
-     *
-     * @param string $path File path
-     * @return int|null
-     */
-    public static function lastModified(string $path): ?int
-    {
-        return static::disk()->lastModified($path);
-    }
-
-    /**
-     * Get MIME type.
-     *
-     * @param string $path File path
-     * @return string|null
-     */
-    public static function mimeType(string $path): ?string
-    {
-        return static::disk()->mimeType($path);
-    }
-
-    /**
-     * List files in directory.
-     *
-     * @param string $directory Directory path
-     * @param bool $recursive Recursive listing
-     * @return array
-     */
-    public static function files(string $directory = '', bool $recursive = false): array
-    {
-        return static::disk()->files($directory, $recursive);
-    }
-
-    /**
-     * List subdirectories.
-     *
-     * @param string $directory Directory path
-     * @param bool $recursive Recursive listing
-     * @return array
-     */
-    public static function directories(string $directory = '', bool $recursive = false): array
-    {
-        return static::disk()->directories($directory, $recursive);
-    }
-
-    /**
-     * Create directory.
-     *
-     * @param string $path Directory path
-     * @return bool
-     */
-    public static function makeDirectory(string $path): bool
-    {
-        return static::disk()->makeDirectory($path);
-    }
-
-    /**
-     * Delete directory.
-     *
-     * @param string $directory Directory path
-     * @return bool
-     */
-    public static function deleteDirectory(string $directory): bool
-    {
-        return static::disk()->deleteDirectory($directory);
-    }
-
-    /**
-     * Get public URL.
-     *
-     * @param string $path File path
-     * @return string
-     */
-    public static function url(string $path): string
-    {
-        return static::disk()->url($path);
-    }
-
-    /**
-     * Get temporary URL (signed).
-     *
-     * @param string $path File path
-     * @param int $expiration Expiration in seconds
-     * @return string
-     */
-    public static function temporaryUrl(string $path, int $expiration): string
-    {
-        return static::disk()->temporaryUrl($path, $expiration);
     }
 }

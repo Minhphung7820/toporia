@@ -12,16 +12,24 @@ use Toporia\Framework\Auth\Authenticatable;
  * Auth Service Accessor
  *
  * Provides static-like access to the authentication manager.
+ * All methods are automatically delegated to the underlying service via __callStatic().
  *
  * @method static GuardInterface guard(?string $name = null) Get guard instance
  * @method static void setDefaultGuard(string $name) Set default guard
  * @method static string getDefaultGuard() Get default guard name
  * @method static bool hasGuard(string $name) Check if guard exists
+ * @method static bool check() Check if user is authenticated
+ * @method static bool guest() Check if user is guest
+ * @method static Authenticatable|null user() Get authenticated user
+ * @method static int|string|null id() Get authenticated user ID
+ * @method static bool attempt(array $credentials) Attempt authentication
+ * @method static void login(Authenticatable $user) Login user
+ * @method static void logout() Logout user
  *
  * @see AuthManagerInterface
  *
  * @example
- * // Check if user is authenticated
+ * // Get default guard and use it
  * if (Auth::guard()->check()) {
  *     $user = Auth::guard()->user();
  * }
@@ -39,80 +47,16 @@ use Toporia\Framework\Auth\Authenticatable;
  */
 final class Auth extends ServiceAccessor
 {
+    /**
+     * Get the service name for this accessor.
+     *
+     * This is the only method needed - all other methods are automatically
+     * delegated to the underlying service via __callStatic().
+     *
+     * @return string Service name in container
+     */
     protected static function getServiceName(): string
     {
         return 'auth';
-    }
-
-    /**
-     * Check if user is authenticated (shortcut).
-     *
-     * @return bool
-     */
-    public static function check(): bool
-    {
-        return static::guard()->check();
-    }
-
-    /**
-     * Check if user is guest (shortcut).
-     *
-     * @return bool
-     */
-    public static function guest(): bool
-    {
-        return static::guard()->guest();
-    }
-
-    /**
-     * Get authenticated user (shortcut).
-     *
-     * @return Authenticatable|null
-     */
-    public static function user(): ?Authenticatable
-    {
-        return static::guard()->user();
-    }
-
-    /**
-     * Get authenticated user ID (shortcut).
-     *
-     * @return int|string|null
-     */
-    public static function id(): int|string|null
-    {
-        return static::guard()->id();
-    }
-
-    /**
-     * Attempt authentication (shortcut).
-     *
-     * @param array<string, mixed> $credentials
-     * @return bool
-     */
-    public static function attempt(array $credentials): bool
-    {
-        return static::guard()->attempt($credentials);
-    }
-
-    /**
-     * Login user (shortcut).
-     *
-     * @param Authenticatable $user
-     * @return void
-     */
-    public static function login(Authenticatable $user): void
-    {
-        static::guard()->login($user);
-    }
-
-    /**
-     * Logout user (shortcut).
-     *
-     * @return void
-     */
-    public static function logout(): void
-    {
-        static::guard()->logout();
     }
 }

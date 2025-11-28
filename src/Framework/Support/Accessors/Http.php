@@ -34,9 +34,14 @@ use Toporia\Framework\Http\Client\GraphQLClient;
 final class Http extends ServiceAccessor
 {
     /**
-     * {@inheritdoc}
+     * Get the service name for this accessor.
+     *
+     * This is the only method needed - all other methods are automatically
+     * delegated to the underlying service via __callStatic().
+     *
+     * @return string Service name in container
      */
-    protected static function getServiceIdentifier(): string
+    protected static function getServiceName(): string
     {
         return ClientManagerInterface::class;
     }

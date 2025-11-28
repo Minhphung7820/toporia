@@ -272,4 +272,55 @@ class DatabaseManager
             $this->connections[$name]->reconnect();
         }
     }
+
+    // =========================================================================
+    // QUERY LOG METHODS (for static access via DB accessor)
+    // =========================================================================
+
+    /**
+     * Enable query logging.
+     *
+     * All executed queries will be logged with their SQL, bindings, and execution time.
+     *
+     * @return void
+     */
+    public function enableQueryLog(): void
+    {
+        QueryBuilder::enableQueryLog();
+    }
+
+    /**
+     * Disable query logging.
+     *
+     * @return void
+     */
+    public function disableQueryLog(): void
+    {
+        QueryBuilder::disableQueryLog();
+    }
+
+    /**
+     * Get the query log.
+     *
+     * Returns array of executed queries with:
+     * - query: SQL query string
+     * - bindings: Parameter bindings
+     * - time: Execution time in milliseconds
+     *
+     * @return array<array{query: string, bindings: array, time: float}>
+     */
+    public function getQueryLog(): array
+    {
+        return QueryBuilder::getQueryLog();
+    }
+
+    /**
+     * Clear the query log.
+     *
+     * @return void
+     */
+    public function flushQueryLog(): void
+    {
+        QueryBuilder::flushQueryLog();
+    }
 }

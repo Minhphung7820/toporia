@@ -198,7 +198,7 @@ class ModelQueryBuilder extends QueryBuilder
      * // Next page (using cursor from previous response)
      * $paginator = ProductModel::query()
      *     ->orderBy('id', 'ASC')
-     *     ->cursorPaginate(50, $request->get('cursor'));
+     *     ->cursorPaginate(50, ['cursor' => $request->get('cursor')]);
      * ```
      *
      * @param int $perPage Number of items per page
@@ -211,22 +211,43 @@ class ModelQueryBuilder extends QueryBuilder
      *
      * @throws \InvalidArgumentException If perPage is invalid
      */
+    /**
+     * Paginate results using cursor-based pagination (Model-specific).
+     *
+     * Overrides parent to use model's primary key as default cursor column
+     * and return ModelCollection instead of RowCollection.
+     *
+     * @param int $perPage Number of items per page
+     * @param array<string, mixed>|null $options Options array with:
+     *   - 'cursor': Encoded cursor string (optional)
+     *   - 'column': Column name for cursor (default: model's primary key)
+     *   - 'path': Base path for pagination URLs (optional)
+     *   - 'baseUrl': Base URL for pagination URLs (optional)
+     *   - 'cursorName': Query parameter name for cursor (default: 'cursor')
+     * @param array<string, mixed>|null $options2 Alternative options format (for backward compatibility)
+     * @return \Toporia\Framework\Support\Pagination\CursorPaginator
+     */
     public function cursorPaginate(
         int $perPage = 15,
-        ?string $cursor = null,
-        ?string $column = null,
-        ?string $path = null,
-        ?string $baseUrl = null,
-        string $cursorName = 'cursor'
+        ?array $options = null,
+        ?array $options2 = null
     ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+        // Normalize options (support both formats)
+        if ($options2 !== null) {
+            $options = array_merge($options ?? [], $options2);
+        }
+
+        // Extract options with defaults
+        $cursor = $options['cursor'] ?? null;
+        // Default to model's primary key instead of 'id'
+        $column = $options['column'] ?? $this->modelClass::getPrimaryKey();
+        $path = $options['path'] ?? null;
+        $baseUrl = $options['baseUrl'] ?? null;
+        $cursorName = $options['cursorName'] ?? 'cursor';
+
         // Validate parameters
         if ($perPage < 1) {
             throw new \InvalidArgumentException('Per page must be at least 1');
-        }
-
-        // Determine cursor column (default to primary key)
-        if ($column === null) {
-            $column = $this->modelClass::getPrimaryKey();
         }
 
         // Get current order by direction for cursor column
@@ -243,7 +264,7 @@ class ModelQueryBuilder extends QueryBuilder
         // Note: Database will automatically use index if available
 
         // Apply cursor constraint if provided
-        if ($cursor !== null) {
+        if ($cursor !== null && is_string($cursor)) {
             $cursorValue = $this->decodeCursor($cursor, $column);
             if ($cursorValue !== null) {
                 // Performance: Use indexed WHERE clause (O(1) lookup)

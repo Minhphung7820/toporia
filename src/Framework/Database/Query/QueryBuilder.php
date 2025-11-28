@@ -2331,6 +2331,247 @@ class QueryBuilder implements QueryBuilderInterface
         );
     }
 
+    /**
+     * Paginate results using cursor-based pagination.
+     *
+     * Cursor-based pagination is more efficient than offset-based pagination
+     * for large datasets because it doesn't require counting all records.
+     *
+     * Performance:
+     * - O(1) performance regardless of dataset size
+     * - No COUNT query needed
+     * - Uses indexed WHERE clause instead of OFFSET
+     *
+     * @param int $perPage Number of items per page
+     * @param array<string, mixed>|null $options Options array with:
+     *   - 'cursor': Encoded cursor string (optional)
+     *   - 'column': Column name for cursor (default: 'id')
+     *   - 'path': Base path for pagination URLs (optional)
+     *   - 'baseUrl': Base URL for pagination URLs (optional)
+     *   - 'cursorName': Query parameter name for cursor (default: 'cursor')
+     * @param array<string, mixed>|null $options2 Alternative options format (for backward compatibility)
+     * @return \Toporia\Framework\Support\Pagination\CursorPaginator
+     *
+     * @example
+     * // Basic cursor pagination
+     * $paginator = DB::table('users')
+     *     ->orderBy('id', 'ASC')
+     *     ->cursorPaginate(15);
+     *
+     * // With cursor from request
+     * $cursor = request()->get('cursor');
+     * $paginator = DB::table('users')
+     *     ->orderBy('id', 'ASC')
+     *     ->cursorPaginate(15, ['cursor' => $cursor]);
+     *
+     * // Custom cursor column
+     * $paginator = DB::table('products')
+     *     ->orderBy('created_at', 'DESC')
+     *     ->cursorPaginate(20, ['column' => 'created_at']);
+     */
+    public function cursorPaginate(
+        int $perPage = 15,
+        ?array $options = null,
+        ?array $options2 = null
+    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+        // Normalize options (support both formats)
+        if ($options2 !== null) {
+            $options = array_merge($options ?? [], $options2);
+        }
+
+        // Extract options with defaults
+        $cursor = $options['cursor'] ?? null;
+        $column = $options['column'] ?? 'id';
+        $path = $options['path'] ?? null;
+        $baseUrl = $options['baseUrl'] ?? null;
+        $cursorName = $options['cursorName'] ?? 'cursor';
+
+        // Validate parameters
+        if ($perPage < 1) {
+            throw new \InvalidArgumentException('Per page must be at least 1');
+        }
+
+        // Get current order by direction for cursor column
+        // Default to ASC if not specified
+        $orderDirection = $this->getOrderDirectionForColumn($column) ?? 'ASC';
+
+        // Build query with cursor constraint
+        // Performance: Clone to avoid modifying original query
+        $query = clone $this;
+
+        // Apply cursor constraint if provided
+        if ($cursor !== null && is_string($cursor)) {
+            $cursorValue = $this->decodeCursor($cursor, $column);
+            if ($cursorValue !== null) {
+                // Performance: Use indexed WHERE clause (O(1) lookup)
+                // WHERE id > cursor is much faster than OFFSET for large datasets
+                if ($orderDirection === 'ASC') {
+                    $query->where($column, '>', $cursorValue);
+                } else {
+                    $query->where($column, '<', $cursorValue);
+                }
+            }
+        }
+
+        // Ensure ordering by cursor column for consistent pagination
+        // Critical: Cursor pagination requires stable ordering
+        // The cursor column must be the primary sort key
+        $query = $this->ensureOrderByCursorColumn($query, $column, $orderDirection);
+
+        // Performance: Fetch one extra item to determine if there are more pages
+        // This avoids an additional COUNT query (O(n) operation)
+        // Instead, we use O(1) check: if we got perPage+1 items, there are more pages
+        $items = $query->limit($perPage + 1)->get();
+
+        // Determine if there are more pages
+        $hasMore = $items->count() > $perPage;
+
+        // Remove the extra item if it exists
+        if ($hasMore) {
+            $items = $items->take($perPage);
+        }
+
+        // Get cursors for next and previous pages
+        $nextCursor = null;
+        $prevCursor = null;
+
+        if ($hasMore && $items->isNotEmpty()) {
+            // Get the last item's cursor value
+            $lastItem = $items->last();
+            if (is_array($lastItem) && isset($lastItem[$column])) {
+                $nextCursorValue = $lastItem[$column];
+                $nextCursor = $this->encodeCursor($nextCursorValue, $column);
+            }
+        }
+
+        // Previous cursor is the current cursor (for backward navigation)
+        $prevCursor = $cursor;
+
+        return new \Toporia\Framework\Support\Pagination\CursorPaginator(
+            items: $items,
+            perPage: $perPage,
+            nextCursor: $nextCursor,
+            prevCursor: $prevCursor,
+            hasMore: $hasMore,
+            path: $path,
+            baseUrl: $baseUrl,
+            cursorName: $cursorName
+        );
+    }
+
+    /**
+     * Get the order direction for a specific column.
+     *
+     * Checks existing order by clauses to determine direction.
+     *
+     * @param string $column Column name
+     * @return string|null 'ASC' or 'DESC', or null if not found
+     */
+    private function getOrderDirectionForColumn(string $column): ?string
+    {
+        $orders = $this->getOrders();
+
+        // Find order by for this column
+        foreach ($orders as $order) {
+            if (isset($order['column']) && $order['column'] === $column) {
+                return $order['direction'] ?? 'ASC';
+            }
+        }
+
+        // Default to ASC if not found
+        return 'ASC';
+    }
+
+    /**
+     * Ensure query is ordered by cursor column.
+     *
+     * Adds cursor column as primary sort if not already present.
+     * This is critical for cursor pagination to work correctly.
+     *
+     * @param QueryBuilder $query Query builder
+     * @param string $column Cursor column
+     * @param string $direction Order direction
+     * @return QueryBuilder
+     */
+    private function ensureOrderByCursorColumn(QueryBuilder $query, string $column, string $direction): QueryBuilder
+    {
+        $orders = $query->getOrders();
+
+        // Check if cursor column is already in order by
+        $hasCursorColumn = false;
+        foreach ($orders as $order) {
+            if (isset($order['column']) && $order['column'] === $column) {
+                $hasCursorColumn = true;
+                break;
+            }
+        }
+
+        // Add cursor column as primary sort if not present
+        if (!$hasCursorColumn) {
+            // Note: We can't easily prepend, so we add it
+            // The database will use the first order by as primary
+            // For cursor pagination, cursor column should be first
+            $query->orderBy($column, $direction);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Encode cursor value for URL-safe transmission.
+     *
+     * Uses base64-encoded JSON for security and flexibility.
+     *
+     * @param mixed $value Cursor value (typically int for IDs, or string for UUIDs)
+     * @param string $column Column name (for validation)
+     * @return string Encoded cursor (URL-safe)
+     */
+    private function encodeCursor(mixed $value, string $column): string
+    {
+        // Format: {"column": "id", "value": 123, "ts": timestamp}
+        $data = [
+            'column' => $column,
+            'value' => $value,
+            'ts' => time(), // Optional: for cursor expiration
+        ];
+
+        return base64_encode(json_encode($data, JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Decode cursor value from URL parameter.
+     *
+     * Validates cursor structure and column to prevent injection attacks.
+     *
+     * @param string $cursor Encoded cursor
+     * @param string $expectedColumn Expected column name (for validation)
+     * @return mixed|null Decoded cursor value, or null if invalid
+     */
+    private function decodeCursor(string $cursor, string $expectedColumn): mixed
+    {
+        try {
+            $decoded = base64_decode($cursor, true);
+            if ($decoded === false) {
+                return null;
+            }
+
+            $data = json_decode($decoded, true);
+            if (!is_array($data) || !isset($data['value'])) {
+                return null;
+            }
+
+            // Security: Validate column matches (prevents column injection)
+            if (isset($data['column']) && $data['column'] !== $expectedColumn) {
+                return null;
+            }
+
+            return $data['value'];
+        } catch (\Throwable $e) {
+            // Invalid cursor format - return null to start from beginning
+            return null;
+        }
+    }
+
     // =========================================================================
     // GETTER METHODS FOR GRAMMAR ACCESS
     // =========================================================================

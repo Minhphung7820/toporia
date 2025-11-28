@@ -84,7 +84,7 @@ final class ProcessPool
         }
 
         // Run and collect results
-        $chunkResults = $manager->run($this->workerCount);
+        $chunkResults = $manager->execute($this->workerCount);
 
         // Flatten results
         foreach ($chunkResults as $chunkResult) {
@@ -144,7 +144,7 @@ final class ProcessPool
         }
 
         // Execute in parallel
-        $chunkResults = $manager->run($this->workerCount);
+        $chunkResults = $manager->execute($this->workerCount);
 
         // Flatten results
         foreach ($chunkResults as $chunkResult) {

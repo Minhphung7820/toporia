@@ -27,8 +27,7 @@ final class StorageManager
     public function __construct(
         private readonly array $config,
         private readonly string $defaultDisk = 'local'
-    ) {
-    }
+    ) {}
 
     /**
      * Get filesystem disk instance.
@@ -117,5 +116,192 @@ final class StorageManager
     public function __call(string $method, array $parameters): mixed
     {
         return $this->disk()->$method(...$parameters);
+    }
+
+    // =========================================================================
+    // CONVENIENCE METHODS (for static access via Storage accessor)
+    // =========================================================================
+
+    /**
+     * Store file contents (convenience method).
+     *
+     * @param string $path File path
+     * @param mixed $contents File contents (string or resource)
+     * @param array $options Options (visibility, etc.)
+     * @return bool
+     */
+    public function put(string $path, mixed $contents, array $options = []): bool
+    {
+        return $this->disk()->put($path, $contents, $options);
+    }
+
+    /**
+     * Get file contents (convenience method).
+     *
+     * @param string $path File path
+     * @return string|null
+     */
+    public function get(string $path): ?string
+    {
+        return $this->disk()->get($path);
+    }
+
+    /**
+     * Get file as stream resource (convenience method).
+     *
+     * @param string $path File path
+     * @return resource|null
+     */
+    public function readStream(string $path)
+    {
+        return $this->disk()->readStream($path);
+    }
+
+    /**
+     * Check if file exists (convenience method).
+     *
+     * @param string $path File path
+     * @return bool
+     */
+    public function exists(string $path): bool
+    {
+        return $this->disk()->exists($path);
+    }
+
+    /**
+     * Delete file(s) (convenience method).
+     *
+     * @param string|array $paths File path(s)
+     * @return bool
+     */
+    public function delete(string|array $paths): bool
+    {
+        return $this->disk()->delete($paths);
+    }
+
+    /**
+     * Copy file (convenience method).
+     *
+     * @param string $from Source path
+     * @param string $to Destination path
+     * @return bool
+     */
+    public function copy(string $from, string $to): bool
+    {
+        return $this->disk()->copy($from, $to);
+    }
+
+    /**
+     * Move file (convenience method).
+     *
+     * @param string $from Source path
+     * @param string $to Destination path
+     * @return bool
+     */
+    public function move(string $from, string $to): bool
+    {
+        return $this->disk()->move($from, $to);
+    }
+
+    /**
+     * Get file size (convenience method).
+     *
+     * @param string $path File path
+     * @return int|null
+     */
+    public function size(string $path): ?int
+    {
+        return $this->disk()->size($path);
+    }
+
+    /**
+     * Get last modified timestamp (convenience method).
+     *
+     * @param string $path File path
+     * @return int|null
+     */
+    public function lastModified(string $path): ?int
+    {
+        return $this->disk()->lastModified($path);
+    }
+
+    /**
+     * Get MIME type (convenience method).
+     *
+     * @param string $path File path
+     * @return string|null
+     */
+    public function mimeType(string $path): ?string
+    {
+        return $this->disk()->mimeType($path);
+    }
+
+    /**
+     * List files in directory (convenience method).
+     *
+     * @param string $directory Directory path
+     * @param bool $recursive Recursive listing
+     * @return array
+     */
+    public function files(string $directory = '', bool $recursive = false): array
+    {
+        return $this->disk()->files($directory, $recursive);
+    }
+
+    /**
+     * List subdirectories (convenience method).
+     *
+     * @param string $directory Directory path
+     * @param bool $recursive Recursive listing
+     * @return array
+     */
+    public function directories(string $directory = '', bool $recursive = false): array
+    {
+        return $this->disk()->directories($directory, $recursive);
+    }
+
+    /**
+     * Create directory (convenience method).
+     *
+     * @param string $path Directory path
+     * @return bool
+     */
+    public function makeDirectory(string $path): bool
+    {
+        return $this->disk()->makeDirectory($path);
+    }
+
+    /**
+     * Delete directory (convenience method).
+     *
+     * @param string $directory Directory path
+     * @return bool
+     */
+    public function deleteDirectory(string $directory): bool
+    {
+        return $this->disk()->deleteDirectory($directory);
+    }
+
+    /**
+     * Get public URL (convenience method).
+     *
+     * @param string $path File path
+     * @return string
+     */
+    public function url(string $path): string
+    {
+        return $this->disk()->url($path);
+    }
+
+    /**
+     * Get temporary URL (signed) (convenience method).
+     *
+     * @param string $path File path
+     * @param int $expiration Expiration in seconds
+     * @return string
+     */
+    public function temporaryUrl(string $path, int $expiration): string
+    {
+        return $this->disk()->temporaryUrl($path, $expiration);
     }
 }

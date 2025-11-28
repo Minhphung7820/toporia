@@ -29,7 +29,12 @@ use Toporia\Framework\Foundation\ServiceAccessor;
 final class Trans extends ServiceAccessor
 {
     /**
-     * {@inheritdoc}
+     * Get the service name for this accessor.
+     *
+     * This is the only method needed - all other methods are automatically
+     * delegated to the underlying service via __callStatic().
+     *
+     * @return string Service name in container
      */
     protected static function getServiceName(): string
     {

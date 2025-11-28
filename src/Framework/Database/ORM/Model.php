@@ -793,7 +793,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      * $paginator = ProductModel::cursorPaginate(50);
      *
      * // Next page (using cursor from previous response)
-     * $paginator = ProductModel::cursorPaginate(50, $request->get('cursor'));
+     * $paginator = ProductModel::cursorPaginate(50, ['cursor' => $request->get('cursor')]);
      * ```
      *
      * @param int $perPage Number of items per page
@@ -804,15 +804,25 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      * @param string $cursorName Query parameter name for cursor (default: 'cursor')
      * @return \Toporia\Framework\Support\Pagination\CursorPaginator
      */
+    /**
+     * Paginate results using cursor-based pagination.
+     *
+     * @param int $perPage Number of items per page
+     * @param array<string, mixed>|null $options Options array with:
+     *   - 'cursor': Encoded cursor string (optional)
+     *   - 'column': Column name for cursor (default: model's primary key)
+     *   - 'path': Base path for pagination URLs (optional)
+     *   - 'baseUrl': Base URL for pagination URLs (optional)
+     *   - 'cursorName': Query parameter name for cursor (default: 'cursor')
+     * @param array<string, mixed>|null $options2 Alternative options format (for backward compatibility)
+     * @return \Toporia\Framework\Support\Pagination\CursorPaginator
+     */
     public static function cursorPaginate(
         int $perPage = 15,
-        ?string $cursor = null,
-        ?string $column = null,
-        ?string $path = null,
-        ?string $baseUrl = null,
-        string $cursorName = 'cursor'
+        ?array $options = null,
+        ?array $options2 = null
     ): \Toporia\Framework\Support\Pagination\CursorPaginator {
-        return static::query()->cursorPaginate($perPage, $cursor, $column, $path, $baseUrl, $cursorName);
+        return static::query()->cursorPaginate($perPage, $options, $options2);
     }
 
 

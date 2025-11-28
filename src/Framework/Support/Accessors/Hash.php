@@ -4,19 +4,28 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support\Accessors;
 
+use Toporia\Framework\Foundation\ServiceAccessor;
 use Toporia\Framework\Hashing\HashManager;
 use Toporia\Framework\Hashing\Contracts\HasherInterface;
 
 /**
- * Hash Accessor (Facade)
+ * Hash Service Accessor
  *
- * Static accessor for HashManager providing fluent API.
- * Enables static method calls for convenient hashing operations.
+ * Provides static-like access to the hash manager.
+ * All methods are automatically delegated to the underlying service via __callStatic().
  *
- * Usage:
- * ```php
- * use Toporia\Framework\Support\Accessors\Hash;
+ * @method static string make(string $value, array $options = []) Hash a value
+ * @method static bool check(string $value, string $hashedValue, array $options = []) Verify a value against a hash
+ * @method static bool needsRehash(string $hashedValue, array $options = []) Check if hash needs rehashing
+ * @method static array info(string $hashedValue) Get hash information
+ * @method static bool isHashed(string $value) Check if value is already hashed
+ * @method static HasherInterface driver(?string $name = null) Get specific hasher driver
+ * @method static string getDefaultDriver() Get default driver name
+ * @method static array getAvailableDrivers() Get available drivers
  *
+ * @see HashManager
+ *
+ * @example
  * // Hash password
  * $hash = Hash::make('secret');
  *
@@ -29,69 +38,19 @@ use Toporia\Framework\Hashing\Contracts\HasherInterface;
  * if (Hash::needsRehash($hash)) {
  *     $newHash = Hash::make('secret');
  * }
- * ```
- *
- * Performance:
- * - O(1) instance resolution (singleton)
- * - Same performance as direct HashManager usage
- * - No overhead from static calls
- *
- * @method static string make(string $value, array $options = [])
- * @method static bool check(string $value, string $hashedValue, array $options = [])
- * @method static bool needsRehash(string $hashedValue, array $options = [])
- * @method static array info(string $hashedValue)
- * @method static bool isHashed(string $value)
- * @method static HasherInterface driver(?string $name = null)
- * @method static string getDefaultDriver()
- * @method static array getAvailableDrivers()
- *
- * @package Toporia\Framework\Support\Accessors
  */
-final class Hash
+final class Hash extends ServiceAccessor
 {
     /**
-     * Cached HashManager instance.
+     * Get the service name for this accessor.
      *
-     * @var HashManager|null
+     * This is the only method needed - all other methods are automatically
+     * delegated to the underlying service via __callStatic().
+     *
+     * @return string Service name in container
      */
-    private static ?HashManager $instance = null;
-
-    /**
-     * Get HashManager instance.
-     *
-     * Uses singleton pattern for performance.
-     *
-     * @return HashManager
-     */
-    private static function getInstance(): HashManager
+    protected static function getServiceName(): string
     {
-        if (self::$instance === null) {
-            self::$instance = app('hash');
-        }
-
-        return self::$instance;
-    }
-
-    /**
-     * Forward static calls to HashManager instance.
-     *
-     * @param string $method Method name
-     * @param array $arguments Method arguments
-     * @return mixed
-     */
-    public static function __callStatic(string $method, array $arguments): mixed
-    {
-        return self::getInstance()->$method(...$arguments);
-    }
-
-    /**
-     * Reset cached instance (for testing).
-     *
-     * @internal
-     * @return void
-     */
-    public static function clearResolvedInstance(): void
-    {
-        self::$instance = null;
+        return 'hash';
     }
 }

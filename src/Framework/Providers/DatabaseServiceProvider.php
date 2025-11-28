@@ -41,10 +41,13 @@ class DatabaseServiceProvider extends ServiceProvider
             return new DatabaseManager($config);
         });
 
-        // Default connection alias (lazy - only connects when actually used)
-        $container->singleton('db', fn(ContainerInterface $c) => $c->get(DatabaseManager::class)->connection());
-        $container->bind(ConnectionInterface::class, fn(ContainerInterface $c) => $c->get('db'));
-        $container->bind(Connection::class, fn(ContainerInterface $c) => $c->get('db'));
+        // Default service alias - returns DatabaseManager (not ConnectionProxy)
+        // This allows DB::enableQueryLog(), DB::connection(), etc. to work
+        $container->singleton('db', fn(ContainerInterface $c) => $c->get(DatabaseManager::class));
+
+        // Connection interface bindings (for dependency injection)
+        $container->bind(ConnectionInterface::class, fn(ContainerInterface $c) => $c->get(DatabaseManager::class)->getConnection());
+        $container->bind(Connection::class, fn(ContainerInterface $c) => $c->get(DatabaseManager::class)->getConnection());
     }
 
     /**

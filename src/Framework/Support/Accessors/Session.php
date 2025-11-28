@@ -79,38 +79,15 @@ use Toporia\Framework\Session\Store;
 final class Session extends ServiceAccessor
 {
     /**
-     * Cached Store instance.
+     * Get the service name for this accessor.
      *
-     * @var Store|null
+     * This is the only method needed - all other methods are automatically
+     * delegated to the underlying service via __callStatic().
+     *
+     * @return string Service name in container
      */
-    private static ?Store $instance = null;
-
-    /**
-     * Get Store instance.
-     *
-     * Performance: O(1) - Cached after first call
-     *
-     * @return Store
-     */
-    private static function getInstance(): Store
+    protected static function getServiceName(): string
     {
-        if (self::$instance === null) {
-            self::$instance = app('session');
-        }
-
-        return self::$instance;
-    }
-
-    /**
-     * Forward static calls to Store instance.
-     *
-     * @param string $method
-     * @param array $arguments
-     * @return mixed
-     */
-    public static function __callStatic(string $method, array $arguments): mixed
-    {
-        return self::getInstance()->$method(...$arguments);
+        return 'session';
     }
 }
-

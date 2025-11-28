@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Auth;
 
 use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, GuardInterface};
+
 /**
  * Auth Manager - Manages multiple authentication guards.
  *
@@ -36,8 +37,7 @@ final class AuthManager implements AuthManagerInterface
     public function __construct(
         private array $guardFactories = [],
         private string $defaultGuard = 'web'
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}
@@ -126,5 +126,81 @@ final class AuthManager implements AuthManagerInterface
     public function __call(string $method, array $parameters): mixed
     {
         return $this->guard()->{$method}(...$parameters);
+    }
+
+    // =========================================================================
+    // CONVENIENCE METHODS (for static access via Auth accessor)
+    // =========================================================================
+
+    /**
+     * Check if user is authenticated (convenience method).
+     *
+     * @return bool
+     */
+    public function check(): bool
+    {
+        return $this->guard()->check();
+    }
+
+    /**
+     * Check if user is guest (convenience method).
+     *
+     * @return bool
+     */
+    public function guest(): bool
+    {
+        return $this->guard()->guest();
+    }
+
+    /**
+     * Get authenticated user (convenience method).
+     *
+     * @return \Toporia\Framework\Auth\Authenticatable|null
+     */
+    public function user(): ?\Toporia\Framework\Auth\Authenticatable
+    {
+        return $this->guard()->user();
+    }
+
+    /**
+     * Get authenticated user ID (convenience method).
+     *
+     * @return int|string|null
+     */
+    public function id(): int|string|null
+    {
+        return $this->guard()->id();
+    }
+
+    /**
+     * Attempt authentication (convenience method).
+     *
+     * @param array<string, mixed> $credentials
+     * @return bool
+     */
+    public function attempt(array $credentials): bool
+    {
+        return $this->guard()->attempt($credentials);
+    }
+
+    /**
+     * Login user (convenience method).
+     *
+     * @param \Toporia\Framework\Auth\Authenticatable $user
+     * @return void
+     */
+    public function login(\Toporia\Framework\Auth\Authenticatable $user): void
+    {
+        $this->guard()->login($user);
+    }
+
+    /**
+     * Logout user (convenience method).
+     *
+     * @return void
+     */
+    public function logout(): void
+    {
+        $this->guard()->logout();
     }
 }

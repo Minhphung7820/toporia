@@ -5,152 +5,43 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Accessors;
 
 use Toporia\Framework\Foundation\ServiceAccessor;
-use Toporia\Framework\Database\Contracts\ConnectionInterface;
-use Toporia\Framework\Database\Query\QueryBuilder;
-use Toporia\Framework\Database\DatabaseManager;
-
 
 /**
- * Class DB
+ * DB Service Accessor
  *
- * Core class for the Accessors layer providing essential functionality for
- * the Toporia Framework.
+ * Provides static-like access to the database manager.
+ * All methods are automatically delegated to the underlying service via __callStatic().
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
- * @copyright   Copyright (c) 2025 Toporia Framework
- * @license     MIT
- * @version     1.0.0
- * @package     toporia/framework
- * @subpackage  Accessors
- * @since       2025-01-10
+ * @method static ConnectionProxy connection(?string $name = null) Get connection proxy
+ * @method static ConnectionInterface getConnection(?string $name = null) Get connection directly
+ * @method static void setDefaultConnection(string $name) Set default connection
+ * @method static string getDefaultConnection() Get default connection name
+ * @method static void enableQueryLog() Enable query logging
+ * @method static void disableQueryLog() Disable query logging
+ * @method static array getQueryLog() Get the query log
+ * @method static void flushQueryLog() Clear the query log
  *
- * @link        https://github.com/Minhphung7820/toporia
+ * @see DatabaseManager
+ *
+ * @example
+ * // Get default connection and use it
+ * DB::connection()->table('users')->get();
+ *
+ * // Get named connection
+ * DB::connection('mysql')->table('users')->get();
  */
-class DB extends ServiceAccessor
+final class DB extends ServiceAccessor
 {
     /**
-     * Get a specific database connection by name.
+     * Get the service name for this accessor.
      *
-     * This method follows SOLID principles:
-     * - Single Responsibility: Only retrieves connections, doesn't create them
-     * - Dependency Inversion: Depends on DatabaseManager abstraction via container
-     * - Open/Closed: Can be overridden in subclasses for custom behavior
+     * This is the only method needed - all other methods are automatically
+     * delegated to the underlying service via __callStatic().
      *
-     * @param string|null $name Connection name from config/database.php.
-     *                          If null, returns the default connection.
-     * @return ConnectionInterface Database connection instance.
-     *
-     * @example
-     * // Get default connection
-     * $conn = DB::connection();
-     * $conn->table('users')->get();
-     *
-     * // Get named connection
-     * $mysql = DB::connection('mysql');
-     * $postgres = DB::connection('analytics');
-     * $redis = DB::connection('redis');
-     */
-    public static function connection(?string $name = null): ConnectionInterface
-    {
-        return static::getDatabaseManager()->connection($name);
-    }
-
-    /**
-     * Get the DatabaseManager instance from the container.
-     *
-     * Separated into its own method following SOLID principles:
-     * - Single Responsibility: Encapsulates container access logic
-     * - Open/Closed: Can be overridden for testing or custom implementations
-     * - Dependency Inversion: Isolates container dependency in one place
-     *
-     * Benefits:
-     * - Testability: Easy to mock in unit tests
-     * - Reusability: Can be used by subclasses
-     * - Maintainability: Single point of change for container access
-     *
-     * @return DatabaseManager
-     */
-    protected static function getDatabaseManager(): DatabaseManager
-    {
-        return container(DatabaseManager::class);
-    }
-
-    /**
-     * {@inheritdoc}
-     *
-     * Returns the service name for the default connection.
-     * This enables static method delegation via ServiceAccessor.
+     * @return string Service name in container
      */
     protected static function getServiceName(): string
     {
         return 'db';
-    }
-
-    /**
-     * Enable query logging.
-     *
-     * All executed queries will be logged with their SQL, bindings, and execution time.
-     *
-     * @return void
-     *
-     * @example
-     * ```php
-     * DB::enableQueryLog();
-     * $users = DB::table('users')->get();
-     * $queries = DB::getQueryLog();
-     * ```
-     */
-    public static function enableQueryLog(): void
-    {
-        QueryBuilder::enableQueryLog();
-    }
-
-    /**
-     * Disable query logging.
-     *
-     * @return void
-     */
-    public static function disableQueryLog(): void
-    {
-        QueryBuilder::disableQueryLog();
-    }
-
-    /**
-     * Get the query log.
-     *
-     * Returns array of executed queries with:
-     * - query: SQL query string
-     * - bindings: Parameter bindings
-     * - time: Execution time in milliseconds
-     *
-     * @return array<array{query: string, bindings: array, time: float}>
-     *
-     * @example
-     * ```php
-     * DB::enableQueryLog();
-     * $users = DB::table('users')->get();
-     * $queries = DB::getQueryLog();
-     * // [
-     * //     [
-     * //         'query' => 'SELECT * FROM users',
-     * //         'bindings' => [],
-     * //         'time' => 0.5
-     * //     ]
-     * // ]
-     * ```
-     */
-    public static function getQueryLog(): array
-    {
-        return QueryBuilder::getQueryLog();
-    }
-
-    /**
-     * Clear the query log.
-     *
-     * @return void
-     */
-    public static function flushQueryLog(): void
-    {
-        QueryBuilder::flushQueryLog();
     }
 }

@@ -81,12 +81,12 @@ final class ProcessManager implements ProcessManagerInterface
     }
 
     /**
-     * Run all processes with concurrency limit.
+     * Execute all pending processes with concurrency limit.
      *
      * @param int $maxConcurrent
      * @return array
      */
-    public function run(int $maxConcurrent = 4): array
+    public function execute(int $maxConcurrent = 4): array
     {
         if (!ForkProcess::isSupported()) {
             // Fallback to synchronous execution
@@ -143,6 +143,7 @@ final class ProcessManager implements ProcessManagerInterface
 
         return $this->results;
     }
+
 
     /**
      * Wait for all processes to complete.
@@ -317,5 +318,170 @@ final class ProcessManager implements ProcessManagerInterface
 
         // Kill any remaining processes
         $this->killAll(SIGKILL);
+    }
+
+    // =========================================================================
+    // CONVENIENCE METHODS (for static access via Process accessor)
+    // =========================================================================
+
+    /**
+     * Get ProcessManager instance (for consistency with accessor API).
+     *
+     * @return ProcessManager Returns self for fluent API
+     */
+    public function manager(): ProcessManager
+    {
+        return $this;
+    }
+
+    /**
+     * Run tasks in parallel with concurrency limit (convenience method).
+     *
+     * @param array<callable> $tasks Array of callables to execute
+     * @param int $maxConcurrent Maximum concurrent processes
+     * @return array Results in order of tasks
+     * @throws \RuntimeException If called from HTTP context
+     */
+    public function runTasks(array $tasks, int $maxConcurrent = 4): array
+    {
+        $this->guardAgainstHttpContext();
+
+        foreach ($tasks as $task) {
+            $this->add($task);
+        }
+
+        return $this->execute($maxConcurrent);
+    }
+
+
+    /**
+     * Get ProcessPool instance.
+     *
+     * @param int|null $workerCount Number of workers (null = auto-detect CPU cores)
+     * @return ProcessPool
+     */
+    public function pool(?int $workerCount = null): ProcessPool
+    {
+        if ($workerCount === null) {
+            $workerCount = $this->getCpuCores();
+        }
+
+        return new ProcessPool(workerCount: $workerCount);
+    }
+
+    /**
+     * Map function over array in parallel.
+     *
+     * @param array $items Items to process
+     * @param callable $callback Function to apply to each item
+     * @param int|null $workerCount Number of workers (null = auto-detect)
+     * @return array Mapped results
+     * @throws \RuntimeException If called from HTTP context
+     */
+    public function map(array $items, callable $callback, ?int $workerCount = null): array
+    {
+        $this->guardAgainstHttpContext();
+        return $this->pool($workerCount)->map($items, $callback);
+    }
+
+    /**
+     * Filter array in parallel.
+     *
+     * @param array $items Items to filter
+     * @param callable $callback Predicate function
+     * @param int|null $workerCount Number of workers (null = auto-detect)
+     * @return array Filtered items
+     * @throws \RuntimeException If called from HTTP context
+     */
+    public function filter(array $items, callable $callback, ?int $workerCount = null): array
+    {
+        $this->guardAgainstHttpContext();
+        return $this->pool($workerCount)->filter($items, $callback);
+    }
+
+    /**
+     * Reduce array in parallel.
+     *
+     * @param array $items Items to reduce
+     * @param callable $callback Reducer function
+     * @param mixed $initial Initial value
+     * @param int|null $workerCount Number of workers (null = auto-detect)
+     * @return mixed Reduced value
+     * @throws \RuntimeException If called from HTTP context
+     */
+    public function reduce(array $items, callable $callback, mixed $initial = null, ?int $workerCount = null): mixed
+    {
+        $this->guardAgainstHttpContext();
+        return $this->pool($workerCount)->reduce($items, $callback, $initial);
+    }
+
+    /**
+     * Create a single fork process.
+     *
+     * @param callable $callback Function to execute in child process
+     * @param array $args Arguments to pass to callback
+     * @return ProcessInterface
+     */
+    public function fork(callable $callback, array $args = []): ProcessInterface
+    {
+        return new ForkProcess($callback, $args);
+    }
+
+    /**
+     * Check if PCNTL fork is supported.
+     *
+     * @return bool
+     */
+    public function isSupported(): bool
+    {
+        return ForkProcess::isSupported();
+    }
+
+    /**
+     * Get number of CPU cores.
+     *
+     * @return int
+     */
+    public function getCpuCores(): int
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            return (int) ($_ENV['NUMBER_OF_PROCESSORS'] ?? 4);
+        }
+
+        $output = shell_exec('nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4');
+        return max(1, (int) trim((string) $output));
+    }
+
+    /**
+     * Guard against HTTP context.
+     *
+     * PCNTL fork in HTTP context (web requests) causes serious issues:
+     * - Child processes inherit HTTP server socket
+     * - Output buffering corruption
+     * - Zombie processes
+     * - Memory leaks
+     *
+     * @throws \RuntimeException If called from HTTP/SAPI context
+     */
+    private function guardAgainstHttpContext(): void
+    {
+        // Check for HTTP request variables (more reliable than PHP_SAPI)
+        // PHP built-in server, Apache, Nginx, etc. all set REQUEST_METHOD
+        if (isset($_SERVER['REQUEST_METHOD']) || isset($_SERVER['HTTP_HOST'])) {
+            throw new \RuntimeException(
+                'Process methods cannot be called from HTTP context. ' .
+                    'Use Queue jobs for async processing in web requests. ' .
+                    'Multi-process execution is only safe in CLI context (console commands).'
+            );
+        }
+
+        // Check if running in non-CLI SAPI
+        if (PHP_SAPI !== 'cli' && PHP_SAPI !== 'phpdbg') {
+            throw new \RuntimeException(
+                'Process methods require CLI SAPI. ' .
+                    'Current SAPI: ' . PHP_SAPI . '. ' .
+                    'Multi-process execution is only safe in CLI context (console commands).'
+            );
+        }
     }
 }

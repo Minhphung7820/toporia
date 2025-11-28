@@ -52,20 +52,15 @@ use Toporia\Framework\Routing\Contracts\RouterInterface;
 final class Route extends ServiceAccessor
 {
     /**
-     * {@inheritdoc}
+     * Get the service name for this accessor.
+     *
+     * This is the only method needed - all other methods are automatically
+     * delegated to the underlying service via __callStatic().
+     *
+     * @return string Service name in container
      */
     protected static function getServiceName(): string
     {
         return 'router';
-    }
-
-    /**
-     * Get the router instance.
-     *
-     * @return RouterInterface
-     */
-    public static function getInstance(): RouterInterface
-    {
-        return parent::getInstance();
     }
 }

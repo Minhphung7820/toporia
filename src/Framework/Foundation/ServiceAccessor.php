@@ -136,11 +136,13 @@ abstract class ServiceAccessor
      * Handle dynamic static method calls.
      *
      * Forwards all static method calls to the underlying service instance.
+     * This enables Laravel Facade-like behavior where you only need to
+     * implement getServiceName() and all methods are automatically delegated.
      *
      * Performance:
      * - O(1) instance lookup (cached)
      * - Direct method call forwarding (no overhead)
-     * - Lazy method_exists check only on first call per method
+     * - Better error messages than letting PHP handle naturally
      *
      * @param string $method Method name
      * @param array<mixed> $arguments Method arguments
@@ -152,9 +154,16 @@ abstract class ServiceAccessor
         // Get cached service instance (O(1))
         $instance = static::resolveService();
 
+        // Check if method exists for better error messages
+        if (!method_exists($instance, $method)) {
+            $serviceName = static::getServiceName();
+            $instanceClass = get_class($instance);
+            throw new RuntimeException(
+                "Method '{$method}' does not exist on service '{$serviceName}' (instance of {$instanceClass})."
+            );
+        }
+
         // Direct method call - fastest path
-        // Let PHP handle method_exists check naturally via error
-        // This is faster than explicit method_exists() call
         return $instance->$method(...$arguments);
     }
 

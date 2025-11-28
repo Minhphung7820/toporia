@@ -84,7 +84,7 @@ final class ProductController extends BaseController
             ->with('categories')
             ->optimizeForLargeResults()
             ->orderBy('id', 'ASC') // Cursor column must be ordered
-            ->paginate(15);
+            ->cursorPaginate($perPage, ['cursor' => $cursor], ['path' => $path, 'baseUrl' => $baseUrl]);
         $queries = DB::getQueryLog();
         $singleProduct = [
             'queries' => array_map(function ($query) {
