@@ -295,6 +295,16 @@ class BelongsToMany extends Relation
     }
 
     /**
+     * Get the related table name (public method).
+     *
+     * @return string
+     */
+    public function getRelatedTable(): string
+    {
+        return $this->getRelatedTableName();
+    }
+
+    /**
      * Normalize operator and value for where clauses.
      *
      * @return array{0: string, 1: mixed}
@@ -1307,6 +1317,16 @@ class BelongsToMany extends Relation
     public function getRelatedKey(): string
     {
         return $this->relatedKey;
+    }
+
+    /**
+     * Get the related table name.
+     *
+     * @return string
+     */
+    public function getRelatedTableName(): string
+    {
+        return $this->getRelatedTableName();
     }
 
     /**

@@ -9,6 +9,7 @@ use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Contracts\RelationInterface;
 use Toporia\Framework\Database\DatabaseCollection;
+use Toporia\Framework\Database\ORM\Relations\BelongsToMany;
 
 
 /**
@@ -1262,6 +1263,12 @@ class ModelQueryBuilder extends QueryBuilder
             $callback($relationQuery);
         }
 
+        // Special handling for BelongsToMany relationships (many-to-many through pivot table)
+        if ($relationInstance instanceof BelongsToMany) {
+            $this->addBelongsToManyCountSelect($relationInstance, $relation, $table, $relationQuery);
+            return;
+        }
+
         $foreignKey = $relationInstance->getForeignKey();
         $localKey = $relationInstance->getLocalKey();
         $relationTable = $relationQuery->getTable();
@@ -1295,6 +1302,81 @@ class ModelQueryBuilder extends QueryBuilder
 
             $subquery .= " AND ({$boundWhereClause})";
         }
+
+        $columnAlias = "{$relation}_count";
+
+        // Ensure we select table.* along with the subquery (only once)
+        $columns = $this->getColumns();
+        if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+            $this->select("{$table}.*");
+        }
+
+        $this->selectRaw("({$subquery}) AS {$columnAlias}");
+    }
+
+    /**
+     * Add count select for BelongsToMany relationships.
+     *
+     * For many-to-many relationships, we count records in the pivot table,
+     * not the related table directly.
+     *
+     * @param BelongsToMany $relationInstance The BelongsToMany relation instance
+     * @param string $relation The relation name
+     * @param string $table The parent table name
+     * @param QueryBuilder $relationQuery The relation query builder
+     * @return void
+     */
+    private function addBelongsToManyCountSelect(
+        BelongsToMany $relationInstance,
+        string $relation,
+        string $table,
+        QueryBuilder $relationQuery
+    ): void {
+        // Get pivot table and keys using public methods
+        $pivotTable = $relationInstance->getPivotTable();
+        $foreignPivotKey = $relationInstance->getForeignPivotKey();
+        $parentKey = $relationInstance->getParentKey();
+
+        // Build subquery counting records in pivot table
+        // Example: SELECT COUNT(*) FROM product_categories WHERE product_categories.product_id = products.id
+        $pivotAlias = "{$pivotTable}_pivot";
+        $subquery = "SELECT COUNT(*) FROM {$pivotTable} AS {$pivotAlias} WHERE {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
+
+        // Check if relation query has constraints on the related table
+        // If so, we need to join the related table to apply those constraints
+        $relationSql = $relationQuery->toSql();
+        $hasRelatedConstraints = preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches);
+
+        if ($hasRelatedConstraints) {
+            $whereClause = $matches[1];
+
+            // Get related table info using public methods
+            $relatedTable = $relationInstance->getRelatedTable();
+            $relatedPivotKey = $relationInstance->getRelatedPivotKey();
+            $relatedKey = $relationInstance->getRelatedKey();
+
+            // Join related table to apply constraints
+            $relatedAlias = "{$relatedTable}_related";
+            $subquery = "SELECT COUNT(*) FROM {$pivotTable} AS {$pivotAlias} " .
+                "INNER JOIN {$relatedTable} AS {$relatedAlias} ON {$pivotAlias}.{$relatedPivotKey} = {$relatedAlias}.{$relatedKey} " .
+                "WHERE {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            // Replace table references in where clause with alias
+            $boundWhereClause = preg_replace('/\b' . preg_quote($relatedTable, '/') . '\./', "{$relatedAlias}.", $boundWhereClause);
+
+            $subquery .= " AND ({$boundWhereClause})";
+        }
+
+        // Note: Pivot where constraints (wherePivot, wherePivotIn) are already applied
+        // to the relationQuery, so they'll be included in the above handling
 
         $columnAlias = "{$relation}_count";
 
