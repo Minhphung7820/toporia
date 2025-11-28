@@ -567,17 +567,22 @@ class BelongsToMany extends Relation
         }
         $relatedIds = array_keys($relatedIds);
 
-        if (empty($parentIds) || empty($relatedIds)) {
-            // No valid IDs - set empty collections
+        if (empty($parentIds)) {
+            // No valid parent IDs - set empty collections
             foreach ($models as $model) {
                 $model->setRelation($relationName, new ModelCollection([]));
             }
             return $models;
         }
 
+        // Note: $relatedIds can be empty if main query didn't return any categories
+        // This is OK - we'll still query pivot table and match what we can
+
         // Step 2: Query pivot table to get parent-to-related mappings with pivot data
+        // IMPORTANT: Only filter by parentIds and pivot constraints, NOT by relatedIds
+        // This ensures we get all valid pivot records for the parents, then match with results
         // SELECT foreign_key, related_key, ...pivot_columns FROM pivot_table
-        // WHERE foreign_key IN (...) AND related_key IN (...)
+        // WHERE foreign_key IN (...) AND pivot_constraints
         $qb = new QueryBuilder($this->query->getConnection());
 
         // Build select columns: foreign key, related key, and pivot columns
@@ -588,10 +593,9 @@ class BelongsToMany extends Relation
 
         $pivotQuery = $qb->table($this->pivotTable)
             ->select($selectColumns)
-            ->whereIn($this->foreignPivotKey, $parentIds)
-            ->whereIn($this->relatedPivotKey, $relatedIds);
+            ->whereIn($this->foreignPivotKey, $parentIds);
 
-        // Apply pivot constraints to the pivot query
+        // Apply pivot constraints to the pivot query (e.g., wherePivot('sort_order', '>=', 89))
         $this->applyPivotConstraintsToQuery($pivotQuery);
 
         try {
@@ -602,8 +606,7 @@ class BelongsToMany extends Relation
                 // Rebuild query without pivot columns
                 $pivotQuery = $qb->table($this->pivotTable)
                     ->select($this->foreignPivotKey, $this->relatedPivotKey)
-                    ->whereIn($this->foreignPivotKey, $parentIds)
-                    ->whereIn($this->relatedPivotKey, $relatedIds);
+                    ->whereIn($this->foreignPivotKey, $parentIds);
                 $this->applyPivotConstraintsToQuery($pivotQuery);
                 $pivotRows = $pivotQuery->get();
             } else {
@@ -612,58 +615,127 @@ class BelongsToMany extends Relation
         }
 
         // Step 3: Build dictionary mapping parent IDs to arrays of [relatedId => pivotData]
-        // Example: [1 => [10 => ['sort_order' => 1], 20 => ['sort_order' => 2]], ...]
+        // CRITICAL: Use the actual parentId and relatedId from pivot row, NOT from variables that might be overwritten
+        // Normalize IDs to strings for consistent comparison
+        // Example: ["1" => ["10" => ['product_id' => 1, 'category_id' => 10, 'sort_order' => 1], ...], ...]
         $dictionary = [];
-        foreach ($pivotRows as $pivot) {
-            $parentId = $pivot[$this->foreignPivotKey] ?? null;
-            $relatedId = $pivot[$this->relatedPivotKey] ?? null;
+        foreach ($pivotRows as $pivotRow) {
+            // Get parentId and relatedId directly from pivot row - these are the source of truth
+            $rowParentId = $pivotRow[$this->foreignPivotKey] ?? null;
+            $rowRelatedId = $pivotRow[$this->relatedPivotKey] ?? null;
 
-            if ($parentId !== null && $relatedId !== null) {
-                if (!isset($dictionary[$parentId])) {
-                    $dictionary[$parentId] = [];
+            if ($rowParentId !== null && $rowRelatedId !== null) {
+                // Normalize to string for consistent comparison
+                $parentIdKey = (string) $rowParentId;
+                $relatedIdKey = (string) $rowRelatedId;
+
+                if (!isset($dictionary[$parentIdKey])) {
+                    $dictionary[$parentIdKey] = [];
                 }
 
-                // Extract pivot data (exclude foreign keys)
+                // Build pivot data - CRITICAL: Use the actual values from pivot row
+                // Laravel includes both foreign keys in pivot data when using withPivot()
                 $pivotData = [];
-                foreach ($pivot as $key => $value) {
-                    if ($key !== $this->foreignPivotKey && $key !== $this->relatedPivotKey) {
-                        $pivotData[$key] = $value;
-                    }
+                foreach ($pivotRow as $key => $value) {
+                    $pivotData[$key] = $value;
                 }
 
-                $dictionary[$parentId][$relatedId] = $pivotData;
+                // CRITICAL: Force set both foreign keys to ensure they match the actual pivot row values
+                // This prevents any potential issues with type conversion or data corruption
+                $pivotData[$this->foreignPivotKey] = $rowParentId;
+                $pivotData[$this->relatedPivotKey] = $rowRelatedId;
+
+                $dictionary[$parentIdKey][$relatedIdKey] = $pivotData;
             }
         }
 
         // Step 4: Build index of related models by ID for O(1) lookup
-        // Example: [10 => Model, 20 => Model, ...]
+        // Normalize IDs to strings to avoid type mismatch issues (int vs string)
+        // Example: [10 => Model, 20 => Model, ...] or ["10" => Model, "20" => Model, ...]
         $relatedIndex = [];
         foreach ($results as $result) {
             $relatedId = $result->getAttribute($this->relatedKey);
             if ($relatedId !== null) {
-                $relatedIndex[$relatedId] = $result;
+                // Normalize to string for consistent comparison
+                $relatedIndex[(string) $relatedId] = $result;
             }
         }
 
         // Step 5: Match related models to parents using dictionary and attach pivot data
+        // CRITICAL: Clone related models for each parent to avoid pivot data being shared/reused
+        // When multiple products share the same category, each product needs its own category instance with correct pivot data
         foreach ($models as $model) {
-            $parentId = $model->getAttribute($this->parentKey);
+            $modelParentId = $model->getAttribute($this->parentKey);
             $matched = [];
 
-            if ($parentId !== null && isset($dictionary[$parentId])) {
-                // Get related IDs with pivot data for this parent from dictionary
-                $relatedDataForParent = $dictionary[$parentId];
+            if ($modelParentId !== null) {
+                // Normalize to string for consistent comparison
+                $modelParentIdKey = (string) $modelParentId;
+
+                // CRITICAL: Only match if dictionary has entries for THIS specific parentId
+                // Double-check: Ensure the key exists and matches exactly
+                if (!isset($dictionary[$modelParentIdKey])) {
+                    // No pivot data for this product - set empty collection
+                    $model->setRelation($relationName, new ModelCollection([]));
+                    continue;
+                }
+
+                // Get related IDs with pivot data for THIS parent from dictionary
+                $relatedDataForParent = $dictionary[$modelParentIdKey];
+
+                // CRITICAL: Verify that all pivot data in this array belongs to THIS product
+                // This is a safety check to catch any dictionary building errors
+                foreach ($relatedDataForParent as $relatedIdStr => $pivotData) {
+                    $pivotParentId = $pivotData[$this->foreignPivotKey] ?? null;
+                    if ($pivotParentId === null || (string) $pivotParentId !== $modelParentIdKey) {
+                        // Dictionary corruption detected - remove invalid entry
+                        unset($relatedDataForParent[$relatedIdStr]);
+                    }
+                }
 
                 // Look up actual models by ID and attach pivot data
-                foreach ($relatedDataForParent as $relatedId => $pivotData) {
-                    if (isset($relatedIndex[$relatedId])) {
-                        $relatedModel = $relatedIndex[$relatedId];
+                foreach ($relatedDataForParent as $relatedIdStr => $pivotData) {
+                    // Normalize to string for consistent comparison
+                    $relatedIdKey = (string) $relatedIdStr;
 
-                        // Attach pivot data to the model
-                        if (!empty($pivotData)) {
-                            $pivotModel = $this->newPivot($pivotData, true);
-                            $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
+                    if (isset($relatedIndex[$relatedIdKey])) {
+                        // CRITICAL: Verify pivot data has correct parentId BEFORE cloning
+                        // This ensures we don't waste time cloning if pivot data is wrong
+                        $pivotParentId = $pivotData[$this->foreignPivotKey] ?? null;
+                        $pivotRelatedId = $pivotData[$this->relatedPivotKey] ?? null;
+
+                        // CRITICAL: pivot data MUST match the model's parentId
+                        // If it doesn't match, skip this pivot record entirely
+                        if ($pivotParentId === null || (string) $pivotParentId !== $modelParentIdKey) {
+                            // Pivot data doesn't belong to this product - skip it
+                            continue;
                         }
+
+                        // CRITICAL: Clone the related model to avoid sharing pivot data between products
+                        // When multiple products share the same category, each needs its own instance
+                        $originalRelatedModel = $relatedIndex[$relatedIdKey];
+
+                        // Clone the model to create a fresh instance for this product
+                        $relatedModel = clone $originalRelatedModel;
+
+                        // Clear any existing relations on the cloned model
+                        $relatedModel->setRelation($this->pivotAccessor, null);
+
+                        // Attach pivot data to the cloned model
+                        // Create a fresh copy of pivot data to avoid any reference issues
+                        $cleanPivotData = [];
+                        foreach ($pivotData as $key => $value) {
+                            $cleanPivotData[$key] = $value;
+                        }
+
+                        // CRITICAL: Force set foreign keys to match THIS product's ID
+                        // This ensures pivot data always has the correct product_id
+                        // Even though we verified above, we still force set to be absolutely sure
+                        $cleanPivotData[$this->foreignPivotKey] = $modelParentId;
+                        $cleanPivotData[$this->relatedPivotKey] = $pivotRelatedId;
+
+                        $pivotModel = $this->newPivot($cleanPivotData, true);
+                        $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
 
                         $matched[] = $relatedModel;
                     }
@@ -680,7 +752,8 @@ class BelongsToMany extends Relation
     /**
      * Apply pivot constraints to a separate pivot query.
      *
-     * FIXED: Synchronized function-based column handling with main constraint methods
+     * FIXED: Always qualifies pivot columns with table name to avoid ambiguous column errors.
+     * This ensures queries work correctly when both related table and pivot table have columns with the same name.
      *
      * @param QueryBuilder $query Pivot query builder
      * @return void
@@ -690,96 +763,22 @@ class BelongsToMany extends Relation
         // Apply pivot where constraints
         foreach ($this->pivotWheres as $where) {
             $column = $where['column'];
+            $operator = $where['operator'];
+            $value = $where['value'];
 
-            // Handle function-based columns (synchronized with wherePivot* methods)
+            // Handle function-based columns (DATE, MONTH, YEAR, TIME, etc.)
             if (Str::contains($column, '(') && Str::contains($column, ')')) {
-                $operator = $where['operator'];
-                $value = $where['value'];
-
-                // FIXED: Extract column name and qualify with pivot table to avoid ambiguity
-                if (Str::startsWith($column, 'DATE(')) {
-                    $actualColumn = str_replace(['DATE(', ')'], '', $column);
-                    // Qualify column if not already qualified
-                    if (!Str::contains($actualColumn, '.')) {
-                        $actualColumn = $this->qualifyPivotColumn($actualColumn);
-                    }
-                    $query->whereRaw("DATE({$actualColumn}) {$operator} ?", [$value]);
-                } elseif (Str::startsWith($column, 'MONTH(')) {
-                    $actualColumn = str_replace(['MONTH(', ')'], '', $column);
-                    if (!Str::contains($actualColumn, '.')) {
-                        $actualColumn = $this->qualifyPivotColumn($actualColumn);
-                    }
-                    $query->whereRaw("MONTH({$actualColumn}) {$operator} ?", [$value]);
-                } elseif (Str::startsWith($column, 'YEAR(')) {
-                    $actualColumn = str_replace(['YEAR(', ')'], '', $column);
-                    if (!Str::contains($actualColumn, '.')) {
-                        $actualColumn = $this->qualifyPivotColumn($actualColumn);
-                    }
-                    $query->whereRaw("YEAR({$actualColumn}) {$operator} ?", [$value]);
-                } elseif (Str::startsWith($column, 'TIME(')) {
-                    $actualColumn = str_replace(['TIME(', ')'], '', $column);
-                    if (!Str::contains($actualColumn, '.')) {
-                        $actualColumn = $this->qualifyPivotColumn($actualColumn);
-                    }
-                    $query->whereRaw("TIME({$actualColumn}) {$operator} ?", [$value]);
-                } elseif (Str::startsWith($column, 'JSON_CONTAINS(')) {
-                    // For JSON functions, the column might already be in the format JSON_CONTAINS(table.column, ...)
-                    // Extract and qualify if needed
-                    $query->whereRaw("{$column} = ?", [$value]);
-                } elseif (Str::startsWith($column, 'JSON_LENGTH(')) {
-                    // Extract JSON_LENGTH parameters
-                    $query->whereRaw("{$column} {$operator} ?", [$value]);
-                } else {
-                    // Generic function handling - try to extract and qualify column
-                    // Pattern: FUNCTION(column) or FUNCTION(table.column)
-                    if (preg_match('/^(\w+)\(([^)]+)\)$/', $column, $matches)) {
-                        $functionName = $matches[1];
-                        $functionColumn = $matches[2];
-                        if (!Str::contains($functionColumn, '.')) {
-                            $functionColumn = $this->qualifyPivotColumn($functionColumn);
-                        }
-                        $query->whereRaw("{$functionName}({$functionColumn}) {$operator} ?", [$value]);
-                    } else {
-                        $query->whereRaw("{$column} {$operator} ?", [$value]);
-                    }
-                }
+                $this->applyFunctionBasedPivotConstraint($query, $column, $operator, $value);
             } else {
                 // Regular column - always qualify with pivot table name to avoid ambiguity
-                $fullColumn = $column;
-                if (!Str::contains($column, '.')) {
-                    // Column is not qualified, add pivot table prefix
-                    $fullColumn = $this->qualifyPivotColumn($column);
-                } elseif (!Str::startsWith($column, $this->pivotTable . '.')) {
-                    // Column is qualified but not with pivot table, qualify it
-                    $columnName = Str::afterLast($column, '.');
-                    $fullColumn = $this->qualifyPivotColumn($columnName);
-                }
-
-                if ($where['operator'] === 'BETWEEN' && is_array($where['value'])) {
-                    $query->whereBetween($fullColumn, $where['value']);
-                } elseif ($where['operator'] === 'NOT BETWEEN' && is_array($where['value'])) {
-                    $query->whereNotBetween($fullColumn, $where['value']);
-                } elseif ($where['operator'] === 'IS' && $where['value'] === null) {
-                    $query->whereNull($fullColumn);
-                } elseif ($where['operator'] === 'IS NOT' && $where['value'] === null) {
-                    $query->whereNotNull($fullColumn);
-                } else {
-                    $query->where($fullColumn, $where['operator'], $where['value']);
-                }
+                $fullColumn = $this->ensurePivotColumnQualified($column);
+                $this->applyWhereToQueryBuilder($query, $fullColumn, $operator, $value);
             }
         }
 
         // Apply pivot whereIn constraints
         foreach ($this->pivotWhereIns as $whereIn) {
-            $column = $whereIn['column'];
-            // Always qualify with pivot table name to avoid ambiguity
-            if (!Str::contains($column, '.')) {
-                $column = $this->qualifyPivotColumn($column);
-            } elseif (!Str::startsWith($column, $this->pivotTable . '.')) {
-                // Column is qualified but not with pivot table, qualify it
-                $columnName = Str::afterLast($column, '.');
-                $column = $this->qualifyPivotColumn($columnName);
-            }
+            $column = $this->ensurePivotColumnQualified($whereIn['column']);
 
             if (isset($whereIn['not']) && $whereIn['not']) {
                 $query->whereNotIn($column, $whereIn['values']);
@@ -787,6 +786,95 @@ class BelongsToMany extends Relation
                 $query->whereIn($column, $whereIn['values']);
             }
         }
+    }
+
+    /**
+     * Ensure a column is qualified with the pivot table name.
+     *
+     * @param string $column Column name (may or may not be qualified)
+     * @return string Qualified column name (e.g., "product_categories.sort_order")
+     */
+    protected function ensurePivotColumnQualified(string $column): string
+    {
+        if (!Str::contains($column, '.')) {
+            // Column is not qualified, add pivot table prefix
+            return $this->qualifyPivotColumn($column);
+        }
+
+        if (!Str::startsWith($column, $this->pivotTable . '.')) {
+            // Column is qualified but not with pivot table, extract and requalify
+            $columnName = Str::afterLast($column, '.');
+            return $this->qualifyPivotColumn($columnName);
+        }
+
+        // Already qualified with pivot table
+        return $column;
+    }
+
+    /**
+     * Apply a function-based pivot constraint (DATE, MONTH, YEAR, TIME, etc.).
+     *
+     * @param QueryBuilder $query Query builder
+     * @param string $column Function expression (e.g., "DATE(sort_order)")
+     * @param string $operator SQL operator
+     * @param mixed $value Value to compare
+     * @return void
+     */
+    protected function applyFunctionBasedPivotConstraint(QueryBuilder $query, string $column, string $operator, mixed $value): void
+    {
+        // Handle specific SQL functions
+        $sqlFunctions = ['DATE', 'MONTH', 'YEAR', 'TIME'];
+        foreach ($sqlFunctions as $function) {
+            if (Str::startsWith($column, "{$function}(")) {
+                $actualColumn = str_replace(["{$function}(", ')'], '', $column);
+                $qualifiedColumn = $this->ensurePivotColumnQualified($actualColumn);
+                $query->whereRaw("{$function}({$qualifiedColumn}) {$operator} ?", [$value]);
+                return;
+            }
+        }
+
+        // Handle JSON functions (they may already have complex syntax)
+        if (Str::startsWith($column, 'JSON_CONTAINS(')) {
+            $query->whereRaw("{$column} = ?", [$value]);
+            return;
+        }
+
+        if (Str::startsWith($column, 'JSON_LENGTH(')) {
+            $query->whereRaw("{$column} {$operator} ?", [$value]);
+            return;
+        }
+
+        // Generic function handling - extract function name and column
+        if (preg_match('/^(\w+)\(([^)]+)\)$/', $column, $matches)) {
+            $functionName = $matches[1];
+            $functionColumn = $matches[2];
+            $qualifiedColumn = $this->ensurePivotColumnQualified($functionColumn);
+            $query->whereRaw("{$functionName}({$qualifiedColumn}) {$operator} ?", [$value]);
+        } else {
+            // Fallback for complex expressions
+            $query->whereRaw("{$column} {$operator} ?", [$value]);
+        }
+    }
+
+    /**
+     * Apply a where constraint to a query builder.
+     * Helper method to avoid code duplication when working with external query builders.
+     *
+     * @param QueryBuilder $query Query builder
+     * @param string $column Column name
+     * @param string $operator SQL operator
+     * @param mixed $value Value to compare
+     * @return void
+     */
+    protected function applyWhereToQueryBuilder(QueryBuilder $query, string $column, string $operator, mixed $value): void
+    {
+        match (true) {
+            $operator === 'BETWEEN' && is_array($value) => $query->whereBetween($column, $value),
+            $operator === 'NOT BETWEEN' && is_array($value) => $query->whereNotBetween($column, $value),
+            $operator === 'IS' && $value === null => $query->whereNull($column),
+            $operator === 'IS NOT' && $value === null => $query->whereNotNull($column),
+            default => $query->where($column, $operator, $value),
+        };
     }
 
     /**
