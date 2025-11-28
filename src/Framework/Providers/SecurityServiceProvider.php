@@ -11,7 +11,7 @@ use Toporia\Framework\Security\{SessionCsrfTokenManager, SessionReplayAttackProt
 use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, GateContract};
 use Toporia\Framework\Auth\Access\Gate;
 use Toporia\Framework\Http\CookieJar;
-use Toporia\Framework\RateLimit\{CacheRateLimiter, Contracts\RateLimiterInterface};
+use Toporia\Framework\RateLimit\{CacheRateLimiter, Contracts\RateLimiterInterface, RateLimiter};
 
 /**
  * Security Service Provider
@@ -80,5 +80,10 @@ final class SecurityServiceProvider extends ServiceProvider
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
+
+        // Set RateLimiter instance for named limiters
+        // This allows AppServiceProvider to register named limiters
+        $limiter = $container->get(RateLimiterInterface::class);
+        RateLimiter::setLimiter($limiter);
     }
 }

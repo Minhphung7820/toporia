@@ -35,40 +35,22 @@ return [
     'groups' => [
         'web' => [
             // Web routes middleware
-            AddSecurityHeaders::class,  // Security headers for web
-            // CSRF protection with excluded URIs from config
-            fn($container) => new CsrfProtection(
-                $container->get('csrf'),
-                $container->get('config')->get('security.csrf.except', [])
-            ),
-            // ReplayAttackProtection middleware with config from security.php
-            fn($container) => new ReplayAttackProtection(
-                $container->get('replay'),
-                $container->get('config')->get('security.replay.nonce_ttl', 300),
-                $container->get('config')->get('security.replay.cleanup_probability', 100)
-            ),
+            // Auto-wiring: Framework automatically resolves dependencies from container
+            AddSecurityHeaders::class,
+            CsrfProtection::class,  // Auto-wires: csrf service, config
+            ReplayAttackProtection::class,  // Auto-wires: replay service, config
             // ValidateFormRequest is now handled automatically by Router (no middleware needed)
             // LogRequest::class,        // Uncomment to log web requests
         ],
 
         'api' => [
-            fn($container) => new CsrfProtection(
-                $container->get('csrf'),
-                $container->get('config')->get('security.csrf.except', [])
-            ),
             // API routes middleware
-            // CORS middleware with config from security.php
-            fn($container) => new HandleCors(
-                $container->get('config')->get('security.cors', [])
-            ),
-            ValidateJsonRequest::class,  // Validate JSON for API
-            // Rate limiting: 120 requests per minute (increased for development/SPA usage)
-            // For production, consider reducing to 60 requests per minute
-            fn($container) => ThrottleRequests::with(
-                $container->get('rate_limiter'),
-                20,  // max attempts (increased from 60)
-                2     // decay minutes
-            ),
+            // Auto-wiring: Framework automatically resolves dependencies from container
+            HandleCors::class,  // Auto-wires: config
+            ValidateJsonRequest::class,
+            // Rate limiting: Use named limiter 'api' (defined in AppServiceProvider)
+            // Or use direct config: 'throttle:20,2' for 20 requests per 2 minutes
+            'throttle:api',  // Named limiter (recommended)
             // ValidateFormRequest is now handled automatically by Router (no middleware needed)
             // LogRequest::class,         // Uncomment to log API requests
         ],
@@ -98,9 +80,8 @@ return [
         'json' => ValidateJsonRequest::class,
         'csrf' => CsrfProtection::class,
         'replay' => ReplayAttackProtection::class,
-        'cors' => fn($container) => new HandleCors(
-            $container->get('config')->get('security.cors', [])
-        ),
+        'cors' => HandleCors::class,  // Auto-wires: config
+        'throttle' => ThrottleRequests::class,  // Supports: throttle:api-per-user or throttle:60,1
 
         // Add more aliases here as needed
         // 'guest' => GuestMiddleware::class,

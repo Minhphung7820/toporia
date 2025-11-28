@@ -71,6 +71,7 @@ final class MiddlewarePipeline
      * Wrap a single middleware around the next handler.
      *
      * Supports both string identifiers (class names/aliases) and callable factories.
+     * Also supports middleware parameters (e.g., 'throttle:api-per-user' or 'throttle:60,1').
      *
      * @param string|callable $middlewareIdentifier Middleware class name, alias, or callable factory.
      * @param callable $next Next handler in the pipeline.
@@ -81,15 +82,49 @@ final class MiddlewarePipeline
         // If it's already a callable (factory), use it directly
         if (is_callable($middlewareIdentifier)) {
             $middlewareClass = $middlewareIdentifier;
+            $parameters = null;
         } else {
-            // Otherwise, resolve from aliases or use as class name
-            $middlewareClass = $this->resolveMiddleware($middlewareIdentifier);
+            // Parse middleware identifier for parameters (e.g., 'throttle:api-per-user' or 'throttle:60,1')
+            [$middlewareName, $parameters] = $this->parseMiddlewareIdentifier($middlewareIdentifier);
+            $middlewareClass = $this->resolveMiddleware($middlewareName);
         }
 
-        return function (Request $request, Response $response) use ($middlewareClass, $next) {
-            $middleware = $this->instantiateMiddleware($middlewareClass);
+        return function (Request $request, Response $response) use ($middlewareClass, $parameters, $next) {
+            $middleware = $this->instantiateMiddleware($middlewareClass, $parameters);
             return $middleware->handle($request, $response, $next);
         };
+    }
+
+    /**
+     * Parse middleware identifier to extract name and parameters.
+     *
+     * Examples:
+     * - 'throttle:api-per-user' -> ['throttle', 'api-per-user']
+     * - 'throttle:60,1' -> ['throttle', ['60', '1']]
+     * - 'auth' -> ['auth', null]
+     *
+     * @param string $identifier Middleware identifier with optional parameters
+     * @return array{0: string, 1: string|array|null} [middlewareName, parameters]
+     */
+    private function parseMiddlewareIdentifier(string $identifier): array
+    {
+        if (!str_contains($identifier, ':')) {
+            return [$identifier, null];
+        }
+
+        [$name, $params] = explode(':', $identifier, 2);
+
+        // Check if parameters are comma-separated (direct config) or single value (named limiter)
+        if (str_contains($params, ',')) {
+            // Direct config: 'throttle:60,1' -> ['60', '1']
+            $parameters = explode(',', $params);
+            $parameters = array_map('trim', $parameters);
+        } else {
+            // Named limiter or single parameter: 'throttle:api-per-user'
+            $parameters = $params;
+        }
+
+        return [$name, $parameters];
     }
 
     /**
@@ -106,18 +141,29 @@ final class MiddlewarePipeline
     /**
      * Instantiate middleware from container with auto-wiring.
      *
+     * Supports middleware parameters for flexible configuration.
+     * For ThrottleRequests, parameters can be:
+     * - Named limiter: 'api-per-user' -> uses RateLimiter::for('api-per-user')
+     * - Direct config: ['60', '1'] -> maxAttempts=60, decayMinutes=1
+     *
      * @param string|callable $middlewareClass Middleware class name or callable factory.
+     * @param string|array|null $parameters Optional middleware parameters.
      * @return MiddlewareInterface Middleware instance.
      * @throws \RuntimeException If middleware doesn't implement MiddlewareInterface.
      */
-    private function instantiateMiddleware(string|callable $middlewareClass): MiddlewareInterface
+    private function instantiateMiddleware(string|callable $middlewareClass, string|array|null $parameters = null): MiddlewareInterface
     {
         // If it's a callable (closure), call it to get the instance
         if (is_callable($middlewareClass)) {
             $middleware = $middlewareClass($this->container);
         } else {
-            // Otherwise, resolve from container
-            $middleware = $this->container->get($middlewareClass);
+            // Check if middleware needs parameters (e.g., ThrottleRequests)
+            if ($parameters !== null && $this->needsParameters($middlewareClass)) {
+                $middleware = $this->instantiateWithParameters($middlewareClass, $parameters);
+            } else {
+                // Standard auto-wiring - container resolves all dependencies
+                $middleware = $this->container->get($middlewareClass);
+            }
         }
 
         if (!$middleware instanceof MiddlewareInterface) {
@@ -131,6 +177,81 @@ final class MiddlewarePipeline
         }
 
         return $middleware;
+    }
+
+    /**
+     * Check if middleware class supports parameters.
+     *
+     * @param string $middlewareClass
+     * @return bool
+     */
+    private function needsParameters(string $middlewareClass): bool
+    {
+        // ThrottleRequests supports parameters
+        return $middlewareClass === \Toporia\Framework\Http\Middleware\ThrottleRequests::class
+            || str_ends_with($middlewareClass, 'ThrottleRequests');
+    }
+
+    /**
+     * Instantiate middleware with parameters.
+     *
+     * @param string $middlewareClass
+     * @param string|array $parameters
+     * @return MiddlewareInterface
+     */
+    private function instantiateWithParameters(string $middlewareClass, string|array $parameters): MiddlewareInterface
+    {
+        // Get base rate limiter from container
+        $limiter = $this->container->get(\Toporia\Framework\RateLimit\Contracts\RateLimiterInterface::class);
+
+        // Handle ThrottleRequests parameters
+        if (
+            $middlewareClass === \Toporia\Framework\Http\Middleware\ThrottleRequests::class
+            || str_ends_with($middlewareClass, 'ThrottleRequests')
+        ) {
+            return $this->instantiateThrottleRequests($limiter, $parameters);
+        }
+
+        // Default: try to resolve with parameters as constructor arguments
+        // This allows other middleware to accept parameters if needed
+        return $this->container->get($middlewareClass);
+    }
+
+    /**
+     * Instantiate ThrottleRequests with parameters.
+     *
+     * @param \Toporia\Framework\RateLimit\Contracts\RateLimiterInterface $limiter
+     * @param string|array $parameters
+     * @return \Toporia\Framework\Http\Middleware\ThrottleRequests
+     */
+    private function instantiateThrottleRequests(
+        \Toporia\Framework\RateLimit\Contracts\RateLimiterInterface $limiter,
+        string|array $parameters
+    ): \Toporia\Framework\Http\Middleware\ThrottleRequests {
+        // If parameters is a string, it's a named limiter
+        if (is_string($parameters)) {
+            return new \Toporia\Framework\Http\Middleware\ThrottleRequests(
+                $limiter,
+                null, // maxAttempts
+                null, // decayMinutes
+                $parameters, // namedLimiter
+                null  // prefix
+            );
+        }
+
+        // If parameters is an array, it's direct config [maxAttempts, decayMinutes]
+        if (is_array($parameters) && count($parameters) >= 2) {
+            return new \Toporia\Framework\Http\Middleware\ThrottleRequests(
+                $limiter,
+                (int) $parameters[0], // maxAttempts
+                (int) $parameters[1], // decayMinutes
+                null, // namedLimiter
+                null  // prefix
+            );
+        }
+
+        // Fallback: use defaults
+        return new \Toporia\Framework\Http\Middleware\ThrottleRequests($limiter);
     }
 
     /**

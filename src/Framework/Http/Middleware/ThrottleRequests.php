@@ -6,40 +6,98 @@ namespace Toporia\Framework\Http\Middleware;
 
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Http\{Request, Response};
-use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
+use Toporia\Framework\RateLimit\{Contracts\RateLimiterInterface, RateLimiter, Limit};
 
 /**
  * Throttle Requests Middleware
  *
  * Rate limits HTTP requests based on configurable criteria.
- * Supports per-user, per-IP, and custom key-based limiting.
+ * Supports named limiters (like Laravel) and direct configuration.
+ *
+ * Usage with named limiter:
+ * ```php
+ * Route::middleware('throttle:api-per-user')->group(function () {
+ *     Route::get('/orders', fn() => 'orders');
+ * });
+ * ```
+ *
+ * Usage with direct limits:
+ * ```php
+ * Route::middleware('throttle:60,1')->group(function () {
+ *     Route::get('/api', fn() => 'api');
+ * });
+ * ```
  */
 final class ThrottleRequests implements MiddlewareInterface
 {
+    /**
+     * @param RateLimiterInterface $limiter Base rate limiter instance
+     * @param int|null $maxAttempts Maximum attempts (null = use named limiter)
+     * @param int|null $decayMinutes Decay time in minutes (null = use named limiter)
+     * @param string|null $namedLimiter Named limiter name (e.g., 'api-per-user')
+     * @param string|null $prefix Optional prefix for rate limit key
+     */
     public function __construct(
         private RateLimiterInterface $limiter,
-        private int $maxAttempts = 60,
-        private int $decayMinutes = 1,
+        private ?int $maxAttempts = null,
+        private ?int $decayMinutes = null,
+        private ?string $namedLimiter = null,
         private ?string $prefix = null
     ) {}
 
     public function handle(Request $request, Response $response, callable $next): mixed
     {
-        $key = $this->resolveRequestSignature($request);
+        // Resolve limit configuration (named limiter or direct config)
+        $limit = $this->resolveLimit($request);
 
-        $decaySeconds = $this->decayMinutes * 60;
-        if ($this->limiter->tooManyAttempts($key, $this->maxAttempts, $decaySeconds)) {
-            return $this->buildRateLimitResponse($response, $key);
+        if ($limit === null) {
+            // No limit configured - allow request
+            return $next($request, $response);
         }
 
-        $this->limiter->attempt($key, $this->maxAttempts, $this->decayMinutes * 60);
+        $key = $this->resolveRequestSignature($request, $limit);
+        $maxAttempts = $limit->getMaxAttempts();
+        $decaySeconds = $limit->getDecaySeconds();
+
+        if ($this->limiter->tooManyAttempts($key, $maxAttempts, $decaySeconds)) {
+            return $this->buildRateLimitResponse($response, $key, $maxAttempts, $decaySeconds);
+        }
+
+        $this->limiter->attempt($key, $maxAttempts, $decaySeconds);
 
         $result = $next($request, $response);
 
         // Add rate limit headers
-        $this->addHeaders($response, $key);
+        $this->addHeaders($response, $key, $maxAttempts);
 
         return $result;
+    }
+
+    /**
+     * Resolve limit configuration from named limiter or direct config.
+     *
+     * @param Request $request
+     * @return Limit|null
+     */
+    private function resolveLimit(Request $request): ?Limit
+    {
+        // Priority 1: Named limiter
+        if ($this->namedLimiter !== null) {
+            return RateLimiter::limiter($this->namedLimiter, $request);
+        }
+
+        // Priority 2: Direct configuration
+        if ($this->maxAttempts !== null && $this->decayMinutes !== null) {
+            return new Limit(
+                $this->maxAttempts,
+                $this->decayMinutes * 60,
+                null,
+                $this->prefix
+            );
+        }
+
+        // No limit configured
+        return null;
     }
 
     /**
@@ -47,13 +105,14 @@ final class ThrottleRequests implements MiddlewareInterface
      *
      * @param Response $response
      * @param string $key
+     * @param int $maxAttempts
+     * @param int $decaySeconds
      * @return null
      */
-    private function buildRateLimitResponse(Response $response, string $key): null
+    private function buildRateLimitResponse(Response $response, string $key, int $maxAttempts, int $decaySeconds): null
     {
         // Ensure we have a valid retry after time
         // Pass decaySeconds to availableIn() to help calculate reset time if not set
-        $decaySeconds = $this->decayMinutes * 60;
         $retryAfter = $this->limiter->availableIn($key, $decaySeconds);
 
         // Fallback: If retryAfter is still 0 or negative, use decaySeconds
@@ -64,7 +123,7 @@ final class ThrottleRequests implements MiddlewareInterface
 
         $response->setStatus(429);
         $response->header('Retry-After', (string)$retryAfter);
-        $response->header('X-RateLimit-Limit', (string)$this->maxAttempts);
+        $response->header('X-RateLimit-Limit', (string)$maxAttempts);
         $response->header('X-RateLimit-Remaining', '0');
         $response->header('X-RateLimit-Reset', (string)(time() + $retryAfter));
 
@@ -82,12 +141,13 @@ final class ThrottleRequests implements MiddlewareInterface
      *
      * @param Response $response
      * @param string $key
+     * @param int $maxAttempts
      * @return void
      */
-    private function addHeaders(Response $response, string $key): void
+    private function addHeaders(Response $response, string $key, int $maxAttempts): void
     {
-        $response->header('X-RateLimit-Limit', (string)$this->maxAttempts);
-        $response->header('X-RateLimit-Remaining', (string)$this->limiter->remaining($key, $this->maxAttempts));
+        $response->header('X-RateLimit-Limit', (string)$maxAttempts);
+        $response->header('X-RateLimit-Remaining', (string)$this->limiter->remaining($key, $maxAttempts));
 
         $resetTime = time() + $this->limiter->availableIn($key);
         $response->header('X-RateLimit-Reset', (string)$resetTime);
@@ -97,12 +157,26 @@ final class ThrottleRequests implements MiddlewareInterface
      * Resolve the request signature for rate limiting
      *
      * @param Request $request
+     * @param Limit $limit
      * @return string
      */
-    private function resolveRequestSignature(Request $request): string
+    private function resolveRequestSignature(Request $request, Limit $limit): string
     {
+        $prefix = $limit->getPrefix() ?? $this->prefix ?? 'throttle';
+
+        // Use custom key resolver if provided
+        $keyResolver = $limit->getKeyResolver();
+        if ($keyResolver !== null) {
+            $key = $keyResolver($request);
+            if (!is_string($key)) {
+                throw new \InvalidArgumentException('Key resolver must return a string');
+            }
+            return $prefix . ':' . $key;
+        }
+
+        // Default: use user ID or IP
         $parts = [
-            $this->prefix ?? 'throttle',
+            $prefix,
             $this->getUserIdentifier($request),
             $request->path(),
         ];
@@ -149,6 +223,6 @@ final class ThrottleRequests implements MiddlewareInterface
         int $decayMinutes = 1,
         ?string $prefix = null
     ): self {
-        return new self($limiter, $maxAttempts, $decayMinutes, $prefix);
+        return new self($limiter, $maxAttempts, $decayMinutes, null, $prefix);
     }
 }

@@ -47,6 +47,22 @@ Route::get('/products/{id}', [ProductController::class, 'show']);
 Route::get('/products/{id}/reviews', [ProductController::class, 'reviews']);
 Route::get('/categories', [ProductController::class, 'categories']);
 
+// Product CRUD and Relationship Testing Routes
+Route::post('/products', [ProductController::class, 'store']);
+Route::get('/products/{id}/relationships', [ProductController::class, 'getAllRelationships']);
+Route::put('/products/{id}/relationships', [ProductController::class, 'updateRelationships']);
+
+// Polymorphic Relationship Testing Routes
+Route::get('/products/{id}/polymorphic-tags', [ProductController::class, 'getPolymorphicTags']);
+Route::post('/products/{id}/polymorphic-tags', [ProductController::class, 'attachPolymorphicTags']);
+Route::put('/products/{id}/polymorphic-tags', [ProductController::class, 'syncPolymorphicTags']);
+Route::delete('/products/{id}/polymorphic-tags', [ProductController::class, 'detachPolymorphicTags']);
+
+// Tag API Routes
+Route::post('/tags', [ProductController::class, 'createTag']);
+Route::get('/tags', [ProductController::class, 'getTags']);
+Route::get('/tags/{id}', [ProductController::class, 'getTag']);
+
 // Complex Relationship Testing Routes
 Route::get('/products/test-belongs-to-many', [ProductController::class, 'testBelongsToMany']);
 Route::get('/products/test-has-relationships', [ProductController::class, 'testHasRelationships']);

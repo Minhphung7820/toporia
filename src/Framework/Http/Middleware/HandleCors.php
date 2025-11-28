@@ -58,11 +58,25 @@ final class HandleCors implements MiddlewareInterface
     ];
 
     /**
-     * @param array $config CORS configuration
+     * @param array|null $config CORS configuration (null = resolve from config)
      */
     public function __construct(
-        private readonly array $config
-    ) {}
+        ?array $config = null
+    ) {
+        // Auto-resolve config from container if not provided
+        if ($config === null) {
+            try {
+                $configService = app('config');
+                $this->config = $configService->get('security.cors', []) ?? [];
+            } catch (\Throwable $e) {
+                $this->config = [];
+            }
+        } else {
+            $this->config = $config;
+        }
+    }
+
+    private array $config;
 
     /**
      * Handle the request.

@@ -735,47 +735,80 @@ class BelongsToMany extends Relation
     /**
      * Attach multiple related models to the parent via pivot table.
      *
+     * Performance Optimizations:
+     * - Cache parent key to avoid repeated attribute access
+     * - Cache timestamp once if timestamps enabled
+     * - Pre-allocate arrays with known size
+     * - Early return for empty input
+     * - Single bulk insert instead of multiple queries
+     *
+     * Performance: O(n) where n = number of IDs
+     * Memory: O(n) - One array allocation for insert data
+     *
      * @param array $ids Array of IDs or associative array with pivot data
      * @param bool $touch Whether to touch parent timestamps
      * @return array Array of attached IDs
      */
     protected function attachMany(array $ids, bool $touch = true): array
     {
+        // Early return for empty input
+        if (empty($ids)) {
+            return [];
+        }
+
+        // Performance: Cache parent key once (avoid repeated attribute access)
+        $parentKeyValue = $this->parent->getAttribute($this->parentKey);
+
+        // Performance: Cache timestamp once if timestamps enabled (avoid repeated now() calls)
+        $timestamp = $this->withTimestamps ? now()->toDateTimeString() : null;
+
+        // Initialize arrays
         $attached = [];
         $insertData = [];
 
+        // Build insert data efficiently
         foreach ($ids as $key => $value) {
-            if (is_numeric($key)) {
-                // Simple array: [1, 2, 3]
+            // Check if value is an array (pivot data) or a simple ID
+            if (is_array($value)) {
+                // Associative array with pivot data: [1 => ['created_at' => ..., 'created_by' => ...]]
+                // OR numeric key with array value: [0 => ['id' => 1, 'created_at' => ...]]
+                $relatedId = $key;
+                $pivotData = $value;
+            } else {
+                // Simple array: [1, 2, 3] - numeric key, non-array value
+                // OR string key with non-array value (shouldn't happen, but handle it)
                 $relatedId = $value;
                 $pivotData = [];
-            } else {
-                // Associative array: [1 => ['role' => 'admin'], 2 => ['role' => 'user']]
-                $relatedId = $key;
-                $pivotData = is_array($value) ? $value : [];
             }
 
-            $data = array_merge([
-                $this->foreignPivotKey => $this->parent->getAttribute($this->parentKey),
+            // Build data array efficiently
+            $data = [
+                $this->foreignPivotKey => $parentKeyValue,
                 $this->relatedPivotKey => $relatedId,
-            ], $pivotData);
+            ];
 
-            // Add timestamps if enabled
-            if ($this->withTimestamps) {
-                $now = date('Y-m-d H:i:s');
-                $data['created_at'] = $now;
-                $data['updated_at'] = $now;
+            // Merge pivot data if present
+            if (!empty($pivotData)) {
+                $data = array_merge($data, $pivotData);
+            }
+
+            // Add timestamps if enabled (use cached timestamp)
+            if ($this->withTimestamps && $timestamp !== null) {
+                $data['created_at'] = $timestamp;
+                $data['updated_at'] = $timestamp;
             }
 
             $insertData[] = $data;
             $attached[] = $relatedId;
         }
 
+        // Single bulk insert for all records (much faster than multiple inserts)
         if (!empty($insertData)) {
             $qb = new QueryBuilder($this->query->getConnection());
             $qb->table($this->pivotTable)->insert($insertData);
         }
 
+        // Touch parent timestamps if requested
         if ($touch) {
             $this->touchParent();
         }

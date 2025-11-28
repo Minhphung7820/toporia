@@ -14,6 +14,8 @@ use App\Presentation\Console\Kernel;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Realtime\RealtimeManager;
+use Toporia\Framework\RateLimit\{RateLimiter, Limit};
+use Toporia\Framework\Http\Request;
 
 /**
  * Application Service Provider
@@ -73,6 +75,44 @@ class AppServiceProvider extends ServiceProvider
             return new \App\Application\Services\IssueCsrfCookieService(
                 $c->get(\Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface::class),
                 $isProduction
+            );
+        });
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * Boot application services.
+     * Register named rate limiters here (similar to Laravel).
+     */
+    public function boot(ContainerInterface $container): void
+    {
+        // Set RateLimiter instance for named limiters
+        $limiter = $container->get(\Toporia\Framework\RateLimit\Contracts\RateLimiterInterface::class);
+        RateLimiter::setLimiter($limiter);
+
+        // Register named rate limiters
+        // Example: API rate limit per user (100 requests per minute)
+        RateLimiter::for('api-per-user', function (Request $request) {
+            return Limit::perMinute(100)->by(
+                $request->user()?->getId() ?? $request->ip()
+            );
+        });
+
+        // Example: API rate limit (20 requests per 2 minutes)
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(20)->by($request->ip());
+        });
+
+        // Example: Strict rate limit for sensitive endpoints
+        RateLimiter::for('strict', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
+
+        // Example: High-volume rate limit (1000 requests per hour)
+        RateLimiter::for('high-volume', function (Request $request) {
+            return Limit::perHour(1000)->by(
+                $request->user()?->getId() ?? $request->ip()
             );
         });
     }

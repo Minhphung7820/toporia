@@ -53,11 +53,36 @@ final class ReplayAttackProtection implements MiddlewareInterface
      */
     private const DEFAULT_CLEANUP_PROBABILITY = 100;
 
+    /**
+     * @var int Nonce TTL in seconds
+     */
+    private int $nonceTtl;
+
+    /**
+     * @var int Cleanup probability (1 in N requests)
+     */
+    private int $cleanupProbability;
+
+    /**
+     * @param ReplayAttackProtectionInterface $protection
+     * @param int|null $nonceTtl Nonce TTL in seconds (null = resolve from config)
+     * @param int|null $cleanupProbability Cleanup probability (null = resolve from config)
+     */
     public function __construct(
-        private readonly ReplayAttackProtectionInterface $protection,
-        private readonly int $nonceTtl = self::DEFAULT_NONCE_TTL,
-        private readonly int $cleanupProbability = self::DEFAULT_CLEANUP_PROBABILITY
-    ) {}
+        private ReplayAttackProtectionInterface $protection,
+        ?int $nonceTtl = null,
+        ?int $cleanupProbability = null
+    ) {
+        // Auto-resolve from config if not provided
+        try {
+            $config = app('config');
+            $this->nonceTtl = $nonceTtl ?? $config->get('security.replay.nonce_ttl', self::DEFAULT_NONCE_TTL) ?? self::DEFAULT_NONCE_TTL;
+            $this->cleanupProbability = $cleanupProbability ?? $config->get('security.replay.cleanup_probability', self::DEFAULT_CLEANUP_PROBABILITY) ?? self::DEFAULT_CLEANUP_PROBABILITY;
+        } catch (\Throwable $e) {
+            $this->nonceTtl = $nonceTtl ?? self::DEFAULT_NONCE_TTL;
+            $this->cleanupProbability = $cleanupProbability ?? self::DEFAULT_CLEANUP_PROBABILITY;
+        }
+    }
 
     /**
      * Handle the request.

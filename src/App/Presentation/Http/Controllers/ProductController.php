@@ -69,10 +69,18 @@ final class ProductController extends BaseController
             'sql' => $query->toSql(),
             'bindings' => $query->getBindings()
         ];
-
-        // Option 2: Execute query and get actual data
         $actualData = ProductModel::where('category_id', 1)->first();
 
+        $perPage = (int) ($request->get('per_page', 15));
+        $cursor = $request->get('cursor'); // Get cursor from query parameter
+        $path = $request->path();
+        $baseUrl = $request->root(); // Get base URL (http://localhost:8000)
+        // Option 2: Execute query and get actual data
+        $optimizedQuery = ProductModel::query()
+            ->with('categories')
+            ->optimizeForLargeResults()
+            ->orderBy('id', 'ASC') // Cursor column must be ordered
+            ->cursorPaginate($perPage, $cursor, 'id', $path, $baseUrl);
         // Option 3: Performance testing with query hints
         // Cursor-based pagination (high-performance for large datasets)
         // O(1) performance regardless of dataset size
@@ -795,6 +803,507 @@ final class ProductController extends BaseController
             'success' => true,
             'message' => 'Pivot validation tests',
             'data' => $results
+        ]);
+    }
+
+    /**
+     * Create a new product with relationships.
+     *
+     * POST /api/products
+     * Body: {
+     *   "title": "Product Name",
+     *   "price": 99.99,
+     *   "category_ids": [1, 2],           // belongsToMany categories
+     *   "tag_ids": [1, 2, 3],            // belongsToMany tags
+     *   "polymorphic_tag_ids": [4, 5],   // morphToMany allTags
+     *   "related_product_ids": [10, 11]  // belongsToMany relatedProducts
+     * }
+     */
+    public function store(Request $request): void
+    {
+        $data = $request->json();
+
+        // Create product
+        $product = ProductModel::create([
+            'title' => $data['title'] ?? 'Test Product',
+            'slug' => $data['slug'] ?? strtolower(str_replace(' ', '-', $data['title'] ?? 'test-product')),
+            'price' => $data['price'] ?? 99.99,
+            'sale_price' => $data['sale_price'] ?? null,
+            'stock' => $data['stock'] ?? 100,
+            'description' => $data['description'] ?? null,
+            'category_id' => $data['category_id'] ?? null,
+            'is_active' => $data['is_active'] ?? true,
+            'status' => $data['status'] ?? 'active',
+        ]);
+
+        // Attach belongsToMany categories
+        if (isset($data['category_ids']) && is_array($data['category_ids'])) {
+            $product->categories()->attach($data['category_ids']);
+        }
+
+        // Attach belongsToMany tags (with pivot data)
+        if (isset($data['tag_ids']) && is_array($data['tag_ids'])) {
+            $pivotData = [];
+            $createdBy = null;
+
+            // Validate created_by if provided
+            if (isset($data['created_by'])) {
+                $user = UserModel::find($data['created_by']);
+                if ($user) {
+                    $createdBy = $data['created_by'];
+                }
+                // If user doesn't exist, created_by will be null (foreign key allows NULL)
+            }
+
+            foreach ($data['tag_ids'] as $tagId) {
+                $tagPivotData = [
+                    'created_at' => date('Y-m-d H:i:s'),
+                ];
+
+                // Only add created_by if user exists
+                if ($createdBy !== null) {
+                    $tagPivotData['created_by'] = $createdBy;
+                }
+
+                $pivotData[$tagId] = $tagPivotData;
+            }
+            $product->tags()->attach($pivotData);
+        }
+
+        // Attach polymorphic many-to-many tags (morphToMany)
+        if (isset($data['polymorphic_tag_ids']) && is_array($data['polymorphic_tag_ids'])) {
+            $product->allTags()->attach($data['polymorphic_tag_ids']);
+        }
+
+        // Attach related products (self-referencing many-to-many)
+        if (isset($data['related_product_ids']) && is_array($data['related_product_ids'])) {
+            $pivotData = [];
+            foreach ($data['related_product_ids'] as $relatedId) {
+                $pivotData[$relatedId] = [
+                    'relation_type' => $data['relation_type'] ?? 'similar',
+                    'strength' => $data['strength'] ?? 0.8,
+                ];
+            }
+            $product->relatedProducts()->attach($pivotData);
+        }
+
+        // Load relationships for response
+        $product->load(['category', 'categories', 'tags', 'allTags', 'relatedProducts']);
+
+        $this->json([
+            'success' => true,
+            'message' => 'Product created successfully',
+            'data' => $product->toArray(),
+        ], 201);
+    }
+
+    /**
+     * Update product relationships (sync operations).
+     *
+     * PUT /api/products/{id}/relationships
+     * Body: {
+     *   "category_ids": [1, 2, 3],        // Sync categories (detach others)
+     *   "tag_ids": [1, 2],                // Sync tags
+     *   "polymorphic_tag_ids": [4, 5, 6], // Sync polymorphic tags
+     *   "related_product_ids": [10, 11]   // Sync related products
+     * }
+     */
+    public function updateRelationships(Request $request, int $id): void
+    {
+        $product = ProductModel::find($id);
+
+        if (!$product) {
+            $this->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+            return;
+        }
+
+        $data = $request->json();
+        $results = [];
+
+        // Sync belongsToMany categories
+        if (isset($data['category_ids'])) {
+            $synced = $product->categories()->sync($data['category_ids']);
+            $results['categories'] = [
+                'attached' => $synced['attached'] ?? [],
+                'detached' => $synced['detached'] ?? [],
+                'updated' => $synced['updated'] ?? [],
+            ];
+        }
+
+        // Sync belongsToMany tags
+        if (isset($data['tag_ids'])) {
+            $synced = $product->tags()->sync($data['tag_ids']);
+            $results['tags'] = [
+                'attached' => $synced['attached'] ?? [],
+                'detached' => $synced['detached'] ?? [],
+                'updated' => $synced['updated'] ?? [],
+            ];
+        }
+
+        // Sync polymorphic many-to-many tags (morphToMany)
+        if (isset($data['polymorphic_tag_ids'])) {
+            $synced = $product->allTags()->sync($data['polymorphic_tag_ids']);
+            $results['polymorphic_tags'] = [
+                'attached' => $synced['attached'] ?? [],
+                'detached' => $synced['detached'] ?? [],
+                'updated' => $synced['updated'] ?? [],
+            ];
+        }
+
+        // Sync related products
+        if (isset($data['related_product_ids'])) {
+            $synced = $product->relatedProducts()->sync($data['related_product_ids']);
+            $results['related_products'] = [
+                'attached' => $synced['attached'] ?? [],
+                'detached' => $synced['detached'] ?? [],
+                'updated' => $synced['updated'] ?? [],
+            ];
+        }
+
+        // Reload relationships
+        $product->load(['categories', 'tags', 'allTags', 'relatedProducts']);
+
+        $this->json([
+            'success' => true,
+            'message' => 'Relationships updated successfully',
+            'data' => [
+                'product' => $product->toArray(),
+                'sync_results' => $results,
+            ],
+        ]);
+    }
+
+    /**
+     * Test polymorphic relationships (morphToMany).
+     *
+     * GET /api/products/{id}/polymorphic-tags
+     */
+    public function getPolymorphicTags(Request $request, int $id): void
+    {
+        $product = ProductModel::find($id);
+
+        if (!$product) {
+            $this->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+            return;
+        }
+
+        // Load polymorphic tags
+        $product->load('allTags');
+
+        $this->json([
+            'success' => true,
+            'data' => [
+                'product_id' => $product->id,
+                'product_title' => $product->title,
+                'polymorphic_tags' => $product->allTags->toArray(),
+                'polymorphic_tags_count' => $product->allTags->count(),
+            ],
+        ]);
+    }
+
+    /**
+     * Attach polymorphic tags to product.
+     *
+     * POST /api/products/{id}/polymorphic-tags
+     * Body: {
+     *   "tag_ids": [1, 2, 3]
+     * }
+     */
+    public function attachPolymorphicTags(Request $request, int $id): void
+    {
+        $product = ProductModel::find($id);
+
+        if (!$product) {
+            $this->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+            return;
+        }
+
+        $data = $request->json();
+        $tagIds = $data['tag_ids'] ?? [];
+
+        if (empty($tagIds) || !is_array($tagIds)) {
+            $this->json([
+                'success' => false,
+                'message' => 'tag_ids must be a non-empty array',
+            ], 400);
+            return;
+        }
+
+        // Attach polymorphic tags
+        $product->allTags()->attach($tagIds);
+
+        // Reload to get updated tags
+        $product->load('allTags');
+
+        $this->json([
+            'success' => true,
+            'message' => 'Polymorphic tags attached successfully',
+            'data' => [
+                'product_id' => $product->id,
+                'attached_tag_ids' => $tagIds,
+                'polymorphic_tags' => $product->allTags->toArray(),
+            ],
+        ]);
+    }
+
+    /**
+     * Sync polymorphic tags for product.
+     *
+     * PUT /api/products/{id}/polymorphic-tags
+     * Body: {
+     *   "tag_ids": [1, 2, 3]  // Will detach others not in this list
+     * }
+     */
+    public function syncPolymorphicTags(Request $request, int $id): void
+    {
+        $product = ProductModel::find($id);
+
+        if (!$product) {
+            $this->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+            return;
+        }
+
+        $data = $request->json();
+        $tagIds = $data['tag_ids'] ?? [];
+
+        // Sync polymorphic tags (detach others by default)
+        $synced = $product->allTags()->sync($tagIds);
+
+        // Reload to get updated tags
+        $product->load('allTags');
+
+        $this->json([
+            'success' => true,
+            'message' => 'Polymorphic tags synced successfully',
+            'data' => [
+                'product_id' => $product->id,
+                'sync_results' => [
+                    'attached' => $synced['attached'] ?? [],
+                    'detached' => $synced['detached'] ?? [],
+                    'updated' => $synced['updated'] ?? [],
+                ],
+                'polymorphic_tags' => $product->allTags->toArray(),
+            ],
+        ]);
+    }
+
+    /**
+     * Detach polymorphic tags from product.
+     *
+     * DELETE /api/products/{id}/polymorphic-tags
+     * Body: {
+     *   "tag_ids": [1, 2]  // Optional: specific tags to detach. If empty, detach all.
+     * }
+     */
+    public function detachPolymorphicTags(Request $request, int $id): void
+    {
+        $product = ProductModel::find($id);
+
+        if (!$product) {
+            $this->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+            return;
+        }
+
+        $data = $request->json();
+        $tagIds = $data['tag_ids'] ?? null;
+
+        // Detach specific tags or all tags
+        if ($tagIds !== null && is_array($tagIds)) {
+            $product->allTags()->detach($tagIds);
+            $message = 'Specific polymorphic tags detached successfully';
+        } else {
+            $product->allTags()->detach();
+            $message = 'All polymorphic tags detached successfully';
+        }
+
+        // Reload to get updated tags
+        $product->load('allTags');
+
+        $this->json([
+            'success' => true,
+            'message' => $message,
+            'data' => [
+                'product_id' => $product->id,
+                'detached_tag_ids' => $tagIds,
+                'polymorphic_tags' => $product->allTags->toArray(),
+            ],
+        ]);
+    }
+
+    /**
+     * Test all relationship types for a product.
+     *
+     * GET /api/products/{id}/relationships
+     */
+    public function getAllRelationships(Request $request, int $id): void
+    {
+        $product = ProductModel::with([
+            'category',              // belongsTo
+            'categories',            // belongsToMany
+            'reviews',               // hasMany
+            'approvedReviews',       // hasMany with constraint
+            'tags',                  // belongsToMany with pivot
+            'allTags',               // morphToMany (polymorphic)
+            'relatedProducts',       // belongsToMany self-referencing
+            'favoritedBy',           // belongsToMany (users)
+        ])->find($id);
+
+        if (!$product) {
+            $this->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+            return;
+        }
+
+        $this->json([
+            'success' => true,
+            'data' => [
+                'product' => [
+                    'id' => $product->id,
+                    'title' => $product->title,
+                    'price' => $product->price,
+                ],
+                'relationships' => [
+                    'category' => $product->category ? $product->category->toArray() : null,
+                    'categories' => $product->categories->toArray(),
+                    'categories_count' => $product->categories->count(),
+                    'reviews' => $product->reviews->toArray(),
+                    'reviews_count' => $product->reviews->count(),
+                    'approved_reviews' => $product->approvedReviews->toArray(),
+                    'approved_reviews_count' => $product->approvedReviews->count(),
+                    'tags' => $product->tags->toArray(),
+                    'tags_count' => $product->tags->count(),
+                    'polymorphic_tags' => $product->allTags->toArray(),
+                    'polymorphic_tags_count' => $product->allTags->count(),
+                    'related_products' => $product->relatedProducts->toArray(),
+                    'related_products_count' => $product->relatedProducts->count(),
+                    'favorited_by' => $product->favoritedBy->toArray(),
+                    'favorited_by_count' => $product->favoritedBy->count(),
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * Create a new tag.
+     *
+     * POST /api/tags
+     * Body: {
+     *   "name": "Tag Name",
+     *   "slug": "tag-name",  // Optional: auto-generated from name
+     *   "description": "Tag description",
+     *   "color": "#FF5733",
+     *   "is_active": true
+     * }
+     */
+    public function createTag(Request $request): void
+    {
+        $data = $request->json();
+
+        // Validate required fields
+        if (empty($data['name'])) {
+            $this->json([
+                'success' => false,
+                'message' => 'Tag name is required',
+            ], 400);
+            return;
+        }
+
+        // Auto-generate slug if not provided
+        $slug = $data['slug'] ?? strtolower(str_replace(' ', '-', $data['name']));
+
+        // Create tag
+        $tag = TagModel::create([
+            'name' => $data['name'],
+            'slug' => $slug,
+            'description' => $data['description'] ?? null,
+            'color' => $data['color'] ?? '#3498db',
+            'is_active' => $data['is_active'] ?? true,
+            'usage_count' => 0,
+        ]);
+
+        $this->json([
+            'success' => true,
+            'message' => 'Tag created successfully',
+            'data' => $tag->toArray(),
+        ], 201);
+    }
+
+    /**
+     * Get all tags.
+     *
+     * GET /api/tags?active=true&popular=true&limit=20
+     */
+    public function getTags(Request $request): void
+    {
+        $query = TagModel::query();
+
+        // Filter active tags
+        if ($request->get('active') === 'true') {
+            $query->where('is_active', true);
+        }
+
+        // Get popular tags
+        if ($request->get('popular') === 'true') {
+            $limit = (int) ($request->get('limit', 10));
+            $tags = TagModel::popular($limit)->get();
+        } else {
+            $tags = $query->orderBy('name', 'ASC')->get();
+        }
+
+        $this->json([
+            'success' => true,
+            'data' => $tags->toArray(),
+            'count' => $tags->count(),
+        ]);
+    }
+
+    /**
+     * Get single tag with relationships.
+     *
+     * GET /api/tags/{id}?with=products,categories
+     */
+    public function getTag(Request $request, int $id): void
+    {
+        $query = TagModel::where('id', $id);
+
+        // Eager loading
+        $with = $request->input('with', '');
+        if ($with) {
+            $relations = explode(',', $with);
+            $relations = array_map('trim', $relations);
+            $query->with(...$relations);
+        }
+
+        $tag = $query->first();
+
+        if (!$tag) {
+            $this->json([
+                'success' => false,
+                'message' => 'Tag not found',
+            ], 404);
+            return;
+        }
+
+        $this->json([
+            'success' => true,
+            'data' => $tag->toArray(),
         ]);
     }
 }

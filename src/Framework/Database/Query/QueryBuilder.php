@@ -1170,7 +1170,21 @@ class QueryBuilder implements QueryBuilderInterface
         $grammar = $this->connection->getGrammar();
         $sql = $grammar->compileInsert($this, $data);
 
-        $this->connection->execute($sql, array_values($data));
+        // Flatten bindings for bulk insert
+        // If $data is array of arrays (multiple rows), flatten it
+        // If $data is single row, just use array_values
+        if (isset($data[0]) && is_array($data[0])) {
+            // Multiple rows: flatten all values
+            $bindings = [];
+            foreach ($data as $row) {
+                $bindings = array_merge($bindings, array_values($row));
+            }
+        } else {
+            // Single row
+            $bindings = array_values($data);
+        }
+
+        $this->connection->execute($sql, $bindings);
 
         return (int) $this->connection->lastInsertId();
     }

@@ -21,13 +21,31 @@ final class CsrfProtection implements MiddlewareInterface
     private const CSRF_COOKIE_NAME = 'XSRF-TOKEN'; // Standard SPA CSRF cookie name
 
     /**
+     * @var array URIs to exclude from CSRF verification
+     */
+    private array $except = [];
+
+    /**
      * @param CsrfTokenManagerInterface $tokenManager
-     * @param array $except URIs to exclude from CSRF verification (supports wildcards)
+     * @param array|null $except URIs to exclude from CSRF verification (supports wildcards)
+     *                          If null, will be resolved from config
      */
     public function __construct(
         private CsrfTokenManagerInterface $tokenManager,
-        private array $except = []
-    ) {}
+        ?array $except = null
+    ) {
+        // Auto-resolve except URIs from config if not provided
+        if ($except === null) {
+            try {
+                $config = app('config');
+                $this->except = $config->get('security.csrf.except', []) ?? [];
+            } catch (\Throwable $e) {
+                $this->except = [];
+            }
+        } else {
+            $this->except = $except;
+        }
+    }
 
     public function handle(Request $request, Response $response, callable $next): mixed
     {
