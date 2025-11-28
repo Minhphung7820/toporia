@@ -327,4 +327,129 @@ abstract class Relation implements RelationInterface
         // Default implementation - subclasses should override
         return '';
     }
+
+    /**
+     * Get the order direction for a specific column from query.
+     *
+     * Helper method for cursor pagination.
+     *
+     * @param QueryBuilder $query Query builder
+     * @param string $column Column name
+     * @return string|null 'ASC' or 'DESC', or null if not found
+     */
+    protected function getOrderDirectionForColumn(QueryBuilder $query, string $column): ?string
+    {
+        // Use reflection to access orders (QueryBuilder doesn't expose this publicly)
+        try {
+            $reflection = new \ReflectionClass($query);
+            $ordersProperty = $reflection->getProperty('orders');
+            $ordersProperty->setAccessible(true);
+            $orders = $ordersProperty->getValue($query);
+            $ordersProperty->setAccessible(false);
+
+            // Find order by for this column
+            foreach ($orders as $order) {
+                if (isset($order['column']) && $order['column'] === $column) {
+                    return $order['direction'] ?? 'ASC';
+                }
+            }
+        } catch (\ReflectionException $e) {
+            // Fallback to null if reflection fails
+        }
+
+        return null;
+    }
+
+    /**
+     * Ensure query is ordered by cursor column.
+     *
+     * Helper method for cursor pagination.
+     *
+     * @param QueryBuilder $query Query builder
+     * @param string $column Cursor column
+     * @param string $direction Order direction
+     * @return QueryBuilder
+     */
+    protected function ensureOrderByCursorColumn(QueryBuilder $query, string $column, string $direction): QueryBuilder
+    {
+        // Check if column is already ordered
+        $isOrdered = false;
+        try {
+            $reflection = new \ReflectionClass($query);
+            $ordersProperty = $reflection->getProperty('orders');
+            $ordersProperty->setAccessible(true);
+            $orders = $ordersProperty->getValue($query);
+            $ordersProperty->setAccessible(false);
+
+            foreach ($orders as $order) {
+                if (isset($order['column']) && $order['column'] === $column) {
+                    $isOrdered = true;
+                    break;
+                }
+            }
+        } catch (\ReflectionException $e) {
+            // If reflection fails, add order anyway
+        }
+
+        // Add cursor column as primary sort if not already present
+        if (!$isOrdered) {
+            $query->orderBy($column, $direction);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Encode cursor value for pagination.
+     *
+     * Helper method for cursor pagination.
+     *
+     * @param mixed $value Cursor value
+     * @param string $column Column name
+     * @return string Encoded cursor
+     */
+    protected function encodeCursor(mixed $value, string $column): string
+    {
+        $data = [
+            'column' => $column,
+            'value' => $value,
+            'ts' => time(),
+        ];
+
+        return base64_encode(json_encode($data, JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Decode cursor value from pagination.
+     *
+     * Helper method for cursor pagination.
+     *
+     * @param string $cursor Encoded cursor
+     * @param string $column Expected column name
+     * @return mixed|null Decoded cursor value or null if invalid
+     */
+    protected function decodeCursor(string $cursor, string $column): mixed
+    {
+        try {
+            $decoded = base64_decode($cursor, true);
+            if ($decoded === false) {
+                return null;
+            }
+
+            $data = json_decode($decoded, true);
+            if (!is_array($data) || !isset($data['value'])) {
+                return null;
+            }
+
+            // Security: Validate column matches (prevents column injection)
+            if (isset($data['column']) && $data['column'] !== $column) {
+                return null;
+            }
+
+            return $data['value'];
+        } catch (\Throwable $e) {
+            // Invalid cursor format - return null to start from beginning
+            return null;
+        }
+    }
 }

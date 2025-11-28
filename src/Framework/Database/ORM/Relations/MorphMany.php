@@ -633,6 +633,120 @@ class MorphMany extends Relation
         ];
     }
 
+    /**
+     * Paginate using cursor-based pagination (high-performance for large datasets).
+     *
+     * Cursor pagination provides O(1) performance regardless of dataset size,
+     * making it ideal for large datasets (millions+ records).
+     *
+     * Performance Benefits:
+     * - No COUNT query overhead
+     * - O(1) query time with indexed WHERE clause
+     * - Consistent results even with concurrent inserts/deletes
+     * - Works efficiently with millions of records
+     *
+     * Usage:
+     * ```php
+     * // First page
+     * $paginator = $post->comments()->cursorPaginate(50);
+     *
+     * // Next page (using cursor from previous response)
+     * $paginator = $post->comments()->cursorPaginate(50, $request->get('cursor'));
+     * ```
+     *
+     * @param int $perPage Number of items per page
+     * @param string|null $cursor Cursor value from previous page (null for first page)
+     * @param string|null $column Column to use as cursor (default: primary key)
+     * @param string|null $path Base URL path for pagination links
+     * @param string|null $baseUrl Base URL (scheme + host) for building full URLs
+     * @param string $cursorName Query parameter name for cursor (default: 'cursor')
+     * @return \Toporia\Framework\Support\Pagination\CursorPaginator
+     *
+     * @throws \InvalidArgumentException If perPage is invalid
+     */
+    public function cursorPaginate(
+        int $perPage = 15,
+        ?string $cursor = null,
+        ?string $column = null,
+        ?string $path = null,
+        ?string $baseUrl = null,
+        string $cursorName = 'cursor'
+    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+        // Validate parameters
+        if ($perPage < 1) {
+            throw new \InvalidArgumentException('Per page must be at least 1');
+        }
+
+        // Determine cursor column (default to primary key)
+        if ($column === null) {
+            $column = $this->relatedClass::getPrimaryKey();
+        }
+
+        // Get related table name
+        $relatedTable = $this->relatedClass::getTableName();
+        $fullColumn = "{$relatedTable}.{$column}";
+
+        // Clone query to avoid modifying original
+        $query = clone $this->query;
+
+        // Get current order direction for cursor column
+        $orderDirection = $this->getOrderDirectionForColumn($query, $fullColumn) ?? 'ASC';
+
+        // Apply cursor constraint if provided
+        if ($cursor !== null) {
+            $cursorValue = $this->decodeCursor($cursor, $column);
+            if ($cursorValue !== null) {
+                // Performance: Use indexed WHERE clause (O(1) lookup)
+                if ($orderDirection === 'ASC') {
+                    $query->where($fullColumn, '>', $cursorValue);
+                } else {
+                    $query->where($fullColumn, '<', $cursorValue);
+                }
+            }
+        }
+
+        // Ensure ordering by cursor column for consistent pagination
+        $query = $this->ensureOrderByCursorColumn($query, $fullColumn, $orderDirection);
+
+        // Performance: Fetch one extra item to determine if there are more pages
+        $items = $query->limit($perPage + 1)->get();
+        $rows = $items instanceof \Toporia\Framework\Database\Query\RowCollection ? $items->toArray() : $items;
+        $models = $this->relatedClass::hydrate($rows);
+
+        // Determine if there are more pages
+        $hasMore = $models->count() > $perPage;
+
+        // Remove the extra item if it exists
+        if ($hasMore) {
+            $models = $models->take($perPage);
+        }
+
+        // Get cursors for next and previous pages
+        $nextCursor = null;
+        $prevCursor = null;
+
+        if ($hasMore && $models->isNotEmpty()) {
+            // Get the last item's cursor value
+            $lastItem = $models->last();
+            $nextCursorValue = $lastItem->getAttribute($column);
+            $nextCursor = $this->encodeCursor($nextCursorValue, $column);
+        }
+
+        // Previous cursor is the current cursor (for backward navigation)
+        $prevCursor = $cursor;
+
+        return new \Toporia\Framework\Support\Pagination\CursorPaginator(
+            items: $models,
+            perPage: $perPage,
+            nextCursor: $nextCursor,
+            prevCursor: $prevCursor,
+            hasMore: $hasMore,
+            path: $path,
+            baseUrl: $baseUrl,
+            cursorName: $cursorName
+        );
+    }
+
     // =========================================================================
     // GETTER METHODS
     // =========================================================================
