@@ -83,7 +83,8 @@ class ProductModel extends Model
             'product_categories',
             'product_id',    // Foreign key for current model (ProductModel)
             'category_id'    // Foreign key for related model (CategoryModel)
-        )->withPivot('sort_order')
+        )->wherePivot('sort_order', '>=', 89)
+            ->withPivot('sort_order')
             ->withTimestamps();
     }
 

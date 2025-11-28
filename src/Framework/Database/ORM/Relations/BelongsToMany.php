@@ -696,34 +696,63 @@ class BelongsToMany extends Relation
                 $operator = $where['operator'];
                 $value = $where['value'];
 
-                // FIXED: Use exact same logic as wherePivot* methods
+                // FIXED: Extract column name and qualify with pivot table to avoid ambiguity
                 if (Str::startsWith($column, 'DATE(')) {
                     $actualColumn = str_replace(['DATE(', ')'], '', $column);
+                    // Qualify column if not already qualified
+                    if (!Str::contains($actualColumn, '.')) {
+                        $actualColumn = $this->qualifyPivotColumn($actualColumn);
+                    }
                     $query->whereRaw("DATE({$actualColumn}) {$operator} ?", [$value]);
                 } elseif (Str::startsWith($column, 'MONTH(')) {
                     $actualColumn = str_replace(['MONTH(', ')'], '', $column);
+                    if (!Str::contains($actualColumn, '.')) {
+                        $actualColumn = $this->qualifyPivotColumn($actualColumn);
+                    }
                     $query->whereRaw("MONTH({$actualColumn}) {$operator} ?", [$value]);
                 } elseif (Str::startsWith($column, 'YEAR(')) {
                     $actualColumn = str_replace(['YEAR(', ')'], '', $column);
+                    if (!Str::contains($actualColumn, '.')) {
+                        $actualColumn = $this->qualifyPivotColumn($actualColumn);
+                    }
                     $query->whereRaw("YEAR({$actualColumn}) {$operator} ?", [$value]);
                 } elseif (Str::startsWith($column, 'TIME(')) {
                     $actualColumn = str_replace(['TIME(', ')'], '', $column);
+                    if (!Str::contains($actualColumn, '.')) {
+                        $actualColumn = $this->qualifyPivotColumn($actualColumn);
+                    }
                     $query->whereRaw("TIME({$actualColumn}) {$operator} ?", [$value]);
                 } elseif (Str::startsWith($column, 'JSON_CONTAINS(')) {
-                    // Extract JSON_CONTAINS parameters
+                    // For JSON functions, the column might already be in the format JSON_CONTAINS(table.column, ...)
+                    // Extract and qualify if needed
                     $query->whereRaw("{$column} = ?", [$value]);
                 } elseif (Str::startsWith($column, 'JSON_LENGTH(')) {
                     // Extract JSON_LENGTH parameters
                     $query->whereRaw("{$column} {$operator} ?", [$value]);
                 } else {
-                    // Generic function handling
-                    $query->whereRaw("{$column} {$operator} ?", [$value]);
+                    // Generic function handling - try to extract and qualify column
+                    // Pattern: FUNCTION(column) or FUNCTION(table.column)
+                    if (preg_match('/^(\w+)\(([^)]+)\)$/', $column, $matches)) {
+                        $functionName = $matches[1];
+                        $functionColumn = $matches[2];
+                        if (!Str::contains($functionColumn, '.')) {
+                            $functionColumn = $this->qualifyPivotColumn($functionColumn);
+                        }
+                        $query->whereRaw("{$functionName}({$functionColumn}) {$operator} ?", [$value]);
+                    } else {
+                        $query->whereRaw("{$column} {$operator} ?", [$value]);
+                    }
                 }
             } else {
-                // Regular column - add table prefix for pivot query
+                // Regular column - always qualify with pivot table name to avoid ambiguity
                 $fullColumn = $column;
                 if (!Str::contains($column, '.')) {
-                    $fullColumn = $column; // Already handled in storage
+                    // Column is not qualified, add pivot table prefix
+                    $fullColumn = $this->qualifyPivotColumn($column);
+                } elseif (!Str::startsWith($column, $this->pivotTable . '.')) {
+                    // Column is qualified but not with pivot table, qualify it
+                    $columnName = Str::afterLast($column, '.');
+                    $fullColumn = $this->qualifyPivotColumn($columnName);
                 }
 
                 if ($where['operator'] === 'BETWEEN' && is_array($where['value'])) {
@@ -743,8 +772,13 @@ class BelongsToMany extends Relation
         // Apply pivot whereIn constraints
         foreach ($this->pivotWhereIns as $whereIn) {
             $column = $whereIn['column'];
+            // Always qualify with pivot table name to avoid ambiguity
             if (!Str::contains($column, '.')) {
-                $column = $column; // Already handled in storage
+                $column = $this->qualifyPivotColumn($column);
+            } elseif (!Str::startsWith($column, $this->pivotTable . '.')) {
+                // Column is qualified but not with pivot table, qualify it
+                $columnName = Str::afterLast($column, '.');
+                $column = $this->qualifyPivotColumn($columnName);
             }
 
             if (isset($whereIn['not']) && $whereIn['not']) {
