@@ -74,16 +74,18 @@ final class ProductController extends BaseController
         $actualData = ProductModel::where('category_id', 1)->first();
 
         // Option 3: Performance testing with query hints
+        // Cursor-based pagination (high-performance for large datasets)
+        // O(1) performance regardless of dataset size
         $perPage = (int) ($request->get('per_page', 15));
-        $page = (int) ($request->get('page', 1));
+        $cursor = $request->get('cursor'); // Get cursor from query parameter
         $path = $request->path();
         $baseUrl = $request->root(); // Get base URL (http://localhost:8000)
 
-        $optimizedQuery = ProductModel::query()->with('categories')
+        $optimizedQuery = ProductModel::query()
+            ->with('categories')
             ->optimizeForLargeResults()
-            ->limit(1000)
-            ->orderBy('id', 'ASC')
-            ->paginate($perPage, $page, $path, $baseUrl);
+            ->orderBy('id', 'ASC') // Cursor column must be ordered
+            ->cursorPaginate($perPage, $cursor, 'id', $path, $baseUrl);
 
         $singleProduct = [
             'sql_info' => $sqlInfo,

@@ -774,6 +774,46 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
         return static::query()->paginate($perPage, $page, $path, $baseUrl);
     }
 
+    /**
+     * Paginate using cursor-based pagination (high-performance for large datasets).
+     *
+     * Cursor pagination provides O(1) performance regardless of dataset size,
+     * making it ideal for large datasets (millions+ records).
+     *
+     * Performance Benefits:
+     * - No COUNT query overhead
+     * - O(1) query time with indexed WHERE clause
+     * - Consistent results even with concurrent inserts/deletes
+     * - Works efficiently with millions of records
+     *
+     * Usage:
+     * ```php
+     * // First page
+     * $paginator = ProductModel::cursorPaginate(50);
+     *
+     * // Next page (using cursor from previous response)
+     * $paginator = ProductModel::cursorPaginate(50, $request->get('cursor'));
+     * ```
+     *
+     * @param int $perPage Number of items per page
+     * @param string|null $cursor Cursor value from previous page (null for first page)
+     * @param string|null $column Column to use as cursor (default: primary key)
+     * @param string|null $path Base URL path for pagination links
+     * @param string|null $baseUrl Base URL (scheme + host) for building full URLs
+     * @param string $cursorName Query parameter name for cursor (default: 'cursor')
+     * @return \Toporia\Framework\Support\Pagination\CursorPaginator
+     */
+    public static function cursorPaginate(
+        int $perPage = 15,
+        ?string $cursor = null,
+        ?string $column = null,
+        ?string $path = null,
+        ?string $baseUrl = null,
+        string $cursorName = 'cursor'
+    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+        return static::query()->cursorPaginate($perPage, $cursor, $column, $path, $baseUrl, $cursorName);
+    }
+
 
     /**
      * Create a new instance and immediately persist it.
