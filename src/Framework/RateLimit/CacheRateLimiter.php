@@ -117,88 +117,70 @@ final class CacheRateLimiter implements RateLimiterInterface
     {
         $decay = $decaySeconds ?? self::DEFAULT_DECAY_SECONDS;
 
-        // CRITICAL FIX: When rate limit is FIRST exceeded, set resetTime to NOW + decaySeconds
-        // This ensures user waits the full decay period from when they exceed the limit,
-        // not from when the window started (which could be much earlier)
-
-        // If resetTime doesn't exist or expired, set new one
+        // CRITICAL: If resetTime doesn't exist or expired, set new one
         if ($existingResetTime === null || $existingResetTime < $currentTime) {
             $this->cache->set(
                 $this->resetTimeKey($key),
                 $currentTime + $decay,
                 $decay
             );
+            // Set flag to track that resetTime was set when exceeded
+            $this->cache->set($this->resetFlagKey($key), true, $decay);
             return;
         }
 
-        // CRITICAL FIX: When rate limit is FIRST exceeded, reset resetTime to NOW + decaySeconds
-        // This ensures user waits the FULL decaySeconds from when they exceed, not from window start
-        // But we should ONLY reset if resetTime was set at window start, not if it was already reset
+        // CRITICAL: When rate limit is FIRST exceeded, resetTime may have been set from window start
+        // (e.g., 20 seconds ago). We need to reset it to NOW + decaySeconds to ensure
+        // user waits the FULL decay period from when they exceed, not from window start.
 
-        // Calculate when resetTime was originally set (window start time)
-        // If resetTime = now + decay, then originalResetTime = now
-        // If resetTime was set from window start, originalResetTime would be in the past
-        $originalResetTime = $existingResetTime - $decay;
-        $timeSinceWindowStart = $currentTime - $originalResetTime;
-
-        // Calculate how much time is left in the current resetTime
-        $timeLeftInResetTime = $existingResetTime - $currentTime;
-
-        // CRITICAL: Only reset if resetTime was set from window start (not from exceeding limit)
-        // Check if we already reset when exceeding (using a flag in cache)
+        // Check if we already reset when exceeded (using a flag)
         $resetFlagKey = $this->resetFlagKey($key);
         $alreadyResetWhenExceeded = $this->cache->get($resetFlagKey);
 
         // If already reset when exceeded, don't reset again
+        // This prevents resetting every time tooManyAttempts() is called
         if ($alreadyResetWhenExceeded) {
             return; // Already reset, keep current resetTime
         }
 
-        // Check if resetTime was set from window start (more than 3s ago)
-        $wasSetFromWindowStart = $timeSinceWindowStart > 3;
-
-        // If resetTime was set from window start, reset it to NOW + decaySeconds
-        // and set flag to prevent resetting again
-        if ($wasSetFromWindowStart) {
-            // Reset to NOW to ensure user waits full decaySeconds from when they exceed
-            $this->cache->set(
-                $this->resetTimeKey($key),
-                $currentTime + $decay,
-                $decay
-            );
-            // Set flag to indicate we already reset when exceeding
-            // Flag expires when resetTime expires
-            $this->cache->set($resetFlagKey, true, $decay);
-            return;
-        }
-
-        // Sliding window: Reset timer on each violation
-        if ($this->resetOnViolation) {
-            $this->cache->set(
-                $this->resetTimeKey($key),
-                $currentTime + $decay,
-                $decay
-            );
-            return;
-        }
-
-        // Fixed window: If resetTime was just set (within last 2s), keep it unchanged
-        // This handles edge case where resetTime was set very recently
+        // This is the FIRST time rate limit is exceeded
+        // Reset resetTime to NOW + decaySeconds to ensure full 60s wait from now
+        $this->cache->set(
+            $this->resetTimeKey($key),
+            $currentTime + $decay,
+            $decay
+        );
+        // Set flag to indicate we already reset when exceeding
+        $this->cache->set($resetFlagKey, true, $decay);
     }
 
     public function attempts(string $key): int
     {
-        // CRITICAL: Check resetTime first - if expired, attempts should be 0
+        // CRITICAL: Check resetTime first - if expired or missing, attempts should be 0
         $resetTime = $this->cache->get($this->resetTimeKey($key));
         $currentTime = time();
 
-        // If resetTime has expired, attempts should be 0 regardless of cache value
-        if ($resetTime !== null && $resetTime < $currentTime) {
-            // Reset time expired - clear attempts and return 0
-            $this->cache->delete($this->attemptsKey($key));
+        // If resetTime doesn't exist, rate limit window has expired
+        // Attempts should be 0 (or cleaned up if stale)
+        if ($resetTime === null) {
+            // ResetTime doesn't exist - check if attempts still exist (stale data)
+            $attempts = (int) $this->cache->get($this->attemptsKey($key), 0);
+            if ($attempts > 0) {
+                // Stale attempts exist without resetTime - clean up
+                $this->cache->delete($this->attemptsKey($key));
+            }
             return 0;
         }
 
+        // If resetTime has expired (timestamp in the past), attempts should be 0
+        if ($resetTime < $currentTime) {
+            // Reset time expired - clear attempts and return 0
+            $this->cache->delete($this->attemptsKey($key));
+            $this->cache->delete($this->resetTimeKey($key));
+            return 0;
+        }
+
+        // ResetTime is valid - return attempts count
         return (int) $this->cache->get($this->attemptsKey($key), 0);
     }
 
@@ -211,34 +193,37 @@ final class CacheRateLimiter implements RateLimiterInterface
     public function availableIn(string $key, ?int $decaySeconds = null): int
     {
         $resetTime = $this->cache->get($this->resetTimeKey($key));
+        $currentTime = time();
 
-        if ($resetTime === null) {
-            // If reset time doesn't exist, check if we have attempts
-            // If attempts exist, we need to estimate reset time based on decay
-            // This can happen if rate limit was exceeded but reset time not set yet
-            $attempts = $this->attempts($key);
-
-            if ($attempts > 0) {
-                // Attempts exist but no reset time - estimate based on decay
-                // Use provided decaySeconds or default as fallback
-                $decay = $decaySeconds ?? self::DEFAULT_DECAY_SECONDS;
-                $resetTime = time() + $decay;
-
-                // Store reset time for future calls with proper TTL
-                $this->cache->set($this->resetTimeKey($key), $resetTime, $decay);
-
-                return max(1, $decay); // At least 1 second
+        // If resetTime exists, check if it's still valid
+        if ($resetTime !== null) {
+            // Check if resetTime timestamp has expired
+            if ($resetTime < $currentTime) {
+                // ResetTime expired - rate limit is no longer active
+                // Clean up stale data
+                $this->resetAttempts($key);
+                return 0;
             }
 
-            // No attempts and no reset time - rate limit is not active
+            // ResetTime is valid - return remaining time
+            $remaining = max(0, $resetTime - $currentTime);
+            return $remaining > 0 ? $remaining : 0;
+        }
+
+        // ResetTime doesn't exist - check if attempts still exist
+        // This handles edge case where resetTime TTL expired but attempts TTL hasn't
+        $attempts = $this->attempts($key);
+
+        if ($attempts > 0) {
+            // Attempts exist but no resetTime - this is an inconsistent state
+            // This should not happen in normal flow, but if it does, we should reset
+            // to prevent infinite rate limiting
+            $this->resetAttempts($key);
             return 0;
         }
 
-        $remaining = max(0, $resetTime - time());
-
-        // If resetTime has already passed, return at least 1 second
-        // This prevents "0 seconds" message when resetTime is in the past
-        return $remaining > 0 ? $remaining : 0;
+        // No attempts and no reset time - rate limit is not active
+        return 0;
     }
 
     public function clear(string $key): void
@@ -250,6 +235,7 @@ final class CacheRateLimiter implements RateLimiterInterface
     {
         $this->cache->delete($this->attemptsKey($key));
         $this->cache->delete($this->resetTimeKey($key));
+        $this->cache->delete($this->resetFlagKey($key));
     }
 
     /**

@@ -112,14 +112,15 @@ final class ThrottleRequests implements MiddlewareInterface
      */
     private function buildRateLimitResponse(Response $response, string $key, int $maxAttempts, int $decaySeconds): void
     {
-        // Ensure we have a valid retry after time
-        // Pass decaySeconds to availableIn() to help calculate reset time if not set
+        // Get the actual retry after time
         $retryAfter = $this->limiter->availableIn($key, $decaySeconds);
 
-        // Fallback: If retryAfter is still 0 or negative, use decaySeconds
-        // This ensures we always show a meaningful retry time
+        // If retryAfter is 0, rate limit has expired - allow the request
+        // Don't set fallback to decaySeconds as that would incorrectly extend the rate limit
         if ($retryAfter <= 0) {
-            $retryAfter = $decaySeconds;
+            // Rate limit has expired - this shouldn't happen if tooManyAttempts() was called correctly
+            // But if it does, return 0 to indicate no wait time
+            $retryAfter = 0;
         }
 
         $response->setStatus(429);
@@ -130,7 +131,9 @@ final class ThrottleRequests implements MiddlewareInterface
 
         $response->json([
             'error' => 'Too Many Requests',
-            'message' => 'Rate limit exceeded. Please try again in ' . $retryAfter . ' seconds.',
+            'message' => $retryAfter > 0
+                ? 'Rate limit exceeded. Please try again in ' . $retryAfter . ' seconds.'
+                : 'Rate limit exceeded.',
             'retry_after' => $retryAfter,
         ], 429);
     }
