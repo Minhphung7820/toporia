@@ -60,7 +60,8 @@ final class ThrottleRequests implements MiddlewareInterface
         $decaySeconds = $limit->getDecaySeconds();
 
         if ($this->limiter->tooManyAttempts($key, $maxAttempts, $decaySeconds)) {
-            return $this->buildRateLimitResponse($response, $key, $maxAttempts, $decaySeconds);
+            $this->buildRateLimitResponse($response, $key, $maxAttempts, $decaySeconds);
+            return null; // Short-circuit - response already sent
         }
 
         $this->limiter->attempt($key, $maxAttempts, $decaySeconds);
@@ -101,15 +102,15 @@ final class ThrottleRequests implements MiddlewareInterface
     }
 
     /**
-     * Build rate limit exceeded response
+     * Build and send rate limit exceeded response
      *
      * @param Response $response
      * @param string $key
      * @param int $maxAttempts
      * @param int $decaySeconds
-     * @return null
+     * @return void
      */
-    private function buildRateLimitResponse(Response $response, string $key, int $maxAttempts, int $decaySeconds): null
+    private function buildRateLimitResponse(Response $response, string $key, int $maxAttempts, int $decaySeconds): void
     {
         // Ensure we have a valid retry after time
         // Pass decaySeconds to availableIn() to help calculate reset time if not set
@@ -132,8 +133,6 @@ final class ThrottleRequests implements MiddlewareInterface
             'message' => 'Rate limit exceeded. Please try again in ' . $retryAfter . ' seconds.',
             'retry_after' => $retryAfter,
         ], 429);
-
-        return null; // Short-circuit
     }
 
     /**
