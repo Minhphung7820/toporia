@@ -142,29 +142,15 @@ abstract class ServiceAccessor
      * Performance:
      * - O(1) instance lookup (cached)
      * - Direct method call forwarding (no overhead)
-     * - Better error messages than letting PHP handle naturally
+     * - No method_exists check - let PHP handle naturally for best performance
      *
      * @param string $method Method name
      * @param array<mixed> $arguments Method arguments
      * @return mixed Method result
-     * @throws RuntimeException If method doesn't exist on service
      */
     public static function __callStatic(string $method, array $arguments): mixed
     {
-        // Get cached service instance (O(1))
-        $instance = static::resolveService();
-
-        // Check if method exists for better error messages
-        if (!method_exists($instance, $method)) {
-            $serviceName = static::getServiceName();
-            $instanceClass = get_class($instance);
-            throw new RuntimeException(
-                "Method '{$method}' does not exist on service '{$serviceName}' (instance of {$instanceClass})."
-            );
-        }
-
-        // Direct method call - fastest path
-        return $instance->$method(...$arguments);
+        return static::resolveService()->$method(...$arguments);
     }
 
     /**
