@@ -245,6 +245,16 @@ class DatabaseManager
     }
 
     /**
+     * Get the default connection name.
+     *
+     * @return string
+     */
+    public function getDefaultConnectionName(): string
+    {
+        return $this->defaultConnection;
+    }
+
+    /**
      * Disconnect all connections.
      *
      * @return void

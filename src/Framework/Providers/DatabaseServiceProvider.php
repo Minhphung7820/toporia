@@ -8,6 +8,7 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Database\{Connection, DatabaseManager};
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\ORM\Model;
+use Toporia\Framework\Database\Schema\Schema;
 use Toporia\Framework\Foundation\ServiceProvider;
 
 
@@ -59,10 +60,13 @@ class DatabaseServiceProvider extends ServiceProvider
      */
     public function boot(ContainerInterface $container): void
     {
-        // Set default connection for ORM Models
+        // Set default connection for ORM Models and Schema facade
         try {
             $db = $container->get(DatabaseManager::class);
             Model::setConnection($db->connection());
+
+            // Initialize Schema facade with DatabaseManager
+            Schema::setManager($db);
         } catch (\Throwable $e) {
             // Database not configured - Models will fail when used
             // This allows application to boot even without database
@@ -71,6 +75,18 @@ class DatabaseServiceProvider extends ServiceProvider
 
     /**
      * Get database configuration.
+     *
+     * Supports multiple database connections. Example config:
+     * ```php
+     * 'database' => [
+     *     'default' => 'mysql',
+     *     'connections' => [
+     *         'mysql' => [...],
+     *         'mysql_logs' => [...],
+     *         'pgsql' => [...],
+     *     ]
+     * ]
+     * ```
      *
      * @return array<string, array<string, mixed>>
      */
@@ -82,8 +98,16 @@ class DatabaseServiceProvider extends ServiceProvider
             $defaultConnection = $config->get('database.default', 'mysql');
             $connections = $config->get('database.connections', []);
 
-            if (!empty($connections) && isset($connections[$defaultConnection])) {
-                return ['default' => $connections[$defaultConnection]];
+            if (!empty($connections)) {
+                // Return all connections with 'default' pointing to the default connection config
+                $result = $connections;
+
+                // Ensure 'default' key exists for backward compatibility
+                if (!isset($result['default']) && isset($result[$defaultConnection])) {
+                    $result['default'] = $result[$defaultConnection];
+                }
+
+                return $result;
             }
         } catch (\Throwable $e) {
             // Config not available, use fallback
