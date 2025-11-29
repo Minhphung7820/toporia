@@ -566,9 +566,8 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
         }
 
         // Auto-infer from class name (works for both SQL and MongoDB)
-        // Extract class name without namespace
-        $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class);
-        $className = $reflection->getShortName(static::class);
+        // Extract class name without namespace using basename trick (no reflection needed)
+        $className = substr(strrchr(static::class, '\\') ?: static::class, 1) ?: static::class;
 
         // Remove "Model" suffix if present
         // ProductModel -> Product
@@ -1552,8 +1551,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
 
         // Call model hook method if exists (only instance methods, not static)
         if (method_exists($this, $method)) {
-            $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class);
-            $reflectionMethod = $reflection->getMethod($this, $method);
+            $reflectionMethod = new \ReflectionMethod($this, $method);
             // Only call if it's not a static method (avoid calling event registration methods)
             if (!$reflectionMethod->isStatic()) {
                 $result = $this->{$method}();

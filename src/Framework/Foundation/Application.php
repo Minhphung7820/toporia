@@ -7,7 +7,6 @@ namespace Toporia\Framework\Foundation;
 use Toporia\Framework\Foundation\Contracts\ServiceProviderInterface;
 use Toporia\Framework\Container\Container;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
-use Toporia\Framework\Support\ReflectionService;
 
 
 /**
@@ -190,14 +189,8 @@ class Application
      */
     private function registerCoreServices(): void
     {
-        // Register ReflectionService as singleton
-        // Only the container should use reflection directly
-        $this->container->singleton(ReflectionService::class, function () {
-            return new ReflectionService();
-        });
-
-        // Register as instance for easier access
-        $this->container->instance('reflection', $this->container->make(ReflectionService::class));
+        // Core services are registered here if needed
+        // Reflection is handled by PHP's native Reflection API - no wrapper service needed
     }
 
     // =========================================================================

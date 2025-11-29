@@ -448,9 +448,8 @@ final class ProductSeeder extends Seeder
 
         // Get table name from model
         if ($table === null) {
-            $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class);
-            if ($reflection->hasProperty($factory, 'model')) {
-                $modelClass = $reflection->getPropertyValue($factory, 'model');
+            if (property_exists($factory, 'model')) {
+                $modelClass = (new \ReflectionProperty($factory, 'model'))->getValue($factory);
 
                 if ($modelClass && method_exists($modelClass, 'getTableName')) {
                     $table = $modelClass::getTableName();
@@ -470,18 +469,19 @@ final class ProductSeeder extends Seeder
 
         // Generate data using factory
         $data = [];
-        $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class);
-        $method = $reflection->getMethod($factory, 'definition');
-        $method->setAccessible(true);
+        $definitionMethod = new \ReflectionMethod($factory, 'definition');
 
         // Access defaultAttributes via reflection
-        $defaultAttributes = $reflection->getPropertyValue($factory, 'defaultAttributes');
+        $defaultAttributesProp = new \ReflectionProperty($factory, 'defaultAttributes');
+        $defaultAttributes = $defaultAttributesProp->getValue($factory);
+
+        $sequenceIndexProp = new \ReflectionProperty($factory, 'sequenceIndex');
 
         for ($i = 0; $i < $count; $i++) {
-            $reflection->setPropertyValue($factory, 'sequenceIndex', $i);
+            $sequenceIndexProp->setValue($factory, $i);
 
             // Get base data from factory
-            $row = array_merge($method->invoke($factory), $defaultAttributes);
+            $row = array_merge($definitionMethod->invoke($factory), $defaultAttributes);
 
             // Apply callable attributes
             foreach ($attributes as $key => $value) {

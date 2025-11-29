@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM\Concerns;
 
 use Toporia\Framework\Database\Contracts\FactoryInterface;
-use Toporia\Framework\Support\ReflectionService;
 
 /**
  * HasFactory Trait
@@ -119,14 +118,13 @@ trait HasFactory
 
         // Check for custom factory property
         if (property_exists(static::class, 'factory')) {
-            $reflection = app()->make(ReflectionService::class);
-            if ($reflection->hasProperty(static::class, 'factory')) {
-                $customFactory = $reflection->getPropertyValue(new static(), 'factory');
+            $instance = new static();
+            $reflectionProperty = new \ReflectionProperty($instance, 'factory');
+            $customFactory = $reflectionProperty->getValue($instance);
 
-                if (is_string($customFactory) && !empty($customFactory)) {
-                    self::$factoryCache[$modelClass] = $customFactory;
-                    return $customFactory;
-                }
+            if (is_string($customFactory) && !empty($customFactory)) {
+                self::$factoryCache[$modelClass] = $customFactory;
+                return $customFactory;
             }
         }
 

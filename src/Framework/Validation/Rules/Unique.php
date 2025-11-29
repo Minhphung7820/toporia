@@ -239,9 +239,7 @@ final class Unique implements RuleInterface, DataAwareRuleInterface
 
         // Fallback: use reflection to access Validator's protected static method
         try {
-            $reflection = app()->make(\Toporia\Framework\Support\ReflectionService::class)->getClass(\Toporia\Framework\Validation\Validator::class);
-            $method = $reflection->getMethod('getConnection');
-            $method->setAccessible(true);
+            $method = new \ReflectionMethod(\Toporia\Framework\Validation\Validator::class, 'getConnection');
             return $method->invoke(null);
         } catch (\ReflectionException $e) {
             throw new \RuntimeException('Database connection not available: ' . $e->getMessage());

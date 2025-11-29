@@ -8,7 +8,6 @@ use Toporia\Framework\Database\Contracts\SeederInterface;
 use Toporia\Framework\Database\Contracts\FactoryInterface;
 use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\ORM\Model;
-use Toporia\Framework\Support\ReflectionService;
 
 
 /**
@@ -53,12 +52,6 @@ abstract class Seeder implements SeederInterface
      */
     protected bool $useTransaction = true;
 
-    /**
-     * Reflection service for safe reflection operations.
-     *
-     * @var ReflectionService|null
-     */
-    protected ?ReflectionService $reflection = null;
 
     /**
      * Batch size for bulk operations.
@@ -219,9 +212,8 @@ abstract class Seeder implements SeederInterface
 
         // Get table name from model
         if ($table === null) {
-            $reflection = $this->getReflectionService();
-            if ($reflection->hasProperty($factory, 'model')) {
-                $modelClass = $reflection->getPropertyValue($factory, 'model');
+            if (property_exists($factory, 'model')) {
+                $modelClass = (new \ReflectionProperty($factory, 'model'))->getValue($factory);
 
                 if ($modelClass && method_exists($modelClass, 'getTableName')) {
                     $table = $modelClass::getTableName();
@@ -241,21 +233,18 @@ abstract class Seeder implements SeederInterface
 
         // Generate data using factory
         $data = [];
-        $reflection = $this->getReflectionService();
-        $method = $reflection->getMethod($factory, 'definition');
-        $method->setAccessible(true);
+        $definitionMethod = new \ReflectionMethod($factory, 'definition');
 
         // Access defaultAttributes via reflection
-        $defaultAttributesProp = $reflection->getProperty($factory, 'defaultAttributes');
-        $defaultAttributesProp->setAccessible(true);
+        $defaultAttributesProp = new \ReflectionProperty($factory, 'defaultAttributes');
         $defaultAttributes = $defaultAttributesProp->getValue($factory);
 
+        $sequenceIndexProp = new \ReflectionProperty($factory, 'sequenceIndex');
+
         for ($i = 0; $i < $count; $i++) {
-            $sequenceIndexProp = $reflection->getProperty($factory, 'sequenceIndex');
-            $sequenceIndexProp->setAccessible(true);
             $sequenceIndexProp->setValue($factory, $i);
 
-            $row = array_merge($method->invoke($factory), $defaultAttributes, $attributes);
+            $row = array_merge($definitionMethod->invoke($factory), $defaultAttributes, $attributes);
             $data[] = $row;
         }
 
@@ -537,23 +526,4 @@ abstract class Seeder implements SeederInterface
         echo PHP_EOL;
     }
 
-    /**
-     * Get ReflectionService from container.
-     *
-     * Follows Laravel pattern: only container should use reflection directly.
-     * All other components should use ReflectionService through DI.
-     *
-     * Performance: O(1) - Singleton resolution from container
-     *
-     * @return ReflectionService
-     */
-    protected function getReflectionService(): ReflectionService
-    {
-        if ($this->reflection === null) {
-            // Use app()->make() pattern like Laravel
-            $this->reflection = app()->make(ReflectionService::class);
-        }
-
-        return $this->reflection;
-    }
 }

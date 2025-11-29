@@ -751,15 +751,13 @@ class ModelQueryBuilder extends QueryBuilder
      */
     protected function buildPivotWhereHasSubquery($relation, string $parentTable, $relationQuery): string
     {
-        $reflectionService = app()->make(\Toporia\Framework\Support\ReflectionService::class);
-
         if ($relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany) {
             // Get pivot table and keys for BelongsToMany
-            $pivotTable = $reflectionService->getPropertyValue($relation, 'pivotTable');
-            $foreignPivotKey = $reflectionService->getPropertyValue($relation, 'foreignPivotKey');
-            $relatedPivotKey = $reflectionService->getPropertyValue($relation, 'relatedPivotKey');
-            $parentKey = $reflectionService->getPropertyValue($relation, 'parentKey');
-            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+            $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
+            $foreignPivotKey = $this->getRelationProperty($relation, 'foreignPivotKey');
+            $relatedPivotKey = $this->getRelationProperty($relation, 'relatedPivotKey');
+            $parentKey = $this->getRelationProperty($relation, 'parentKey');
+            $relatedKey = $this->getRelationProperty($relation, 'relatedKey');
 
             // Get related table
             $relatedTable = $relationQuery->getTable();
@@ -773,12 +771,12 @@ class ModelQueryBuilder extends QueryBuilder
                 "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
         } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany) {
             // Similar logic for MorphToMany
-            $pivotTable = $reflectionService->getPropertyValue($relation, 'pivotTable');
-            $morphType = $reflectionService->getPropertyValue($relation, 'morphType');
-            $morphId = $reflectionService->getPropertyValue($relation, 'foreignKey');
-            $relatedPivotKey = $reflectionService->getPropertyValue($relation, 'relatedPivotKey');
-            $parentKey = $reflectionService->getPropertyValue($relation, 'localKey');
-            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+            $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
+            $morphType = $this->getRelationProperty($relation, 'morphType');
+            $morphId = $this->getRelationProperty($relation, 'foreignKey');
+            $relatedPivotKey = $this->getRelationProperty($relation, 'relatedPivotKey');
+            $parentKey = $this->getRelationProperty($relation, 'localKey');
+            $relatedKey = $this->getRelationProperty($relation, 'relatedKey');
 
             // Get related table and morph class
             $relatedTable = $relationQuery->getTable();
@@ -791,6 +789,21 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         return $subquerySql;
+    }
+
+    /**
+     * Get a property value from a relation object using reflection.
+     *
+     * This is internal framework code that needs to access protected/private
+     * properties of relation classes for query building.
+     *
+     * @param object $relation Relation instance
+     * @param string $property Property name
+     * @return mixed Property value
+     */
+    private function getRelationProperty(object $relation, string $property): mixed
+    {
+        return (new \ReflectionProperty($relation, $property))->getValue($relation);
     }
 
     /**
@@ -870,15 +883,13 @@ class ModelQueryBuilder extends QueryBuilder
      */
     protected function buildPivotExistsSubquery($relation, string $parentTable, $relationQuery): string
     {
-        $reflectionService = app()->make(\Toporia\Framework\Support\ReflectionService::class);
-
         if ($relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany) {
             // Get pivot table and keys for BelongsToMany
-            $pivotTable = $reflectionService->getPropertyValue($relation, 'pivotTable');
-            $foreignPivotKey = $reflectionService->getPropertyValue($relation, 'foreignPivotKey');
-            $relatedPivotKey = $reflectionService->getPropertyValue($relation, 'relatedPivotKey');
-            $parentKey = $reflectionService->getPropertyValue($relation, 'parentKey');
-            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+            $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
+            $foreignPivotKey = $this->getRelationProperty($relation, 'foreignPivotKey');
+            $relatedPivotKey = $this->getRelationProperty($relation, 'relatedPivotKey');
+            $parentKey = $this->getRelationProperty($relation, 'parentKey');
+            $relatedKey = $this->getRelationProperty($relation, 'relatedKey');
 
             // Get related table
             $relatedTable = $relationQuery->getTable();
@@ -889,12 +900,12 @@ class ModelQueryBuilder extends QueryBuilder
                 "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
         } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany) {
             // Similar logic for MorphToMany
-            $pivotTable = $reflectionService->getPropertyValue($relation, 'pivotTable');
-            $morphType = $reflectionService->getPropertyValue($relation, 'morphType');
-            $morphId = $reflectionService->getPropertyValue($relation, 'foreignKey');
-            $relatedPivotKey = $reflectionService->getPropertyValue($relation, 'relatedPivotKey');
-            $parentKey = $reflectionService->getPropertyValue($relation, 'localKey');
-            $relatedKey = $reflectionService->getPropertyValue($relation, 'relatedKey');
+            $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
+            $morphType = $this->getRelationProperty($relation, 'morphType');
+            $morphId = $this->getRelationProperty($relation, 'foreignKey');
+            $relatedPivotKey = $this->getRelationProperty($relation, 'relatedPivotKey');
+            $parentKey = $this->getRelationProperty($relation, 'localKey');
+            $relatedKey = $this->getRelationProperty($relation, 'relatedKey');
 
             // Get related table and morph class
             $relatedTable = $relationQuery->getTable();
