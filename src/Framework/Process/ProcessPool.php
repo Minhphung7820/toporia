@@ -44,7 +44,6 @@ use Toporia\Framework\Process\Contracts\WorkerInterface;
  */
 final class ProcessPool
 {
-    private array $workers = [];
     private array $jobs = [];
     private array $results = [];
     private int $processed = 0;
@@ -177,11 +176,15 @@ final class ProcessPool
      */
     public function filter(array $items, callable $callback): array
     {
-        $results = $this->map($items, function ($item) use ($callback) {
-            return $callback($item) ? $item : null;
+        // Use sentinel object to distinguish between "filtered out" and actual null/false values
+        $sentinel = new \stdClass();
+
+        $results = $this->map($items, function ($item) use ($callback, $sentinel) {
+            return $callback($item) ? $item : $sentinel;
         });
 
-        return array_filter($results, fn($item) => $item !== null);
+        // Filter out sentinel values, keeping actual null/false/0 values that passed the filter
+        return array_values(array_filter($results, fn($item) => $item !== $sentinel));
     }
 
     /**
@@ -205,7 +208,7 @@ final class ProcessPool
             }, [$chunk, $callback, $initial]);
         }
 
-        $partialResults = $manager->run($this->workerCount);
+        $partialResults = $manager->execute($this->workerCount);
 
         // Final reduce
         return array_reduce($partialResults, $callback, $initial);
@@ -239,15 +242,8 @@ final class ProcessPool
     public function shutdown(): void
     {
         $this->shutdown = true;
-
-        // Wait for all workers to finish current jobs
-        foreach ($this->workers as $worker) {
-            if ($worker->isRunning()) {
-                $worker->wait();
-            }
-        }
-
-        $this->workers = [];
+        // Workers are created on-demand and cleaned up after each operation
+        // Nothing to do here - just mark as shutdown
     }
 
     /**

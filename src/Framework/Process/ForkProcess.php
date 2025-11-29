@@ -243,21 +243,15 @@ final class ForkProcess implements ProcessInterface
      */
     private function collectOutput(): void
     {
-        $currentPid = getmypid();
         $pidKey = (string) $this->pid;
-
-        // Get caller info
-        $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
-        $caller = isset($bt[1]) ? ($bt[1]['class'] ?? '') . '::' . ($bt[1]['function'] ?? 'unknown') : 'unknown';
-
 
         // CRITICAL: Only PARENT process should collect output from CHILD
         // If current process == child PID, we're IN the child and should NOT collect
-        if ($currentPid === $this->pid) {
+        if (getmypid() === $this->pid) {
             return;
         }
 
-        // Prevent double collection using static PID tracking (works across all parent instances)
+        // Prevent double collection using static PID tracking
         if (isset(self::$collected[$pidKey])) {
             return;
         }
@@ -265,16 +259,14 @@ final class ForkProcess implements ProcessInterface
         // Mark as collected IMMEDIATELY
         self::$collected[$pidKey] = true;
 
-
         if (!isset($this->pipes[$this->pid])) {
             return;
         }
 
         $pipe = $this->pipes[$this->pid];
 
-        // Read all available data (stream_get_contents works best with blocking mode)
+        // Read all available data
         $serialized = stream_get_contents($pipe);
-        $bytes = strlen($serialized);
 
         // Close and cleanup
         fclose($pipe);
@@ -288,7 +280,6 @@ final class ForkProcess implements ProcessInterface
                 $this->output = null;
                 error_log("Failed to deserialize process output: " . $e->getMessage());
             }
-        } else {
         }
     }
 
