@@ -323,4 +323,45 @@ class DatabaseManager
     {
         QueryBuilder::flushQueryLog();
     }
+
+    // =========================================================================
+    // RAW SQL METHODS (for static access via DB accessor)
+    // =========================================================================
+
+    /**
+     * Execute a raw SQL SELECT query.
+     *
+     * @param string $sql Raw SQL query
+     * @param array<int|string, mixed> $bindings Query parameter bindings
+     * @return DatabaseCollection Query results
+     */
+    public function raw(string $sql, array $bindings = []): DatabaseCollection
+    {
+        return $this->connection()->raw($sql, $bindings);
+    }
+
+    /**
+     * Execute a raw SQL statement (INSERT, UPDATE, DELETE).
+     *
+     * @param string $sql Raw SQL statement
+     * @param array<int|string, mixed> $bindings Query parameter bindings
+     * @return int Number of affected rows
+     */
+    public function statement(string $sql, array $bindings = []): int
+    {
+        return $this->connection()->statement($sql, $bindings);
+    }
+
+    /**
+     * Execute an unprepared SQL statement (DDL, SET variables).
+     *
+     * WARNING: Does NOT use prepared statements. Never pass user input.
+     *
+     * @param string $sql Raw SQL statement
+     * @return bool True on success
+     */
+    public function unprepared(string $sql): bool
+    {
+        return $this->connection()->unprepared($sql);
+    }
 }

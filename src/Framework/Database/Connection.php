@@ -537,6 +537,14 @@ class Connection implements ConnectionInterface
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function unprepared(string $query): bool
+    {
+        return $this->pdo->exec($query) !== false;
+    }
+
+    /**
      * Get a query builder for the given table.
      *
      * This enables fluent query building:

@@ -20,6 +20,9 @@ use Toporia\Framework\Foundation\ServiceAccessor;
  * @method static void disableQueryLog() Disable query logging
  * @method static array getQueryLog() Get the query log
  * @method static void flushQueryLog() Clear the query log
+ * @method static \Toporia\Framework\Database\DatabaseCollection raw(string $sql, array $bindings = []) Execute raw SELECT query
+ * @method static int statement(string $sql, array $bindings = []) Execute raw INSERT/UPDATE/DELETE statement
+ * @method static bool unprepared(string $sql) Execute unprepared SQL (DDL statements)
  *
  * @see DatabaseManager
  *
@@ -29,6 +32,11 @@ use Toporia\Framework\Foundation\ServiceAccessor;
  *
  * // Get named connection
  * DB::connection('mysql')->table('users')->get();
+ *
+ * // Execute raw SQL
+ * DB::raw('SELECT * FROM users WHERE status = ?', ['active']);
+ * DB::statement('UPDATE users SET status = ? WHERE id = ?', ['inactive', 1]);
+ * DB::unprepared('TRUNCATE TABLE cache');
  */
 final class DB extends ServiceAccessor
 {

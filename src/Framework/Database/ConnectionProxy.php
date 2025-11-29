@@ -216,4 +216,40 @@ class ConnectionProxy implements ConnectionInterface
         // Delegate to underlying connection
         return $this->connection->table($table);
     }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function unprepared(string $query): bool
+    {
+        return $this->connection->unprepared($query);
+    }
+
+    // =========================================================================
+    // RAW SQL METHODS
+    // =========================================================================
+
+    /**
+     * Execute a raw SQL SELECT query.
+     *
+     * @param string $sql Raw SQL query
+     * @param array<int|string, mixed> $bindings Query parameter bindings
+     * @return \Toporia\Framework\Database\DatabaseCollection Query results
+     */
+    public function raw(string $sql, array $bindings = []): \Toporia\Framework\Database\DatabaseCollection
+    {
+        return $this->table('')->raw($sql, $bindings);
+    }
+
+    /**
+     * Execute a raw SQL statement (INSERT, UPDATE, DELETE).
+     *
+     * @param string $sql Raw SQL statement
+     * @param array<int|string, mixed> $bindings Query parameter bindings
+     * @return int Number of affected rows
+     */
+    public function statement(string $sql, array $bindings = []): int
+    {
+        return $this->table('')->statement($sql, $bindings);
+    }
 }

@@ -1225,6 +1225,138 @@ class QueryBuilder implements QueryBuilderInterface
         return $this->connection->affectingStatement($sql, $this->bindings);
     }
 
+    // =========================================================================
+    // RAW SQL EXECUTION
+    // =========================================================================
+
+    /**
+     * Execute a raw SQL SELECT query and return results.
+     *
+     * Use this for complex queries that cannot be expressed with the query builder.
+     * Supports parameter binding for security (prevents SQL injection).
+     *
+     * Performance: Direct SQL execution, no query builder overhead
+     *
+     * @param string $sql Raw SQL query
+     * @param array<int|string, mixed> $bindings Query parameter bindings
+     * @return DatabaseCollection<int, array<string, mixed>> Query results
+     *
+     * @example
+     * ```php
+     * // Simple raw query
+     * $users = DB::raw('SELECT * FROM users WHERE status = ?', ['active']);
+     *
+     * // Complex query with joins and subqueries
+     * $results = DB::raw('
+     *     SELECT u.*, COUNT(p.id) as post_count
+     *     FROM users u
+     *     LEFT JOIN posts p ON p.user_id = u.id
+     *     WHERE u.created_at > ?
+     *     GROUP BY u.id
+     *     HAVING post_count > ?
+     * ', [$date, 5]);
+     *
+     * // Named parameters (if supported by driver)
+     * $user = DB::raw('SELECT * FROM users WHERE id = :id', ['id' => 1]);
+     * ```
+     */
+    public function raw(string $sql, array $bindings = []): DatabaseCollection
+    {
+        if (self::$loggingEnabled) {
+            $startTime = microtime(true);
+        }
+
+        $rows = $this->connection->select($sql, $bindings);
+
+        if (self::$loggingEnabled) {
+            $executionTime = (microtime(true) - $startTime) * 1000;
+            self::logQuery($sql, $bindings, $executionTime);
+        }
+
+        return new RowCollection($rows);
+    }
+
+    /**
+     * Execute a raw SQL statement that modifies data (INSERT, UPDATE, DELETE).
+     *
+     * Returns the number of affected rows.
+     *
+     * Performance: Direct SQL execution, no query builder overhead
+     *
+     * @param string $sql Raw SQL statement
+     * @param array<int|string, mixed> $bindings Query parameter bindings
+     * @return int Number of affected rows
+     *
+     * @example
+     * ```php
+     * // Raw UPDATE
+     * $affected = DB::statement('UPDATE users SET status = ? WHERE last_login < ?', ['inactive', $date]);
+     *
+     * // Raw DELETE
+     * $deleted = DB::statement('DELETE FROM sessions WHERE expires_at < NOW()');
+     *
+     * // Raw INSERT
+     * DB::statement('INSERT INTO logs (message, level) VALUES (?, ?)', [$message, 'info']);
+     * ```
+     */
+    public function statement(string $sql, array $bindings = []): int
+    {
+        if (self::$loggingEnabled) {
+            $startTime = microtime(true);
+        }
+
+        $affected = $this->connection->affectingStatement($sql, $bindings);
+
+        if (self::$loggingEnabled) {
+            $executionTime = (microtime(true) - $startTime) * 1000;
+            self::logQuery($sql, $bindings, $executionTime);
+        }
+
+        return $affected;
+    }
+
+    /**
+     * Execute an unprepared raw SQL statement.
+     *
+     * WARNING: This method does NOT use prepared statements.
+     * Only use for DDL statements (CREATE, ALTER, DROP) or when prepared
+     * statements are not supported (e.g., some MySQL variables).
+     *
+     * SECURITY: Never pass user input directly to this method.
+     *
+     * Performance: Direct execution without prepare overhead
+     *
+     * @param string $sql Raw SQL statement (no parameter binding)
+     * @return bool True on success
+     *
+     * @example
+     * ```php
+     * // Create table
+     * DB::unprepared('CREATE TABLE temp_data (id INT PRIMARY KEY, data TEXT)');
+     *
+     * // Set MySQL variables
+     * DB::unprepared('SET FOREIGN_KEY_CHECKS = 0');
+     *
+     * // Truncate table
+     * DB::unprepared('TRUNCATE TABLE cache');
+     * ```
+     */
+    public function unprepared(string $sql): bool
+    {
+        if (self::$loggingEnabled) {
+            $startTime = microtime(true);
+        }
+
+        $result = $this->connection->unprepared($sql);
+
+        if (self::$loggingEnabled) {
+            $executionTime = (microtime(true) - $startTime) * 1000;
+            self::logQuery($sql, [], $executionTime);
+        }
+
+        return $result;
+    }
+
     /**
      * Increment a column's value.
      *

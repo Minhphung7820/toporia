@@ -37,6 +37,13 @@ interface ConnectionInterface
     public function getPdo(): PDO;
 
     /**
+     * Get connection configuration.
+     *
+     * @return array<string, mixed>
+     */
+    public function getConfig(): array;
+
+    /**
      * Execute a SQL query and return the PDO statement.
      *
      * @param string $query SQL query.
@@ -44,6 +51,22 @@ interface ConnectionInterface
      * @return \PDOStatement
      */
     public function execute(string $query, array $bindings = []): \PDOStatement;
+
+    /**
+     * Execute query in streaming mode for large datasets.
+     *
+     * @param string $query SQL query.
+     * @param array $bindings Parameter bindings.
+     * @return \Generator<array>
+     */
+    public function executeStreaming(string $query, array $bindings = []): \Generator;
+
+    /**
+     * Check if streaming is supported for current driver.
+     *
+     * @return bool
+     */
+    public function supportsStreaming(): bool;
 
     /**
      * Begin a database transaction.
@@ -137,6 +160,17 @@ interface ConnectionInterface
      * @return int Number of affected rows.
      */
     public function affectingStatement(string $query, array $bindings = []): int;
+
+    /**
+     * Execute an unprepared SQL statement.
+     *
+     * WARNING: This method does NOT use prepared statements.
+     * Only use for DDL statements or when prepared statements are not supported.
+     *
+     * @param string $query Raw SQL statement (no parameter binding).
+     * @return bool True on success.
+     */
+    public function unprepared(string $query): bool;
 
     /**
      * Get a query builder for the given table.
