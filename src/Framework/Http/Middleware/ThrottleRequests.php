@@ -135,10 +135,43 @@ final class ThrottleRequests implements MiddlewareInterface
         $response->json([
             'error' => 'Too Many Requests',
             'message' => $retryAfter > 0
-                ? 'Rate limit exceeded. Please try again in ' . $retryAfter . ' seconds.'
+                ? 'Rate limit exceeded. Please try again in ' . $this->formatDuration($retryAfter) . '.'
                 : 'Rate limit exceeded.',
             'retry_after' => $retryAfter,
         ], 429);
+    }
+
+    /**
+     * Format seconds into human-readable duration (e.g., 1h25m38s, 1m54s, 45s)
+     *
+     * @param int $seconds
+     * @return string
+     */
+    private function formatDuration(int $seconds): string
+    {
+        if ($seconds < 60) {
+            return $seconds . 's';
+        }
+
+        $hours = intval($seconds / 3600);
+        $minutes = intval(($seconds % 3600) / 60);
+        $secs = $seconds % 60;
+
+        $parts = [];
+
+        if ($hours > 0) {
+            $parts[] = $hours . 'h';
+        }
+
+        if ($minutes > 0) {
+            $parts[] = $minutes . 'm';
+        }
+
+        if ($secs > 0) {
+            $parts[] = $secs . 's';
+        }
+
+        return implode('', $parts);
     }
 
     /**
