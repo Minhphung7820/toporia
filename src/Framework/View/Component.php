@@ -203,7 +203,7 @@ abstract class Component
         }
 
         $class = static::class;
-        $name = class_basename($class);
+        $name = static::classBasename($class);
 
         return Str::kebab($name);
     }
@@ -262,10 +262,20 @@ abstract class Component
         $reflection = new \ReflectionClass($this);
 
         $ignoreMethods = [
-            'render', 'resolve', 'data', 'withSlot', 'slot',
-            'withNamedSlot', 'namedSlot', 'hasSlot', 'withAttributes',
-            'componentAlias', 'shouldRender', 'extractPublicProperties',
-            'extractPublicMethods', '__construct',
+            'render',
+            'resolve',
+            'data',
+            'withSlot',
+            'slot',
+            'withNamedSlot',
+            'namedSlot',
+            'hasSlot',
+            'withAttributes',
+            'componentAlias',
+            'shouldRender',
+            'extractPublicProperties',
+            'extractPublicMethods',
+            '__construct',
         ];
 
         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
