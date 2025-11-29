@@ -44,10 +44,8 @@ use Toporia\Framework\Process\Contracts\WorkerInterface;
  */
 final class ProcessPool
 {
-    private array $jobs = [];
     private array $results = [];
     private int $processed = 0;
-    private bool $shutdown = false;
 
     public function __construct(
         private readonly int $workerCount = 4,
@@ -107,7 +105,6 @@ final class ProcessPool
             throw new \RuntimeException('Worker interface required for process()');
         }
 
-        $this->jobs = $jobs;
         $this->results = [];
         $this->processed = 0;
 
@@ -241,9 +238,8 @@ final class ProcessPool
      */
     public function shutdown(): void
     {
-        $this->shutdown = true;
         // Workers are created on-demand and cleaned up after each operation
-        // Nothing to do here - just mark as shutdown
+        // Nothing to do here
     }
 
     /**
