@@ -34,18 +34,15 @@ use Toporia\Framework\Process\Contracts\WorkerInterface;
  *
  * Example:
  * ```php
- * $pool = new ProcessPool(workers: 4);
+ * $pool = new ProcessPool(workerCount: 4);
  *
  * $jobs = range(1, 1000);
  * $results = $pool->map($jobs, fn($n) => $n * 2);
- *
- * $pool->shutdown();
  * ```
  */
 final class ProcessPool
 {
     private array $results = [];
-    private int $processed = 0;
 
     public function __construct(
         private readonly int $workerCount = 4,
@@ -54,9 +51,6 @@ final class ProcessPool
         if (!ForkProcess::isSupported()) {
             throw new \RuntimeException('ProcessPool requires PCNTL extension');
         }
-
-        $this->initializeWorkers();
-        $this->registerSignalHandlers();
     }
 
     /**
@@ -106,7 +100,6 @@ final class ProcessPool
         }
 
         $this->results = [];
-        $this->processed = 0;
 
         $manager = new ProcessManager();
 
@@ -219,61 +212,5 @@ final class ProcessPool
     public function getWorkerCount(): int
     {
         return $this->workerCount;
-    }
-
-    /**
-     * Get processed job count.
-     *
-     * @return int
-     */
-    public function getProcessedCount(): int
-    {
-        return $this->processed;
-    }
-
-    /**
-     * Gracefully shutdown the pool.
-     *
-     * @return void
-     */
-    public function shutdown(): void
-    {
-        // Workers are created on-demand and cleaned up after each operation
-        // Nothing to do here
-    }
-
-    /**
-     * Initialize worker processes.
-     *
-     * @return void
-     */
-    private function initializeWorkers(): void
-    {
-        // Workers are created on-demand in map/process methods
-        // This avoids keeping idle processes
-    }
-
-    /**
-     * Register signal handlers.
-     *
-     * @return void
-     */
-    private function registerSignalHandlers(): void
-    {
-        if (!function_exists('pcntl_signal')) {
-            return;
-        }
-
-        pcntl_signal(SIGTERM, fn() => $this->shutdown());
-        pcntl_signal(SIGINT, fn() => $this->shutdown());
-        pcntl_async_signals(true);
-    }
-
-    /**
-     * Cleanup on destruction.
-     */
-    public function __destruct()
-    {
-        $this->shutdown();
     }
 }

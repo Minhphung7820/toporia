@@ -81,6 +81,18 @@ final class ProcessManager implements ProcessManagerInterface
     }
 
     /**
+     * Run all pending processes with concurrency limit.
+     * Alias for execute() - implements ProcessManagerInterface.
+     *
+     * @param int $maxConcurrent
+     * @return array
+     */
+    public function run(int $maxConcurrent = 4): array
+    {
+        return $this->execute($maxConcurrent);
+    }
+
+    /**
      * Execute all pending processes with concurrency limit.
      *
      * @param int $maxConcurrent
