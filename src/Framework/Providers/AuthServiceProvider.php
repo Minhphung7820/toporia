@@ -8,6 +8,12 @@ use Toporia\Framework\Auth\AuthManager;
 use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, TokenRepositoryInterface, UserProviderInterface};
 use Toporia\Framework\Auth\Guards\{PersonalTokenGuard, SessionGuard, TokenGuard};
 use Toporia\Framework\Auth\Repositories\TokenRepository;
+use Toporia\Framework\Auth\EmailVerification\EmailVerificationBroker;
+use Toporia\Framework\Auth\EmailVerification\Contracts\EmailVerificationBrokerInterface;
+use Toporia\Framework\Auth\Passwords\PasswordBroker;
+use Toporia\Framework\Auth\Passwords\DatabaseTokenRepository;
+use Toporia\Framework\Auth\Passwords\Contracts\PasswordBrokerInterface;
+use Toporia\Framework\Auth\Passwords\Contracts\TokenRepositoryInterface as PasswordTokenRepositoryInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Http\Request;
@@ -40,6 +46,8 @@ class AuthServiceProvider extends ServiceProvider
         $this->registerTokenRepository($container);
         $this->registerAuthManager($container);
         $this->registerAuthAlias($container);
+        $this->registerEmailVerification($container);
+        $this->registerPasswordBroker($container);
     }
 
     /**
@@ -169,5 +177,106 @@ class AuthServiceProvider extends ServiceProvider
         $tokens = $container->get(TokenRepositoryInterface::class);
 
         return new PersonalTokenGuard($request, $userProvider, $tokens);
+    }
+
+    /**
+     * Register Email Verification Broker.
+     *
+     * @param ContainerInterface $container
+     * @return void
+     */
+    protected function registerEmailVerification(ContainerInterface $container): void
+    {
+        $container->singleton(EmailVerificationBrokerInterface::class, function (ContainerInterface $c) {
+            $key = $this->getAppKey($c);
+            $expiration = $this->getConfig($c, 'auth.verification.expire', 60);
+
+            $broker = new EmailVerificationBroker($key, $expiration);
+
+            // Set mailer if available
+            if ($c->has('mailer')) {
+                $broker->setMailer($c->get('mailer'));
+            }
+
+            return $broker;
+        });
+
+        $container->bind('auth.verification', fn($c) => $c->get(EmailVerificationBrokerInterface::class));
+    }
+
+    /**
+     * Register Password Reset Broker.
+     *
+     * @param ContainerInterface $container
+     * @return void
+     */
+    protected function registerPasswordBroker(ContainerInterface $container): void
+    {
+        // Register password token repository
+        $container->singleton(PasswordTokenRepositoryInterface::class, function (ContainerInterface $c) {
+            $connection = $c->get('db');
+            $hasher = $c->get('hash')->driver();
+
+            $table = $this->getConfig($c, 'auth.passwords.table', 'password_reset_tokens');
+            $key = $this->getAppKey($c);
+            $expires = $this->getConfig($c, 'auth.passwords.expire', 3600);
+            $throttle = $this->getConfig($c, 'auth.passwords.throttle', 60);
+
+            return new DatabaseTokenRepository(
+                $connection,
+                $hasher,
+                $table,
+                $key,
+                $expires,
+                $throttle
+            );
+        });
+
+        // Register password broker
+        $container->singleton(PasswordBrokerInterface::class, function (ContainerInterface $c) {
+            $tokens = $c->get(PasswordTokenRepositoryInterface::class);
+
+            // User resolver callback
+            $userResolver = function (array $credentials) use ($c) {
+                $userProvider = $c->get(UserProviderInterface::class);
+                return $userProvider->retrieveByCredentials($credentials);
+            };
+
+            return new PasswordBroker($tokens, $userResolver);
+        });
+
+        $container->bind('auth.password', fn($c) => $c->get(PasswordBrokerInterface::class));
+    }
+
+    /**
+     * Get application key.
+     *
+     * @param ContainerInterface $container
+     * @return string
+     */
+    protected function getAppKey(ContainerInterface $container): string
+    {
+        return $this->getConfig($container, 'app.key', '');
+    }
+
+    /**
+     * Get config value.
+     *
+     * @param ContainerInterface $container
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    protected function getConfig(ContainerInterface $container, string $key, mixed $default = null): mixed
+    {
+        try {
+            if ($container->has('config')) {
+                return $container->get('config')->get($key, $default);
+            }
+        } catch (\Throwable) {
+            // Fall back to default
+        }
+
+        return $default;
     }
 }

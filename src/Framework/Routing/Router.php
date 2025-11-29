@@ -8,6 +8,8 @@ use Toporia\Framework\Routing\Contracts\{RouteCollectionInterface, RouteInterfac
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Http\Middleware\MiddlewarePipeline;
 use Toporia\Framework\Http\{Request, Response};
+use Toporia\Framework\Routing\RouteModelBinding;
+use Toporia\Framework\Routing\SubdomainRouter;
 
 /**
  * HTTP Router with middleware support and dependency injection.
@@ -50,6 +52,16 @@ final class Router implements RouterInterface
      * @var string Current name prefix for route groups
      */
     private string $currentNamePrefix = '';
+
+    /**
+     * @var RouteModelBinding|null Route model binding instance
+     */
+    private ?RouteModelBinding $modelBinding = null;
+
+    /**
+     * @var SubdomainRouter|null Subdomain router instance
+     */
+    private ?SubdomainRouter $subdomainRouter = null;
 
     /**
      * @param Request $request Current HTTP request.
@@ -198,6 +210,11 @@ final class Router implements RouterInterface
     private function executeRoute(RouteInterface $route, array $parameters): void
     {
         $handler = $route->getHandler();
+
+        // Apply route model binding if configured
+        if ($this->modelBinding !== null) {
+            $parameters = $this->modelBinding->resolve($parameters, $route);
+        }
 
         // Store route parameters in request attributes
         // This allows FormRequest->route() and middleware to access route parameters
@@ -506,5 +523,131 @@ final class Router implements RouterInterface
             'array', 'string' => $data['value'],
             default => fn() => null // Closure placeholder
         };
+    }
+
+    // ============================================================================
+    // Route Model Binding
+    // ============================================================================
+
+    /**
+     * Get or create the model binding instance.
+     *
+     * @return RouteModelBinding
+     */
+    public function getModelBinding(): RouteModelBinding
+    {
+        if ($this->modelBinding === null) {
+            $this->modelBinding = new RouteModelBinding($this->container);
+        }
+
+        return $this->modelBinding;
+    }
+
+    /**
+     * Set the model binding instance.
+     *
+     * @param RouteModelBinding $binding
+     * @return self
+     */
+    public function setModelBinding(RouteModelBinding $binding): self
+    {
+        $this->modelBinding = $binding;
+
+        return $this;
+    }
+
+    /**
+     * Bind a model to a route parameter.
+     *
+     * @param string $parameter Route parameter name
+     * @param string|callable $resolver Model class or resolver callback
+     * @param string|null $key Custom column for lookup
+     * @return self
+     */
+    public function bind(string $parameter, string|callable $resolver, ?string $key = null): self
+    {
+        $this->getModelBinding()->bind($parameter, $resolver, $key);
+
+        return $this;
+    }
+
+    /**
+     * Register a model binding.
+     *
+     * @param string $parameter Route parameter name
+     * @param string $model Model class
+     * @param string|null $key Custom column
+     * @return self
+     */
+    public function model(string $parameter, string $model, ?string $key = null): self
+    {
+        return $this->bind($parameter, $model, $key);
+    }
+
+    // ============================================================================
+    // Subdomain Routing
+    // ============================================================================
+
+    /**
+     * Get or create the subdomain router instance.
+     *
+     * @return SubdomainRouter
+     */
+    public function getSubdomainRouter(): SubdomainRouter
+    {
+        if ($this->subdomainRouter === null) {
+            $this->subdomainRouter = new SubdomainRouter();
+        }
+
+        return $this->subdomainRouter;
+    }
+
+    /**
+     * Set the subdomain router instance.
+     *
+     * @param SubdomainRouter $router
+     * @return self
+     */
+    public function setSubdomainRouter(SubdomainRouter $router): self
+    {
+        $this->subdomainRouter = $router;
+
+        return $this;
+    }
+
+    /**
+     * Create a route group for a specific domain.
+     *
+     * @param string $domain Domain pattern (e.g., '{tenant}.example.com')
+     * @param callable $callback Route definitions callback
+     * @return self
+     */
+    public function domain(string $domain, callable $callback): self
+    {
+        $this->getSubdomainRouter()->group($domain, $callback, $this);
+
+        return $this;
+    }
+
+    /**
+     * Get subdomain parameters from current request.
+     *
+     * @return array<string, string>
+     */
+    public function getSubdomainParameters(): array
+    {
+        return $this->getSubdomainRouter()->getSubdomainParameters();
+    }
+
+    /**
+     * Get a specific subdomain parameter.
+     *
+     * @param string $key Parameter name
+     * @param string|null $default Default value
+     * @return string|null
+     */
+    public function getSubdomainParameter(string $key, ?string $default = null): ?string
+    {
+        return $this->getSubdomainRouter()->getSubdomainParameter($key, $default);
     }
 }

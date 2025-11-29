@@ -38,6 +38,7 @@ class QueryBuilder implements QueryBuilderInterface
     use Concerns\BuildsAggregates;
     use Concerns\BuildsChunking;
     use Concerns\BuildsAdvancedQueries;
+    use Concerns\BuildsJsonQueries;
     /**
      * Target table name.
      *
