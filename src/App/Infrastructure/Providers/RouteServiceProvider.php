@@ -35,6 +35,12 @@ class RouteServiceProvider extends ServiceProvider
         // Load API routes FIRST (before web routes) to ensure they match before catch-all
         $this->loadApiRoutes($app, $router, $middlewareGroups['api'] ?? []);
 
+        // Load webhook routes (no prefix, no middleware group by default)
+        $this->loadWebhookRoutes($app, $router);
+
+        // Load socialite routes (no prefix, no middleware group by default)
+        $this->loadSocialiteRoutes($app, $router);
+
         // Load web routes with 'web' middleware group (catch-all should be last)
         $this->loadWebRoutes($app, $router, $middlewareGroups['web'] ?? []);
     }
@@ -80,5 +86,35 @@ class RouteServiceProvider extends ServiceProvider
                 require $path;
             }
         });
+    }
+
+    /**
+     * Load webhook routes.
+     *
+     * @param Application $app
+     * @param Router $router
+     * @return void
+     */
+    protected function loadWebhookRoutes(Application $app, Router $router): void
+    {
+        $path = $app->path('routes/webhook.php');
+        if (file_exists($path)) {
+            require $path;
+        }
+    }
+
+    /**
+     * Load socialite routes.
+     *
+     * @param Application $app
+     * @param Router $router
+     * @return void
+     */
+    protected function loadSocialiteRoutes(Application $app, Router $router): void
+    {
+        $path = $app->path('routes/socialite.php');
+        if (file_exists($path)) {
+            require $path;
+        }
     }
 }
