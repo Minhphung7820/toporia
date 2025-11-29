@@ -54,7 +54,7 @@ final class ThrottleLogins implements MiddlewareInterface
 
             return $response->json([
                 'error' => 'Too many login attempts',
-                'message' => "Please try again in {$seconds} seconds.",
+                'message' => "Please try again in " . $this->formatDuration($seconds) . ".",
             ], 429); // Too Many Requests
         }
 
@@ -107,5 +107,38 @@ final class ThrottleLogins implements MiddlewareInterface
 
         // Fallback to IP address
         return $request->ip() ?? 'unknown';
+    }
+
+    /**
+     * Format seconds into human-readable duration (e.g., 1h25m38s, 1m54s, 45s)
+     *
+     * @param int $seconds
+     * @return string
+     */
+    private function formatDuration(int $seconds): string
+    {
+        if ($seconds < 60) {
+            return $seconds . 's';
+        }
+
+        $hours = intval($seconds / 3600);
+        $minutes = intval(($seconds % 3600) / 60);
+        $secs = $seconds % 60;
+
+        $parts = [];
+
+        if ($hours > 0) {
+            $parts[] = $hours . 'h';
+        }
+
+        if ($minutes > 0) {
+            $parts[] = $minutes . 'm';
+        }
+
+        if ($secs > 0) {
+            $parts[] = $secs . 's';
+        }
+
+        return implode('', $parts);
     }
 }
