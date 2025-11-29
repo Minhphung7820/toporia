@@ -5,7 +5,17 @@ declare(strict_types=1);
 namespace Toporia\Framework\Mail;
 
 use Toporia\Framework\Mail\Contracts\{MailManagerInterface, MailerInterface, MessageInterface};
-use Toporia\Framework\Mail\{Mailable, ArrayMailer, LogMailer, SmtpMailer};
+use Toporia\Framework\Mail\Transport\{
+    TransportInterface,
+    SmtpTransport,
+    MailgunTransport,
+    SesTransport,
+    PostmarkTransport,
+    ResendTransport,
+    SendGridTransport,
+    LogTransport,
+    ArrayTransport
+};
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**
@@ -13,6 +23,16 @@ use Toporia\Framework\Queue\Contracts\QueueInterface;
  *
  * Manages multiple mail drivers with lazy loading.
  * Follows Strategy pattern for driver selection.
+ *
+ * Supports:
+ * - SMTP (with TLS/STARTTLS)
+ * - Mailgun API
+ * - Amazon SES
+ * - Postmark
+ * - Resend
+ * - SendGrid
+ * - Log (development)
+ * - Array (testing)
  */
 final class MailManager implements MailManagerInterface
 {
@@ -20,6 +40,11 @@ final class MailManager implements MailManagerInterface
      * @var array<string, MailerInterface> Resolved driver instances.
      */
     private array $drivers = [];
+
+    /**
+     * @var array<string, callable> Custom transport creators.
+     */
+    private array $customTransports = [];
 
     /**
      * @param array $config Mail configuration.
@@ -104,13 +129,183 @@ final class MailManager implements MailManagerInterface
         }
 
         $config = $mailers[$driver];
-        $transport = $config['transport'] ?? $driver;
+        $transportType = $config['transport'] ?? $driver;
 
-        return match ($transport) {
-            'smtp' => new SmtpMailer($config, $this->queue),
-            'log' => new LogMailer($config['path'] ?? ''),
-            'array' => new ArrayMailer(),
-            default => throw new \InvalidArgumentException("Unsupported mail transport [{$transport}]"),
+        // Check for custom transport
+        if (isset($this->customTransports[$transportType])) {
+            $transport = ($this->customTransports[$transportType])($config);
+            return $this->createMailerFromTransport($transport, $config);
+        }
+
+        // Create transport based on type
+        $transport = $this->createTransport($transportType, $config);
+
+        return $this->createMailerFromTransport($transport, $config);
+    }
+
+    /**
+     * Create transport from type and config.
+     *
+     * @param string $type Transport type.
+     * @param array<string, mixed> $config Configuration.
+     * @return TransportInterface
+     */
+    private function createTransport(string $type, array $config): TransportInterface
+    {
+        return match ($type) {
+            'smtp', 'mail' => new SmtpTransport(
+                host: $config['host'] ?? 'localhost',
+                port: (int) ($config['port'] ?? 587),
+                encryption: $config['encryption'] ?? 'tls',
+                username: $config['username'] ?? '',
+                password: $config['password'] ?? '',
+                timeout: (int) ($config['timeout'] ?? 30)
+            ),
+            'mailgun' => new MailgunTransport(
+                apiKey: $config['secret'] ?? $config['api_key'] ?? '',
+                domain: $config['domain'] ?? '',
+                region: $config['region'] ?? 'us'
+            ),
+            'ses' => new SesTransport(
+                key: $config['key'] ?? '',
+                secret: $config['secret'] ?? '',
+                region: $config['region'] ?? 'us-east-1'
+            ),
+            'postmark' => new PostmarkTransport(
+                token: $config['token'] ?? $config['secret'] ?? ''
+            ),
+            'resend' => new ResendTransport(
+                apiKey: $config['key'] ?? $config['secret'] ?? ''
+            ),
+            'sendgrid' => new SendGridTransport(
+                apiKey: $config['key'] ?? $config['secret'] ?? ''
+            ),
+            'log' => new LogTransport(
+                logPath: $config['path'] ?? storage_path('logs/mail.log')
+            ),
+            'array' => new ArrayTransport(),
+            default => throw new \InvalidArgumentException(
+                "Unsupported mail transport [{$type}]. Supported: smtp, mailgun, ses, postmark, resend, sendgrid, log, array"
+            ),
         };
+    }
+
+    /**
+     * Create mailer from transport.
+     *
+     * @param TransportInterface $transport Transport instance.
+     * @param array<string, mixed> $config Configuration.
+     * @return Mailer
+     */
+    private function createMailerFromTransport(TransportInterface $transport, array $config): Mailer
+    {
+        $mailer = new Mailer($transport, $this->queue);
+
+        // Set global from address
+        $from = $this->config['from'] ?? [];
+        if (!empty($from['address'])) {
+            $mailer->alwaysFrom($from['address'], $from['name'] ?? '');
+        }
+
+        // Set global reply-to
+        $replyTo = $this->config['reply_to'] ?? [];
+        if (!empty($replyTo['address'])) {
+            $mailer->alwaysReplyTo($replyTo['address'], $replyTo['name'] ?? '');
+        }
+
+        return $mailer;
+    }
+
+    /**
+     * Register a custom transport creator.
+     *
+     * Example:
+     * ```php
+     * $manager->extend('custom', function (array $config) {
+     *     return new CustomTransport($config);
+     * });
+     * ```
+     *
+     * @param string $transport Transport name.
+     * @param callable $callback Creator callback.
+     * @return $this
+     */
+    public function extend(string $transport, callable $callback): self
+    {
+        $this->customTransports[$transport] = $callback;
+        return $this;
+    }
+
+    /**
+     * Get all configured mailer names.
+     *
+     * @return array<string>
+     */
+    public function getAvailableMailers(): array
+    {
+        return array_keys($this->config['mailers'] ?? []);
+    }
+
+    /**
+     * Get global from address.
+     *
+     * @return array{address: string, name: string}
+     */
+    public function getFromAddress(): array
+    {
+        return [
+            'address' => $this->config['from']['address'] ?? '',
+            'name' => $this->config['from']['name'] ?? '',
+        ];
+    }
+
+    /**
+     * Purge cached driver(s).
+     *
+     * @param string|null $driver Driver name (null for all).
+     * @return $this
+     */
+    public function purge(?string $driver = null): self
+    {
+        if ($driver === null) {
+            $this->drivers = [];
+        } else {
+            unset($this->drivers[$driver]);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Begin composing mail to recipient(s).
+     *
+     * @param string|array<string> $recipients Recipient(s).
+     * @return PendingMail
+     */
+    public function to(string|array $recipients): PendingMail
+    {
+        return (new PendingMail($this->driver()))->to($recipients);
+    }
+
+    /**
+     * Begin composing mail with CC.
+     *
+     * @param string|array<string> $recipients CC recipient(s).
+     * @return PendingMail
+     */
+    public function cc(string|array $recipients): PendingMail
+    {
+        return (new PendingMail($this->driver()))->cc($recipients);
+    }
+
+    /**
+     * Begin composing mail with BCC.
+     *
+     * @param string|array<string> $recipients BCC recipient(s).
+     * @return PendingMail
+     */
+    public function bcc(string|array $recipients): PendingMail
+    {
+        return (new PendingMail($this->driver()))->bcc($recipients);
     }
 }

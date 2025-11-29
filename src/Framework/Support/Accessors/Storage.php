@@ -14,9 +14,19 @@ use Toporia\Framework\Storage\Contracts\FilesystemInterface;
  * Provides static-like access to the Storage system.
  * All methods are automatically delegated to the underlying service via __callStatic().
  *
+ * Supported drivers:
+ * - local: Local filesystem
+ * - s3: Amazon S3 / DigitalOcean Spaces / Minio / Cloudflare R2
+ * - gcs: Google Cloud Storage
+ * - azure: Azure Blob Storage
+ * - ftp: FTP/FTPS server
+ * - sftp: SFTP server
+ *
  * @method static FilesystemInterface disk(?string $name = null) Get filesystem disk instance
- * @method static void setDefaultDisk(string $name) Set default disk
  * @method static string getDefaultDisk() Get default disk name
+ * @method static array getAvailableDisks() Get all configured disk names
+ * @method static self extend(string $driver, callable $callback) Register custom driver
+ * @method static self purge(?string $name = null) Clear cached disk(s)
  * @method static bool put(string $path, mixed $contents, array $options = []) Store file contents
  * @method static string|null get(string $path) Get file contents
  * @method static resource|null readStream(string $path) Get file as stream resource
@@ -38,16 +48,25 @@ use Toporia\Framework\Storage\Contracts\FilesystemInterface;
  *
  * @example
  * // Get default disk and use it
- * Storage::disk()->put('file.txt', 'content');
- * $content = Storage::disk()->get('file.txt');
+ * Storage::put('file.txt', 'content');
+ * $content = Storage::get('file.txt');
  *
  * // Get specific disk
  * Storage::disk('s3')->put('uploads/photo.jpg', $data);
+ * Storage::disk('gcs')->put('backups/db.sql', $dump);
+ * Storage::disk('azure')->put('documents/report.pdf', $pdf);
  *
- * // All FilesystemInterface methods available on disk
- * Storage::disk()->exists('file.txt');
- * Storage::disk()->delete('file.txt');
- * Storage::disk()->files('uploads');
+ * // FTP/SFTP
+ * Storage::disk('ftp')->put('remote/file.txt', $content);
+ * Storage::disk('sftp')->get('secure/data.json');
+ *
+ * // Temporary URLs (S3, GCS, Azure)
+ * $url = Storage::disk('s3')->temporaryUrl('private/file.pdf', 3600);
+ *
+ * // Register custom driver
+ * Storage::extend('dropbox', function (array $config) {
+ *     return new DropboxFilesystem($config);
+ * });
  */
 final class Storage extends ServiceAccessor
 {

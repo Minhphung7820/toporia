@@ -25,9 +25,29 @@ final class S3Filesystem implements FilesystemInterface
         private readonly string $key,
         private readonly string $secret,
         private readonly string $baseUrl = '',
-        private readonly string $endpoint = ''
+        private readonly string $endpoint = '',
+        private readonly string $prefix = ''
     ) {
         $this->initializeClient();
+    }
+
+    /**
+     * Create from config.
+     *
+     * @param array<string, mixed> $config Configuration.
+     * @return self
+     */
+    public static function fromConfig(array $config): self
+    {
+        return new self(
+            bucket: $config['bucket'] ?? '',
+            region: $config['region'] ?? 'us-east-1',
+            key: $config['key'] ?? '',
+            secret: $config['secret'] ?? '',
+            baseUrl: $config['url'] ?? '',
+            endpoint: $config['endpoint'] ?? '',
+            prefix: $config['prefix'] ?? ''
+        );
     }
 
     public function put(string $path, mixed $contents, array $options = []): bool

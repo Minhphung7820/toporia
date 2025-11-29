@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Storage;
 
 use Toporia\Framework\Storage\Contracts\FilesystemInterface;
+use Toporia\Framework\Storage\Contracts\CloudFilesystemInterface;
 
 /**
  * Storage Manager
@@ -13,8 +14,11 @@ use Toporia\Framework\Storage\Contracts\FilesystemInterface;
  *
  * Supports:
  * - Local filesystem
- * - S3 (AWS/DigitalOcean/Minio)
- * - FTP (future)
+ * - S3 (AWS/DigitalOcean/Minio/Cloudflare R2)
+ * - Google Cloud Storage (GCS)
+ * - Azure Blob Storage
+ * - FTP/FTPS
+ * - SFTP
  *
  * Performance: O(1) driver lookup with caching
  * SOLID: Single Responsibility - manages multiple storage drivers
@@ -23,6 +27,9 @@ final class StorageManager
 {
     /** @var array<string, FilesystemInterface> */
     private array $disks = [];
+
+    /** @var array<string, callable> Custom driver creators */
+    private array $customDrivers = [];
 
     public function __construct(
         private readonly array $config,
@@ -65,23 +72,89 @@ final class StorageManager
         $config = $this->config['disks'][$name];
         $driver = $config['driver'] ?? 'local';
 
+        // Check for custom driver
+        if (isset($this->customDrivers[$driver])) {
+            return ($this->customDrivers[$driver])($config, $name);
+        }
+
         return match ($driver) {
             'local' => $this->createLocalDisk($config),
             's3' => $this->createS3Disk($config),
-            default => throw new \RuntimeException("Unsupported driver [{$driver}]"),
+            'gcs' => $this->createGcsDisk($config),
+            'azure' => $this->createAzureDisk($config),
+            'ftp' => $this->createFtpDisk($config),
+            'sftp' => $this->createSftpDisk($config),
+            default => throw new \RuntimeException("Unsupported storage driver [{$driver}]. Supported: local, s3, gcs, azure, ftp, sftp"),
         };
+    }
+
+    /**
+     * Register a custom driver creator.
+     *
+     * Example:
+     * ```php
+     * $manager->extend('dropbox', function (array $config, string $name) {
+     *     return new DropboxFilesystem($config);
+     * });
+     * ```
+     *
+     * @param string $driver Driver name
+     * @param callable $callback Creator callback
+     * @return $this
+     */
+    public function extend(string $driver, callable $callback): self
+    {
+        $this->customDrivers[$driver] = $callback;
+        return $this;
+    }
+
+    /**
+     * Get the default disk name.
+     *
+     * @return string
+     */
+    public function getDefaultDisk(): string
+    {
+        return $this->defaultDisk;
+    }
+
+    /**
+     * Get all configured disk names.
+     *
+     * @return array<string>
+     */
+    public function getAvailableDisks(): array
+    {
+        return array_keys($this->config['disks'] ?? []);
+    }
+
+    /**
+     * Purge a disk from cache.
+     *
+     * @param string|null $name Disk name (null for all)
+     * @return $this
+     */
+    public function purge(?string $name = null): self
+    {
+        if ($name === null) {
+            $this->disks = [];
+        } else {
+            unset($this->disks[$name]);
+        }
+
+        return $this;
     }
 
     /**
      * Create local filesystem disk.
      *
-     * @param array $config Disk configuration
+     * @param array<string, mixed> $config Disk configuration
      * @return LocalFilesystem
      */
     private function createLocalDisk(array $config): LocalFilesystem
     {
         return new LocalFilesystem(
-            root: $config['root'],
+            root: $config['root'] ?? storage_path('app'),
             baseUrl: $config['url'] ?? ''
         );
     }
@@ -89,19 +162,58 @@ final class StorageManager
     /**
      * Create S3 filesystem disk.
      *
-     * @param array $config Disk configuration
+     * Supports: AWS S3, DigitalOcean Spaces, Minio, Cloudflare R2, etc.
+     *
+     * @param array<string, mixed> $config Disk configuration
      * @return S3Filesystem
      */
     private function createS3Disk(array $config): S3Filesystem
     {
-        return new S3Filesystem(
-            bucket: $config['bucket'],
-            region: $config['region'] ?? 'us-east-1',
-            key: $config['key'],
-            secret: $config['secret'],
-            baseUrl: $config['url'] ?? '',
-            endpoint: $config['endpoint'] ?? ''
-        );
+        return S3Filesystem::fromConfig($config);
+    }
+
+    /**
+     * Create Google Cloud Storage filesystem disk.
+     *
+     * @param array<string, mixed> $config Disk configuration
+     * @return GcsFilesystem
+     */
+    private function createGcsDisk(array $config): GcsFilesystem
+    {
+        return GcsFilesystem::fromConfig($config);
+    }
+
+    /**
+     * Create Azure Blob Storage filesystem disk.
+     *
+     * @param array<string, mixed> $config Disk configuration
+     * @return AzureFilesystem
+     */
+    private function createAzureDisk(array $config): AzureFilesystem
+    {
+        return AzureFilesystem::fromConfig($config);
+    }
+
+    /**
+     * Create FTP filesystem disk.
+     *
+     * @param array<string, mixed> $config Disk configuration
+     * @return FtpFilesystem
+     */
+    private function createFtpDisk(array $config): FtpFilesystem
+    {
+        return FtpFilesystem::fromConfig($config);
+    }
+
+    /**
+     * Create SFTP filesystem disk.
+     *
+     * @param array<string, mixed> $config Disk configuration
+     * @return SftpFilesystem
+     */
+    private function createSftpDisk(array $config): SftpFilesystem
+    {
+        return SftpFilesystem::fromConfig($config);
     }
 
     /**
