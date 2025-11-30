@@ -50,7 +50,7 @@ return [
             ValidateJsonRequest::class,
             // Rate limiting: Use named limiter 'api' (defined in AppServiceProvider)
             // Or use direct config: 'throttle:20,2' for 20 requests per 2 minutes
-            'throttle:api',  // Named limiter (recommended)
+            // 'throttle:api',  // Named limiter (recommended)
             // ValidateFormRequest is now handled automatically by Router (no middleware needed)
             // LogRequest::class,         // Uncomment to log API requests
         ],
