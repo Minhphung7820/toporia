@@ -1229,7 +1229,13 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      */
     protected function parentSetAttribute(string $key, mixed $value): void
     {
-        $this->attributes[$key] = $value;
+        // Apply cast immediately when setting attribute
+        // This ensures casts are applied consistently everywhere:
+        // - When hydrating from database
+        // - When filling attributes
+        // - When setting via relationships
+        // Performance: O(1) cast lookup, minimal overhead
+        $this->attributes[$key] = $this->castAttribute($key, $value);
     }
 
     /**
@@ -1308,6 +1314,18 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      *
      * Supported types: int, float, string, bool, array, json, date (\DateTime).
      */
+    /**
+     * Cast an attribute value to its defined type.
+     *
+     * Performance optimized:
+     * - O(1) cast lookup (static array)
+     * - Type check before casting to avoid unnecessary operations
+     * - Idempotent: casting already-cast values is safe
+     *
+     * @param string $key Attribute key
+     * @param mixed $value Value to cast
+     * @return mixed Casted value
+     */
     private function castAttribute(string $key, mixed $value): mixed
     {
         if ($value === null) {
@@ -1316,14 +1334,20 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
 
         $cast = static::$casts[$key] ?? null;
 
+        if ($cast === null) {
+            return $value;
+        }
+
+        // Performance optimization: Check type before casting to avoid unnecessary operations
+        // This ensures casts are idempotent (safe to call multiple times)
         return match ($cast) {
-            'int', 'integer' => (int) $value,
-            'float', 'double' => (float) $value,
-            'string' => (string) $value,
-            'bool', 'boolean' => (bool) $value,
-            'array' => is_string($value) ? json_decode($value, true) : $value,
+            'int', 'integer' => is_int($value) ? $value : (int) $value,
+            'float', 'double' => is_float($value) ? $value : (float) $value,
+            'string' => is_string($value) ? $value : (string) $value,
+            'bool', 'boolean' => is_bool($value) ? $value : (bool) $value,
+            'array' => is_array($value) ? $value : (is_string($value) ? json_decode($value, true) : $value),
             'json' => is_string($value) ? json_decode($value) : $value,
-            'date' => is_string($value) ? new \DateTime($value) : $value,
+            'date' => $value instanceof \DateTime ? $value : (is_string($value) ? new \DateTime($value) : $value),
             default => $value
         };
     }
@@ -1600,8 +1624,11 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      */
     public function toArray(): array
     {
-        // Step 1: Start with base attributes
-        $array = $this->attributes;
+        // Step 1: Start with base attributes and apply casts
+        $array = [];
+        foreach ($this->attributes as $key => $value) {
+            $array[$key] = $this->castAttribute($key, $value);
+        }
 
         // Step 2: Include loaded relationships
         foreach ($this->relations as $name => $relation) {

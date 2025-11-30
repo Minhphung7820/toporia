@@ -63,6 +63,7 @@ class ProductModel extends Model
         'images' => 'array',
         'specifications' => 'array',
         'is_active' => 'bool',
+        'avg_rating' => 'float',
     ];
 
     /**
