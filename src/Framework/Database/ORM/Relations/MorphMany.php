@@ -690,7 +690,7 @@ class MorphMany extends Relation
     public function chunk(int $count, callable $callback): bool
     {
         $page = 1;
-        $relatedKey = $this->relatedKey;
+        $relatedKey = $this->relatedClass::getPrimaryKey();
         $relatedTable = $this->getRelatedTableName();
 
         do {
