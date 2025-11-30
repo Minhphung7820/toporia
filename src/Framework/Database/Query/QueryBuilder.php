@@ -1115,18 +1115,9 @@ class QueryBuilder implements QueryBuilderInterface
     {
         $sql = $this->toSql();
 
-        // Log query if logging is enabled
-        if (self::$loggingEnabled) {
-            $startTime = microtime(true);
-        }
-
+        // Connection::select() will log the query automatically
+        // No need to log here to avoid duplicate logs
         $rows = $this->connection->select($sql, $this->bindings); // array<array>
-
-        // Log execution time
-        if (self::$loggingEnabled) {
-            $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
-            self::logQuery($sql, $this->bindings, $executionTime);
-        }
 
         return new RowCollection($rows);
     }
@@ -1211,9 +1202,24 @@ class QueryBuilder implements QueryBuilderInterface
             $bindings = array_values($data);
         }
 
-        $this->connection->execute($sql, $bindings);
+        // Execute INSERT query
+        // Note: Connection::execute() doesn't log, but we log INSERT specifically
+        // because it's important for query log visibility
+        $startTime = null;
+        if (self::$loggingEnabled) {
+            $startTime = microtime(true);
+        }
 
-        return (int) $this->connection->lastInsertId();
+        $this->connection->execute($sql, $bindings);
+        $insertId = (int) $this->connection->lastInsertId();
+
+        // Log INSERT query execution
+        if ($startTime !== null) {
+            $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
+            self::logQuery($sql, $bindings, $executionTime);
+        }
+
+        return $insertId;
     }
 
     /**
@@ -1233,6 +1239,7 @@ class QueryBuilder implements QueryBuilderInterface
         // Merge SET values and WHERE bindings
         $bindings = array_merge(array_values($data), $this->bindings);
 
+        // Connection::affectingStatement() will log the query automatically
         return $this->connection->affectingStatement($sql, $bindings);
     }
 
@@ -1249,6 +1256,7 @@ class QueryBuilder implements QueryBuilderInterface
         $grammar = $this->connection->getGrammar();
         $sql = $grammar->compileDelete($this);
 
+        // Connection::affectingStatement() will log the query automatically
         return $this->connection->affectingStatement($sql, $this->bindings);
     }
 
@@ -1289,16 +1297,8 @@ class QueryBuilder implements QueryBuilderInterface
      */
     public function raw(string $sql, array $bindings = []): DatabaseCollection
     {
-        if (self::$loggingEnabled) {
-            $startTime = microtime(true);
-        }
-
+        // Connection::select() will log the query automatically
         $rows = $this->connection->select($sql, $bindings);
-
-        if (self::$loggingEnabled) {
-            $executionTime = (microtime(true) - $startTime) * 1000;
-            self::logQuery($sql, $bindings, $executionTime);
-        }
 
         return new RowCollection($rows);
     }
@@ -1328,18 +1328,8 @@ class QueryBuilder implements QueryBuilderInterface
      */
     public function statement(string $sql, array $bindings = []): int
     {
-        if (self::$loggingEnabled) {
-            $startTime = microtime(true);
-        }
-
-        $affected = $this->connection->affectingStatement($sql, $bindings);
-
-        if (self::$loggingEnabled) {
-            $executionTime = (microtime(true) - $startTime) * 1000;
-            self::logQuery($sql, $bindings, $executionTime);
-        }
-
-        return $affected;
+        // Connection::affectingStatement() will log the query automatically
+        return $this->connection->affectingStatement($sql, $bindings);
     }
 
     /**
@@ -2022,6 +2012,43 @@ class QueryBuilder implements QueryBuilderInterface
      * @return void
      */
     private static function logQuery(string $query, array $bindings, float $time): void
+    {
+        if (!self::$loggingEnabled) {
+            return;
+        }
+
+        self::$queryLog[] = [
+            'query' => $query,
+            'bindings' => $bindings,
+            'time' => $time,
+        ];
+    }
+
+    /**
+     * Check if query logging is enabled.
+     *
+     * Public method to allow Connection and other classes to check logging status.
+     *
+     * @return bool
+     */
+    public static function isQueryLogEnabled(): bool
+    {
+        return self::$loggingEnabled;
+    }
+
+    /**
+     * Log a query directly from Connection or other classes.
+     *
+     * This allows Connection::select(), Connection::affectingStatement(), etc.
+     * to log queries even when called directly (not through QueryBuilder).
+     * This ensures all queries are logged, including window functions, subqueries, etc.
+     *
+     * @param string $query SQL query
+     * @param array $bindings Parameter bindings
+     * @param float $time Execution time in milliseconds
+     * @return void
+     */
+    public static function logQueryDirectly(string $query, array $bindings, float $time): void
     {
         if (!self::$loggingEnabled) {
             return;

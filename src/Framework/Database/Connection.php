@@ -197,8 +197,22 @@ class Connection implements ConnectionInterface
      */
     public function query(string $query, array $bindings = []): array
     {
+        // Log query if query logging is enabled
+        $startTime = null;
+        if (\Toporia\Framework\Database\Query\QueryBuilder::isQueryLogEnabled()) {
+            $startTime = microtime(true);
+        }
+
         $statement = $this->execute($query, $bindings);
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        $results = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        // Log query execution
+        if ($startTime !== null) {
+            $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
+            \Toporia\Framework\Database\Query\QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
+        }
+
+        return $results;
     }
 
     /**
@@ -505,8 +519,22 @@ class Connection implements ConnectionInterface
      */
     public function select(string $query, array $bindings = []): array
     {
+        // Log query if query logging is enabled
+        $startTime = null;
+        if (\Toporia\Framework\Database\Query\QueryBuilder::isQueryLogEnabled()) {
+            $startTime = microtime(true);
+        }
+
         $statement = $this->execute($query, $bindings);
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        $results = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        // Log query execution (important for window functions, subqueries, etc.)
+        if ($startTime !== null) {
+            $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
+            \Toporia\Framework\Database\Query\QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
+        }
+
+        return $results;
     }
 
     /**
@@ -518,8 +546,21 @@ class Connection implements ConnectionInterface
      */
     public function selectOne(string $query, array $bindings = []): ?array
     {
+        // Log query if query logging is enabled
+        $startTime = null;
+        if (\Toporia\Framework\Database\Query\QueryBuilder::isQueryLogEnabled()) {
+            $startTime = microtime(true);
+        }
+
         $statement = $this->execute($query, $bindings);
         $result = $statement->fetch(PDO::FETCH_ASSOC);
+
+        // Log query execution
+        if ($startTime !== null) {
+            $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
+            \Toporia\Framework\Database\Query\QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
+        }
+
         return $result ?: null;
     }
 
@@ -532,8 +573,22 @@ class Connection implements ConnectionInterface
      */
     public function affectingStatement(string $query, array $bindings = []): int
     {
+        // Log query if query logging is enabled
+        $startTime = null;
+        if (\Toporia\Framework\Database\Query\QueryBuilder::isQueryLogEnabled()) {
+            $startTime = microtime(true);
+        }
+
         $statement = $this->execute($query, $bindings);
-        return $statement->rowCount();
+        $affected = $statement->rowCount();
+
+        // Log query execution (important for insert/update/delete operations)
+        if ($startTime !== null) {
+            $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
+            \Toporia\Framework\Database\Query\QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
+        }
+
+        return $affected;
     }
 
     /**
