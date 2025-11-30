@@ -465,13 +465,26 @@ class HasManyThrough extends Relation
      * Process records in chunks to optimize memory usage.
      * Note: Uses OFFSET/LIMIT which can be slow on large tables.
      * For better performance on large datasets, use chunkById() instead.
+     *
+     * CRITICAL: Always orders by primary key to ensure consistent pagination
+     * and prevent skipped/duplicate records when data changes during chunking.
      */
     public function chunk(int $count, callable $callback): bool
     {
         $page = 1;
+        $relatedKey = $this->relatedKey;
+        $relatedTable = $this->getRelatedTableName();
 
         do {
-            $results = $this->query->limit($count)->offset(($page - 1) * $count)->get();
+            // Clone query to avoid mutating the base query
+            $query = clone $this->query;
+
+            // CRITICAL: Always order by primary key to ensure consistent pagination
+            // This prevents skipped/duplicate records when data changes during chunking
+            // Use qualified column name to avoid ambiguity in JOIN queries
+            $query->orderBy("{$relatedTable}.{$relatedKey}", 'ASC');
+
+            $results = $query->limit($count)->offset(($page - 1) * $count)->get();
 
             if ($results->isEmpty()) {
                 break;

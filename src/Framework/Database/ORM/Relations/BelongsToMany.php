@@ -1981,10 +1981,18 @@ class BelongsToMany extends Relation
     public function chunk(int $count, callable $callback): bool
     {
         $page = 1;
+        $relatedKey = $this->relatedKey;
+        $relatedTable = $this->getRelatedTableName();
 
         do {
             // Clone query to avoid mutating the base query
             $query = clone $this->query;
+
+            // CRITICAL: Always order by primary key to ensure consistent pagination
+            // This prevents skipped/duplicate records when data changes during chunking
+            // Use qualified column name to avoid ambiguity in JOIN queries
+            $query->orderBy("{$relatedTable}.{$relatedKey}", 'ASC');
+
             $results = $query->limit($count)->offset(($page - 1) * $count)->get();
 
             if ($results->isEmpty()) {
