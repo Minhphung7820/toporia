@@ -112,9 +112,8 @@ class HasMany extends Relation
                 $foreignKey = $this->foreignKey;
                 $table = $this->query->getTable();
 
-                // Get Grammar for safe column/table wrapping
+                // Get Grammar for safe column wrapping
                 $grammar = $this->query->getConnection()->getGrammar();
-                $wrappedTable = $grammar->wrapTable($table);
                 $wrappedForeignKey = $grammar->wrapColumn($foreignKey);
 
                 // Build ORDER BY clause for window function
