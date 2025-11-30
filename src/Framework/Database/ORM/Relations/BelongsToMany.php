@@ -257,7 +257,6 @@ class BelongsToMany extends Relation
         }
 
         $relatedTable = $this->getRelatedTableName();
-        $selectColumns = $this->buildSelectColumns($relatedTable);
 
         $this->query
             ->join(
@@ -270,35 +269,23 @@ class BelongsToMany extends Relation
                 $this->qualifyPivotColumn($this->foreignPivotKey),
                 $this->parent->getAttribute($this->parentKey)
             )
-            ->select($selectColumns);
+            ->select("{$relatedTable}.*");
 
-        // Apply soft delete scope if related model uses soft deletes
-        $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
-    }
+        // Use selectRaw for pivot columns to avoid wrapping issues with aliases
+        // This ensures pivot columns are selected with correct aliases (not wrapped as single string)
+        $this->query->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
+        $this->query->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
 
-    /**
-     * Build the SELECT columns array including pivot columns.
-     *
-     * OPTIMIZED: Also selects foreignPivotKey and relatedPivotKey from pivot table
-     * to avoid a separate pivot query during eager loading.
-     */
-    protected function buildSelectColumns(string $relatedTable): array
-    {
-        $columns = ["{$relatedTable}.*"];
-
-        // Always select foreignPivotKey and relatedPivotKey from pivot table
-        // This allows us to use pivot data from the main query instead of querying again
-        $columns[] = "{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}";
-        $columns[] = "{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}";
-
+        // Add other pivot columns
         foreach ($this->pivotColumns as $column) {
             // Skip if already added (foreignPivotKey or relatedPivotKey might be in pivotColumns)
             if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
-                $columns[] = "{$this->pivotTable}.{$column} as pivot_{$column}";
+                $this->query->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
             }
         }
 
-        return $columns;
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
     }
 
     /**
@@ -1953,7 +1940,9 @@ class BelongsToMany extends Relation
         $page = 1;
 
         do {
-            $results = $this->query->limit($count)->offset(($page - 1) * $count)->get();
+            // Clone query to avoid mutating the base query
+            $query = clone $this->query;
+            $results = $query->limit($count)->offset(($page - 1) * $count)->get();
 
             if ($results->isEmpty()) {
                 break;

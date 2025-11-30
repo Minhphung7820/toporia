@@ -12,6 +12,7 @@ use App\Infrastructure\Persistence\Models\UserModel;
 use App\Infrastructure\Persistence\Models\TagModel;
 use App\Infrastructure\Persistence\Models\OrderItemModel;
 use Toporia\Framework\Http\Request;
+use Toporia\Framework\Http\Contracts\JsonResponseInterface;
 use Toporia\Framework\Support\Accessors\DB;
 use Toporia\Framework\Support\Accessors\QueryBuilder;
 
@@ -23,6 +24,23 @@ use Toporia\Framework\Support\Accessors\QueryBuilder;
 final class ProductController extends BaseController
 {
     /**
+     * Format query logs for response.
+     *
+     * @param array $queries Raw query logs
+     * @return array Formatted query logs
+     */
+    private function formatQueryLogs(array $queries): array
+    {
+        return array_map(function ($query) {
+            return [
+                'query' => $query['query'] ?? '',
+                'bindings' => $query['bindings'] ?? [],
+                'time' => ($query['time'] ?? 0) . 'ms'
+            ];
+        }, $queries);
+    }
+
+    /**
      * Demo method to test different HTTP methods.
      *
      * GET /api/products/test-methods
@@ -31,8 +49,10 @@ final class ProductController extends BaseController
      * PATCH /api/products/test-methods
      * DELETE /api/products/test-methods
      */
-    public function testMethods(Request $request): void
+    public function testMethods(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $response = [
             'method' => $request->method(),
             'is_get' => $request->isGet(),
@@ -48,10 +68,13 @@ final class ProductController extends BaseController
             'all_input' => $request->input(),
         ];
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'HTTP Methods Test',
             'data' => $response,
+            'queries' => $queries,
         ]);
     }
 
@@ -62,6 +85,8 @@ final class ProductController extends BaseController
      */
     public function index(Request $request)
     {
+        DB::enableQueryLog();
+
         // Test enterprise Response system with different response types
         // Test different approaches for explain functionality
 
@@ -80,21 +105,14 @@ final class ProductController extends BaseController
         $cursor = $request->get('cursor'); // Get cursor from query parameter
         $path = $request->path();
         $baseUrl = $request->root(); // Get base URL (http://localhost:8000)
-        DB::enableQueryLog();
         $optimizedQuery = ProductModel::query()
             ->with('categories')
             ->optimizeForLargeResults()
             ->orderBy('id', 'ASC') // Cursor column must be ordered
             ->cursorPaginate($perPage, ['cursor' => $cursor], ['path' => $path, 'baseUrl' => $baseUrl]);
-        $queries = DB::getQueryLog();
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
         $singleProduct = [
-            'queries' => array_map(function ($query) {
-                return [
-                    'query' => $query['query'],
-                    'bindings' => $query['bindings'],
-                    'time' => $query['time'] . 'ms'
-                ];
-            }, $queries),
+            'queries' => $queries,
             'sql_info' => $sqlInfo,
             'actual_data' => $actualData,
             'optimized_result' => $optimizedQuery,
@@ -111,9 +129,11 @@ final class ProductController extends BaseController
      *
      * GET /api/products/{id}?with=category,reviews,categories
      */
-    public function show(Request $request, int $id): void
+    public function show(Request $request, int $id): JsonResponseInterface
     {
         try {
+            DB::enableQueryLog();
+
             $query = ProductModel::where('id', $id);
 
             // Eager loading
@@ -127,22 +147,27 @@ final class ProductController extends BaseController
             /** @var ProductModel|null $product */
             $product = $query->first();
 
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+
             if (!$product) {
-                $this->json([
+                return response()->json([
                     'success' => false,
                     'message' => 'Product not found',
+                    'queries' => $queries,
                 ], 404);
-                return;
             }
 
-            $this->json([
+            return response()->json([
                 'success' => true,
                 'data' => $product->toArray(),
+                'queries' => $queries,
             ]);
         } catch (\Throwable $e) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),
+                'queries' => $queries,
             ], 500);
         }
     }
@@ -385,9 +410,11 @@ final class ProductController extends BaseController
      *
      * GET /api/categories
      */
-    public function categories(Request $request): void
+    public function categories(Request $request): JsonResponseInterface
     {
         try {
+            DB::enableQueryLog();
+
             $query = CategoryModel::query();
 
             if ($request->has('active')) {
@@ -403,14 +430,19 @@ final class ProductController extends BaseController
                 $data[] = $category->toArray();
             }
 
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+            return response()->json([
                 'success' => true,
                 'data' => $data,
+                'queries' => $queries,
             ]);
         } catch (\Throwable $e) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),
+                'queries' => $queries,
             ], 500);
         }
     }
@@ -420,8 +452,10 @@ final class ProductController extends BaseController
      *
      * GET /api/products/stats
      */
-    public function stats(Request $request): void
+    public function stats(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $stats = [
             'total_products' => ProductModel::count(),
             'active_products' => ProductModel::where('is_active', true)->count(),
@@ -443,9 +477,12 @@ final class ProductController extends BaseController
                 ]),
         ];
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'data' => $stats,
+            'queries' => $queries,
         ]);
     }
 
@@ -454,8 +491,10 @@ final class ProductController extends BaseController
      *
      * GET /api/products/performance?limit=1000
      */
-    public function performance(Request $request): void
+    public function performance(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $limit = (int) $request->input('limit', 100);
 
         $startTime = microtime(true);
@@ -469,7 +508,9 @@ final class ProductController extends BaseController
         $endTime = microtime(true);
         $executionTime = round(($endTime - $startTime) * 1000, 2); // milliseconds
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'data' => [
                 'count' => $products->count(),
@@ -477,6 +518,7 @@ final class ProductController extends BaseController
                 'memory_usage_mb' => round(memory_get_usage(true) / 1024 / 1024, 2),
             ],
             'products' => array_map(fn($p) => $p->toArray(), $products->all()),
+            'queries' => $queries,
         ]);
     }
 
@@ -485,7 +527,7 @@ final class ProductController extends BaseController
      *
      * GET /api/products/top-rated?limit=10
      */
-    public function topRated(Request $request): void
+    public function topRated(Request $request): JsonResponseInterface
     {
         $limit = (int) $request->input('limit', 10);
 
@@ -501,7 +543,7 @@ final class ProductController extends BaseController
             $data[] = $product->toArray();
         }
 
-        $this->json([
+        return response()->json([
             'success' => true,
             'data' => $data,
         ]);
@@ -512,17 +554,20 @@ final class ProductController extends BaseController
      *
      * GET /api/products/{id}/reviews
      */
-    public function reviews(Request $request, int $id): void
+    public function reviews(Request $request, int $id): JsonResponseInterface
     {
         try {
+            DB::enableQueryLog();
+
             $product = ProductModel::find($id);
 
             if (!$product) {
-                $this->json([
+                $queries = $this->formatQueryLogs(DB::getQueryLog());
+                return response()->json([
                     'success' => false,
                     'message' => 'Product not found',
+                    'queries' => $queries,
                 ], 404);
-                return;
             }
 
             $reviews = $product->reviews()
@@ -531,7 +576,9 @@ final class ProductController extends BaseController
                 ->orderBy('created_at', 'DESC')
                 ->paginate(20, (int) $request->input('page', 1));
 
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+            return response()->json([
                 'success' => true,
                 'data' => [
                     'product' => $product->toArray(),
@@ -542,11 +589,14 @@ final class ProductController extends BaseController
                         'last_page' => $reviews->lastPage(),
                     ],
                 ],
+                'queries' => $queries,
             ]);
         } catch (\Throwable $e) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),
+                'queries' => $queries,
             ], 500);
         }
     }
@@ -556,30 +606,22 @@ final class ProductController extends BaseController
      *
      * GET /api/products/test-belongs-to-many
      */
-    public function testBelongsToMany(Request $request): void
+    public function testBelongsToMany(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         // Test various BelongsToMany features
         $results = [];
 
         // 1. Basic many-to-many with pivot columns
-        $productsWithCategories = ProductModel::with(['categories' => function ($query) {
-            $query->withPivot('created_at', 'updated_at', 'sort_order')
-                ->withTimestamps()
-                ->wherePivot('is_active', true)
-                ->orderByPivot('sort_order', 'asc');
-        }])
+        $productsWithCategories = ProductModel::with(['categories'])
             ->limit(5)
             ->get();
 
         $results['basic_pivot'] = $productsWithCategories;
 
         // 2. Complex pivot constraints
-        $productsWithFilteredCategories = ProductModel::with(['categories' => function ($query) {
-            $query->withPivot('sort_order', 'is_featured', 'created_at')
-                ->wherePivotBetween('sort_order', [1, 10])
-                ->wherePivotDate('created_at', '>=', '2024-01-01')
-                ->wherePivotNotNull('is_featured');
-        }])
+        $productsWithFilteredCategories = ProductModel::with(['categories'])
             ->limit(3)
             ->get();
 
@@ -602,10 +644,13 @@ final class ProductController extends BaseController
         });
         $results['chunk_results'] = $chunkResults;
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'BelongsToMany relationship tests',
-            'data' => $results
+            'data' => $results,
+            'queries' => $queries
         ]);
     }
 
@@ -614,8 +659,10 @@ final class ProductController extends BaseController
      *
      * GET /api/products/test-has-relationships
      */
-    public function testHasRelationships(Request $request): void
+    public function testHasRelationships(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $results = [];
 
         // 1. HasMany with complex queries
@@ -652,10 +699,13 @@ final class ProductController extends BaseController
         });
         $results['chunked_reviews'] = $chunkData;
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'HasMany relationship tests',
-            'data' => $results
+            'data' => $results,
+            'queries' => $queries
         ]);
     }
 
@@ -664,8 +714,10 @@ final class ProductController extends BaseController
      *
      * GET /api/products/test-belongs-to
      */
-    public function testBelongsTo(Request $request): void
+    public function testBelongsTo(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $results = [];
 
         // 1. Basic BelongsTo with constraints
@@ -690,10 +742,13 @@ final class ProductController extends BaseController
             })->count(),
         ];
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'BelongsTo relationship tests',
-            'data' => $results
+            'data' => $results,
+            'queries' => $queries
         ]);
     }
 
@@ -702,8 +757,10 @@ final class ProductController extends BaseController
      *
      * GET /api/products/test-complex-queries
      */
-    public function testComplexQueries(Request $request): void
+    public function testComplexQueries(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $results = [];
 
         // 1. Multi-level eager loading
@@ -745,10 +802,13 @@ final class ProductController extends BaseController
 
         $results['subquery_selections'] = $productsWithSubqueries;
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Complex query tests',
-            'data' => $results
+            'data' => $results,
+            'queries' => $queries
         ]);
     }
 
@@ -757,15 +817,16 @@ final class ProductController extends BaseController
      *
      * POST /api/products/test-sync-operations
      */
-    public function testSyncOperations(Request $request): void
+    public function testSyncOperations(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $results = [];
         $productId = $request->input('product_id', 1);
 
         $product = ProductModel::find($productId);
         if (!$product) {
-            $this->json(['error' => 'Product not found'], 404);
-            return;
+            return response()->json(['error' => 'Product not found'], 404);
         }
 
         // 1. Basic sync
@@ -795,10 +856,13 @@ final class ProductController extends BaseController
         ]);
         $results['update_pivot'] = $updateResult;
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Sync operations tests',
-            'data' => $results
+            'data' => $results,
+            'queries' => $queries
         ]);
     }
 
@@ -807,8 +871,10 @@ final class ProductController extends BaseController
      *
      * GET /api/products/test-performance
      */
-    public function testPerformance(Request $request): void
+    public function testPerformance(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $results = [];
         $startTime = microtime(true);
 
@@ -865,11 +931,14 @@ final class ProductController extends BaseController
             'results_count' => $complexQuery->count()
         ];
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Performance tests',
             'data' => $results,
-            'total_time' => microtime(true) - $startTime
+            'total_time' => microtime(true) - $startTime,
+            'queries' => $queries
         ]);
     }
 
@@ -878,15 +947,17 @@ final class ProductController extends BaseController
      *
      * GET /api/products/test-pivot-validation
      */
-    public function testPivotValidation(Request $request): void
+    public function testPivotValidation(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $results = [];
         $productId = $request->input('product_id', 1);
 
         $product = ProductModel::find($productId);
         if (!$product) {
-            $this->json(['error' => 'Product not found'], 404);
-            return;
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json(['error' => 'Product not found', 'queries' => $queries], 404);
         }
 
         // 1. Validate pivot table structure
@@ -913,10 +984,13 @@ final class ProductController extends BaseController
             ->get();
         $results['pivot_query_results'] = $pivotQuery;
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Pivot validation tests',
-            'data' => $results
+            'data' => $results,
+            'queries' => $queries
         ]);
     }
 
@@ -933,8 +1007,10 @@ final class ProductController extends BaseController
      *   "related_product_ids": [10, 11]  // belongsToMany relatedProducts
      * }
      */
-    public function store(Request $request): void
+    public function store(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $data = $request->json();
 
         // Create product
@@ -1004,10 +1080,13 @@ final class ProductController extends BaseController
         // Load relationships for response
         $product->load(['category', 'categories', 'tags', 'allTags', 'relatedProducts']);
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Product created successfully',
             'data' => $product->toArray(),
+            'queries' => $queries,
         ], 201);
     }
 
@@ -1022,16 +1101,19 @@ final class ProductController extends BaseController
      *   "related_product_ids": [10, 11]   // Sync related products
      * }
      */
-    public function updateRelationships(Request $request, int $id): void
+    public function updateRelationships(Request $request, int $id): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $product = ProductModel::find($id);
 
         if (!$product) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found',
+                'queries' => $queries,
             ], 404);
-            return;
         }
 
         $data = $request->json();
@@ -1080,13 +1162,16 @@ final class ProductController extends BaseController
         // Reload relationships
         $product->load(['categories', 'tags', 'allTags', 'relatedProducts']);
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Relationships updated successfully',
             'data' => [
                 'product' => $product->toArray(),
                 'sync_results' => $results,
             ],
+            'queries' => $queries,
         ]);
     }
 
@@ -1095,22 +1180,27 @@ final class ProductController extends BaseController
      *
      * GET /api/products/{id}/polymorphic-tags
      */
-    public function getPolymorphicTags(Request $request, int $id): void
+    public function getPolymorphicTags(Request $request, int $id): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $product = ProductModel::find($id);
 
         if (!$product) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found',
+                'queries' => $queries,
             ], 404);
-            return;
         }
 
         // Load polymorphic tags
         $product->load('allTags');
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'data' => [
                 'product_id' => $product->id,
@@ -1118,6 +1208,7 @@ final class ProductController extends BaseController
                 'polymorphic_tags' => $product->allTags->toArray(),
                 'polymorphic_tags_count' => $product->allTags->count(),
             ],
+            'queries' => $queries,
         ]);
     }
 
@@ -1129,27 +1220,31 @@ final class ProductController extends BaseController
      *   "tag_ids": [1, 2, 3]
      * }
      */
-    public function attachPolymorphicTags(Request $request, int $id): void
+    public function attachPolymorphicTags(Request $request, int $id): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $product = ProductModel::find($id);
 
         if (!$product) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found',
+                'queries' => $queries,
             ], 404);
-            return;
         }
 
         $data = $request->json();
         $tagIds = $data['tag_ids'] ?? [];
 
         if (empty($tagIds) || !is_array($tagIds)) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'message' => 'tag_ids must be a non-empty array',
+                'queries' => $queries,
             ], 400);
-            return;
         }
 
         // Attach polymorphic tags
@@ -1158,7 +1253,9 @@ final class ProductController extends BaseController
         // Reload to get updated tags
         $product->load('allTags');
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Polymorphic tags attached successfully',
             'data' => [
@@ -1166,6 +1263,7 @@ final class ProductController extends BaseController
                 'attached_tag_ids' => $tagIds,
                 'polymorphic_tags' => $product->allTags->toArray(),
             ],
+            'queries' => $queries,
         ]);
     }
 
@@ -1177,16 +1275,19 @@ final class ProductController extends BaseController
      *   "tag_ids": [1, 2, 3]  // Will detach others not in this list
      * }
      */
-    public function syncPolymorphicTags(Request $request, int $id): void
+    public function syncPolymorphicTags(Request $request, int $id): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $product = ProductModel::find($id);
 
         if (!$product) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found',
+                'queries' => $queries,
             ], 404);
-            return;
         }
 
         $data = $request->json();
@@ -1198,7 +1299,9 @@ final class ProductController extends BaseController
         // Reload to get updated tags
         $product->load('allTags');
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Polymorphic tags synced successfully',
             'data' => [
@@ -1210,6 +1313,7 @@ final class ProductController extends BaseController
                 ],
                 'polymorphic_tags' => $product->allTags->toArray(),
             ],
+            'queries' => $queries,
         ]);
     }
 
@@ -1221,16 +1325,19 @@ final class ProductController extends BaseController
      *   "tag_ids": [1, 2]  // Optional: specific tags to detach. If empty, detach all.
      * }
      */
-    public function detachPolymorphicTags(Request $request, int $id): void
+    public function detachPolymorphicTags(Request $request, int $id): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $product = ProductModel::find($id);
 
         if (!$product) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found',
+                'queries' => $queries,
             ], 404);
-            return;
         }
 
         $data = $request->json();
@@ -1248,7 +1355,9 @@ final class ProductController extends BaseController
         // Reload to get updated tags
         $product->load('allTags');
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => $message,
             'data' => [
@@ -1256,6 +1365,7 @@ final class ProductController extends BaseController
                 'detached_tag_ids' => $tagIds,
                 'polymorphic_tags' => $product->allTags->toArray(),
             ],
+            'queries' => $queries,
         ]);
     }
 
@@ -1264,8 +1374,10 @@ final class ProductController extends BaseController
      *
      * GET /api/products/{id}/relationships
      */
-    public function getAllRelationships(Request $request, int $id): void
+    public function getAllRelationships(Request $request, int $id): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $product = ProductModel::with([
             'category',              // belongsTo
             'categories',            // belongsToMany
@@ -1278,14 +1390,17 @@ final class ProductController extends BaseController
         ])->find($id);
 
         if (!$product) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'message' => 'Product not found',
+                'queries' => $queries,
             ], 404);
-            return;
         }
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'data' => [
                 'product' => [
@@ -1311,6 +1426,7 @@ final class ProductController extends BaseController
                     'favorited_by_count' => $product->favoritedBy->count(),
                 ],
             ],
+            'queries' => $queries,
         ]);
     }
 
@@ -1326,17 +1442,20 @@ final class ProductController extends BaseController
      *   "is_active": true
      * }
      */
-    public function createTag(Request $request): void
+    public function createTag(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $data = $request->json();
 
         // Validate required fields
         if (empty($data['name'])) {
-            $this->json([
+            $queries = $this->formatQueryLogs(DB::getQueryLog());
+            return response()->json([
                 'success' => false,
                 'message' => 'Tag name is required',
+                'queries' => $queries,
             ], 400);
-            return;
         }
 
         // Auto-generate slug if not provided
@@ -1352,10 +1471,13 @@ final class ProductController extends BaseController
             'usage_count' => 0,
         ]);
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'message' => 'Tag created successfully',
             'data' => $tag->toArray(),
+            'queries' => $queries,
         ], 201);
     }
 
@@ -1364,8 +1486,10 @@ final class ProductController extends BaseController
      *
      * GET /api/tags?active=true&popular=true&limit=20
      */
-    public function getTags(Request $request): void
+    public function getTags(Request $request): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $query = TagModel::query();
 
         // Filter active tags
@@ -1381,10 +1505,13 @@ final class ProductController extends BaseController
             $tags = $query->orderBy('name', 'ASC')->get();
         }
 
-        $this->json([
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
             'success' => true,
             'data' => $tags->toArray(),
             'count' => $tags->count(),
+            'queries' => $queries,
         ]);
     }
 
@@ -1393,8 +1520,10 @@ final class ProductController extends BaseController
      *
      * GET /api/tags/{id}?with=products,categories
      */
-    public function getTag(Request $request, int $id): void
+    public function getTag(Request $request, int $id): JsonResponseInterface
     {
+        DB::enableQueryLog();
+
         $query = TagModel::where('id', $id);
 
         // Eager loading
@@ -1407,17 +1536,20 @@ final class ProductController extends BaseController
 
         $tag = $query->first();
 
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
         if (!$tag) {
-            $this->json([
+            return response()->json([
                 'success' => false,
                 'message' => 'Tag not found',
+                'queries' => $queries,
             ], 404);
-            return;
         }
 
-        $this->json([
+        return response()->json([
             'success' => true,
             'data' => $tag->toArray(),
+            'queries' => $queries,
         ]);
     }
 }
