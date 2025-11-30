@@ -49,6 +49,13 @@ trait HasEagerLoading
     protected static array $nestedRelations = [];
 
     /**
+     * Constraints for nested relationships.
+     *
+     * @var array<string, array<string, \Closure|null>>
+     */
+    protected static array $nestedConstraints = [];
+
+    /**
      * Eager load relationships for a collection of models.
      *
      * This is the main method that prevents N+1 queries.
@@ -81,8 +88,9 @@ trait HasEagerLoading
             return;
         }
 
-        // Clear nested relations from previous calls
+        // Clear nested relations and constraints from previous calls
         static::$nestedRelations = [];
+        static::$nestedConstraints = [];
 
         // Group relationships by type for batch loading
         $grouped = static::groupRelationsByType($models, $relations);
@@ -94,8 +102,9 @@ trait HasEagerLoading
             static::loadRelationBatch($models, $relationName, $relationInstances, $constraint);
         }
 
-        // Clear nested relations after loading
+        // Clear nested relations and constraints after loading
         static::$nestedRelations = [];
+        static::$nestedConstraints = [];
     }
 
     /**
@@ -113,7 +122,8 @@ trait HasEagerLoading
     {
         $grouped = [];
         $nested = []; // Track nested relations for later processing
-        $constraints = []; // Track constraints for each relation
+        $constraints = []; // Track constraints for first-level relations
+        $nestedConstraints = []; // Track constraints for nested relations
 
         foreach ($relations as $key => $value) {
             // Handle format: ['relation' => Closure] or 'relation'
@@ -131,10 +141,26 @@ trait HasEagerLoading
 
             // Track nested relations for this first-level relation
             if (isset($parts[1])) {
+                $nestedRelation = $parts[1];
+
                 if (!isset($nested[$firstLevelRelation])) {
                     $nested[$firstLevelRelation] = [];
                 }
-                $nested[$firstLevelRelation][] = $parts[1];
+                $nested[$firstLevelRelation][] = $nestedRelation;
+
+                // Store constraint for nested relation (not first-level)
+                // The constraint should apply to the final relationship in the path
+                if ($constraint !== null) {
+                    if (!isset($nestedConstraints[$firstLevelRelation])) {
+                        $nestedConstraints[$firstLevelRelation] = [];
+                    }
+                    $nestedConstraints[$firstLevelRelation][$nestedRelation] = $constraint;
+                }
+            } else {
+                // This is a first-level relation, store constraint for it
+                if ($constraint !== null) {
+                    $constraints[$firstLevelRelation] = $constraint;
+                }
             }
 
             // Skip if already grouped
@@ -153,11 +179,6 @@ trait HasEagerLoading
                 continue;
             }
 
-            // Store constraint if provided
-            if ($constraint !== null) {
-                $constraints[$firstLevelRelation] = $constraint;
-            }
-
             $grouped[$firstLevelRelation] = [];
             foreach ($models as $model) {
                 $grouped[$firstLevelRelation][] = $model->$firstLevelRelation();
@@ -167,6 +188,11 @@ trait HasEagerLoading
         // Store nested relations for processing after first level is loaded
         if (!empty($nested)) {
             static::$nestedRelations = $nested;
+        }
+
+        // Store nested constraints
+        if (!empty($nestedConstraints)) {
+            static::$nestedConstraints = $nestedConstraints;
         }
 
         // Return grouped relations with constraints
@@ -250,7 +276,23 @@ trait HasEagerLoading
 
         // Load nested relationships if any (e.g., 'posts.comments')
         if (isset(static::$nestedRelations[$relationName]) && $results instanceof ModelCollection && !$results->isEmpty()) {
-            static::eagerLoadRelations($results, static::$nestedRelations[$relationName]);
+            $nestedRelationsToLoad = static::$nestedRelations[$relationName];
+
+            // Apply constraints to nested relations if they exist
+            $nestedRelationsWithConstraints = [];
+            $nestedConstraintsForThisRelation = static::$nestedConstraints[$relationName] ?? [];
+
+            foreach ($nestedRelationsToLoad as $nestedRelation) {
+                // If there's a constraint for this nested relation, use it
+                if (isset($nestedConstraintsForThisRelation[$nestedRelation])) {
+                    $nestedRelationsWithConstraints[$nestedRelation] = $nestedConstraintsForThisRelation[$nestedRelation];
+                } else {
+                    // No constraint, just add as string
+                    $nestedRelationsWithConstraints[] = $nestedRelation;
+                }
+            }
+
+            static::eagerLoadRelations($results, $nestedRelationsWithConstraints);
         }
     }
 
