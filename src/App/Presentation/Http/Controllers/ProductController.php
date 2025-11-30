@@ -242,9 +242,31 @@ final class ProductController extends BaseController
             case 'cte':
                 // Test CTE (Common Table Expression)
                 // Note: Use withCte() for CTE, not with() which is for eager loading
+                // withCte() works with both QueryBuilder and ModelQueryBuilder (ORM)
                 DB::enableQueryLog();
 
-                $rows = QueryBuilder::table('top_rated')
+                // Example 1: Using QueryBuilder (raw query)
+                // $rows = DB::table('top_rated')
+                //     ->withCte('top_rated', function ($q) {
+                //         $q->select('product_id')
+                //             ->selectRaw('AVG(rating) as avg_rating')
+                //             ->table('reviews')
+                //             ->where('is_approved', true)
+                //             ->groupBy('product_id')
+                //             ->havingRaw('AVG(rating) >= 4.5');
+                //     })
+                //     ->join('products', 'products.id', '=', 'top_rated.product_id')
+                //     ->select('products.*', 'top_rated.avg_rating')
+                //     ->orderBy('top_rated.avg_rating', 'DESC')
+                //     ->limit(10)
+                //     ->get()->toArray();
+
+                // Example 2: Using ModelQueryBuilder (ORM) - withCte() works here too!
+                // Note: When querying from CTE with joins, results may not hydrate to Model instances
+                // Use QueryBuilder for complex CTE queries, or handle as arrays
+                // Query from products table (ProductModel::query() already sets table to 'products')
+                // Join with CTE to get top rated products
+                $rows = ProductModel::query()
                     ->withCte('top_rated', function ($q) {
                         $q->select('product_id')
                             ->selectRaw('AVG(rating) as avg_rating')
@@ -253,11 +275,22 @@ final class ProductController extends BaseController
                             ->groupBy('product_id')
                             ->havingRaw('AVG(rating) >= 4.5');
                     })
-                    ->join('products', 'products.id', '=', 'top_rated.product_id')
+                    ->join('top_rated', 'products.id', '=', 'top_rated.product_id')
                     ->select('products.*', 'top_rated.avg_rating')
                     ->orderBy('top_rated.avg_rating', 'DESC')
                     ->limit(10)
-                    ->get()->toArray();
+                    ->get();
+
+                // Convert to array - handle both Model instances and arrays
+                $data = [];
+                foreach ($rows as $row) {
+                    if ($row instanceof \Toporia\Framework\Database\ORM\Model) {
+                        $data[] = $row->toArray();
+                    } else {
+                        $data[] = (array) $row;
+                    }
+                }
+                $rows = $data;
                 $queries = DB::getQueryLog();
                 $queries = array_map(function ($query) {
                     return [
