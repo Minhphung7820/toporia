@@ -946,6 +946,32 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
+     * Add a raw HAVING clause.
+     *
+     * @param string $sql Raw SQL expression
+     * @param array $bindings Optional bindings for the expression
+     * @return $this
+     *
+     * @example
+     * $query->havingRaw('AVG(rating) >= ?', [4.5]);
+     * $query->havingRaw('COUNT(*) > 10');
+     */
+    public function havingRaw(string $sql, array $bindings = []): self
+    {
+        $this->havings[] = [
+            'type' => 'Raw',
+            'sql' => $sql,
+            'boolean' => 'AND'
+        ];
+
+        foreach ($bindings as $binding) {
+            $this->bindings[] = $binding;
+        }
+
+        return $this;
+    }
+
+    /**
      * Add an OR HAVING clause.
      *
      * @param string $column Column or aggregate expression
@@ -1766,7 +1792,17 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         // Compile CTEs first (if any)
+        // Store original bindings count to merge CTE bindings at the beginning
+        $originalBindingsCount = count($this->bindings);
         $cteSql = $this->compileCtes();
+
+        // Extract CTE bindings (new bindings added after original count)
+        $cteBindings = array_slice($this->bindings, $originalBindingsCount);
+        // Remove CTE bindings from end (they'll be prepended)
+        $this->bindings = array_slice($this->bindings, 0, $originalBindingsCount);
+
+        // Prepend CTE bindings to maintain correct order in SQL
+        array_unshift($this->bindings, ...$cteBindings);
 
         // Use Grammar for compilation (supports MySQL, PostgreSQL, SQLite)
         $grammar = $this->connection->getGrammar();
@@ -1819,7 +1855,7 @@ class QueryBuilder implements QueryBuilderInterface
                 $cteName .= '(' . implode(', ', $columns) . ')';
             }
 
-            // Build query SQL
+            // Build query SQL and merge bindings
             if ($isRecursive) {
                 // Recursive CTE: anchor UNION ALL recursive
                 $anchor = $cte['query']['anchor'];
@@ -1828,9 +1864,29 @@ class QueryBuilder implements QueryBuilderInterface
                 $anchorSql = $anchor instanceof QueryBuilder ? $anchor->toSql() : $anchor;
                 $recursiveSql = $recursive instanceof QueryBuilder ? $recursive->toSql() : $recursive;
 
+                // Merge bindings from anchor and recursive queries
+                if ($anchor instanceof QueryBuilder) {
+                    foreach ($anchor->getBindings() as $binding) {
+                        $this->bindings[] = $binding;
+                    }
+                }
+                if ($recursive instanceof QueryBuilder) {
+                    foreach ($recursive->getBindings() as $binding) {
+                        $this->bindings[] = $binding;
+                    }
+                }
+
                 $querySql = "({$anchorSql} UNION ALL {$recursiveSql})";
             } else {
                 $querySql = $query instanceof QueryBuilder ? $query->toSql() : $query;
+
+                // Merge bindings from CTE query into main query bindings
+                if ($query instanceof QueryBuilder) {
+                    foreach ($query->getBindings() as $binding) {
+                        $this->bindings[] = $binding;
+                    }
+                }
+
                 $querySql = "({$querySql})";
             }
 

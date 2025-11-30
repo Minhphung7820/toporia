@@ -602,11 +602,18 @@ abstract class Grammar implements GrammarInterface
         $compiled = [];
         foreach ($havings as $index => $having) {
             $boolean = $index === 0 ? 'HAVING' : strtoupper($having['boolean']);
-            $column = $this->wrapColumn($having['column']);
-            $operator = $having['operator'];
-            $placeholder = '?';
 
-            $compiled[] = "{$boolean} {$column} {$operator} {$placeholder}";
+            // Handle raw having clause
+            if (isset($having['type']) && $having['type'] === 'Raw') {
+                $compiled[] = "{$boolean} {$having['sql']}";
+            } else {
+                // Regular having clause
+                $column = $this->wrapColumn($having['column']);
+                $operator = $having['operator'];
+                $placeholder = '?';
+
+                $compiled[] = "{$boolean} {$column} {$operator} {$placeholder}";
+            }
         }
 
         return implode(' ', $compiled);

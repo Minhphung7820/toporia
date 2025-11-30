@@ -13,6 +13,7 @@ use App\Infrastructure\Persistence\Models\TagModel;
 use App\Infrastructure\Persistence\Models\OrderItemModel;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Support\Accessors\DB;
+use Toporia\Framework\Support\Accessors\QueryBuilder;
 
 /**
  * Product API Controller
@@ -144,7 +145,7 @@ final class ProductController extends BaseController
      *
      * GET /api/products/complex?test=aggregates|chunking|eager|subquery|cte
      */
-    public function complex(Request $request): void
+    public function complex(Request $request)
     {
         $test = $request->input('test', 'aggregates');
 
@@ -241,21 +242,31 @@ final class ProductController extends BaseController
             case 'cte':
                 // Test CTE (Common Table Expression)
                 // Note: Use withCte() for CTE, not with() which is for eager loading
-                $connection = ProductModel::newQuery()->getConnection();
-                $rows = $connection->table('products')
+                DB::enableQueryLog();
+
+                $rows = QueryBuilder::table('top_rated')
                     ->withCte('top_rated', function ($q) {
                         $q->select('product_id')
                             ->selectRaw('AVG(rating) as avg_rating')
-                            ->from('reviews')
+                            ->table('reviews')
                             ->where('is_approved', true)
                             ->groupBy('product_id')
                             ->havingRaw('AVG(rating) >= 4.5');
                     })
-                    ->from('top_rated')
                     ->join('products', 'products.id', '=', 'top_rated.product_id')
+                    ->select('products.*', 'top_rated.avg_rating')
                     ->orderBy('top_rated.avg_rating', 'DESC')
                     ->limit(10)
-                    ->get();
+                    ->get()->toArray();
+                $queries = DB::getQueryLog();
+                $queries = array_map(function ($query) {
+                    return [
+                        'query' => $query['query'],
+                        'bindings' => $query['bindings'],
+                        'time' => $query['time'] . 'ms'
+                    ];
+                }, $queries);
+
 
                 // Convert rows to array format
                 $data = [];
@@ -263,7 +274,8 @@ final class ProductController extends BaseController
                     $data[] = (array) $row;
                 }
 
-                $this->json([
+                return  response()->json([
+                    'queries' => $queries,
                     'success' => true,
                     'test' => 'cte',
                     'data' => $data,
