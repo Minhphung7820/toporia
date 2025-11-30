@@ -243,12 +243,6 @@ class HasManyThrough extends Relation
                     return new ModelCollection([]);
                 }
 
-                // Remove the firstKey column from results (it was only for partitioning)
-                foreach ($rows as &$row) {
-                    unset($row["{$throughTable}.{$this->firstKey}"]);
-                    unset($row['toporia_row']);
-                }
-
                 return $this->relatedClass::hydrate($rows);
             }
         }
