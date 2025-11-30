@@ -1624,11 +1624,11 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      */
     public function toArray(): array
     {
-        // Step 1: Start with base attributes and apply casts
-        $array = [];
-        foreach ($this->attributes as $key => $value) {
-            $array[$key] = $this->castAttribute($key, $value);
-        }
+        // Step 1: Start with base attributes
+        // Attributes are already cast in parentSetAttribute() when set from database,
+        // so we can use them directly here for optimal performance.
+        // Cast is only applied once (when setting), not multiple times.
+        $array = $this->attributes;
 
         // Step 2: Include loaded relationships
         foreach ($this->relations as $name => $relation) {
