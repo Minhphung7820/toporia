@@ -113,31 +113,38 @@ final class ProductController extends BaseController
      */
     public function show(Request $request, int $id): void
     {
-        $query = ProductModel::where('id', $id);
+        try {
+            $query = ProductModel::where('id', $id);
 
-        // Eager loading
-        $with = $request->input('with', '');
-        if ($with) {
-            $relations = explode(',', $with);
-            $relations = array_map('trim', $relations); // Trim whitespace
-            $query->with(...$relations);
-        }
+            // Eager loading
+            $with = $request->input('with', '');
+            if ($with) {
+                $relations = explode(',', $with);
+                $relations = array_map('trim', $relations); // Trim whitespace
+                $query->with(...$relations);
+            }
 
-        /** @var ProductModel|null $product */
-        $product = $query->first();
+            /** @var ProductModel|null $product */
+            $product = $query->first();
 
-        if (!$product) {
+            if (!$product) {
+                $this->json([
+                    'success' => false,
+                    'message' => 'Product not found',
+                ], 404);
+                return;
+            }
+
+            $this->json([
+                'success' => true,
+                'data' => $product->toArray(),
+            ]);
+        } catch (\Throwable $e) {
             $this->json([
                 'success' => false,
-                'message' => 'Product not found',
-            ], 404);
-            return;
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $this->json([
-            'success' => true,
-            'data' => $product->toArray(),
-        ]);
     }
 
     /**
@@ -218,8 +225,8 @@ final class ProductController extends BaseController
                 // Test subqueries
                 $products = ProductModel::query()
                     ->whereIn('id', function ($q) {
-                        $q->select('product_id')
-                            ->from('reviews')
+                        $q->table('reviews')
+                            ->select('product_id')
                             ->where('rating', '>=', 4)
                             ->groupBy('product_id')
                             ->havingRaw('COUNT(*) >= 5');
@@ -266,26 +273,18 @@ final class ProductController extends BaseController
                 // Use QueryBuilder for complex CTE queries, or handle as arrays
                 // Query from products table (ProductModel::query() already sets table to 'products')
                 // Join with CTE to get top rated products
-                //
-                // Performance optimizations:
-                // 1. Composite index on (is_approved, product_id, rating) - covering index
-                // 2. Filter is_approved first (uses index) before GROUP BY
-                // 3. Only select necessary columns in CTE (product_id, rating)
-                // 4. Filter out null ratings to reduce data scanned
-                // 5. Use HAVING after GROUP BY (more efficient than WHERE on aggregated data)
-                //
-                // Expected performance improvement:
-                // - Before: Full table scan on reviews (O(n))
-                // - After: Index scan on (is_approved, product_id, rating) (O(log n))
-                // - Improvement: 10-100x faster depending on data size
+                // Performance optimization:
+                // 1. Filter is_approved first (uses index) before GROUP BY
+                // 2. Only select necessary columns (product_id, rating)
+                // 3. Use composite index on (is_approved, product_id, rating) for optimal performance
                 $rows = ProductModel::query()
                     ->withCte('top_rated', function ($q) {
                         $q->select('product_id')
                             ->selectRaw('AVG(rating) as avg_rating')
                             ->table('reviews')
-                            ->where('is_approved', true)  // Uses composite index
+                            ->where('is_approved', true)  // Filter first (uses index)
                             ->whereNotNull('rating')       // Exclude null ratings
-                            ->groupBy('product_id')       // Uses composite index
+                            ->groupBy('product_id')
                             ->havingRaw('AVG(rating) >= 4.5');
                     })
                     ->join('top_rated', 'products.id', '=', 'top_rated.product_id')
@@ -343,25 +342,32 @@ final class ProductController extends BaseController
      */
     public function categories(Request $request): void
     {
-        $query = CategoryModel::query();
+        try {
+            $query = CategoryModel::query();
 
-        if ($request->has('active')) {
-            $query->where('is_active', true);
+            if ($request->has('active')) {
+                $query->where('is_active', true);
+            }
+
+            $categories = $query->withCount('products')
+                ->orderBy('sort_order')
+                ->get();
+
+            $data = [];
+            foreach ($categories as $category) {
+                $data[] = $category->toArray();
+            }
+
+            $this->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Throwable $e) {
+            $this->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $categories = $query->withCount('products')
-            ->orderBy('sort_order')
-            ->get();
-
-        $data = [];
-        foreach ($categories as $category) {
-            $data[] = $category->toArray();
-        }
-
-        $this->json([
-            'success' => true,
-            'data' => $data,
-        ]);
     }
 
     /**
@@ -463,34 +469,41 @@ final class ProductController extends BaseController
      */
     public function reviews(Request $request, int $id): void
     {
-        $product = ProductModel::find($id);
+        try {
+            $product = ProductModel::find($id);
 
-        if (!$product) {
+            if (!$product) {
+                $this->json([
+                    'success' => false,
+                    'message' => 'Product not found',
+                ], 404);
+                return;
+            }
+
+            $reviews = $product->reviews()
+                ->where('is_approved', true)
+                ->orderBy('rating', 'DESC')
+                ->orderBy('created_at', 'DESC')
+                ->paginate(20, (int) $request->input('page', 1));
+
+            $this->json([
+                'success' => true,
+                'data' => [
+                    'product' => $product->toArray(),
+                    'reviews' => array_map(fn($r) => $r->toArray(), $reviews->items()->all()),
+                    'pagination' => [
+                        'current_page' => $reviews->currentPage(),
+                        'total' => $reviews->total(),
+                        'last_page' => $reviews->lastPage(),
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
             $this->json([
                 'success' => false,
-                'message' => 'Product not found',
-            ], 404);
-            return;
+                'error' => $e->getMessage(),
+            ], 500);
         }
-
-        $reviews = $product->reviews()
-            ->where('is_approved', true)
-            ->orderBy('rating', 'DESC')
-            ->orderBy('created_at', 'DESC')
-            ->paginate(20, (int) $request->input('page', 1));
-
-        $this->json([
-            'success' => true,
-            'data' => [
-                'product' => $product->toArray(),
-                'reviews' => array_map(fn($r) => $r->toArray(), $reviews->items()->all()),
-                'pagination' => [
-                    'current_page' => $reviews->currentPage(),
-                    'total' => $reviews->total(),
-                    'last_page' => $reviews->lastPage(),
-                ],
-            ],
-        ]);
     }
 
     /**
