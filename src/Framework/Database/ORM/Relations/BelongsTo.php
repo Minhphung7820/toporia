@@ -173,7 +173,7 @@ class BelongsTo extends Relation
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
-        // Create a clean query without individual constraints
+        // Create a completely clean query without any constraints
         // This prevents WHERE id = ? AND id IN (...) issue during eager loading
         $table = $freshQuery->getTable();
         $connection = $freshQuery->getConnection();
@@ -183,82 +183,50 @@ class BelongsTo extends Relation
             $cleanQuery->table($table);
         }
 
-        // Copy non-constraint properties from freshQuery (select, orders, etc.)
-        // But skip individual WHERE constraints that will be added by addEagerConstraints()
+        // Copy selects from freshQuery if any
         $selects = $freshQuery->getColumns();
         if (!empty($selects)) {
             $cleanQuery->select($selects);
         }
 
-        // Copy SoftDeletes scope if it exists (it's not a constraint on localKey)
+        // Copy only SoftDeletes scope from freshQuery (whereNull on deleted_at)
+        // Skip all other constraints - they will be added by addEagerConstraints()
         $wheres = $freshQuery->getWheres();
         foreach ($wheres as $where) {
-            // Skip individual WHERE constraint for localKey (e.g., WHERE id = ?)
-            // Keep only SoftDeletes scope (whereNull on deleted_at) and other non-localKey constraints
-            if (($where['type'] ?? '') === 'basic' && ($where['column'] ?? '') === $this->localKey) {
-                continue; // Skip individual localKey constraint
+            // Only copy SoftDeletes scope (whereNull/whereNotNull on deleted_at)
+            // Skip all other constraints including individual localKey constraints
+            if (($where['type'] ?? '') === 'Null' || ($where['type'] ?? '') === 'NotNull') {
+                $column = $where['column'] ?? '';
+                // Only copy if it's a deleted_at column (SoftDeletes scope)
+                if (str_contains(strtolower($column), 'deleted_at')) {
+                    if (($where['type'] ?? '') === 'Null') {
+                        $cleanQuery->whereNull($column, $where['boolean'] ?? 'AND');
+                    } else {
+                        $cleanQuery->whereNotNull($column, $where['boolean'] ?? 'AND');
+                    }
+                }
             }
-
-            // Copy other constraints (like SoftDeletes scope)
-            match ($where['type'] ?? '') {
-                'Null' => $cleanQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
-                'NotNull' => $cleanQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
-                default => null
-            };
         }
 
+        // Create a dummy parent model that doesn't exist to prevent initializeConstraints()
+        // from adding WHERE localKey = ? constraint. This ensures only WHERE localKey IN (...)
+        // from addEagerConstraints() is used during eager loading.
+        // Creating a new instance ensures exists() returns false and foreign key is null
+        $parentClass = get_class($this->parent);
+        $dummyParent = new $parentClass();
+
+        // Create instance with clean query and dummy parent
+        // initializeConstraints() will return early because dummy parent has no foreign key
         $instance = new static(
             $cleanQuery,
-            $this->parent,
+            $dummyParent,
             $this->relatedClass,
             $this->foreignKey,
             $this->localKey
         );
 
-        // Constructor called initializeConstraints() which added WHERE id = ?
-        // Remove that constraint for eager loading - we only want WHERE id IN (...) from addEagerConstraints()
-        $instanceQuery = $instance->getQuery();
-        $wheres = $instanceQuery->getWheres();
-        $filteredWheres = [];
-        foreach ($wheres as $where) {
-            // Skip individual WHERE constraint for localKey (e.g., WHERE id = ?)
-            if (($where['type'] ?? '') === 'basic' && ($where['column'] ?? '') === $this->localKey) {
-                continue; // Skip this constraint
-            }
-            $filteredWheres[] = $where;
-        }
-
-        // Rebuild query without the individual localKey constraint
-        $finalQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-        if ($table !== null) {
-            $finalQuery->table($table);
-        }
-
-        // Copy selects
-        $selects = $instanceQuery->getColumns();
-        if (!empty($selects)) {
-            $finalQuery->select($selects);
-        }
-
-        // Copy filtered wheres (without individual localKey constraint)
-        foreach ($filteredWheres as $where) {
-            match ($where['type'] ?? '') {
-                'basic' => $finalQuery->where(
-                    $where['column'],
-                    $where['operator'] ?? '=',
-                    $where['value'] ?? null,
-                    $where['boolean'] ?? 'AND'
-                ),
-                'Null' => $finalQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
-                'NotNull' => $finalQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
-                'In' => $finalQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                'NotIn' => $finalQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                default => null
-            };
-        }
-
-        $instance->setQuery($finalQuery);
-        $instance->constraintsApplied = false; // Reset so addEagerConstraints() can add whereIn
+        // Ensure constraintsApplied is false so addEagerConstraints() will add whereIn
+        $instance->constraintsApplied = false;
 
         return $instance;
     }
