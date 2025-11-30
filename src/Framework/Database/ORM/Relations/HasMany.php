@@ -163,32 +163,79 @@ class HasMany extends Relation
                     $subQuery->select('*');
                 }
 
-                // Build subquery SQL (without ORDER BY/LIMIT - those go in window function)
-                $subQuerySql = $subQuery->toSql();
-                $subQueryBindings = $subQuery->getBindings();
+                // Build optimized window function query directly
+                // Performance optimization: Use direct table reference instead of nested subquery when possible
+                // Note: Requires index on (foreignKey, orderColumn) for optimal performance
+                // Example: CREATE INDEX idx_reviews_product_rating ON reviews(product_id, rating DESC);
 
-                // Replace bindings in subquery SQL
-                foreach ($subQueryBindings as $binding) {
-                    $quoted = is_null($binding)
-                        ? 'NULL'
-                        : (is_bool($binding)
-                            ? ($binding ? '1' : '0')
-                            : (is_numeric($binding)
-                                ? (string)$binding
-                                : $connection->getPdo()->quote((string)$binding)));
-                    $subQuerySql = preg_replace('/\?/', $quoted, $subQuerySql, 1);
+                // Get product IDs from WHERE IN clause
+                $productIds = [];
+                foreach ($wheres as $where) {
+                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                        if (($where['column'] ?? '') === $foreignKey) {
+                            $productIds = $where['values'] ?? [];
+                            break;
+                        }
+                    }
                 }
 
-                // Build window function query
-                // SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY foreignKey ORDER BY ...) AS toporia_row FROM (subquery)) AS toporia_table WHERE toporia_row <= limit
+                // Build base query with all conditions except WHERE IN (handled in window function)
+                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery->table($table);
+
+                // Apply all where conditions except the WHERE IN for foreignKey
+                foreach ($wheres as $where) {
+                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                        if (($where['column'] ?? '') === $foreignKey) {
+                            continue; // Skip WHERE IN, handled in window function
+                        }
+                    }
+                    match ($where['type'] ?? '') {
+                        'basic' => $baseQuery->where(
+                            $where['column'],
+                            $where['operator'] ?? '=',
+                            $where['value'] ?? null,
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        'Null' => $baseQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'NotNull' => $baseQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'NotIn' => $baseQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'Raw' => $baseQuery->whereRaw(
+                            $where['sql'] ?? '',
+                            $where['bindings'] ?? [],
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        default => null
+                    };
+                }
+
+                // Copy selects
+                $selects = $this->query->getColumns();
+                if (!empty($selects)) {
+                    $baseQuery->select($selects);
+                } else {
+                    $baseQuery->select('*');
+                }
+
+                // Build base query SQL and bindings
+                $baseQuerySql = $baseQuery->toSql();
+                $baseQueryBindings = $baseQuery->getBindings();
+
+                // Build optimized window function query
+                // Use parameterized query for better performance and security
+                $placeholders = implode(',', array_fill(0, count($productIds), '?'));
                 $windowQuery = "SELECT * FROM (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row
-                    FROM ({$subQuerySql}) AS toporia_subquery
+                    FROM ({$baseQuerySql}) AS toporia_base
+                    WHERE {$wrappedForeignKey} IN ({$placeholders})
                 ) AS toporia_table WHERE toporia_row <= {$limit}";
 
-                // Execute window function query
+                // Combine bindings: base query bindings + product IDs
+                $allBindings = array_merge($baseQueryBindings, $productIds);
+
+                // Execute optimized window function query with parameterized bindings
                 $connection = $this->query->getConnection();
-                $rows = $connection->select($windowQuery, []);
+                $rows = $connection->select($windowQuery, $allBindings);
 
                 if (empty($rows)) {
                     return new ModelCollection([]);
