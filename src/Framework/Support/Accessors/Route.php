@@ -47,6 +47,7 @@ use Toporia\Framework\Routing\Contracts\RouterInterface;
  * @method static RouteInterface patch(string $path, mixed $handler, array $middleware = [])
  * @method static RouteInterface delete(string $path, mixed $handler, array $middleware = [])
  * @method static RouteInterface any(string $path, mixed $handler, array $middleware = [])
+ * @method static self fallback(mixed $handler)
  * @method static void group(array $attributes, callable $callback)
  */
 final class Route extends ServiceAccessor

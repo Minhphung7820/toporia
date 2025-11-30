@@ -247,7 +247,16 @@ final class JsonResponse extends Response implements JsonResponseInterface
      */
     public function send(string $content): void
     {
-        // Use parent's send method which already handles status and headers
+        // Set status code before sending (important for proper HTTP response)
+        // This ensures the HTTP status code is set correctly via http_response_code()
+        $this->setStatus($this->getStatusCode());
+
+        // Ensure all headers are sent (header() method handles headersSent check)
+        foreach ($this->getHeaders() as $name => $value) {
+            $this->header($name, $value);
+        }
+
+        // Use parent's send method which handles content output
         parent::send($content ?: $this->getContent());
     }
 

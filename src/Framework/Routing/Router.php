@@ -64,6 +64,11 @@ final class Router implements RouterInterface
     private ?SubdomainRouter $subdomainRouter = null;
 
     /**
+     * @var mixed Fallback handler for unmatched routes (404 handler)
+     */
+    private mixed $fallbackHandler = null;
+
+    /**
      * @param Request $request Current HTTP request.
      * @param Response $response HTTP response handler.
      * @param ContainerInterface $container Dependency injection container.
@@ -140,20 +145,141 @@ final class Router implements RouterInterface
     }
 
     /**
+     * Register a fallback handler for unmatched routes (404 handler).
+     *
+     * This handler will be called automatically when no route matches the request.
+     * It acts as a global 404 handler, not a catch-all route.
+     *
+     * @param mixed $handler Fallback handler (controller, closure, etc.)
+     * @return self
+     *
+     * @example
+     * ```php
+     * // In routes/api.php
+     * Route::fallback(function (Request $request) {
+     *     abort(404);
+     *     // or
+     *     return response()->json(['error' => 'Not found'], 404);
+     * });
+     * ```
+     */
+    public function fallback(mixed $handler): self
+    {
+        $this->fallbackHandler = $handler;
+        return $this;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function dispatch(): void
     {
-        $match = $this->routes->match($this->request->method(), $this->request->path());
+        $method = $this->request->method();
+        $path = $this->request->path();
+
+        $match = $this->routes->match($method, $path);
 
         if ($match === null) {
-            $this->handleNotFound();
+            // Check if path exists for any method to determine 404 vs 405
+            if ($this->routes->pathExists($path)) {
+                // Path exists but method is not allowed - return 405
+                $this->handleMethodNotAllowed($path);
+            } else {
+                // Path doesn't exist - return 404
+                $this->handleNotFound();
+            }
             return;
         }
 
         ['route' => $route, 'parameters' => $parameters] = $match;
 
         $this->executeRoute($route, $parameters);
+    }
+
+    /**
+     * Handle 404 Not Found response.
+     *
+     * If a fallback handler is registered, it will be called.
+     * Otherwise, the default 404 response will be sent.
+     *
+     * @return void
+     */
+    private function handleNotFound(): void
+    {
+        // If fallback handler is registered, execute it
+        if ($this->fallbackHandler !== null) {
+            $this->executeFallbackHandler();
+            return;
+        }
+
+        // Default 404 response
+        $this->response->html('<h1>404 Not Found</h1>', 404);
+    }
+
+    /**
+     * Handle 405 Method Not Allowed response.
+     *
+     * This is called when the path exists but the HTTP method is not allowed.
+     * Includes Allow header with allowed methods (Laravel-style).
+     *
+     * @param string $path Requested path
+     * @return void
+     */
+    private function handleMethodNotAllowed(string $path): void
+    {
+        // Get allowed methods for this path
+        $allowedMethods = $this->routes->getAllowedMethods($path);
+
+        // Build Allow header (RFC 7231)
+        $allowHeader = implode(', ', $allowedMethods);
+
+        // Send 405 response with Allow header
+        $this->response->header('Allow', $allowHeader);
+
+        // Check if request expects JSON (API request)
+        if ($this->request->wantsJson() || str_starts_with($this->request->path(), '/api')) {
+            $this->response->json([
+                'success' => false,
+                'message' => 'Method not allowed',
+                'error' => 'The HTTP method is not allowed for this endpoint',
+                'path' => $path,
+                'method' => $this->request->method(),
+                'allowed_methods' => $allowedMethods,
+            ], 405);
+        } else {
+            $this->response->html('<h1>405 Method Not Allowed</h1>', 405);
+        }
+    }
+
+    /**
+     * Execute the fallback handler.
+     *
+     * @return void
+     */
+    private function executeFallbackHandler(): void
+    {
+        $handler = $this->fallbackHandler;
+
+        // Build the core handler
+        $coreHandler = $this->buildCoreHandler($handler, []);
+
+        // Execute handler and get result
+        $result = $coreHandler($this->request, $this->response);
+
+        // Handle different result types
+        if ($result instanceof \Toporia\Framework\Http\Contracts\JsonResponseInterface) {
+            $result->sendResponse();
+        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\RedirectResponseInterface) {
+            $result->sendResponse();
+        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\StreamedResponseInterface) {
+            $result->sendContent();
+        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\ResponseInterface) {
+            $result->send($result->getContent());
+        } elseif (is_string($result)) {
+            $this->response->html($result);
+        } elseif (is_array($result) || is_object($result)) {
+            $this->response->json($result);
+        }
     }
 
     /**
@@ -301,15 +427,6 @@ final class Router implements RouterInterface
     }
 
 
-    /**
-     * Handle 404 Not Found response.
-     *
-     * @return void
-     */
-    private function handleNotFound(): void
-    {
-        $this->response->html('<h1>404 Not Found</h1>', 404);
-    }
 
     /**
      * Get the route collection.

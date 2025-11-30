@@ -11,6 +11,7 @@ declare(strict_types=1);
  */
 
 use Toporia\Framework\Support\Accessors\Route;
+use Toporia\Framework\Http\Request;
 use App\Presentation\Http\Controllers\Api\AuthController;
 use App\Presentation\Http\Controllers\Api\CsrfCookieController;
 use App\Presentation\Http\Controllers\ProductController;
@@ -72,4 +73,8 @@ Route::post('/products/test-sync-operations', [ProductController::class, 'testSy
 Route::get('/products/test-performance', [ProductController::class, 'testPerformance']);
 Route::get('/products/test-pivot-validation', [ProductController::class, 'testPivotValidation']);
 
-/** @var Router $router */
+// 404 Handler - Global handler for unmatched routes
+// This will be called automatically when no route matches the request
+Route::fallback(function () {
+    abort(404);
+});

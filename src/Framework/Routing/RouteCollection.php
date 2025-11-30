@@ -114,6 +114,93 @@ final class RouteCollection implements RouteCollectionInterface
     }
 
     /**
+     * Check if a path exists for any HTTP method.
+     *
+     * This is used to determine if we should return 405 (Method Not Allowed)
+     * instead of 404 (Not Found) when the path exists but method doesn't match.
+     *
+     * @param string $uri URI path to check
+     * @return bool True if path exists for any method
+     */
+    public function pathExists(string $uri): bool
+    {
+        // Rebuild indexes if needed
+        if ($this->needsIndexing) {
+            $this->buildIndexes();
+        }
+
+        // Check all methods for this path
+        $allMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+
+        foreach ($allMethods as $method) {
+            // Fast path: Check exact match
+            if (isset($this->exactRoutes[$method][$uri])) {
+                return true;
+            }
+
+            // Pattern matching: Check routes for this method
+            if (isset($this->routesByMethod[$method])) {
+                foreach ($this->routesByMethod[$method] as $route) {
+                    $routeUri = $route->getUri();
+                    if (str_contains($routeUri, '{')) {
+                        // This is a pattern route
+                        $parameters = $route->matches($method, $uri);
+                        if ($parameters !== null) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get allowed HTTP methods for a given path.
+     *
+     * Used for 405 Method Not Allowed responses to include Allow header.
+     *
+     * @param string $uri URI path to check
+     * @return array<string> Array of allowed HTTP methods
+     */
+    public function getAllowedMethods(string $uri): array
+    {
+        // Rebuild indexes if needed
+        if ($this->needsIndexing) {
+            $this->buildIndexes();
+        }
+
+        $allowedMethods = [];
+        $allMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+
+        foreach ($allMethods as $method) {
+            // Fast path: Check exact match
+            if (isset($this->exactRoutes[$method][$uri])) {
+                $allowedMethods[] = $method;
+                continue;
+            }
+
+            // Pattern matching: Check routes for this method
+            if (isset($this->routesByMethod[$method])) {
+                foreach ($this->routesByMethod[$method] as $route) {
+                    $routeUri = $route->getUri();
+                    if (str_contains($routeUri, '{')) {
+                        // This is a pattern route
+                        $parameters = $route->matches($method, $uri);
+                        if ($parameters !== null) {
+                            $allowedMethods[] = $method;
+                            break; // Found match for this method, move to next
+                        }
+                    }
+                }
+            }
+        }
+
+        return $allowedMethods;
+    }
+
+    /**
      * Build indexes for fast route lookup.
      *
      * This method is called lazily when first match() is called after routes are added.

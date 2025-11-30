@@ -172,9 +172,33 @@ final class Route implements RouteInterface
             // Build pattern with constraints
             $pattern = $this->uri;
             foreach ($this->parameterNames as $name) {
+                // Validate parameter name (must be alphanumeric and underscore only for named groups)
+                if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name)) {
+                    throw new \InvalidArgumentException("Invalid parameter name: {$name}. Parameter names must be alphanumeric and start with a letter or underscore.");
+                }
+
                 // Use custom constraint if provided, otherwise default to [^/]+
                 $constraint = $this->constraints[$name] ?? '[^/]+';
-                $pattern = str_replace('{' . $name . '}', '(?P<' . $name . '>' . $constraint . ')', $pattern);
+
+                // Handle negative lookahead patterns (e.g., (?!api/).*)
+                // Negative lookahead cannot be inside named group, so we need special handling
+                if (str_starts_with($constraint, '(?!')) {
+                    // Extract the lookahead pattern and the rest
+                    // Pattern like (?!api/).* should become: (?!api/)(?P<any>.*)
+                    if (preg_match('/^\((\?![^)]+)\)(.*)$/', $constraint, $lookaheadMatches)) {
+                        $lookahead = '(' . $lookaheadMatches[1] . ')';
+                        $rest = $lookaheadMatches[2] ?: '.*';
+                        $replacement = $lookahead . '(?P<' . $name . '>' . $rest . ')';
+                    } else {
+                        // Fallback: wrap entire constraint in named group (may not work for all cases)
+                        $replacement = '(?P<' . $name . '>' . $constraint . ')';
+                    }
+                } else {
+                    // Normal constraint: wrap in named group
+                    $replacement = '(?P<' . $name . '>' . $constraint . ')';
+                }
+
+                $pattern = str_replace('{' . $name . '}', $replacement, $pattern);
             }
 
             $this->compiledPattern = '#^' . $pattern . '$#';

@@ -58,4 +58,25 @@ interface RouteCollectionInterface
      * @return array<RouteInterface>
      */
     public function all(): array;
+
+    /**
+     * Check if a path exists for any HTTP method.
+     *
+     * Used to determine if we should return 405 (Method Not Allowed)
+     * instead of 404 (Not Found) when the path exists but method doesn't match.
+     *
+     * @param string $uri URI path to check
+     * @return bool True if path exists for any method
+     */
+    public function pathExists(string $uri): bool;
+
+    /**
+     * Get allowed HTTP methods for a given path.
+     *
+     * Used for 405 Method Not Allowed responses to include Allow header.
+     *
+     * @param string $uri URI path to check
+     * @return array<string> Array of allowed HTTP methods
+     */
+    public function getAllowedMethods(string $uri): array;
 }

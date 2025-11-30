@@ -87,6 +87,17 @@ interface RouterInterface
     public function any(string $path, mixed $handler, array $middleware = []): RouteInterface;
 
     /**
+     * Register a fallback handler for unmatched routes (404 handler).
+     *
+     * This handler will be called automatically when no route matches the request.
+     * It acts as a global 404 handler, not a catch-all route.
+     *
+     * @param mixed $handler Fallback handler (controller, closure, etc.)
+     * @return self
+     */
+    public function fallback(mixed $handler): self;
+
+    /**
      * Dispatch the current request and execute the matched route.
      *
      * @return void
