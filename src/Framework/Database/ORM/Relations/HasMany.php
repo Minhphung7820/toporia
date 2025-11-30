@@ -108,7 +108,7 @@ class HasMany extends Relation
 
             if (!empty($orders) && $limit !== null && $limit > 0) {
                 // Build window function query like Laravel
-                // SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY foreignKey ORDER BY ...) AS laravel_row FROM table WHERE ...) AS laravel_table WHERE laravel_row <= limit
+                // SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY foreignKey ORDER BY ...) AS toporia_row FROM table WHERE ...) AS toporia_table WHERE toporia_row <= limit
                 $foreignKey = $this->foreignKey;
                 $table = $this->query->getTable();
 
@@ -127,26 +127,65 @@ class HasMany extends Relation
                 }
                 $orderByClause = implode(', ', $orderParts);
 
-                // Get WHERE clause from original query
-                $relationSql = $this->query->toSql();
-                $relationBindings = $this->query->getBindings();
+                // Build subquery from QueryBuilder to ensure all conditions are included
+                // Create a new query builder with same connection and table
+                $connection = $this->query->getConnection();
+                $subQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $subQuery->table($table);
 
-                // Extract WHERE clause (before ORDER BY/LIMIT)
-                $whereClause = '';
-                if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|GROUP BY|HAVING|$)/s', $relationSql, $matches)) {
-                    $whereClause = $matches[1];
-                    // Replace placeholders with quoted values
-                    foreach ($relationBindings as $binding) {
-                        $quoted = is_null($binding) ? 'NULL' : (is_bool($binding) ? ($binding ? '1' : '0') : (is_numeric($binding) ? (string)$binding : $this->query->getConnection()->getPdo()->quote((string)$binding)));
-                        $whereClause = preg_replace('/\?/', $quoted, $whereClause, 1);
-                    }
+                // Copy all wheres from original query (includes product_id IN (...), is_approved, rating, etc.)
+                $wheres = $this->query->getWheres();
+                foreach ($wheres as $where) {
+                    match ($where['type'] ?? '') {
+                        'basic' => $subQuery->where(
+                            $where['column'],
+                            $where['operator'] ?? '=',
+                            $where['value'] ?? null,
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        'Null' => $subQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'NotNull' => $subQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'In' => $subQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'NotIn' => $subQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'Raw' => $subQuery->whereRaw(
+                            $where['sql'] ?? '',
+                            $where['bindings'] ?? [],
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        default => null
+                    };
+                }
+
+                // Copy selects if any
+                $selects = $this->query->getColumns();
+                if (!empty($selects)) {
+                    $subQuery->select($selects);
+                } else {
+                    $subQuery->select('*');
+                }
+
+                // Build subquery SQL (without ORDER BY/LIMIT - those go in window function)
+                $subQuerySql = $subQuery->toSql();
+                $subQueryBindings = $subQuery->getBindings();
+
+                // Replace bindings in subquery SQL
+                foreach ($subQueryBindings as $binding) {
+                    $quoted = is_null($binding)
+                        ? 'NULL'
+                        : (is_bool($binding)
+                            ? ($binding ? '1' : '0')
+                            : (is_numeric($binding)
+                                ? (string)$binding
+                                : $connection->getPdo()->quote((string)$binding)));
+                    $subQuerySql = preg_replace('/\?/', $quoted, $subQuerySql, 1);
                 }
 
                 // Build window function query
+                // SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY foreignKey ORDER BY ...) AS toporia_row FROM (subquery)) AS toporia_table WHERE toporia_row <= limit
                 $windowQuery = "SELECT * FROM (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row
-                    FROM {$wrappedTable}" . ($whereClause ? " WHERE {$whereClause}" : '') . "
-                ) AS toporia_table WHERE toporia_row <= {$limit} ORDER BY toporia_row";
+                    FROM ({$subQuerySql}) AS toporia_subquery
+                ) AS toporia_table WHERE toporia_row <= {$limit}";
 
                 // Execute window function query
                 $connection = $this->query->getConnection();
@@ -233,13 +272,59 @@ class HasMany extends Relation
             $this->localKey
         );
 
-        // Use freshQuery directly instead of creating another new query
-        // freshQuery already has the table set from loadRelationBatch
-        $instance->setQuery($freshQuery);
+        // Constructor called addConstraints() which may have added WHERE foreignKey = ?
+        // Remove that individual constraint for eager loading - we only want WHERE foreignKey IN (...) from addEagerConstraints()
+        $instanceQuery = $instance->getQuery();
+        $wheres = $instanceQuery->getWheres();
+        $filteredWheres = [];
+        foreach ($wheres as $where) {
+            // Skip individual WHERE constraint for foreignKey (e.g., WHERE product_id = ?)
+            // This was added by addConstraints() in constructor, but we don't want it for eager loading
+            if (($where['type'] ?? '') === 'basic' && ($where['column'] ?? '') === $this->foreignKey) {
+                continue; // Skip this constraint
+            }
+            $filteredWheres[] = $where;
+        }
 
-        // Don't copy constraints from original query when eager loading
-        // Constraints will be applied via closure in loadRelationBatch if needed
-        // This prevents product_id = ? AND product_id IN (...) issue
+        // Rebuild query without the individual foreignKey constraint
+        $connection = $freshQuery->getConnection();
+        $table = $freshQuery->getTable();
+        $finalQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        if ($table !== null) {
+            $finalQuery->table($table);
+        }
+
+        // Copy selects
+        $selects = $instanceQuery->getColumns();
+        if (!empty($selects)) {
+            $finalQuery->select($selects);
+        }
+
+        // Copy filtered wheres (without individual foreignKey constraint)
+        // This preserves SoftDeletes scope and other constraints, but removes the individual foreignKey = ? constraint
+        foreach ($filteredWheres as $where) {
+            match ($where['type'] ?? '') {
+                'basic' => $finalQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $finalQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $finalQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $finalQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $finalQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'Raw' => $finalQuery->whereRaw(
+                    $where['sql'] ?? '',
+                    $where['bindings'] ?? [],
+                    $where['boolean'] ?? 'AND'
+                ),
+                default => null
+            };
+        }
+
+        $instance->setQuery($finalQuery);
 
         return $instance;
     }
