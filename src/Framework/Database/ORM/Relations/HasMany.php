@@ -48,7 +48,7 @@ class HasMany extends Relation
      * OPTIMIZED: Automatically applies soft delete scope if related model uses soft deletes.
      *
      * Note: When eager loading (has whereIn), don't add individual where constraint
-     * to avoid product_id = ? AND product_id IN (...) issue.
+     * to avoid foreignKey = ? AND foreignKey IN (...) issue.
      *
      * @return $this
      */
@@ -132,7 +132,7 @@ class HasMany extends Relation
                 $subQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
                 $subQuery->table($table);
 
-                // Copy all wheres from original query (includes product_id IN (...), is_approved, rating, etc.)
+                // Copy all wheres from original query (includes foreignKey IN (...), and other conditions)
                 $wheres = $this->query->getWheres();
                 foreach ($wheres as $where) {
                     match ($where['type'] ?? '') {
@@ -166,14 +166,14 @@ class HasMany extends Relation
                 // Build optimized window function query directly
                 // Performance optimization: Use direct table reference instead of nested subquery when possible
                 // Note: Requires index on (foreignKey, orderColumn) for optimal performance
-                // Example: CREATE INDEX idx_reviews_product_rating ON reviews(product_id, rating DESC);
+                // Example: CREATE INDEX idx_reviews_product_rating ON reviews(foreign_key, rating DESC);
 
-                // Get product IDs from WHERE IN clause
-                $productIds = [];
+                // Get foreign key values from WHERE IN clause
+                $foreignKeyValues = [];
                 foreach ($wheres as $where) {
                     if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
                         if (($where['column'] ?? '') === $foreignKey) {
-                            $productIds = $where['values'] ?? [];
+                            $foreignKeyValues = $where['values'] ?? [];
                             break;
                         }
                     }
@@ -223,15 +223,15 @@ class HasMany extends Relation
 
                 // Build optimized window function query
                 // Use parameterized query for better performance and security
-                $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+                $placeholders = implode(',', array_fill(0, count($foreignKeyValues), '?'));
                 $windowQuery = "SELECT * FROM (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row
                     FROM ({$baseQuerySql}) AS toporia_base
                     WHERE {$wrappedForeignKey} IN ({$placeholders})
                 ) AS toporia_table WHERE toporia_row <= {$limit}";
 
-                // Combine bindings: base query bindings + product IDs
-                $allBindings = array_merge($baseQueryBindings, $productIds);
+                // Combine bindings: base query bindings + foreign key values
+                $allBindings = array_merge($baseQueryBindings, $foreignKeyValues);
 
                 // Execute optimized window function query with parameterized bindings
                 $connection = $this->query->getConnection();
