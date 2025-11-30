@@ -717,8 +717,24 @@ trait HasRelationships
                 $normalized[$key] = $value;
             }
             // Case 2: Array with string: ['childrens', 'category']
+            // Case 2a: With column selection: ['category:id,name']
             elseif (is_int($key) && is_string($value)) {
-                $normalized[$value] = null;
+                // Check if string contains column selection (e.g., 'category:id,name')
+                if (str_contains($value, ':')) {
+                    [$relationName, $columns] = explode(':', $value, 2);
+                    $columns = array_map('trim', explode(',', $columns));
+
+                    // Create closure to select only specified columns
+                    // Note: For BelongsTo relations, we need to include the foreign key column
+                    // But since we're selecting from the related table, we just need id and specified columns
+                    $normalized[$relationName] = function ($query) use ($columns) {
+                        // Ensure id is included for relation matching (if not already in columns)
+                        $selectColumns = in_array('id', $columns) ? $columns : array_merge(['id'], $columns);
+                        $query->select($selectColumns);
+                    };
+                } else {
+                    $normalized[$value] = null;
+                }
             }
             // Case 3: Nested array (from varargs): [['childrens', 'category']]
             elseif (is_int($key) && is_array($value)) {
