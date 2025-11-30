@@ -157,6 +157,120 @@ class MorphMany extends Relation
      */
     public function getResults(): ModelCollection
     {
+        // Check if this is eager loading with orderBy + limit (needs window function optimization)
+        $wheres = $this->query->getWheres();
+        $hasWhereIn = false;
+        $hasMorphWhere = false;
+        foreach ($wheres as $where) {
+            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                $hasWhereIn = true;
+            }
+            // Check for morph type + foreign key IN pattern (from addEagerConstraints)
+            if (($where['type'] ?? '') === 'nested') {
+                $hasMorphWhere = true;
+            }
+        }
+
+        // If eager loading with orderBy + limit, use window function for optimal performance
+        // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
+        if (($hasWhereIn || $hasMorphWhere) && $this->parent->exists()) {
+            $orders = $this->query->getOrders();
+            $limit = $this->query->getLimit();
+
+            if (!empty($orders) && $limit !== null && $limit > 0) {
+                // Build window function query for morph relationships
+                $table = $this->getRelatedTable();
+                $grammar = $this->query->getConnection()->getGrammar();
+                $wrappedTable = $grammar->wrapTable($table);
+                $wrappedMorphType = $grammar->wrapColumn($this->morphType);
+                $wrappedForeignKey = $grammar->wrapColumn($this->foreignKey);
+
+                // Build ORDER BY clause for window function
+                $orderParts = [];
+                foreach ($orders as $order) {
+                    $col = $order['column'] ?? '';
+                    $dir = strtoupper($order['direction'] ?? 'ASC');
+                    $wrappedCol = $grammar->wrapColumn($col);
+                    $orderParts[] = "{$wrappedCol} {$dir}";
+                }
+                $orderByClause = implode(', ', $orderParts);
+
+                // Build base query with all conditions
+                $connection = $this->query->getConnection();
+                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery->table($table);
+
+                // Copy all where conditions from original query
+                foreach ($wheres as $where) {
+                    match ($where['type'] ?? '') {
+                        'basic' => $baseQuery->where(
+                            $where['column'],
+                            $where['operator'] ?? '=',
+                            $where['value'] ?? null,
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        'Null' => $baseQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'NotNull' => $baseQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'In' => $baseQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'NotIn' => $baseQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'Raw' => $baseQuery->whereRaw(
+                            $where['sql'] ?? '',
+                            $where['bindings'] ?? [],
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        'nested' => $baseQuery->where(function ($q) use ($where) {
+                            // Copy nested where conditions
+                            if (isset($where['query']) && method_exists($where['query'], 'getWheres')) {
+                                $nestedWheres = $where['query']->getWheres();
+                                foreach ($nestedWheres as $nestedWhere) {
+                                    if ($nestedWhere['type'] === 'basic') {
+                                        $q->where(
+                                            $nestedWhere['column'],
+                                            $nestedWhere['operator'] ?? '=',
+                                            $nestedWhere['value'] ?? null,
+                                            $nestedWhere['boolean'] ?? 'AND'
+                                        );
+                                    } elseif ($nestedWhere['type'] === 'In') {
+                                        $q->whereIn($nestedWhere['column'], $nestedWhere['values'] ?? [], $nestedWhere['boolean'] ?? 'AND');
+                                    }
+                                }
+                            }
+                        }, $where['boolean'] ?? 'AND'),
+                        default => null
+                    };
+                }
+
+                // Copy selects
+                $selects = $this->query->getColumns();
+                if (!empty($selects)) {
+                    $baseQuery->select($selects);
+                } else {
+                    $baseQuery->select('*');
+                }
+
+                // Build base query SQL and bindings
+                $baseQuerySql = $baseQuery->toSql();
+                $baseQueryBindings = $baseQuery->getBindings();
+
+                // Build optimized window function query for morph relationships
+                // Partition by both morphType and foreignKey to handle multiple types
+                $windowQuery = "SELECT * FROM (
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedMorphType}, {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row
+                    FROM ({$baseQuerySql}) AS toporia_base
+                ) AS toporia_table WHERE toporia_row <= {$limit}";
+
+                // Execute optimized window function query
+                $rows = $connection->select($windowQuery, $baseQueryBindings);
+
+                if (empty($rows)) {
+                    return new ModelCollection([]);
+                }
+
+                return $this->relatedClass::hydrate($rows);
+            }
+        }
+
+        // Fallback to standard query execution
         if ($this->parent->exists()) {
             $freshQuery = $this->query->newQuery();
             $freshQuery->table($this->getRelatedTable());
@@ -275,16 +389,80 @@ class MorphMany extends Relation
             $this->localKey
         );
 
-        // Use freshQuery directly instead of creating another new query
-        // freshQuery already has the table set from loadRelationBatch
-        $instance->setQuery($freshQuery);
+        // Constructor called addConstraints() which may have added WHERE morphType = ? AND foreignKey = ?
+        // Remove those individual constraints for eager loading - we only want the constraints from addEagerConstraints()
+        $instanceQuery = $instance->getQuery();
+        $wheres = $instanceQuery->getWheres();
+        $filteredWheres = [];
+        foreach ($wheres as $where) {
+            // Skip individual WHERE constraints for morphType and foreignKey
+            // These were added by addConstraints() in constructor, but we don't want them for eager loading
+            if (($where['type'] ?? '') === 'basic') {
+                $column = $where['column'] ?? '';
+                if ($column === $this->morphType || $column === $this->foreignKey) {
+                    continue; // Skip these constraints
+                }
+            }
+            $filteredWheres[] = $where;
+        }
 
-        // Copy where constraints from original query (excluding parent-specific morph constraints)
-        $this->copyWhereConstraints($freshQuery, [
-            $this->morphType,
-            $this->foreignKey,
-            fn($col) => $col === $this->morphType || $col === $this->foreignKey
-        ]);
+        // Rebuild query without the individual morphType/foreignKey constraints
+        $connection = $freshQuery->getConnection();
+        $table = $freshQuery->getTable();
+        $finalQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        if ($table !== null) {
+            $finalQuery->table($table);
+        }
+
+        // Copy selects
+        $selects = $instanceQuery->getColumns();
+        if (!empty($selects)) {
+            $finalQuery->select($selects);
+        }
+
+        // Copy filtered wheres (without individual morphType/foreignKey constraints)
+        // This preserves SoftDeletes scope and other constraints
+        foreach ($filteredWheres as $where) {
+            match ($where['type'] ?? '') {
+                'basic' => $finalQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $finalQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $finalQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $finalQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $finalQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'Raw' => $finalQuery->whereRaw(
+                    $where['sql'] ?? '',
+                    $where['bindings'] ?? [],
+                    $where['boolean'] ?? 'AND'
+                ),
+                'nested' => $finalQuery->where(function ($q) use ($where) {
+                    // Copy nested where conditions
+                    if (isset($where['query']) && method_exists($where['query'], 'getWheres')) {
+                        $nestedWheres = $where['query']->getWheres();
+                        foreach ($nestedWheres as $nestedWhere) {
+                            if ($nestedWhere['type'] === 'basic') {
+                                $q->where(
+                                    $nestedWhere['column'],
+                                    $nestedWhere['operator'] ?? '=',
+                                    $nestedWhere['value'] ?? null,
+                                    $nestedWhere['boolean'] ?? 'AND'
+                                );
+                            } elseif ($nestedWhere['type'] === 'In') {
+                                $q->whereIn($nestedWhere['column'], $nestedWhere['values'] ?? [], $nestedWhere['boolean'] ?? 'AND');
+                            }
+                        }
+                    }
+                }, $where['boolean'] ?? 'AND'),
+                default => null
+            };
+        }
+
+        $instance->setQuery($finalQuery);
 
         return $instance;
     }

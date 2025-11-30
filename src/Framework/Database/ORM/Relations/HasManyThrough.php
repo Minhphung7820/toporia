@@ -126,7 +126,134 @@ class HasManyThrough extends Relation
      */
     public function getResults(): ModelCollection
     {
+        // Check if this is eager loading with orderBy + limit (needs window function optimization)
+        $wheres = $this->query->getWheres();
+        $hasWhereIn = false;
+        foreach ($wheres as $where) {
+            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                $hasWhereIn = true;
+                break;
+            }
+        }
+
         $relatedTable = $this->getRelatedTable();
+        $throughTable = $this->getThroughTable();
+
+        // If eager loading with orderBy + limit, use window function for optimal performance
+        if ($hasWhereIn) {
+            $orders = $this->query->getOrders();
+            $limit = $this->query->getLimit();
+
+            if (!empty($orders) && $limit !== null && $limit > 0) {
+                // Build window function query for HasManyThrough (with JOIN)
+                $grammar = $this->query->getConnection()->getGrammar();
+                $wrappedRelatedTable = $grammar->wrapTable($relatedTable);
+                $wrappedThroughTable = $grammar->wrapTable($throughTable);
+                $wrappedFirstKey = $grammar->wrapColumn("{$throughTable}.{$this->firstKey}");
+
+                // Build ORDER BY clause for window function
+                $orderParts = [];
+                foreach ($orders as $order) {
+                    $col = $order['column'] ?? '';
+                    $dir = strtoupper($order['direction'] ?? 'ASC');
+                    // Handle qualified column names (table.column)
+                    if (str_contains($col, '.')) {
+                        $parts = explode('.', $col, 2);
+                        $wrappedCol = $grammar->wrapTable($parts[0]) . '.' . $grammar->wrapColumn($parts[1]);
+                    } else {
+                        $wrappedCol = $grammar->wrapColumn($col);
+                    }
+                    $orderParts[] = "{$wrappedCol} {$dir}";
+                }
+                $orderByClause = implode(', ', $orderParts);
+
+                // Build base query with JOIN and all conditions
+                $connection = $this->query->getConnection();
+                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery->table($relatedTable);
+                $baseQuery->join(
+                    $throughTable,
+                    "{$throughTable}.{$this->secondLocalKey}",
+                    '=',
+                    "{$relatedTable}.{$this->foreignKey}"
+                );
+
+                // Copy all where conditions from original query
+                foreach ($wheres as $where) {
+                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                        // Skip WHERE IN for firstKey, handled in window function
+                        if (($where['column'] ?? '') === "{$throughTable}.{$this->firstKey}") {
+                            continue;
+                        }
+                    }
+                    match ($where['type'] ?? '') {
+                        'basic' => $baseQuery->where(
+                            $where['column'],
+                            $where['operator'] ?? '=',
+                            $where['value'] ?? null,
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        'Null' => $baseQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'NotNull' => $baseQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'In' => $baseQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'NotIn' => $baseQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'Raw' => $baseQuery->whereRaw(
+                            $where['sql'] ?? '',
+                            $where['bindings'] ?? [],
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        default => null
+                    };
+                }
+
+                // Get firstKey values from WHERE IN clause
+                $firstKeyValues = [];
+                foreach ($wheres as $where) {
+                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                        if (($where['column'] ?? '') === "{$throughTable}.{$this->firstKey}") {
+                            $firstKeyValues = $where['values'] ?? [];
+                            break;
+                        }
+                    }
+                }
+
+                // Select columns needed for window function
+                $baseQuery->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
+
+                // Build base query SQL and bindings
+                $baseQuerySql = $baseQuery->toSql();
+                $baseQueryBindings = $baseQuery->getBindings();
+
+                // Build optimized window function query for HasManyThrough
+                // Partition by firstKey (through table foreign key) to get top N per parent
+                $placeholders = implode(',', array_fill(0, count($firstKeyValues), '?'));
+                $windowQuery = "SELECT * FROM (
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedFirstKey} ORDER BY {$orderByClause}) AS toporia_row
+                    FROM ({$baseQuerySql}) AS toporia_base
+                    WHERE {$wrappedFirstKey} IN ({$placeholders})
+                ) AS toporia_table WHERE toporia_row <= {$limit}";
+
+                // Combine bindings: base query bindings + firstKey values
+                $allBindings = array_merge($baseQueryBindings, $firstKeyValues);
+
+                // Execute optimized window function query
+                $rows = $connection->select($windowQuery, $allBindings);
+
+                if (empty($rows)) {
+                    return new ModelCollection([]);
+                }
+
+                // Remove the firstKey column from results (it was only for partitioning)
+                foreach ($rows as &$row) {
+                    unset($row["{$throughTable}.{$this->firstKey}"]);
+                    unset($row['toporia_row']);
+                }
+
+                return $this->relatedClass::hydrate($rows);
+            }
+        }
+
+        // Fallback to standard query execution
         $this->query->select("{$relatedTable}.*");
 
         $rowCollection = $this->query->get();
