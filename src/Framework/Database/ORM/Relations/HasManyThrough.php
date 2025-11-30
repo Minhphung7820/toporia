@@ -147,8 +147,6 @@ class HasManyThrough extends Relation
             if (!empty($orders) && $limit !== null && $limit > 0) {
                 // Build window function query for HasManyThrough (with JOIN)
                 $grammar = $this->query->getConnection()->getGrammar();
-                $wrappedRelatedTable = $grammar->wrapTable($relatedTable);
-                $wrappedThroughTable = $grammar->wrapTable($throughTable);
                 $wrappedFirstKey = $grammar->wrapColumn("{$throughTable}.{$this->firstKey}");
 
                 // Build ORDER BY clause for window function
@@ -206,12 +204,12 @@ class HasManyThrough extends Relation
                     };
                 }
 
-                // Get firstKey values from WHERE IN clause
-                $firstKeyValues = [];
+                // Get foreign key values from WHERE IN clause
+                $foreignKeyValues = [];
                 foreach ($wheres as $where) {
                     if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
                         if (($where['column'] ?? '') === "{$throughTable}.{$this->firstKey}") {
-                            $firstKeyValues = $where['values'] ?? [];
+                            $foreignKeyValues = $where['values'] ?? [];
                             break;
                         }
                     }
@@ -226,15 +224,15 @@ class HasManyThrough extends Relation
 
                 // Build optimized window function query for HasManyThrough
                 // Partition by firstKey (through table foreign key) to get top N per parent
-                $placeholders = implode(',', array_fill(0, count($firstKeyValues), '?'));
+                $placeholders = implode(',', array_fill(0, count($foreignKeyValues), '?'));
                 $windowQuery = "SELECT * FROM (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedFirstKey} ORDER BY {$orderByClause}) AS toporia_row
                     FROM ({$baseQuerySql}) AS toporia_base
                     WHERE {$wrappedFirstKey} IN ({$placeholders})
                 ) AS toporia_table WHERE toporia_row <= {$limit}";
 
-                // Combine bindings: base query bindings + firstKey values
-                $allBindings = array_merge($baseQueryBindings, $firstKeyValues);
+                // Combine bindings: base query bindings + foreign key values
+                $allBindings = array_merge($baseQueryBindings, $foreignKeyValues);
 
                 // Execute optimized window function query
                 $rows = $connection->select($windowQuery, $allBindings);

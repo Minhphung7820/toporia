@@ -181,7 +181,6 @@ class MorphMany extends Relation
                 // Build window function query for morph relationships
                 $table = $this->getRelatedTable();
                 $grammar = $this->query->getConnection()->getGrammar();
-                $wrappedTable = $grammar->wrapTable($table);
                 $wrappedMorphType = $grammar->wrapColumn($this->morphType);
                 $wrappedForeignKey = $grammar->wrapColumn($this->foreignKey);
 
