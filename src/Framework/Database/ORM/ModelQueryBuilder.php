@@ -9,6 +9,7 @@ use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Contracts\RelationInterface;
 use Toporia\Framework\Database\DatabaseCollection;
+use Toporia\Framework\Database\ORM\Relations\BelongsTo;
 use Toporia\Framework\Database\ORM\Relations\BelongsToMany;
 
 
@@ -849,7 +850,16 @@ class ModelQueryBuilder extends QueryBuilder
 
         // Build EXISTS subquery - SELECT 1 is faster than SELECT COUNT(*)
         $fromClause = $parentTable === $relationTable ? "{$relationTable} AS {$relationAlias}" : $relationTable;
-        $subquerySql = "SELECT 1 FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
+
+        // For BelongsTo relationships, the foreign key is on the parent table and local key is on the related table
+        // For HasOne/HasMany relationships, the foreign key is on the related table and local key is on the parent table
+        if ($relation instanceof BelongsTo) {
+            // BelongsTo: relatedTable.localKey = parentTable.foreignKey
+            $subquerySql = "SELECT 1 FROM {$fromClause} WHERE {$relationAlias}.{$localKey} = {$parentTable}.{$foreignKey}";
+        } else {
+            // HasOne/HasMany: relatedTable.foreignKey = parentTable.localKey
+            $subquerySql = "SELECT 1 FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
+        }
 
         // Add relation constraints
         $relationSql = $relationQuery->toSql();
@@ -982,7 +992,16 @@ class ModelQueryBuilder extends QueryBuilder
 
         // Build COUNT subquery (only used when count comparison is needed)
         $fromClause = $parentTable === $relationTable ? "{$relationTable} AS {$relationAlias}" : $relationTable;
-        $subquerySql = "SELECT COUNT(*) FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
+
+        // For BelongsTo relationships, the foreign key is on the parent table and local key is on the related table
+        // For HasOne/HasMany relationships, the foreign key is on the related table and local key is on the parent table
+        if ($relation instanceof BelongsTo) {
+            // BelongsTo: relatedTable.localKey = parentTable.foreignKey
+            $subquerySql = "SELECT COUNT(*) FROM {$fromClause} WHERE {$relationAlias}.{$localKey} = {$parentTable}.{$foreignKey}";
+        } else {
+            // HasOne/HasMany: relatedTable.foreignKey = parentTable.localKey
+            $subquerySql = "SELECT COUNT(*) FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
+        }
 
         return $subquerySql;
     }
