@@ -173,12 +173,15 @@ class MorphMany extends Relation
 
         // If eager loading with limit, use window function for optimal performance
         // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
-        // When limit() is used in eager loading, we need per-parent limiting, not global limiting
+        // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
+        // Also supports offset()/skip() for pagination within each parent
         if (($hasWhereIn || $hasMorphWhere) && $this->parent->exists()) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();
+            $offset = $this->query->getOffset();
 
             // Use window function when limit is present (even without explicit orderBy)
+            // Also works with offset/skip for pagination
             if ($limit !== null && $limit > 0) {
                 // Build window function query for morph relationships
                 $table = $this->getRelatedTable();
@@ -263,10 +266,21 @@ class MorphMany extends Relation
 
                 // Build optimized window function query for morph relationships
                 // Partition by both morphType and foreignKey to handle multiple types
+                // Support both limit and offset (skip) for pagination within each parent
+
+                // Build WHERE clause for row number filtering
+                // If offset is present, filter: offset < row <= (offset + limit)
+                // Otherwise, filter: row <= limit
+                if ($offset !== null && $offset > 0) {
+                    $rowFilter = "toporia_row > {$offset} AND toporia_row <= " . ($offset + $limit);
+                } else {
+                    $rowFilter = "toporia_row <= {$limit}";
+                }
+
                 $windowQuery = "SELECT * FROM (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedMorphType}, {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row
                     FROM ({$baseQuerySql}) AS toporia_base
-                ) AS toporia_table WHERE toporia_row <= {$limit}";
+                ) AS toporia_table WHERE {$rowFilter}";
 
                 // Execute optimized window function query
                 $rows = $connection->select($windowQuery, $baseQueryBindings);

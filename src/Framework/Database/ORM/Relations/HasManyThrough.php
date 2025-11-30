@@ -140,12 +140,15 @@ class HasManyThrough extends Relation
         $throughTable = $this->getThroughTable();
 
         // If eager loading with limit, use window function for optimal performance
-        // When limit() is used in eager loading, we need per-parent limiting, not global limiting
+        // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
+        // Also supports offset()/skip() for pagination within each parent
         if ($hasWhereIn) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();
+            $offset = $this->query->getOffset();
 
             // Use window function when limit is present (even without explicit orderBy)
+            // Also works with offset/skip for pagination
             if ($limit !== null && $limit > 0) {
                 // Build window function query for HasManyThrough (with JOIN)
                 $grammar = $this->query->getConnection()->getGrammar();
@@ -234,12 +237,23 @@ class HasManyThrough extends Relation
 
                 // Build optimized window function query for HasManyThrough
                 // Partition by firstKey (through table foreign key) to get top N per parent
+                // Support both limit and offset (skip) for pagination within each parent
                 $placeholders = implode(',', array_fill(0, count($foreignKeyValues), '?'));
+
+                // Build WHERE clause for row number filtering
+                // If offset is present, filter: offset < row <= (offset + limit)
+                // Otherwise, filter: row <= limit
+                if ($offset !== null && $offset > 0) {
+                    $rowFilter = "toporia_row > {$offset} AND toporia_row <= " . ($offset + $limit);
+                } else {
+                    $rowFilter = "toporia_row <= {$limit}";
+                }
+
                 $windowQuery = "SELECT * FROM (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedFirstKey} ORDER BY {$orderByClause}) AS toporia_row
                     FROM ({$baseQuerySql}) AS toporia_base
                     WHERE {$wrappedFirstKey} IN ({$placeholders})
-                ) AS toporia_table WHERE toporia_row <= {$limit}";
+                ) AS toporia_table WHERE {$rowFilter}";
 
                 // Combine bindings: base query bindings + foreign key values
                 $allBindings = array_merge($baseQueryBindings, $foreignKeyValues);
