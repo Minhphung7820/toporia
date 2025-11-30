@@ -88,14 +88,39 @@ class BelongsTo extends Relation
     /**
      * {@inheritdoc}
      */
-    public function getResults(): ?Model
+    public function getResults(): mixed
     {
-        if (!$this->hasValidForeignKey()) {
-            return null;
-        }
-
         if (!$this->constraintsApplied) {
             $this->addConstraints();
+        }
+
+        // Check if this is eager loading (has whereIn constraint)
+        $wheres = $this->query->getWheres();
+        $hasWhereIn = false;
+        foreach ($wheres as $where) {
+            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                $hasWhereIn = true;
+                break;
+            }
+        }
+
+        // If eager loading (whereIn), return ModelCollection
+        if ($hasWhereIn) {
+            // Ensure table is set before executing query
+            $table = $this->query->getTable();
+            if ($table === null) {
+                // Get table from related model if not set
+                $table = $this->relatedClass::getTableName();
+                if ($table !== null) {
+                    $this->query->table($table);
+                }
+            }
+            return $this->relatedClass::hydrate($this->query->get()->toArray());
+        }
+
+        // Single model query - return single Model or null
+        if (!$this->hasValidForeignKey()) {
+            return null;
         }
 
         return $this->query->first();
@@ -156,11 +181,12 @@ class BelongsTo extends Relation
             $this->localKey
         );
 
-        $newQuery = $freshQuery->newQuery();
-        $instance->setQuery($newQuery);
+        // Use freshQuery directly instead of creating another new query
+        // freshQuery already has the table set from loadRelationBatch
+        $instance->setQuery($freshQuery);
 
         // Copy where constraints from original query (excluding parent-specific local key constraint)
-        $this->copyWhereConstraints($newQuery, [$this->localKey]);
+        $this->copyWhereConstraints($freshQuery, [$this->localKey]);
 
         return $instance;
     }

@@ -214,6 +214,12 @@ trait HasEagerLoading
         $originalQuery = $firstRelation->getQuery();
         $freshQuery = $originalQuery->newQuery();
 
+        // Copy table from original query to fresh query (newQuery() doesn't preserve table)
+        $table = $originalQuery->getTable();
+        if ($table !== null) {
+            $freshQuery->table($table);
+        }
+
         // Use factory method to create eager loading instance
         // This eliminates reflection overhead and follows Open/Closed principle
         $eagerRelation = $firstRelation->newEagerInstance($freshQuery);

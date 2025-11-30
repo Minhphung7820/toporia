@@ -149,6 +149,16 @@ class MorphOne extends Relation
             return null;
         }
 
+        // Ensure table is set before executing query
+        $table = $this->query->getTable();
+        if ($table === null) {
+            // Get table from related model if not set
+            $table = $this->relatedClass::getTableName();
+            if ($table !== null) {
+                $this->query->table($table);
+            }
+        }
+
         $this->query->where($this->morphType, $this->getMorphClass());
         $this->query->where($this->foreignKey, $this->parent->getAttribute($this->localKey));
 
@@ -233,11 +243,12 @@ class MorphOne extends Relation
             $this->localKey
         );
 
-        $newQuery = $freshQuery->newQuery();
-        $instance->setQuery($newQuery);
+        // Use freshQuery directly instead of creating another new query
+        // freshQuery already has the table set from loadRelationBatch
+        $instance->setQuery($freshQuery);
 
         // Copy where constraints from original query (excluding parent-specific morph constraints)
-        $this->copyWhereConstraints($newQuery, [
+        $this->copyWhereConstraints($freshQuery, [
             $this->morphType,
             $this->foreignKey,
             fn($col) => $col === $this->morphType || $col === $this->foreignKey

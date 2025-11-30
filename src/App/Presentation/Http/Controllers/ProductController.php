@@ -156,6 +156,9 @@ final class ProductController extends BaseController
     {
         $test = $request->input('test', 'aggregates');
 
+        // Enable query logging for all cases
+        DB::enableQueryLog();
+
         switch ($test) {
             case 'aggregates':
                 // Test aggregates
@@ -168,10 +171,20 @@ final class ProductController extends BaseController
                         'total_stock' => 'SUM(stock)',
                     ]);
 
-                $this->json([
+                $queries = DB::getQueryLog();
+                $queries = array_map(function ($query) {
+                    return [
+                        'query' => $query['query'],
+                        'bindings' => $query['bindings'],
+                        'time' => $query['time'] . 'ms'
+                    ];
+                }, $queries);
+
+                return response()->json([
                     'success' => true,
                     'test' => 'aggregates',
                     'data' => $stats,
+                    'queries' => $queries,
                 ]);
                 break;
 
@@ -184,12 +197,22 @@ final class ProductController extends BaseController
                         $count += $products->count();
                     });
 
-                $this->json([
+                $queries = DB::getQueryLog();
+                $queries = array_map(function ($query) {
+                    return [
+                        'query' => $query['query'],
+                        'bindings' => $query['bindings'],
+                        'time' => $query['time'] . 'ms'
+                    ];
+                }, $queries);
+
+                return response()->json([
                     'success' => true,
                     'test' => 'chunking',
                     'data' => [
                         'chunked_count' => $count,
                     ],
+                    'queries' => $queries,
                 ]);
                 break;
 
@@ -209,40 +232,63 @@ final class ProductController extends BaseController
                     ->limit(10)
                     ->get();
 
+                $queries = DB::getQueryLog();
+                $queries = array_map(function ($query) {
+                    return [
+                        'query' => $query['query'],
+                        'bindings' => $query['bindings'],
+                        'time' => $query['time'] . 'ms'
+                    ];
+                }, $queries);
+
                 $data = [];
                 foreach ($products as $product) {
                     $data[] = $product->toArray();
                 }
 
-                $this->json([
+                return response()->json([
                     'success' => true,
                     'test' => 'eager_loading',
                     'data' => $data,
+                    'queries' => $queries,
                 ]);
                 break;
 
             case 'subquery':
                 // Test subqueries
+                // Optimized query using index order: (is_approved, product_id, rating)
                 $products = ProductModel::query()
                     ->whereIn('id', function ($q) {
                         $q->table('reviews')
                             ->select('product_id')
-                            ->where('rating', '>=', 4)
-                            ->groupBy('product_id')
+                            ->where('is_approved', true)  // First: uses index prefix
+                            ->where('rating', '>=', 4)     // Third: uses index suffix
+                            ->groupBy('product_id')        // Second: uses index middle
                             ->havingRaw('COUNT(*) >= 5');
                     })
                     ->with('category')
+                    ->limit(10)
                     ->get();
+
+                $queries = DB::getQueryLog();
+                $queries = array_map(function ($query) {
+                    return [
+                        'query' => $query['query'],
+                        'bindings' => $query['bindings'],
+                        'time' => $query['time'] . 'ms'
+                    ];
+                }, $queries);
 
                 $data = [];
                 foreach ($products as $product) {
                     $data[] = $product->toArray();
                 }
 
-                $this->json([
+                return response()->json([
                     'success' => true,
                     'test' => 'subquery',
                     'data' => $data,
+                    'queries' => $queries,
                 ]);
                 break;
 
@@ -250,8 +296,6 @@ final class ProductController extends BaseController
                 // Test CTE (Common Table Expression)
                 // Note: Use withCte() for CTE, not with() which is for eager loading
                 // withCte() works with both QueryBuilder and ModelQueryBuilder (ORM)
-                DB::enableQueryLog();
-
                 // Example 1: Using QueryBuilder (raw query)
                 // $rows = DB::table('top_rated')
                 //     ->withCte('top_rated', function ($q) {
@@ -319,7 +363,7 @@ final class ProductController extends BaseController
                     $data[] = (array) $row;
                 }
 
-                return  response()->json([
+                return response()->json([
                     'queries' => $queries,
                     'success' => true,
                     'test' => 'cte',
@@ -328,7 +372,7 @@ final class ProductController extends BaseController
                 break;
 
             default:
-                $this->json([
+                return response()->json([
                     'success' => false,
                     'message' => 'Invalid test type. Use: aggregates, chunking, eager, subquery, cte',
                 ], 400);

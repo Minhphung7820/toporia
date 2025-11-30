@@ -84,6 +84,16 @@ class HasOne extends Relation
             return null;
         }
 
+        // Ensure table is set before executing query
+        $table = $this->query->getTable();
+        if ($table === null) {
+            // Get table from related model if not set
+            $table = $this->relatedClass::getTableName();
+            if ($table !== null) {
+                $this->query->table($table);
+            }
+        }
+
         return $this->query->first();
     }
 
@@ -127,11 +137,12 @@ class HasOne extends Relation
             $this->localKey
         );
 
-        $newQuery = $freshQuery->newQuery();
-        $instance->setQuery($newQuery);
+        // Use freshQuery directly instead of creating another new query
+        // freshQuery already has the table set from loadRelationBatch
+        $instance->setQuery($freshQuery);
 
         // Copy where constraints from original query (excluding parent-specific foreign key constraint)
-        $this->copyWhereConstraints($newQuery, [$this->foreignKey]);
+        $this->copyWhereConstraints($freshQuery, [$this->foreignKey]);
 
         return $instance;
     }

@@ -275,11 +275,12 @@ class MorphMany extends Relation
             $this->localKey
         );
 
-        $newQuery = $freshQuery->newQuery();
-        $instance->setQuery($newQuery);
+        // Use freshQuery directly instead of creating another new query
+        // freshQuery already has the table set from loadRelationBatch
+        $instance->setQuery($freshQuery);
 
         // Copy where constraints from original query (excluding parent-specific morph constraints)
-        $this->copyWhereConstraints($newQuery, [
+        $this->copyWhereConstraints($freshQuery, [
             $this->morphType,
             $this->foreignKey,
             fn($col) => $col === $this->morphType || $col === $this->foreignKey

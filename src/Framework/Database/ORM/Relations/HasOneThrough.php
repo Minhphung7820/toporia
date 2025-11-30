@@ -126,6 +126,16 @@ class HasOneThrough extends Relation
     public function getResults(): ?Model
     {
         $relatedTable = $this->getRelatedTable();
+
+        // Ensure table is set before executing query
+        $table = $this->query->getTable();
+        if ($table === null) {
+            // Use related table if not set
+            if ($relatedTable !== null) {
+                $this->query->table($relatedTable);
+            }
+        }
+
         $this->query->select("{$relatedTable}.*");
 
         return $this->query->first();
@@ -217,11 +227,12 @@ class HasOneThrough extends Relation
             $this->secondLocalKey
         );
 
-        $newQuery = $freshQuery->newQuery();
-        $instance->setQuery($newQuery);
+        // Use freshQuery directly instead of creating another new query
+        // freshQuery already has the table set from loadRelationBatch
+        $instance->setQuery($freshQuery);
 
         // Copy where constraints from original query (excluding parent-specific through constraints)
-        $this->copyWhereConstraints($newQuery, [
+        $this->copyWhereConstraints($freshQuery, [
             $this->firstKey,
             $this->foreignKey,
             fn($col) => $col === $this->firstKey || $col === $this->foreignKey
