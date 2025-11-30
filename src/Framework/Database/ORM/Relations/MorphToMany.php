@@ -279,8 +279,21 @@ class MorphToMany extends Relation
 
         // Select related table columns and pivot columns with alias for consistency
         $this->query->select("{$relatedTable}.*");
+
+        // Always select morphType and foreignKey for matching (required for eager loading)
         $this->query->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
         $this->query->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
+
+        // Only select additional pivot columns if we should include pivot object
+        if ($this->shouldIncludePivot()) {
+            // Add other pivot columns
+            foreach ($this->pivotColumns as $column) {
+                // Skip if already added (morphType or foreignKey might be in pivotColumns)
+                if ($column !== $this->morphType && $column !== $this->foreignKey) {
+                    $this->query->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                }
+            }
+        }
 
         // Apply soft delete scope if related model uses soft deletes
         $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
@@ -291,26 +304,115 @@ class MorphToMany extends Relation
      */
     public function match(array $models, mixed $results, string $relationName): array
     {
-        if (!$results instanceof ModelCollection) {
+        if (!$results instanceof ModelCollection || $results->isEmpty()) {
+            // No results - set empty collections for all models
+            foreach ($models as $model) {
+                $model->setRelation($relationName, new ModelCollection([]));
+            }
             return $models;
         }
 
         $dictionary = $this->buildDictionary($results);
 
+        // Build index of related models by ID for O(1) lookup
+        $relatedIndex = [];
+        foreach ($results as $result) {
+            $relatedId = $result->getAttribute($this->relatedKey);
+            if ($relatedId !== null) {
+                $relatedIdKey = (string) $relatedId;
+                // Only keep first instance if duplicate (pivot data will be extracted)
+                if (!isset($relatedIndex[$relatedIdKey])) {
+                    // Remove pivot_* attributes from the first instance to keep it clean
+                    /** @var Model $result */
+                    $this->removePivotAttributes($result);
+                    $relatedIndex[$relatedIdKey] = $result;
+                }
+            }
+        }
+
         foreach ($models as $model) {
             $key = get_class($model) . ':' . $model->getAttribute($this->localKey);
             $matchedResults = $dictionary[$key] ?? [];
 
-            // Remove pivot_* attributes from matched results
+            // Process matched results and attach pivot data if needed
+            $matched = [];
             foreach ($matchedResults as $matchedResult) {
-                /** @var Model $matchedResult */
-                $this->removePivotAttributes($matchedResult);
+                $relatedId = $matchedResult->getAttribute($this->relatedKey);
+                if ($relatedId === null) {
+                    continue;
+                }
+
+                $relatedIdKey = (string) $relatedId;
+
+                // Clone the related model to avoid sharing pivot data
+                if (isset($relatedIndex[$relatedIdKey])) {
+                    $relatedModel = clone $relatedIndex[$relatedIdKey];
+                } else {
+                    // Fallback: use the matched result but remove pivot attributes
+                    $relatedModel = clone $matchedResult;
+                    $this->removePivotAttributes($relatedModel);
+                }
+
+                // Only create and attach pivot object if we should include it
+                if ($this->shouldIncludePivot()) {
+                    // Build pivot data from pivot_* attributes
+                    $pivotData = [
+                        $this->morphType => $matchedResult->getAttribute("pivot_{$this->morphType}"),
+                        $this->foreignKey => $matchedResult->getAttribute("pivot_{$this->foreignKey}"),
+                        $this->relatedPivotKey => $relatedId,
+                    ];
+
+                    // Add other pivot columns
+                    foreach ($this->pivotColumns as $column) {
+                        if ($column !== $this->morphType && $column !== $this->foreignKey && $column !== $this->relatedPivotKey) {
+                            $pivotValue = $matchedResult->getAttribute("pivot_{$column}");
+                            if ($pivotValue !== null) {
+                                $pivotData[$column] = $pivotValue;
+                            }
+                        }
+                    }
+
+                    // Add timestamps if enabled
+                    if ($this->withTimestamps) {
+                        $createdAt = $matchedResult->getAttribute('pivot_created_at');
+                        $updatedAt = $matchedResult->getAttribute('pivot_updated_at');
+                        if ($createdAt !== null) {
+                            $pivotData['created_at'] = $createdAt;
+                        }
+                        if ($updatedAt !== null) {
+                            $pivotData['updated_at'] = $updatedAt;
+                        }
+                    }
+
+                    // Clear any existing relations on the cloned model
+                    $relatedModel->setRelation($this->pivotAccessor, null);
+
+                    // Create and attach pivot object
+                    $pivotModel = $this->newPivot($pivotData, true);
+                    $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
+                }
+
+                $matched[] = $relatedModel;
             }
 
-            $model->setRelation($relationName, new ModelCollection($matchedResults));
+            $model->setRelation($relationName, new ModelCollection($matched));
         }
 
         return $models;
+    }
+
+    /**
+     * Check if pivot object should be included in the relationship.
+     *
+     * Pivot object is only included when:
+     * - withPivot() is called with columns
+     * - withTimestamps() is called
+     *
+     * @return bool
+     */
+    protected function shouldIncludePivot(): bool
+    {
+        return !empty($this->pivotColumns) || $this->withTimestamps;
     }
 
     /**
@@ -330,6 +432,22 @@ class MorphToMany extends Relation
         // Use Model's protected method to remove attributes efficiently
         // This avoids reflection overhead and is much faster
         $model->removeAttributesByPattern('pivot_');
+    }
+
+    /**
+     * Create a new pivot model instance.
+     *
+     * @param array $attributes Pivot attributes
+     * @param bool $exists Whether the pivot exists in database
+     * @return \Toporia\Framework\Database\ORM\Pivot Pivot model instance
+     */
+    protected function newPivot(array $attributes = [], bool $exists = false): \Toporia\Framework\Database\ORM\Pivot
+    {
+        if ($this->pivotClass !== null) {
+            return new ($this->pivotClass)($attributes, $this->pivotTable, $exists);
+        }
+
+        return new \Toporia\Framework\Database\ORM\Pivot($attributes, $this->pivotTable, $exists);
     }
 
     /**
@@ -381,11 +499,14 @@ class MorphToMany extends Relation
         $cleanQuery->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
         $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
 
-        // Add other pivot columns
-        foreach ($this->pivotColumns as $column) {
-            // Skip if already added (morphType or foreignKey might be in pivotColumns)
-            if ($column !== $this->morphType && $column !== $this->foreignKey) {
-                $cleanQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+        // Only select additional pivot columns if we should include pivot object
+        if ($this->shouldIncludePivot()) {
+            // Add other pivot columns
+            foreach ($this->pivotColumns as $column) {
+                // Skip if already added (morphType or foreignKey might be in pivotColumns)
+                if ($column !== $this->morphType && $column !== $this->foreignKey) {
+                    $cleanQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                }
             }
         }
 
