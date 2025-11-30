@@ -310,67 +310,55 @@ class HasMany extends Relation
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
+        // Create a clean query with table and selects from freshQuery
+        $table = $freshQuery->getTable();
+        $connection = $freshQuery->getConnection();
+        $cleanQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        if ($table !== null) {
+            $cleanQuery->table($table);
+        }
+
+        // Copy selects from freshQuery if any
+        $selects = $freshQuery->getColumns();
+        if (!empty($selects)) {
+            $cleanQuery->select($selects);
+        }
+
+        // Copy only SoftDeletes scope from freshQuery (whereNull on deleted_at)
+        // Skip all other constraints - they will be added by addEagerConstraints()
+        $wheres = $freshQuery->getWheres();
+        foreach ($wheres as $where) {
+            // Only copy SoftDeletes scope (whereNull/whereNotNull on deleted_at)
+            if (($where['type'] ?? '') === 'Null' || ($where['type'] ?? '') === 'NotNull') {
+                $column = $where['column'] ?? '';
+                // Only copy if it's a deleted_at column (SoftDeletes scope)
+                if (str_contains(strtolower($column), 'deleted_at')) {
+                    if (($where['type'] ?? '') === 'Null') {
+                        $cleanQuery->whereNull($column, $where['boolean'] ?? 'AND');
+                    } else {
+                        $cleanQuery->whereNotNull($column, $where['boolean'] ?? 'AND');
+                    }
+                }
+            }
+        }
+
+        // Create a dummy parent model that doesn't exist to prevent addConstraints()
+        // from adding WHERE foreignKey = ? constraint. This ensures only WHERE foreignKey IN (...)
+        // from addEagerConstraints() is used during eager loading.
+        // Creating a new instance ensures exists() returns false and localKey is null
+        $parentClass = get_class($this->parent);
+        $dummyParent = new $parentClass();
+
+        // Create instance with clean query and dummy parent
+        // addConstraints() will return early because dummy parent doesn't exist
         $instance = new static(
-            $freshQuery,
-            $this->parent,
+            $cleanQuery,
+            $dummyParent,
             $this->relatedClass,
             $this->foreignKey,
             $this->localKey
         );
-
-        // Constructor called addConstraints() which may have added WHERE foreignKey = ?
-        // Remove that individual constraint for eager loading - we only want WHERE foreignKey IN (...) from addEagerConstraints()
-        $instanceQuery = $instance->getQuery();
-        $wheres = $instanceQuery->getWheres();
-        $filteredWheres = [];
-        foreach ($wheres as $where) {
-            // Skip individual WHERE constraint for foreignKey (e.g., WHERE product_id = ?)
-            // This was added by addConstraints() in constructor, but we don't want it for eager loading
-            if (($where['type'] ?? '') === 'basic' && ($where['column'] ?? '') === $this->foreignKey) {
-                continue; // Skip this constraint
-            }
-            $filteredWheres[] = $where;
-        }
-
-        // Rebuild query without the individual foreignKey constraint
-        $connection = $freshQuery->getConnection();
-        $table = $freshQuery->getTable();
-        $finalQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        if ($table !== null) {
-            $finalQuery->table($table);
-        }
-
-        // Copy selects
-        $selects = $instanceQuery->getColumns();
-        if (!empty($selects)) {
-            $finalQuery->select($selects);
-        }
-
-        // Copy filtered wheres (without individual foreignKey constraint)
-        // This preserves SoftDeletes scope and other constraints, but removes the individual foreignKey = ? constraint
-        foreach ($filteredWheres as $where) {
-            match ($where['type'] ?? '') {
-                'basic' => $finalQuery->where(
-                    $where['column'],
-                    $where['operator'] ?? '=',
-                    $where['value'] ?? null,
-                    $where['boolean'] ?? 'AND'
-                ),
-                'Null' => $finalQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
-                'NotNull' => $finalQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
-                'In' => $finalQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                'NotIn' => $finalQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                'Raw' => $finalQuery->whereRaw(
-                    $where['sql'] ?? '',
-                    $where['bindings'] ?? [],
-                    $where['boolean'] ?? 'AND'
-                ),
-                default => null
-            };
-        }
-
-        $instance->setQuery($finalQuery);
 
         return $instance;
     }

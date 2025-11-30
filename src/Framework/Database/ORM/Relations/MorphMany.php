@@ -379,90 +379,57 @@ class MorphMany extends Relation
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
+        // Create a clean query with table and selects from freshQuery
+        $table = $freshQuery->getTable();
+        $connection = $freshQuery->getConnection();
+        $cleanQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        if ($table !== null) {
+            $cleanQuery->table($table);
+        }
+
+        // Copy selects from freshQuery if any
+        $selects = $freshQuery->getColumns();
+        if (!empty($selects)) {
+            $cleanQuery->select($selects);
+        }
+
+        // Copy only SoftDeletes scope from freshQuery (whereNull on deleted_at)
+        // Skip all other constraints - they will be added by addEagerConstraints()
+        $wheres = $freshQuery->getWheres();
+        foreach ($wheres as $where) {
+            // Only copy SoftDeletes scope (whereNull/whereNotNull on deleted_at)
+            if (($where['type'] ?? '') === 'Null' || ($where['type'] ?? '') === 'NotNull') {
+                $column = $where['column'] ?? '';
+                // Only copy if it's a deleted_at column (SoftDeletes scope)
+                if (str_contains(strtolower($column), 'deleted_at')) {
+                    if (($where['type'] ?? '') === 'Null') {
+                        $cleanQuery->whereNull($column, $where['boolean'] ?? 'AND');
+                    } else {
+                        $cleanQuery->whereNotNull($column, $where['boolean'] ?? 'AND');
+                    }
+                }
+            }
+        }
+
+        // Create a dummy parent model that doesn't exist to prevent addConstraints()
+        // from adding WHERE morphType = ? AND foreignKey = ? constraints. This ensures only
+        // the constraints from addEagerConstraints() are used during eager loading.
+        // Creating a new instance ensures exists() returns false and localKey is null
+        $parentClass = get_class($this->parent);
+        $dummyParent = new $parentClass();
+
+        // Create instance with clean query and dummy parent
+        // addConstraints() will return early because dummy parent doesn't exist
         $instance = new static(
-            $freshQuery,
-            $this->parent,
+            $cleanQuery,
+            $dummyParent,
             $this->relatedClass,
             $this->morphName,
             $this->morphType,
             $this->foreignKey,
             $this->localKey
         );
-
-        // Constructor called addConstraints() which may have added WHERE morphType = ? AND foreignKey = ?
-        // Remove those individual constraints for eager loading - we only want the constraints from addEagerConstraints()
-        $instanceQuery = $instance->getQuery();
-        $wheres = $instanceQuery->getWheres();
-        $filteredWheres = [];
-        foreach ($wheres as $where) {
-            // Skip individual WHERE constraints for morphType and foreignKey
-            // These were added by addConstraints() in constructor, but we don't want them for eager loading
-            if (($where['type'] ?? '') === 'basic') {
-                $column = $where['column'] ?? '';
-                if ($column === $this->morphType || $column === $this->foreignKey) {
-                    continue; // Skip these constraints
-                }
-            }
-            $filteredWheres[] = $where;
-        }
-
-        // Rebuild query without the individual morphType/foreignKey constraints
-        $connection = $freshQuery->getConnection();
-        $table = $freshQuery->getTable();
-        $finalQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
-
-        if ($table !== null) {
-            $finalQuery->table($table);
-        }
-
-        // Copy selects
-        $selects = $instanceQuery->getColumns();
-        if (!empty($selects)) {
-            $finalQuery->select($selects);
-        }
-
-        // Copy filtered wheres (without individual morphType/foreignKey constraints)
-        // This preserves SoftDeletes scope and other constraints
-        foreach ($filteredWheres as $where) {
-            match ($where['type'] ?? '') {
-                'basic' => $finalQuery->where(
-                    $where['column'],
-                    $where['operator'] ?? '=',
-                    $where['value'] ?? null,
-                    $where['boolean'] ?? 'AND'
-                ),
-                'Null' => $finalQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
-                'NotNull' => $finalQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
-                'In' => $finalQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                'NotIn' => $finalQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                'Raw' => $finalQuery->whereRaw(
-                    $where['sql'] ?? '',
-                    $where['bindings'] ?? [],
-                    $where['boolean'] ?? 'AND'
-                ),
-                'nested' => $finalQuery->where(function ($q) use ($where) {
-                    // Copy nested where conditions
-                    if (isset($where['query']) && method_exists($where['query'], 'getWheres')) {
-                        $nestedWheres = $where['query']->getWheres();
-                        foreach ($nestedWheres as $nestedWhere) {
-                            if ($nestedWhere['type'] === 'basic') {
-                                $q->where(
-                                    $nestedWhere['column'],
-                                    $nestedWhere['operator'] ?? '=',
-                                    $nestedWhere['value'] ?? null,
-                                    $nestedWhere['boolean'] ?? 'AND'
-                                );
-                            } elseif ($nestedWhere['type'] === 'In') {
-                                $q->whereIn($nestedWhere['column'], $nestedWhere['values'] ?? [], $nestedWhere['boolean'] ?? 'AND');
-                            }
-                        }
-                    }
-                }, $where['boolean'] ?? 'AND'),
-                default => null
-            };
-        }
-
-        $instance->setQuery($finalQuery);
 
         return $instance;
     }
