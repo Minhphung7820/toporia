@@ -173,21 +173,92 @@ class BelongsTo extends Relation
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
+        // Create a clean query without individual constraints
+        // This prevents WHERE id = ? AND id IN (...) issue during eager loading
+        $table = $freshQuery->getTable();
+        $connection = $freshQuery->getConnection();
+        $cleanQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        if ($table !== null) {
+            $cleanQuery->table($table);
+        }
+
+        // Copy non-constraint properties from freshQuery (select, orders, etc.)
+        // But skip individual WHERE constraints that will be added by addEagerConstraints()
+        $selects = $freshQuery->getColumns();
+        if (!empty($selects)) {
+            $cleanQuery->select($selects);
+        }
+
+        // Copy SoftDeletes scope if it exists (it's not a constraint on localKey)
+        $wheres = $freshQuery->getWheres();
+        foreach ($wheres as $where) {
+            // Skip individual WHERE constraint for localKey (e.g., WHERE id = ?)
+            // Keep only SoftDeletes scope (whereNull on deleted_at) and other non-localKey constraints
+            if (($where['type'] ?? '') === 'basic' && ($where['column'] ?? '') === $this->localKey) {
+                continue; // Skip individual localKey constraint
+            }
+
+            // Copy other constraints (like SoftDeletes scope)
+            match ($where['type'] ?? '') {
+                'Null' => $cleanQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $cleanQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                default => null
+            };
+        }
+
         $instance = new static(
-            $freshQuery,
+            $cleanQuery,
             $this->parent,
             $this->relatedClass,
             $this->foreignKey,
             $this->localKey
         );
 
-        // Use freshQuery directly instead of creating another new query
-        // freshQuery already has the table set from loadRelationBatch
-        $instance->setQuery($freshQuery);
+        // Constructor called initializeConstraints() which added WHERE id = ?
+        // Remove that constraint for eager loading - we only want WHERE id IN (...) from addEagerConstraints()
+        $instanceQuery = $instance->getQuery();
+        $wheres = $instanceQuery->getWheres();
+        $filteredWheres = [];
+        foreach ($wheres as $where) {
+            // Skip individual WHERE constraint for localKey (e.g., WHERE id = ?)
+            if (($where['type'] ?? '') === 'basic' && ($where['column'] ?? '') === $this->localKey) {
+                continue; // Skip this constraint
+            }
+            $filteredWheres[] = $where;
+        }
 
-        // Don't copy constraints from original query when eager loading
-        // Constraints will be applied via closure in loadRelationBatch if needed
-        // This prevents WHERE id = ? AND id IN (...) issue
+        // Rebuild query without the individual localKey constraint
+        $finalQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+        if ($table !== null) {
+            $finalQuery->table($table);
+        }
+
+        // Copy selects
+        $selects = $instanceQuery->getColumns();
+        if (!empty($selects)) {
+            $finalQuery->select($selects);
+        }
+
+        // Copy filtered wheres (without individual localKey constraint)
+        foreach ($filteredWheres as $where) {
+            match ($where['type'] ?? '') {
+                'basic' => $finalQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $finalQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $finalQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $finalQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $finalQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                default => null
+            };
+        }
+
+        $instance->setQuery($finalQuery);
+        $instance->constraintsApplied = false; // Reset so addEagerConstraints() can add whereIn
 
         return $instance;
     }
