@@ -148,10 +148,29 @@ trait HasObservers
 
         // Check for $observers property on model
         if (property_exists($class, 'observers')) {
-            /** @var array<string> $observers */
-            $observers = reflection()->getPropertyValue(new $class(), 'observers');
-            foreach ($observers as $observer) {
-                static::observe($observer);
+            try {
+                $reflection = new \ReflectionClass($class);
+
+                // Check if property exists and is static
+                if ($reflection->hasProperty('observers')) {
+                    $property = $reflection->getProperty('observers');
+                    $property->setAccessible(true);
+
+                    // Get static property value (null for static properties when called without instance)
+                    $observers = $property->isStatic()
+                        ? $property->getValue()
+                        : $property->getValue(new $class());
+
+                    if (is_array($observers) && !empty($observers)) {
+                        /** @var array<string> $observers */
+                        foreach ($observers as $observer) {
+                            static::observe($observer);
+                        }
+                    }
+                }
+            } catch (\ReflectionException $e) {
+                // If reflection fails, skip observers registration
+                // This can happen if the property doesn't exist or is not accessible
             }
         }
 
