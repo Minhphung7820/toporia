@@ -223,8 +223,9 @@ final class ProductController extends BaseController
                     'categories',
                     'reviews' => function ($q) {
                         $q->where('is_approved', true)
+                            ->where('rating', '>=', 1)
                             ->orderBy('rating', 'DESC')
-                            ->limit(5);
+                            ->limit(1);
                     },
                 ])
                     ->withCount('reviews')

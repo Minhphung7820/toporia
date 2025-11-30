@@ -177,7 +177,10 @@ class MorphTo extends Relation
 
         foreach ($groups as $type => $ids) {
             $modelClass = $this->getModelClass($type);
-            $related = $modelClass::whereIn('id', array_unique($ids))->get();
+
+            // Apply SoftDeletes scope automatically (respects withTrashed() via ModelQueryBuilder)
+            $query = $modelClass::whereIn('id', array_unique($ids));
+            $related = $query->get();
 
             foreach ($related as $model) {
                 $relatedModels["{$type}:{$model->getKey()}"] = $model;

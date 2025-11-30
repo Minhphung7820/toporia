@@ -47,11 +47,28 @@ class HasMany extends Relation
      *
      * OPTIMIZED: Automatically applies soft delete scope if related model uses soft deletes.
      *
+     * Note: When eager loading (has whereIn), don't add individual where constraint
+     * to avoid product_id = ? AND product_id IN (...) issue.
+     *
      * @return $this
      */
     public function addConstraints(): static
     {
-        if ($this->parent->exists()) {
+        // Check if this is eager loading (has whereIn for foreignKey)
+        // If so, don't add individual constraint to avoid duplicate conditions
+        $wheres = $this->query->getWheres();
+        $hasWhereIn = false;
+        foreach ($wheres as $where) {
+            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                if (($where['column'] ?? '') === $this->foreignKey) {
+                    $hasWhereIn = true;
+                    break;
+                }
+            }
+        }
+
+        // Only add individual constraint if not eager loading
+        if (!$hasWhereIn && $this->parent->exists()) {
             $this->query->where(
                 $this->foreignKey,
                 $this->parent->getAttribute($this->localKey)
@@ -73,13 +90,83 @@ class HasMany extends Relation
      */
     public function getResults(): ModelCollection
     {
+        // Check if this is eager loading with orderBy + limit (needs window function optimization)
+        $wheres = $this->query->getWheres();
+        $hasWhereIn = false;
+        foreach ($wheres as $where) {
+            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                $hasWhereIn = true;
+                break;
+            }
+        }
+
+        // If eager loading with orderBy + limit, use window function for optimal performance
+        // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
+        if ($hasWhereIn) {
+            $orders = $this->query->getOrders();
+            $limit = $this->query->getLimit();
+
+            if (!empty($orders) && $limit !== null && $limit > 0) {
+                // Build window function query like Laravel
+                // SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY foreignKey ORDER BY ...) AS laravel_row FROM table WHERE ...) AS laravel_table WHERE laravel_row <= limit
+                $foreignKey = $this->foreignKey;
+                $table = $this->query->getTable();
+
+                // Get Grammar for safe column/table wrapping
+                $grammar = $this->query->getConnection()->getGrammar();
+                $wrappedTable = $grammar->wrapTable($table);
+                $wrappedForeignKey = $grammar->wrapColumn($foreignKey);
+
+                // Build ORDER BY clause for window function
+                $orderParts = [];
+                foreach ($orders as $order) {
+                    $col = $order['column'] ?? '';
+                    $dir = strtoupper($order['direction'] ?? 'ASC');
+                    $wrappedCol = $grammar->wrapColumn($col);
+                    $orderParts[] = "{$wrappedCol} {$dir}";
+                }
+                $orderByClause = implode(', ', $orderParts);
+
+                // Get WHERE clause from original query
+                $relationSql = $this->query->toSql();
+                $relationBindings = $this->query->getBindings();
+
+                // Extract WHERE clause (before ORDER BY/LIMIT)
+                $whereClause = '';
+                if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|GROUP BY|HAVING|$)/s', $relationSql, $matches)) {
+                    $whereClause = $matches[1];
+                    // Replace placeholders with quoted values
+                    foreach ($relationBindings as $binding) {
+                        $quoted = is_null($binding) ? 'NULL' : (is_bool($binding) ? ($binding ? '1' : '0') : (is_numeric($binding) ? (string)$binding : $this->query->getConnection()->getPdo()->quote((string)$binding)));
+                        $whereClause = preg_replace('/\?/', $quoted, $whereClause, 1);
+                    }
+                }
+
+                // Build window function query
+                $windowQuery = "SELECT * FROM (
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row
+                    FROM {$wrappedTable}" . ($whereClause ? " WHERE {$whereClause}" : '') . "
+                ) AS toporia_table WHERE toporia_row <= {$limit} ORDER BY toporia_row";
+
+                // Execute window function query
+                $connection = $this->query->getConnection();
+                $rows = $connection->select($windowQuery, []);
+
+                if (empty($rows)) {
+                    return new ModelCollection([]);
+                }
+
+                return $this->relatedClass::hydrate($rows);
+            }
+        }
+
         $rows = $this->query->get();
 
         if ($rows->isEmpty()) {
             return new ModelCollection([]);
         }
 
-        return $this->hydrateModels($rows);
+        return $this->relatedClass::hydrate($rows->toArray());
     }
 
     /**
@@ -110,6 +197,30 @@ class HasMany extends Relation
     }
 
     /**
+     * Build dictionary mapping foreign key to array of models.
+     *
+     * For HasMany, multiple results can belong to the same parent,
+     * so we group them by foreign key.
+     *
+     * @param ModelCollection $results
+     * @return array<int|string, array<Model>>
+     */
+    protected function buildDictionary(ModelCollection $results): array
+    {
+        $dictionary = [];
+        foreach ($results as $result) {
+            $key = $result->getAttribute($this->foreignKey);
+            if ($key !== null) {
+                if (!isset($dictionary[$key])) {
+                    $dictionary[$key] = [];
+                }
+                $dictionary[$key][] = $result;
+            }
+        }
+        return $dictionary;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
@@ -126,8 +237,9 @@ class HasMany extends Relation
         // freshQuery already has the table set from loadRelationBatch
         $instance->setQuery($freshQuery);
 
-        // Copy where constraints from original query (excluding parent-specific foreign key constraint)
-        $this->copyWhereConstraints($freshQuery, [$this->foreignKey]);
+        // Don't copy constraints from original query when eager loading
+        // Constraints will be applied via closure in loadRelationBatch if needed
+        // This prevents product_id = ? AND product_id IN (...) issue
 
         return $instance;
     }

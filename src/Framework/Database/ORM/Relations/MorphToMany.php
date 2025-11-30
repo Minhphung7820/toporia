@@ -281,6 +281,9 @@ class MorphToMany extends Relation
         $this->query->select("{$relatedTable}.*");
         $this->query->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
         $this->query->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
+
+        // Apply soft delete scope if related model uses soft deletes
+        $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
     }
 
     /**

@@ -297,6 +297,7 @@ abstract class Relation implements RelationInterface
      *
      * Performance: O(1) - Single WHERE clause addition
      * Only adds WHERE deleted_at IS NULL if model uses soft deletes
+     * Respects withTrashed() by checking skipGlobalScopes flag
      *
      * @param QueryBuilder $query Query builder
      * @param string $modelClass Related model class name
@@ -307,6 +308,19 @@ abstract class Relation implements RelationInterface
     {
         if (!$this->relatedModelUsesSoftDeletes($modelClass)) {
             return;
+        }
+
+        // Check if query has skipGlobalScopes flag (from withTrashed())
+        // If ModelQueryBuilder with skipGlobalScopes = true, don't apply SoftDeletes scope
+        if ($query instanceof \Toporia\Framework\Database\ORM\ModelQueryBuilder) {
+            $reflection = new \ReflectionClass($query);
+            if ($reflection->hasProperty('skipGlobalScopes')) {
+                $property = $reflection->getProperty('skipGlobalScopes');
+                $property->setAccessible(true);
+                if ($property->getValue($query) === true) {
+                    return; // Skip applying SoftDeletes scope when withTrashed() is used
+                }
+            }
         }
 
         $deletedAtColumn = $this->getDeletedAtColumn($modelClass);

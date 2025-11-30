@@ -185,8 +185,9 @@ class BelongsTo extends Relation
         // freshQuery already has the table set from loadRelationBatch
         $instance->setQuery($freshQuery);
 
-        // Copy where constraints from original query (excluding parent-specific local key constraint)
-        $this->copyWhereConstraints($freshQuery, [$this->localKey]);
+        // Don't copy constraints from original query when eager loading
+        // Constraints will be applied via closure in loadRelationBatch if needed
+        // This prevents WHERE id = ? AND id IN (...) issue
 
         return $instance;
     }

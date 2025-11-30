@@ -1551,6 +1551,37 @@ class ModelQueryBuilder extends QueryBuilder
             $callback($relationQuery);
         }
 
+        // Ensure SoftDeletes is applied if relation model uses it
+        // This is important for withCount/withSum to match Laravel behavior
+        $relatedClass = '';
+        try {
+            // Try to access protected property using reflection
+            $reflection = new \ReflectionClass($relationInstance);
+            if ($reflection->hasProperty('relatedClass')) {
+                $property = $reflection->getProperty('relatedClass');
+                $property->setAccessible(true);
+                $relatedClass = $property->getValue($relationInstance);
+            } elseif ($reflection->hasMethod('getRelatedClass')) {
+                $method = $reflection->getMethod('getRelatedClass');
+                $method->setAccessible(true);
+                $relatedClass = $method->invoke($relationInstance);
+            }
+        } catch (\ReflectionException $e) {
+            // If reflection fails, try alternative methods
+            if (method_exists($relationInstance, 'getRelated')) {
+                $related = $relationInstance->getRelated();
+                $relatedClass = $related ? get_class($related) : '';
+            }
+        }
+
+        if ($relatedClass !== '' && method_exists($relatedClass, 'usesSoftDeletes') && $relatedClass::usesSoftDeletes()) {
+            $deletedAtColumn = method_exists($relatedClass, 'getDeletedAtColumn')
+                ? $relatedClass::getDeletedAtColumn()
+                : 'deleted_at';
+            $relationTable = $relationQuery->getTable();
+            $relationQuery->whereNull("{$relationTable}.{$deletedAtColumn}");
+        }
+
         // Special handling for BelongsToMany relationships (many-to-many through pivot table)
         if ($relationInstance instanceof BelongsToMany) {
             $this->addBelongsToManyCountSelect($relationInstance, $relation, $table, $relationQuery);
@@ -1575,7 +1606,7 @@ class ModelQueryBuilder extends QueryBuilder
         // selectRaw bindings are added to the end, but subquery bindings need to be
         // embedded within the subquery itself for correct ordering
         $relationSql = $relationQuery->toSql();
-        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|GROUP BY|HAVING|$)/s', $relationSql, $matches)) {
             $whereClause = $matches[1];
 
             // Replace placeholders with actual values (safely quoted)
@@ -1706,6 +1737,37 @@ class ModelQueryBuilder extends QueryBuilder
             $callback($relationQuery);
         }
 
+        // Ensure SoftDeletes is applied if relation model uses it
+        // This is important for withSum/withAvg/etc to match Laravel behavior
+        $relatedClass = '';
+        try {
+            // Try to access protected property using reflection
+            $reflection = new \ReflectionClass($relationInstance);
+            if ($reflection->hasProperty('relatedClass')) {
+                $property = $reflection->getProperty('relatedClass');
+                $property->setAccessible(true);
+                $relatedClass = $property->getValue($relationInstance);
+            } elseif ($reflection->hasMethod('getRelatedClass')) {
+                $method = $reflection->getMethod('getRelatedClass');
+                $method->setAccessible(true);
+                $relatedClass = $method->invoke($relationInstance);
+            }
+        } catch (\ReflectionException $e) {
+            // If reflection fails, try alternative methods
+            if (method_exists($relationInstance, 'getRelated')) {
+                $related = $relationInstance->getRelated();
+                $relatedClass = $related ? get_class($related) : '';
+            }
+        }
+
+        if ($relatedClass !== '' && method_exists($relatedClass, 'usesSoftDeletes') && $relatedClass::usesSoftDeletes()) {
+            $deletedAtColumn = method_exists($relatedClass, 'getDeletedAtColumn')
+                ? $relatedClass::getDeletedAtColumn()
+                : 'deleted_at';
+            $relationTable = $relationQuery->getTable();
+            $relationQuery->whereNull("{$relationTable}.{$deletedAtColumn}");
+        }
+
         // Special handling for BelongsToMany relationships (many-to-many through pivot table)
         if ($relationInstance instanceof BelongsToMany) {
             $this->addBelongsToManyAggregateSelect($relationInstance, $relation, $column, $function, $table, $relationQuery);
@@ -1726,7 +1788,7 @@ class ModelQueryBuilder extends QueryBuilder
         // Add relation query wheres to subquery
         // Important: Inject bindings directly into SQL to avoid binding order issues
         $relationSql = $relationQuery->toSql();
-        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|GROUP BY|HAVING|$)/s', $relationSql, $matches)) {
             $whereClause = $matches[1];
 
             // Replace placeholders with actual values (safely quoted)
