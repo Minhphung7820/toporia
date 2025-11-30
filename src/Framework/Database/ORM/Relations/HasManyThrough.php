@@ -126,7 +126,7 @@ class HasManyThrough extends Relation
      */
     public function getResults(): ModelCollection
     {
-        // Check if this is eager loading with orderBy + limit (needs window function optimization)
+        // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
         $hasWhereIn = false;
         foreach ($wheres as $where) {
@@ -139,29 +139,39 @@ class HasManyThrough extends Relation
         $relatedTable = $this->getRelatedTable();
         $throughTable = $this->getThroughTable();
 
-        // If eager loading with orderBy + limit, use window function for optimal performance
+        // If eager loading with limit, use window function for optimal performance
+        // When limit() is used in eager loading, we need per-parent limiting, not global limiting
         if ($hasWhereIn) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();
 
-            if (!empty($orders) && $limit !== null && $limit > 0) {
+            // Use window function when limit is present (even without explicit orderBy)
+            if ($limit !== null && $limit > 0) {
                 // Build window function query for HasManyThrough (with JOIN)
                 $grammar = $this->query->getConnection()->getGrammar();
                 $wrappedFirstKey = $grammar->wrapColumn("{$throughTable}.{$this->firstKey}");
 
                 // Build ORDER BY clause for window function
+                // If no explicit orderBy, use primary key as default for consistent ordering
                 $orderParts = [];
-                foreach ($orders as $order) {
-                    $col = $order['column'] ?? '';
-                    $dir = strtoupper($order['direction'] ?? 'ASC');
-                    // Handle qualified column names (table.column)
-                    if (str_contains($col, '.')) {
-                        $parts = explode('.', $col, 2);
-                        $wrappedCol = $grammar->wrapTable($parts[0]) . '.' . $grammar->wrapColumn($parts[1]);
-                    } else {
-                        $wrappedCol = $grammar->wrapColumn($col);
+                if (!empty($orders)) {
+                    foreach ($orders as $order) {
+                        $col = $order['column'] ?? '';
+                        $dir = strtoupper($order['direction'] ?? 'ASC');
+                        // Handle qualified column names (table.column)
+                        if (str_contains($col, '.')) {
+                            $parts = explode('.', $col, 2);
+                            $wrappedCol = $grammar->wrapTable($parts[0]) . '.' . $grammar->wrapColumn($parts[1]);
+                        } else {
+                            $wrappedCol = $grammar->wrapColumn($col);
+                        }
+                        $orderParts[] = "{$wrappedCol} {$dir}";
                     }
-                    $orderParts[] = "{$wrappedCol} {$dir}";
+                } else {
+                    // Default order by primary key for consistent results
+                    $primaryKey = $this->relatedClass::getPrimaryKey();
+                    $wrappedPrimaryKey = $grammar->wrapTable($relatedTable) . '.' . $grammar->wrapColumn($primaryKey);
+                    $orderParts[] = "{$wrappedPrimaryKey} ASC";
                 }
                 $orderByClause = implode(', ', $orderParts);
 

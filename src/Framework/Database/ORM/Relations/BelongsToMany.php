@@ -421,6 +421,166 @@ class BelongsToMany extends Relation
      */
     public function getResults(): ModelCollection
     {
+        // Check if this is eager loading with limit (needs window function optimization)
+        $wheres = $this->query->getWheres();
+        $hasWhereIn = false;
+        foreach ($wheres as $where) {
+            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                // Check if it's the pivot foreign key WHERE IN (eager loading)
+                $column = $where['column'] ?? '';
+                if (str_contains($column, $this->pivotTable) && str_contains($column, $this->foreignPivotKey)) {
+                    $hasWhereIn = true;
+                    break;
+                }
+            }
+        }
+
+        // If eager loading with limit, use window function for optimal performance
+        // When limit() is used in eager loading, we need per-parent limiting, not global limiting
+        if ($hasWhereIn) {
+            $orders = $this->query->getOrders();
+            $limit = $this->query->getLimit();
+
+            // Use window function when limit is present (even without explicit orderBy)
+            if ($limit !== null && $limit > 0) {
+                $relatedTable = $this->getRelatedTableName();
+                $grammar = $this->query->getConnection()->getGrammar();
+                $wrappedPivotForeignKey = $grammar->wrapColumn("{$this->pivotTable}.{$this->foreignPivotKey}");
+
+                // Build ORDER BY clause for window function
+                // If no explicit orderBy, use primary key as default for consistent ordering
+                $orderParts = [];
+                if (!empty($orders)) {
+                    foreach ($orders as $order) {
+                        $col = $order['column'] ?? '';
+                        $dir = strtoupper($order['direction'] ?? 'ASC');
+                        // Handle qualified column names (table.column)
+                        if (str_contains($col, '.')) {
+                            $parts = explode('.', $col, 2);
+                            $wrappedCol = $grammar->wrapTable($parts[0]) . '.' . $grammar->wrapColumn($parts[1]);
+                        } else {
+                            $wrappedCol = $grammar->wrapColumn($col);
+                        }
+                        $orderParts[] = "{$wrappedCol} {$dir}";
+                    }
+                } else {
+                    // Default order by primary key for consistent results
+                    $primaryKey = $this->relatedClass::getPrimaryKey();
+                    $wrappedPrimaryKey = $grammar->wrapTable($relatedTable) . '.' . $grammar->wrapColumn($primaryKey);
+                    $orderParts[] = "{$wrappedPrimaryKey} ASC";
+                }
+                $orderByClause = implode(', ', $orderParts);
+
+                // Build base query with JOIN and all conditions
+                $connection = $this->query->getConnection();
+                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery->table($relatedTable);
+                $baseQuery->join(
+                    $this->pivotTable,
+                    "{$relatedTable}.{$this->relatedKey}",
+                    '=',
+                    "{$this->pivotTable}.{$this->relatedPivotKey}"
+                );
+
+                // Get foreign key values from WHERE IN clause
+                $foreignKeyValues = [];
+                foreach ($wheres as $where) {
+                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                        $column = $where['column'] ?? '';
+                        if (str_contains($column, $this->pivotTable) && str_contains($column, $this->foreignPivotKey)) {
+                            $foreignKeyValues = $where['values'] ?? [];
+                            break;
+                        }
+                    }
+                }
+
+                // Copy all where conditions from original query (except WHERE IN for pivot foreign key)
+                foreach ($wheres as $where) {
+                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                        $column = $where['column'] ?? '';
+                        // Skip WHERE IN for pivot foreign key, handled in window function
+                        if (str_contains($column, $this->pivotTable) && str_contains($column, $this->foreignPivotKey)) {
+                            continue;
+                        }
+                    }
+                    match ($where['type'] ?? '') {
+                        'basic' => $baseQuery->where(
+                            $where['column'],
+                            $where['operator'] ?? '=',
+                            $where['value'] ?? null,
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        'Null' => $baseQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'NotNull' => $baseQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'In' => $baseQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'NotIn' => $baseQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'Raw' => $baseQuery->whereRaw(
+                            $where['sql'] ?? '',
+                            $where['bindings'] ?? [],
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        default => null
+                    };
+                }
+
+                // Select columns needed for window function
+                $baseQuery->select("{$relatedTable}.*");
+                // Always need pivot keys for matching (with aliases)
+                $baseQuery->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
+                $baseQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
+                // Include additional pivot columns if needed
+                if ($this->shouldIncludePivot()) {
+                    foreach ($this->pivotColumns as $column) {
+                        if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
+                            $baseQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                        }
+                    }
+                }
+
+                // Build base query SQL and bindings
+                $baseQuerySql = $baseQuery->toSql();
+                $baseQueryBindings = $baseQuery->getBindings();
+
+                // Build optimized window function query for BelongsToMany
+                // Partition by pivot foreign key to get top N per parent
+                $placeholders = implode(',', array_fill(0, count($foreignKeyValues), '?'));
+                $windowQuery = "SELECT * FROM (
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedPivotForeignKey} ORDER BY {$orderByClause}) AS toporia_row
+                    FROM ({$baseQuerySql}) AS toporia_base
+                    WHERE {$wrappedPivotForeignKey} IN ({$placeholders})
+                ) AS toporia_table WHERE toporia_row <= {$limit}";
+
+                // Combine bindings: base query bindings + foreign key values
+                $allBindings = array_merge($baseQueryBindings, $foreignKeyValues);
+
+                // Execute optimized window function query
+                try {
+                    $rows = $connection->select($windowQuery, $allBindings);
+                } catch (\Exception $e) {
+                    // If query fails, fall back to standard query
+                    // This can happen if pivot columns don't exist or other issues
+                    return $this->getResultsFallback();
+                }
+
+                if (empty($rows)) {
+                    return new ModelCollection([]);
+                }
+
+                return $this->relatedClass::hydrate($rows);
+            }
+        }
+
+        // Fallback to standard query execution
+        return $this->getResultsFallback();
+    }
+
+    /**
+     * Fallback method for getResults() when window function cannot be used.
+     *
+     * @return ModelCollection
+     */
+    protected function getResultsFallback(): ModelCollection
+    {
         try {
             $rows = $this->query->get();
         } catch (\Exception $e) {

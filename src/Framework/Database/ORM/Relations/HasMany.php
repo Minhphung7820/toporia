@@ -90,7 +90,7 @@ class HasMany extends Relation
      */
     public function getResults(): ModelCollection
     {
-        // Check if this is eager loading with orderBy + limit (needs window function optimization)
+        // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
         $hasWhereIn = false;
         foreach ($wheres as $where) {
@@ -100,13 +100,15 @@ class HasMany extends Relation
             }
         }
 
-        // If eager loading with orderBy + limit, use window function for optimal performance
+        // If eager loading with limit, use window function for optimal performance
         // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
+        // When limit() is used in eager loading, we need per-parent limiting, not global limiting
         if ($hasWhereIn) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();
 
-            if (!empty($orders) && $limit !== null && $limit > 0) {
+            // Use window function when limit is present (even without explicit orderBy)
+            if ($limit !== null && $limit > 0) {
                 // Build window function query like Laravel
                 // SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY foreignKey ORDER BY ...) AS toporia_row FROM table WHERE ...) AS toporia_table WHERE toporia_row <= limit
                 $foreignKey = $this->foreignKey;
@@ -117,12 +119,20 @@ class HasMany extends Relation
                 $wrappedForeignKey = $grammar->wrapColumn($foreignKey);
 
                 // Build ORDER BY clause for window function
+                // If no explicit orderBy, use primary key as default for consistent ordering
                 $orderParts = [];
-                foreach ($orders as $order) {
-                    $col = $order['column'] ?? '';
-                    $dir = strtoupper($order['direction'] ?? 'ASC');
-                    $wrappedCol = $grammar->wrapColumn($col);
-                    $orderParts[] = "{$wrappedCol} {$dir}";
+                if (!empty($orders)) {
+                    foreach ($orders as $order) {
+                        $col = $order['column'] ?? '';
+                        $dir = strtoupper($order['direction'] ?? 'ASC');
+                        $wrappedCol = $grammar->wrapColumn($col);
+                        $orderParts[] = "{$wrappedCol} {$dir}";
+                    }
+                } else {
+                    // Default order by primary key for consistent results
+                    $primaryKey = $this->relatedClass::getPrimaryKey();
+                    $wrappedPrimaryKey = $grammar->wrapColumn($primaryKey);
+                    $orderParts[] = "{$wrappedPrimaryKey} ASC";
                 }
                 $orderByClause = implode(', ', $orderParts);
 
