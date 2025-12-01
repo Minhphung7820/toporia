@@ -1131,10 +1131,22 @@ class MorphToMany extends Relation
 
     /**
      * Check if a specific pivot relationship exists.
+     *
+     * Performance: O(log n) - Uses optimized EXISTS query (SELECT 1 ... LIMIT 1)
+     * Clean Architecture: Expressive existence check
+     *
+     * @param int|string $id Related model ID
+     * @param array $pivotConstraints Additional pivot constraints
+     * @return bool
      */
     public function pivotExists(int|string $id, array $pivotConstraints = []): bool
     {
-        $query = $this->newPivotQuery()->where($this->relatedPivotKey, $id);
+        // Use optimized EXISTS pattern: SELECT 1 FROM ... WHERE ... LIMIT 1
+        // This is much faster than COUNT(*) as it stops at first match
+        $query = $this->newPivotQuery()
+            ->where($this->relatedPivotKey, $id)
+            ->selectRaw('1')
+            ->limit(1);
 
         foreach ($pivotConstraints as $column => $value) {
             $query->where($column, $value);
@@ -1205,10 +1217,23 @@ class MorphToMany extends Relation
 
     /**
      * Get distinct values from a pivot column.
+     *
+     * Performance: O(log n) - Uses database DISTINCT optimization
+     * Clean Architecture: Expressive method for pivot column analysis
+     *
+     * @param string $column Pivot column name
+     * @return array Array of distinct values
      */
     public function distinctPivot(string $column): array
     {
-        return $this->newPivotQuery()->distinct()->pluck($column)->toArray();
+        // Build query once: SELECT DISTINCT column_name FROM pivot_table WHERE ...
+        // This ensures we get distinct values for the column, not distinct full rows
+        $query = $this->newPivotQuery()
+            ->select($column)
+            ->distinct();
+
+        // Execute query once and return as array using ->all() as specified
+        return $query->pluck($column)->all();
     }
 
     // =========================================================================

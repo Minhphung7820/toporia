@@ -48,6 +48,15 @@ class BelongsToMany extends Relation
     /** @var string|null Cached related table name */
     private ?string $relatedTableCache = null;
 
+    /**
+     * @var array<string, array{columns: array<string>, timestamp: int}> Static cache for table schema
+     * Format: ['table_name' => ['columns' => [...], 'timestamp' => unix_timestamp]]
+     */
+    private static array $schemaCache = [];
+
+    /** @var int Cache TTL in seconds (5 minutes default) */
+    private static int $schemaCacheTtl = 300;
+
     public function __construct(
         QueryBuilder $query,
         Model $parent,
@@ -2630,6 +2639,21 @@ class BelongsToMany extends Relation
     }
 
     /**
+     * Create a new pivot query builder instance.
+     *
+     * Internal method used by all pivot-related methods to ensure consistency.
+     * Returns a clean QueryBuilder without model hydration.
+     *
+     * @return QueryBuilder Clean query builder for pivot table
+     */
+    protected function newPivotQuery(): QueryBuilder
+    {
+        $qb = new QueryBuilder($this->query->getConnection());
+        return $qb->table($this->pivotTable)
+            ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey));
+    }
+
+    /**
      * Get the pivot table query builder.
      *
      * Performance: O(1) - Direct query builder access
@@ -2646,9 +2670,7 @@ class BelongsToMany extends Relation
      */
     public function pivotQuery(): QueryBuilder
     {
-        $qb = new QueryBuilder($this->query->getConnection());
-        return $qb->table($this->pivotTable)
-            ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey));
+        return $this->newPivotQuery();
     }
 
     /**
@@ -2667,16 +2689,20 @@ class BelongsToMany extends Relation
      */
     public function distinctPivot(string $column): array
     {
-        return $this->pivotQuery()
-            ->distinct()
-            ->pluck($column)
-            ->toArray();
+        // Build query once: SELECT DISTINCT column_name FROM pivot_table WHERE ...
+        // This ensures we get distinct values for the column, not distinct full rows
+        $query = $this->newPivotQuery()
+            ->select($column)
+            ->distinct();
+
+        // Execute query once and return as array using ->all() as specified
+        return $query->pluck($column)->all();
     }
 
     /**
      * Check if a specific pivot relationship exists.
      *
-     * Performance: O(log n) - Indexed lookup with early termination
+     * Performance: O(log n) - Uses optimized EXISTS query (SELECT 1 ... LIMIT 1)
      * Clean Architecture: Expressive existence check
      *
      * @param int|string $id Related model ID
@@ -2692,7 +2718,12 @@ class BelongsToMany extends Relation
      */
     public function pivotExists(int|string $id, array $pivotConstraints = []): bool
     {
-        $query = $this->pivotQuery()->where($this->relatedPivotKey, $id);
+        // Use optimized EXISTS pattern: SELECT 1 FROM ... WHERE ... LIMIT 1
+        // This is much faster than COUNT(*) as it stops at first match
+        $query = $this->newPivotQuery()
+            ->where($this->relatedPivotKey, $id)
+            ->selectRaw('1')
+            ->limit(1);
 
         foreach ($pivotConstraints as $column => $value) {
             $query->where($column, $value);
@@ -2717,6 +2748,9 @@ class BelongsToMany extends Relation
      * This method helps debug column not found errors by checking
      * if the expected columns exist in the pivot table.
      *
+     * Performance: Uses schema caching to avoid SHOW COLUMNS on every request.
+     * Cache TTL: 5 minutes (configurable via $schemaCacheTtl)
+     *
      * @return array Validation results
      */
     public function validatePivotStructure(): array
@@ -2724,9 +2758,8 @@ class BelongsToMany extends Relation
         $connection = $this->query->getConnection();
 
         try {
-            // Get table columns
-            $columns = $connection->select("SHOW COLUMNS FROM `{$this->pivotTable}`");
-            $columnNames = array_column($columns, 'Field');
+            // Get table columns with caching
+            $columnNames = $this->getCachedTableColumns($this->pivotTable, $connection);
 
             return [
                 'table' => $this->pivotTable,
@@ -2778,12 +2811,11 @@ class BelongsToMany extends Relation
         // Check for potential column name conflicts
         $pivotAlias = "pivot_{$this->foreignPivotKey}";
 
-        // Get related table columns to check for conflicts
+        // Get related table columns to check for conflicts (with caching)
         try {
             $relatedTable = $this->relatedClass::getTableName();
             $connection = $this->query->getConnection();
-            $relatedColumns = $connection->select("SHOW COLUMNS FROM `{$relatedTable}`");
-            $relatedColumnNames = array_column($relatedColumns, 'Field');
+            $relatedColumnNames = $this->getCachedTableColumns($relatedTable, $connection);
 
             // Check if pivot alias would conflict with related table columns
             if (in_array($pivotAlias, $relatedColumnNames)) {
@@ -2795,5 +2827,65 @@ class BelongsToMany extends Relation
             // If we can't validate related table, play it safe
             return false;
         }
+    }
+
+    /**
+     * Get table columns with caching to avoid repeated SHOW COLUMNS queries.
+     *
+     * @param string $tableName Table name
+     * @param mixed $connection Database connection
+     * @return array<string> Array of column names
+     */
+    protected function getCachedTableColumns(string $tableName, $connection): array
+    {
+        $cacheKey = $tableName;
+        $now = time();
+
+        // Check cache
+        if (isset(self::$schemaCache[$cacheKey])) {
+            $cached = self::$schemaCache[$cacheKey];
+            // Return cached data if still valid
+            if (($now - $cached['timestamp']) < self::$schemaCacheTtl) {
+                return $cached['columns'];
+            }
+        }
+
+        // Cache miss or expired - fetch from database
+        $columns = $connection->select("SHOW COLUMNS FROM `{$tableName}`");
+        $columnNames = array_column($columns, 'Field');
+
+        // Store in cache
+        self::$schemaCache[$cacheKey] = [
+            'columns' => $columnNames,
+            'timestamp' => $now
+        ];
+
+        return $columnNames;
+    }
+
+    /**
+     * Clear schema cache for a specific table or all tables.
+     *
+     * @param string|null $tableName Table name to clear, or null to clear all
+     * @return void
+     */
+    public static function clearSchemaCache(?string $tableName = null): void
+    {
+        if ($tableName === null) {
+            self::$schemaCache = [];
+        } else {
+            unset(self::$schemaCache[$tableName]);
+        }
+    }
+
+    /**
+     * Set schema cache TTL in seconds.
+     *
+     * @param int $seconds Cache TTL in seconds
+     * @return void
+     */
+    public static function setSchemaCacheTtl(int $seconds): void
+    {
+        self::$schemaCacheTtl = $seconds;
     }
 }

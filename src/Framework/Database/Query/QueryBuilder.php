@@ -1773,10 +1773,33 @@ class QueryBuilder implements QueryBuilderInterface
 
     /**
      * Whether at least one row exists for the current query.
+     *
+     * Performance: Uses optimized EXISTS pattern (SELECT 1 ... LIMIT 1)
+     * instead of COUNT(*) which is much faster as it stops at first match.
+     *
+     * @return bool
      */
     public function exists(): bool
     {
-        return $this->count() > 0;
+        // Save original state
+        $originalColumns = $this->columns;
+        $originalLimit = $this->limit;
+
+        // Build optimized exists query: SELECT 1 FROM ... WHERE ... LIMIT 1
+        // This is much faster than COUNT(*) as it stops at first match
+        // Use Expression to mark as raw SQL (should not be quoted as column name)
+        $this->columns = [new Expression('1')];
+        $this->limit = 1;
+
+        // Execute lightweight exists-style query
+        $sql = $this->toSql();
+        $result = $this->connection->selectOne($sql, $this->bindings);
+
+        // Restore original state
+        $this->columns = $originalColumns;
+        $this->limit = $originalLimit;
+
+        return $result !== null;
     }
 
     /**
