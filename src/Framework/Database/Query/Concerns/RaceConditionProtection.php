@@ -277,4 +277,3 @@ trait RaceConditionProtection
      */
     abstract public function getBindings(): array;
 }
-
