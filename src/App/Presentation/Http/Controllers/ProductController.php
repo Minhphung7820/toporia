@@ -1011,7 +1011,7 @@ final class ProductController extends BaseController
     {
         DB::enableQueryLog();
 
-        $data = $request->json();
+        $data = $request->all();
 
         // Create product
         $product = ProductModel::create([
