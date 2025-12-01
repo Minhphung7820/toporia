@@ -1004,6 +1004,12 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
 
         $dirty = $this->getDirty();
 
+        // Check if model uses optimistic locking
+        if (method_exists($this, 'usesOptimisticLocking') && static::usesOptimisticLocking()) {
+            // Use optimistic locking save method
+            return $this->saveWithOptimisticLock();
+        }
+
         static::query()
             ->where(static::$primaryKey, $this->getKey())
             ->update($dirty);

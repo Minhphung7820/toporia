@@ -831,6 +831,7 @@ final class ProductController extends BaseController
 
         // 1. Basic sync
         $syncResult1 = $product->categories()->sync([1, 2, 3]);
+
         $results['basic_sync'] = $syncResult1;
 
         // 2. Sync with pivot data
