@@ -1102,7 +1102,20 @@ class MorphToMany extends Relation
         $formatted = [];
 
         foreach ($records as $key => $value) {
-            $formatted[is_numeric($key) ? $value : $key] = is_numeric($key) ? [] : (is_array($value) ? $value : []);
+            // Check if this is a simple array format: [1, 2, 3]
+            // This happens when key is numeric AND value is scalar
+            if (is_numeric($key) && is_scalar($value)) {
+                // Simple array: [1, 2, 3] -> convert to [1 => [], 2 => [], 3 => []]
+                $formatted[$value] = [];
+            } elseif (is_scalar($key)) {
+                // Associative array format: [1 => ['role' => 'admin'], 2 => ['role' => 'user']]
+                // or ['a' => [...], 'b' => [...]]
+                // Key must be scalar (int/string) to use as array key
+                $formatted[$key] = is_array($value) ? $value : [];
+            } else {
+                // Skip invalid keys (arrays/objects cannot be used as keys)
+                continue;
+            }
         }
 
         return $formatted;

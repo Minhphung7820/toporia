@@ -1163,6 +1163,20 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
+     * Get a collection of a given column's values.
+     *
+     * Executes the query and extracts the specified column from each row.
+     *
+     * @param string|array $column Column name (or dot-separated path) to extract from each row.
+     * @return DatabaseCollection Collection containing the plucked values.
+     */
+    public function pluck(string|array $column): DatabaseCollection
+    {
+        $collection = $this->get();
+        return $collection->pluck($column);
+    }
+
+    /**
      * Find a row by primary key column.
      *
      * Return type is mixed to allow ModelQueryBuilder to override with Model return type.

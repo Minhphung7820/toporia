@@ -836,9 +836,9 @@ final class ProductController extends BaseController
 
         // 2. Sync with pivot data
         $syncResult2 = $product->categories()->sync([
-            1 => ['sort_order' => 1, 'is_featured' => true],
-            2 => ['sort_order' => 2, 'is_featured' => false],
-            4 => ['sort_order' => 3, 'is_featured' => true],
+            1 => ['sort_order' => 1],
+            2 => ['sort_order' => 2],
+            4 => ['sort_order' => 3],
         ]);
         $results['sync_with_pivot'] = $syncResult2;
 
@@ -852,8 +852,7 @@ final class ProductController extends BaseController
 
         // 5. Update existing pivot
         $updateResult = $product->categories()->updateExistingPivot(1, [
-            'sort_order' => 10,
-            'is_featured' => false
+            'sort_order' => 10
         ]);
         $results['update_pivot'] = $updateResult;
 

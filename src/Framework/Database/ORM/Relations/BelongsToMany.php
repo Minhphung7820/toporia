@@ -385,6 +385,9 @@ class BelongsToMany extends Relation
 
     /**
      * Apply stored pivot constraints to a query builder.
+     *
+     * FIXED: Properly qualifies pivot columns with table name to ensure
+     * constraints are applied correctly in sync/toggle/updateExistingPivot operations.
      */
     protected function applyStoredConstraintsToQuery(QueryBuilder $query): void
     {
@@ -394,12 +397,15 @@ class BelongsToMany extends Relation
             } elseif (isset($where['type']) && $where['type'] === 'function') {
                 $query->whereRaw("{$where['column']} {$where['operator']} ?", [$where['value']]);
             } elseif (!$this->isRawColumn($where['column'])) {
-                $this->applyWhereToQuery($where['column'], $where['operator'], $where['value']);
+                // FIXED: Qualify column with pivot table name
+                $qualifiedColumn = $this->ensurePivotColumnQualified($where['column']);
+                $this->applyWhereToQueryBuilder($query, $qualifiedColumn, $where['operator'], $where['value']);
             }
         }
 
         foreach ($this->pivotWhereIns as $whereIn) {
-            $column = $whereIn['column'];
+            // FIXED: Qualify column with pivot table name
+            $column = $this->ensurePivotColumnQualified($whereIn['column']);
             $whereIn['not']
                 ? $query->whereNotIn($column, $whereIn['values'])
                 : $query->whereIn($column, $whereIn['values']);
@@ -1222,20 +1228,25 @@ class BelongsToMany extends Relation
     /**
      * Detach a related model from the parent via pivot table.
      *
+     * FIXED: Applies relation constraints (wherePivot/where) like Laravel.
+     *
      * @param int|string|null $id Related model ID (null = detach all)
      * @return int Number of rows deleted
      */
     public function detach(int|string|null $id = null): int
     {
         $qb = new QueryBuilder($this->query->getConnection());
-        $qb->table($this->pivotTable)
+        $query = $qb->table($this->pivotTable)
             ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey));
 
         if ($id !== null) {
-            $qb->where($this->relatedPivotKey, $id);
+            $query->where($this->relatedPivotKey, $id);
         }
 
-        return $qb->delete();
+        // FIXED: Apply stored pivot constraints (wherePivot, wherePivotIn, etc.)
+        $this->applyStoredConstraintsToQuery($query);
+
+        return $query->delete();
     }
 
     /**
@@ -1353,6 +1364,12 @@ class BelongsToMany extends Relation
     /**
      * Sync the pivot table with the given IDs.
      *
+     * FIXED:
+     * - Wrapped in database transaction for atomicity
+     * - Loads current state once and reuses it
+     * - Batch inserts for new attachments (bulk insert)
+     * - Applies relation constraints (wherePivot/where) like Laravel
+     *
      * PERFORMANCE GUIDELINES:
      * - Use sync() for relationships with < 5,000 records
      * - Use syncChunked() for relationships with ≥ 5,000 records
@@ -1386,48 +1403,78 @@ class BelongsToMany extends Relation
             'updated' => []
         ];
 
-        // Get current pivot records
-        $current = $this->getCurrentPivotIds();
+        $connection = $this->query->getConnection();
 
-        // Normalize input IDs
-        $records = $this->formatSyncRecords($ids);
-        $syncIds = array_keys($records);
+        // FIXED: Wrap entire operation in transaction for atomicity
+        $connection->beginTransaction();
 
-        // PERFORMANCE: Convert current IDs to associative array for O(1) lookup
-        // This is much faster than in_array() which is O(n)
-        $currentLookup = [];
-        foreach ($current as $currentId) {
-            $currentLookup[$currentId] = true;
-        }
+        try {
+            // FIXED: Load current state once and reuse it
+            $current = $this->getCurrentPivotIds();
 
-        if ($detaching) {
-            // Determine what to detach
-            $detach = array_diff($current, $syncIds);
-            if (!empty($detach)) {
-                $this->detachMany($detach);
-                $changes['detached'] = $detach;
+            // Normalize input IDs
+            $records = $this->formatSyncRecords($ids);
+            $syncIds = array_keys($records);
+
+            // PERFORMANCE: Convert current IDs to associative array for O(1) lookup
+            // This is much faster than in_array() which is O(n)
+            $currentLookup = [];
+            foreach ($current as $currentId) {
+                $currentLookup[$currentId] = true;
             }
-        }
 
-        // Determine what to attach or update
-        foreach ($records as $id => $pivotData) {
-            // PERFORMANCE: Use isset() for O(1) lookup instead of in_array() which is O(n)
-            if (isset($currentLookup[$id])) {
-                // Update existing pivot record
-                if (!empty($pivotData)) {
+            // FIXED: Batch detach if needed
+            if ($detaching) {
+                // Determine what to detach
+                $detach = array_diff($current, $syncIds);
+                if (!empty($detach)) {
+                    $this->detachMany($detach);
+                    $changes['detached'] = array_values($detach);
+                }
+            }
+
+            // FIXED: Batch attach and update operations
+            $toAttach = [];
+            $toUpdate = [];
+
+            foreach ($records as $id => $pivotData) {
+                // PERFORMANCE: Use isset() for O(1) lookup instead of in_array() which is O(n)
+                if (isset($currentLookup[$id])) {
+                    // Update existing pivot record
+                    if (!empty($pivotData)) {
+                        $toUpdate[$id] = $pivotData;
+                    }
+                } else {
+                    // Queue for batch attach
+                    $toAttach[$id] = $pivotData;
+                }
+            }
+
+            // FIXED: Batch update existing records
+            if (!empty($toUpdate)) {
+                foreach ($toUpdate as $id => $pivotData) {
                     $this->updateExistingPivot($id, $pivotData);
                     $changes['updated'][] = $id;
                 }
-            } else {
-                // Attach new record
-                $this->attach($id, $pivotData, false);
-                $changes['attached'][] = $id;
             }
+
+            // FIXED: Batch attach new records (single bulk insert)
+            if (!empty($toAttach)) {
+                $attached = $this->attachMany($toAttach, false);
+                $changes['attached'] = $attached;
+            }
+
+            $this->touchParent();
+
+            // Commit transaction
+            $connection->commit();
+
+            return $changes;
+        } catch (\Exception $e) {
+            // Rollback on error
+            $connection->rollback();
+            throw $e;
         }
-
-        $this->touchParent();
-
-        return $changes;
     }
 
     /**
@@ -1563,6 +1610,12 @@ class BelongsToMany extends Relation
     /**
      * Toggle the attachment of related models.
      *
+     * FIXED:
+     * - Wrapped in database transaction for atomicity
+     * - Loads current state once and reuses it
+     * - Batch operations (single DELETE + single bulk INSERT)
+     * - Applies relation constraints (wherePivot/where) like Laravel
+     *
      * @param array|int|string $ids Related model IDs
      * @param bool $touch Whether to touch parent timestamps
      * @return array Toggle results with attached and detached arrays
@@ -1572,56 +1625,128 @@ class BelongsToMany extends Relation
         $ids = is_array($ids) ? $ids : [$ids];
         $changes = ['attached' => [], 'detached' => []];
 
-        $current = $this->getCurrentPivotIds();
-
-        // PERFORMANCE: Convert current IDs to associative array for O(1) lookup
-        $currentLookup = [];
-        foreach ($current as $currentId) {
-            $currentLookup[$currentId] = true;
+        if (empty($ids)) {
+            return $changes;
         }
 
-        foreach ($ids as $id) {
-            // PERFORMANCE: Use isset() for O(1) lookup instead of in_array() which is O(n)
-            if (isset($currentLookup[$id])) {
-                $this->detach($id);
-                $changes['detached'][] = $id;
-            } else {
-                $this->attach($id, [], false);
-                $changes['attached'][] = $id;
+        $connection = $this->query->getConnection();
+
+        // FIXED: Wrap entire operation in transaction for atomicity
+        $connection->beginTransaction();
+
+        try {
+            // FIXED: Load current state once and reuse it
+            $current = $this->getCurrentPivotIds();
+
+            // PERFORMANCE: Convert current IDs to associative array for O(1) lookup
+            $currentLookup = [];
+            foreach ($current as $currentId) {
+                $currentLookup[$currentId] = true;
             }
-        }
 
-        if ($touch) {
-            $this->touchParent();
-        }
+            // FIXED: Calculate diff in PHP, then execute minimal queries
+            $toDetach = [];
+            $toAttach = [];
 
-        return $changes;
+            foreach ($ids as $id) {
+                // PERFORMANCE: Use isset() for O(1) lookup instead of in_array() which is O(n)
+                if (isset($currentLookup[$id])) {
+                    $toDetach[] = $id;
+                } else {
+                    $toAttach[] = $id;
+                }
+            }
+
+            // FIXED: Batch detach (single DELETE query)
+            if (!empty($toDetach)) {
+                $this->detachMany($toDetach);
+                $changes['detached'] = $toDetach;
+            }
+
+            // FIXED: Batch attach (single bulk INSERT query)
+            if (!empty($toAttach)) {
+                $attached = $this->attachMany($toAttach, false);
+                $changes['attached'] = $attached;
+            }
+
+            if ($touch) {
+                $this->touchParent();
+            }
+
+            // Commit transaction
+            $connection->commit();
+
+            return $changes;
+        } catch (\Exception $e) {
+            // Rollback on error
+            $connection->rollback();
+            throw $e;
+        }
     }
 
     /**
      * Update an existing pivot record.
      *
-     * @param int|string $id Related model ID
+     * FIXED:
+     * - Supports array of IDs (WHERE IN) like Laravel
+     * - Applies relation constraints (wherePivot/where) like Laravel
+     * - Wrapped in database transaction for atomicity
+     *
+     * @param int|string|array $id Related model ID(s)
      * @param array $pivotData Pivot data to update
-     * @return bool
+     * @return bool|int Returns bool for single ID, int (affected rows) for array of IDs
      */
-    public function updateExistingPivot(int|string $id, array $pivotData): bool
+    public function updateExistingPivot(int|string|array $id, array $pivotData): bool|int
     {
+        if (empty($pivotData)) {
+            return is_array($id) ? 0 : false;
+        }
+
         if ($this->withTimestamps && !isset($pivotData['updated_at'])) {
             $pivotData['updated_at'] = now()->toDateTimeString();
         }
 
-        $qb = new QueryBuilder($this->query->getConnection());
-        $affected = $qb->table($this->pivotTable)
-            ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey))
-            ->where($this->relatedPivotKey, $id)
-            ->update($pivotData);
+        $connection = $this->query->getConnection();
+        $connection->beginTransaction();
 
-        return $affected > 0;
+        try {
+            $qb = new QueryBuilder($connection);
+            $query = $qb->table($this->pivotTable)
+                ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey));
+
+            // FIXED: Support array of IDs (WHERE IN) like Laravel
+            if (is_array($id)) {
+                if (empty($id)) {
+                    $connection->rollback();
+                    return 0;
+                }
+                // Remove duplicates
+                $id = array_values(array_unique($id));
+                $query->whereIn($this->relatedPivotKey, $id);
+            } else {
+                $query->where($this->relatedPivotKey, $id);
+            }
+
+            // FIXED: Apply stored pivot constraints (wherePivot, wherePivotIn, etc.)
+            $this->applyStoredConstraintsToQuery($query);
+
+            $affected = $query->update($pivotData);
+
+            $connection->commit();
+
+            // Return int for array, bool for single ID (Laravel compatibility)
+            return is_array($id) ? $affected : ($affected > 0);
+        } catch (\Exception $e) {
+            $connection->rollback();
+            throw $e;
+        }
     }
 
     /**
      * Get current pivot IDs for the parent model.
+     *
+     * FIXED: Now applies relation constraints (wherePivot/where) like Laravel.
+     * All queries now include constraints from the relation builder.
      *
      * PERFORMANCE WARNING: Loads all pivot IDs into memory.
      * For very large relationships (>10k records), consider:
@@ -1644,6 +1769,9 @@ class BelongsToMany extends Relation
         $query = $qb->table($this->pivotTable)
             ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey));
 
+        // FIXED: Apply stored pivot constraints (wherePivot, wherePivotIn, etc.)
+        $this->applyStoredConstraintsToQuery($query);
+
         // Apply limit if specified for safety
         if ($limit !== null) {
             $query->limit($limit);
@@ -1658,6 +1786,8 @@ class BelongsToMany extends Relation
     /**
      * Get current pivot IDs for specific related IDs only.
      *
+     * FIXED: Now applies relation constraints (wherePivot/where) like Laravel.
+     *
      * Performance: O(log n) - Uses indexed lookup with whereIn
      * Clean Architecture: Targeted query for chunked operations
      *
@@ -1671,10 +1801,14 @@ class BelongsToMany extends Relation
         }
 
         $qb = new QueryBuilder($this->query->getConnection());
-        $results = $qb->table($this->pivotTable)
+        $query = $qb->table($this->pivotTable)
             ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey))
-            ->whereIn($this->relatedPivotKey, $relatedIds)
-            ->pluck($this->relatedPivotKey);
+            ->whereIn($this->relatedPivotKey, $relatedIds);
+
+        // FIXED: Apply stored pivot constraints (wherePivot, wherePivotIn, etc.)
+        $this->applyStoredConstraintsToQuery($query);
+
+        $results = $query->pluck($this->relatedPivotKey);
 
         return $results->toArray();
     }
@@ -1690,12 +1824,19 @@ class BelongsToMany extends Relation
         $formatted = [];
 
         foreach ($records as $key => $value) {
-            if (is_numeric($key)) {
-                // Simple array: [1, 2, 3]
+            // Check if this is a simple array format: [1, 2, 3]
+            // This happens when key is numeric AND value is scalar
+            if (is_numeric($key) && is_scalar($value)) {
+                // Simple array: [1, 2, 3] -> convert to [1 => [], 2 => [], 3 => []]
                 $formatted[$value] = [];
-            } else {
-                // Associative array: [1 => ['role' => 'admin'], 2 => ['role' => 'user']]
+            } elseif (is_scalar($key)) {
+                // Associative array format: [1 => ['role' => 'admin'], 2 => ['role' => 'user']]
+                // or ['a' => [...], 'b' => [...]]
+                // Key must be scalar (int/string) to use as array key
                 $formatted[$key] = is_array($value) ? $value : [];
+            } else {
+                // Skip invalid keys (arrays/objects cannot be used as keys)
+                continue;
             }
         }
 
@@ -1705,16 +1846,35 @@ class BelongsToMany extends Relation
     /**
      * Detach multiple related models.
      *
+     * FIXED:
+     * - Removes duplicate IDs before building query
+     * - Applies relation constraints (wherePivot/where) like Laravel
+     *
      * @param array $ids Related model IDs
      * @return int Number of rows deleted
      */
     protected function detachMany(array $ids): int
     {
+        if (empty($ids)) {
+            return 0;
+        }
+
+        // FIXED: Remove duplicate IDs to avoid duplicate placeholders in IN clause
+        $ids = array_values(array_unique($ids));
+
+        if (empty($ids)) {
+            return 0;
+        }
+
         $qb = new QueryBuilder($this->query->getConnection());
-        return $qb->table($this->pivotTable)
+        $query = $qb->table($this->pivotTable)
             ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey))
-            ->whereIn($this->relatedPivotKey, $ids)
-            ->delete();
+            ->whereIn($this->relatedPivotKey, $ids);
+
+        // FIXED: Apply stored pivot constraints (wherePivot, wherePivotIn, etc.)
+        $this->applyStoredConstraintsToQuery($query);
+
+        return $query->delete();
     }
 
     /**
