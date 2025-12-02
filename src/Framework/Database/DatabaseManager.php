@@ -6,7 +6,7 @@ namespace Toporia\Framework\Database;
 
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Schema\SchemaBuilder;
-use Toporia\Framework\Database\Query\QueryBuilder;
+use Toporia\Framework\Database\Query\{QueryBuilder, Expression, RowCollection};
 use Toporia\Framework\Database\ConnectionProxy;
 
 
@@ -339,23 +339,110 @@ class DatabaseManager
     // =========================================================================
 
     /**
-     * Execute a raw SQL SELECT query.
+     * Create a raw database expression.
      *
-     * @param string $sql Raw SQL query
+     * Returns an Expression object that can be used in query building.
+     * The expression will not be quoted or escaped by the query grammar.
+     *
+     * This method works exactly like Laravel's DB::raw() - it returns an
+     * expression object for use in query building, not execute a query.
+     *
+     * Performance: O(1) - lightweight object creation, no database overhead
+     * Security: Expression is not automatically escaped - use with caution
+     *
+     * @param string $value Raw SQL expression
+     * @return Expression Expression object for use in queries
+     *
+     * @example
+     * ```php
+     * // Use in SELECT clause
+     * DB::table('users')
+     *     ->select(DB::raw('COUNT(*) as total'))
+     *     ->get();
+     *
+     * // Use in WHERE clause
+     * DB::table('orders')
+     *     ->where(DB::raw('DATE(created_at)'), '=', '2024-01-01')
+     *     ->get();
+     *
+     * // Use in ORDER BY
+     * DB::table('products')
+     *     ->orderBy(DB::raw('RAND()'))
+     *     ->get();
+     *
+     * // Use in aggregate functions
+     * DB::table('users')
+     *     ->select(DB::raw('AVG(age) as avg_age'))
+     *     ->get();
+     * ```
+     */
+    public function raw(string $value): Expression
+    {
+        return new Expression($value);
+    }
+
+    /**
+     * Execute a raw SQL SELECT query and return results.
+     *
+     * Executes a raw SELECT query and returns the results as a DatabaseCollection.
+     * This is different from raw() which returns an Expression for query building.
+     *
+     * Performance: Direct SQL execution with prepared statements
+     * Security: Uses parameter binding to prevent SQL injection
+     *
+     * @param string $sql Raw SQL SELECT query
      * @param array<int|string, mixed> $bindings Query parameter bindings
      * @return DatabaseCollection Query results
+     *
+     * @example
+     * ```php
+     * // Simple raw query
+     * $users = DB::select('SELECT * FROM users WHERE status = ?', ['active']);
+     *
+     * // Complex query with joins
+     * $results = DB::select('
+     *     SELECT u.*, COUNT(p.id) as post_count
+     *     FROM users u
+     *     LEFT JOIN posts p ON p.user_id = u.id
+     *     WHERE u.created_at > ?
+     *     GROUP BY u.id
+     * ', [$date]);
+     *
+     * // Named parameters
+     * $user = DB::select('SELECT * FROM users WHERE id = :id', ['id' => 1]);
+     * ```
      */
-    public function raw(string $sql, array $bindings = []): DatabaseCollection
+    public function select(string $sql, array $bindings = []): DatabaseCollection
     {
-        return $this->connection()->raw($sql, $bindings);
+        $connection = $this->getConnection();
+        $rows = $connection->select($sql, $bindings);
+        return new RowCollection($rows);
     }
 
     /**
      * Execute a raw SQL statement (INSERT, UPDATE, DELETE).
      *
+     * Executes a raw SQL statement that modifies data and returns the number
+     * of affected rows.
+     *
+     * Performance: Direct SQL execution with prepared statements
+     * Security: Uses parameter binding to prevent SQL injection
+     *
      * @param string $sql Raw SQL statement
      * @param array<int|string, mixed> $bindings Query parameter bindings
      * @return int Number of affected rows
+     *
+     * @example
+     * ```php
+     * // Raw UPDATE
+     * $affected = DB::statement('UPDATE users SET status = ? WHERE last_login < ?', ['inactive', $date]);
+     *
+     * // Raw DELETE
+     * $deleted = DB::statement('DELETE FROM sessions WHERE expires_at < NOW()');
+     *
+     * // Raw INSERT
+     * DB::statement('INSERT INTO logs (message, level) VALUES (?, ?)', [$message, 'info']);
+     * ```
      */
     public function statement(string $sql, array $bindings = []): int
     {
@@ -366,9 +453,18 @@ class DatabaseManager
      * Execute an unprepared SQL statement (DDL, SET variables).
      *
      * WARNING: Does NOT use prepared statements. Never pass user input.
+     * Use only for DDL statements (CREATE, DROP, ALTER) or SET operations.
      *
      * @param string $sql Raw SQL statement
      * @return bool True on success
+     *
+     * @example
+     * ```php
+     * // DDL statements
+     * DB::unprepared('CREATE TABLE temp_data (id INT PRIMARY KEY, data TEXT)');
+     * DB::unprepared('SET FOREIGN_KEY_CHECKS = 0');
+     * DB::unprepared('TRUNCATE TABLE cache');
+     * ```
      */
     public function unprepared(string $sql): bool
     {

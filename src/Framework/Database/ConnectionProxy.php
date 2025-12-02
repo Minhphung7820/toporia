@@ -230,18 +230,6 @@ class ConnectionProxy implements ConnectionInterface
     // =========================================================================
 
     /**
-     * Execute a raw SQL SELECT query.
-     *
-     * @param string $sql Raw SQL query
-     * @param array<int|string, mixed> $bindings Query parameter bindings
-     * @return \Toporia\Framework\Database\DatabaseCollection Query results
-     */
-    public function raw(string $sql, array $bindings = []): \Toporia\Framework\Database\DatabaseCollection
-    {
-        return $this->table('')->raw($sql, $bindings);
-    }
-
-    /**
      * Execute a raw SQL statement (INSERT, UPDATE, DELETE).
      *
      * @param string $sql Raw SQL statement
@@ -250,6 +238,6 @@ class ConnectionProxy implements ConnectionInterface
      */
     public function statement(string $sql, array $bindings = []): int
     {
-        return $this->table('')->statement($sql, $bindings);
+        return $this->connection->affectingStatement($sql, $bindings);
     }
 }

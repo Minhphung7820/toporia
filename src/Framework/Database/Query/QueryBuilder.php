@@ -199,12 +199,17 @@ class QueryBuilder implements QueryBuilderInterface
      * Set selected columns.
      *
      * Accepts either an array of columns or varargs: select('id', 'name').
+     * Also accepts Expression objects from DB::raw() for raw SQL expressions.
      *
-     * @param string|array<int,string> $columns
+     * @param string|array<int,string|Expression>|Expression $columns Column names or Expression objects
      */
-    public function select(string|array $columns = ['*']): self
+    public function select(string|array|Expression $columns = ['*']): self
     {
-        $this->columns = is_array($columns) ? $columns : func_get_args();
+        if ($columns instanceof Expression) {
+            $this->columns = [$columns];
+        } else {
+            $this->columns = is_array($columns) ? $columns : func_get_args();
+        }
         $this->invalidateCache();
         return $this;
     }

@@ -20,7 +20,8 @@ use Toporia\Framework\Foundation\ServiceAccessor;
  * @method static void disableQueryLog() Disable query logging
  * @method static array getQueryLog() Get the query log
  * @method static void flushQueryLog() Clear the query log
- * @method static \Toporia\Framework\Database\DatabaseCollection raw(string $sql, array $bindings = []) Execute raw SELECT query
+ * @method static \Toporia\Framework\Database\Query\Expression raw(string $value) Create raw SQL expression for query building
+ * @method static \Toporia\Framework\Database\DatabaseCollection select(string $sql, array $bindings = []) Execute raw SELECT query
  * @method static int statement(string $sql, array $bindings = []) Execute raw INSERT/UPDATE/DELETE statement
  * @method static bool unprepared(string $sql) Execute unprepared SQL (DDL statements)
  *
@@ -33,8 +34,19 @@ use Toporia\Framework\Foundation\ServiceAccessor;
  * // Get named connection
  * DB::connection('mysql')->table('users')->get();
  *
- * // Execute raw SQL
- * DB::raw('SELECT * FROM users WHERE status = ?', ['active']);
+ * // Create raw expression for query building (like Laravel's DB::raw())
+ * DB::table('users')
+ *     ->select(DB::raw('COUNT(*) as total'))
+ *     ->get();
+ *
+ * DB::table('orders')
+ *     ->where(DB::raw('DATE(created_at)'), '=', '2024-01-01')
+ *     ->get();
+ *
+ * // Execute raw SELECT query
+ * DB::select('SELECT * FROM users WHERE status = ?', ['active']);
+ *
+ * // Execute raw statements
  * DB::statement('UPDATE users SET status = ? WHERE id = ?', ['inactive', 1]);
  * DB::unprepared('TRUNCATE TABLE cache');
  */
