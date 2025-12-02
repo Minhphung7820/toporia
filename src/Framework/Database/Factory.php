@@ -321,7 +321,7 @@ abstract class Factory implements FactoryInterface
 
             // Apply timestamps if model uses them
             if (method_exists($modelClass, 'usesTimestamps') && $modelClass::usesTimestamps()) {
-                $now = date('Y-m-d H:i:s');
+                $now = now()->toDateTimeString();
                 $modelAttributes['created_at'] = $modelAttributes['created_at'] ?? $now;
                 $modelAttributes['updated_at'] = $modelAttributes['updated_at'] ?? $now;
             } elseif (property_exists($modelClass, 'timestamps')) {
@@ -329,7 +329,7 @@ abstract class Factory implements FactoryInterface
                 try {
                     $reflection = reflection()->getProperty($modelClass, 'timestamps');
                     if ($reflection->isStatic() && $reflection->getValue()) {
-                        $now = date('Y-m-d H:i:s');
+                        $now = now()->toDateTimeString();
                         $modelAttributes['created_at'] = $modelAttributes['created_at'] ?? $now;
                         $modelAttributes['updated_at'] = $modelAttributes['updated_at'] ?? $now;
                     }

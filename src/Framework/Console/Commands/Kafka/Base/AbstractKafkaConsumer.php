@@ -244,7 +244,7 @@ abstract class AbstractKafkaConsumer extends Command
      */
     protected function logKafkaEvent(string $label, string $message, string $style = 'info'): void
     {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = now()->toDateTimeString();
         $label = strtoupper($label);
 
         $styleMap = [

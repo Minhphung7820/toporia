@@ -167,7 +167,7 @@ final class RedisQueue implements Contracts\QueueInterface
         $this->redis->hSet($jobKey, 'payload', serialize($job));
         $this->redis->hSet($jobKey, 'queue', $queue);
         $this->redis->hSet($jobKey, 'attempts', 0);
-        $this->redis->hSet($jobKey, 'created_at', time());
+        $this->redis->hSet($jobKey, 'created_at', now()->getTimestamp());
         $this->redis->rPush($queueKey, $jobId);
         $this->redis->exec();
 
@@ -190,7 +190,7 @@ final class RedisQueue implements Contracts\QueueInterface
         $jobId = $job->getId();
         $delayedKey = $this->getDelayedKey($queue);
         $jobKey = $this->getJobKey($jobId);
-        $availableAt = time() + $delay;
+        $availableAt = now()->getTimestamp() + $delay;
 
         // Store job payload and add to delayed sorted set
         // Score = timestamp when job becomes available
@@ -198,7 +198,7 @@ final class RedisQueue implements Contracts\QueueInterface
         $this->redis->hSet($jobKey, 'payload', serialize($job));
         $this->redis->hSet($jobKey, 'queue', $queue);
         $this->redis->hSet($jobKey, 'attempts', 0);
-        $this->redis->hSet($jobKey, 'created_at', time());
+        $this->redis->hSet($jobKey, 'created_at', now()->getTimestamp());
         $this->redis->hSet($jobKey, 'available_at', $availableAt);
         $this->redis->zAdd($delayedKey, $availableAt, $jobId);
         $this->redis->exec();
@@ -251,7 +251,7 @@ final class RedisQueue implements Contracts\QueueInterface
 
         // Move to reserved set (for timeout tracking)
         $reservedKey = $this->getReservedKey($queue);
-        $this->redis->zAdd($reservedKey, time() + 3600, $jobId); // 1 hour timeout
+        $this->redis->zAdd($reservedKey, now()->getTimestamp() + 3600, $jobId); // 1 hour timeout
 
         // Increment attempts
         $this->redis->hIncrBy($jobKey, 'attempts', 1);
@@ -286,7 +286,7 @@ final class RedisQueue implements Contracts\QueueInterface
     {
         $delayedKey = $this->getDelayedKey($queue);
         $queueKey = $this->getQueueKey($queue);
-        $currentTime = time();
+        $currentTime = now()->getTimestamp();
 
         // Get all jobs with score <= current time
         // ZRANGEBYSCORE is O(log N + k) where k = returned elements
@@ -409,7 +409,7 @@ LUA;
         $failedId = uniqid('failed_', true);
         $failedJobKey = $this->getFailedJobKey($failedId);
         $failedKey = "{$this->prefix}:failed";
-        $failedAt = time();
+        $failedAt = now()->getTimestamp();
 
         // CRITICAL: Store full exception details including stack trace
         $exceptionData = $this->formatException($exception);

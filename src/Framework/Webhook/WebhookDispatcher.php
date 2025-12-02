@@ -68,7 +68,7 @@ final class WebhookDispatcher implements WebhookDispatcherInterface
         // Prepare payload
         $data = [
             'event' => $event,
-            'timestamp' => time(),
+            'timestamp' => now()->getTimestamp(),
             'data' => $payload,
         ];
 
@@ -201,4 +201,3 @@ final class WebhookDispatcher implements WebhookDispatcherInterface
         }
     }
 }
-

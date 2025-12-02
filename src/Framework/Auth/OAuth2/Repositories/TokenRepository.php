@@ -45,7 +45,7 @@ final class TokenRepository implements TokenRepositoryInterface
     public function createAccessToken(string $clientId, ?string $userId, array $scopes, int $expiresIn): string
     {
         $expiresIn = $expiresIn > 0 ? $expiresIn : self::DEFAULT_ACCESS_TOKEN_EXPIRES_IN;
-        $expiresAt = time() + $expiresIn;
+        $expiresAt = now()->getTimestamp() + $expiresIn;
 
         // Generate JWT token (simplified - in production use proper JWT library)
         $token = $this->generateJwtToken($clientId, $userId, $scopes, $expiresAt);
@@ -56,7 +56,7 @@ final class TokenRepository implements TokenRepositoryInterface
             'client_id' => $clientId,
             'user_id' => $userId,
             'scopes' => $scopes,
-            'expires_at' => date('Y-m-d H:i:s', $expiresAt),
+            'expires_at' => now()->setTimestamp($expiresAt)->toDateTimeString(),
         ]);
 
         return $token;
@@ -68,7 +68,7 @@ final class TokenRepository implements TokenRepositoryInterface
     public function createRefreshToken(string $clientId, string $userId, array $scopes, int $expiresIn): string
     {
         $expiresIn = $expiresIn > 0 ? $expiresIn : self::DEFAULT_REFRESH_TOKEN_EXPIRES_IN;
-        $expiresAt = time() + $expiresIn;
+        $expiresAt = now()->getTimestamp() + $expiresIn;
 
         // Generate random token
         $token = bin2hex(random_bytes(32)); // 64 character hex string
@@ -79,7 +79,7 @@ final class TokenRepository implements TokenRepositoryInterface
             'client_id' => $clientId,
             'user_id' => $userId,
             'scopes' => $scopes,
-            'expires_at' => date('Y-m-d H:i:s', $expiresAt),
+            'expires_at' => now()->setTimestamp($expiresAt)->toDateTimeString(),
         ]);
 
         return $token;
@@ -146,7 +146,7 @@ final class TokenRepository implements TokenRepositoryInterface
             return false;
         }
 
-        $tokenModel->update(['revoked_at' => date('Y-m-d H:i:s')]);
+        $tokenModel->update(['revoked_at' => now()->toDateTimeString()]);
         return true;
     }
 
@@ -162,7 +162,7 @@ final class TokenRepository implements TokenRepositoryInterface
             return false;
         }
 
-        $tokenModel->update(['revoked_at' => date('Y-m-d H:i:s')]);
+        $tokenModel->update(['revoked_at' => now()->toDateTimeString()]);
         return true;
     }
 

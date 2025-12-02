@@ -73,7 +73,7 @@ final class NotificationFailed extends Event
             'channel' => $this->channel,
             'error_message' => $this->exception->getMessage(),
             'error_class' => get_class($this->exception),
-            'timestamp' => date('Y-m-d H:i:s')
+            'timestamp' => now()->toDateTimeString()
         ];
     }
 }

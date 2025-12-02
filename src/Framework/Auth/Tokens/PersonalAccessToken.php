@@ -156,7 +156,7 @@ class PersonalAccessToken extends Model implements PersonalAccessTokenInterface
      */
     public function revoke(): bool
     {
-        $this->expires_at = date('Y-m-d H:i:s', time() - 1);
+        $this->expires_at = now()->subSecond()->toDateTimeString();
         return $this->save();
     }
 
@@ -169,7 +169,7 @@ class PersonalAccessToken extends Model implements PersonalAccessTokenInterface
      */
     public function touchLastUsedAt(): bool
     {
-        $this->last_used_at = date('Y-m-d H:i:s');
+        $this->last_used_at = now()->toDateTimeString();
         return $this->save();
     }
 

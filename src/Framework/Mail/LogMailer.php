@@ -77,7 +77,7 @@ final class LogMailer implements MailerInterface
      */
     private function formatLogEntry(MessageInterface $message): string
     {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = now()->toDateTimeString();
         $to = implode(', ', $message->getTo());
 
         $entry = <<<LOG

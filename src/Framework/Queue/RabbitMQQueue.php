@@ -395,7 +395,7 @@ final class RabbitMQQueue implements QueueInterface
             'delivery_mode' => AMQPMessage::DELIVERY_MODE_PERSISTENT, // Make message persistent
             'content_type' => 'application/php',
             'message_id' => $jobId,
-            'timestamp' => time(),
+            'timestamp' => now()->getTimestamp(),
         ]);
 
         // Add priority if job has priority
@@ -441,7 +441,7 @@ final class RabbitMQQueue implements QueueInterface
                 'delivery_mode' => AMQPMessage::DELIVERY_MODE_PERSISTENT,
                 'content_type' => 'application/php',
                 'message_id' => $jobId,
-                'timestamp' => time(),
+                'timestamp' => now()->getTimestamp(),
             ]);
 
             // Set delay in milliseconds
@@ -459,7 +459,7 @@ final class RabbitMQQueue implements QueueInterface
                 'delivery_mode' => AMQPMessage::DELIVERY_MODE_PERSISTENT,
                 'content_type' => 'application/php',
                 'message_id' => $jobId,
-                'timestamp' => time(),
+                'timestamp' => now()->getTimestamp(),
             ]);
 
             $channel->basic_publish($message, $this->exchange, $delayedQueue);

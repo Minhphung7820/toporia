@@ -34,7 +34,7 @@ final class MemoryCache implements CacheInterface
         $data = $this->storage[$key];
 
         // Check if expired
-        if ($data['expires_at'] !== null && $data['expires_at'] < time()) {
+        if ($data['expires_at'] !== null && $data['expires_at'] < now()->getTimestamp()) {
             unset($this->storage[$key]);
             return $default;
         }
@@ -44,7 +44,7 @@ final class MemoryCache implements CacheInterface
 
     public function set(string $key, mixed $value, ?int $ttl = null): bool
     {
-        $expiresAt = $ttl !== null ? time() + $ttl : null;
+        $expiresAt = $ttl !== null ? now()->getTimestamp() + $ttl : null;
 
         $this->storage[$key] = [
             'value' => $value,
@@ -169,7 +169,7 @@ final class MemoryCache implements CacheInterface
         }
 
         // Key doesn't exist or is expired - set it
-        $expiresAt = $ttl !== null ? time() + $ttl : null;
+        $expiresAt = $ttl !== null ? now()->getTimestamp() + $ttl : null;
         $this->storage[$key] = [
             'value' => $value,
             'expires_at' => $expiresAt,

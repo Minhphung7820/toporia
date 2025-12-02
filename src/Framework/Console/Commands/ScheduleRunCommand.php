@@ -81,7 +81,7 @@ final class ScheduleRunCommand extends Command
         $this->line('=', 80);
         $this->writeln('Schedule Runner');
         $this->line('=', 80);
-        $this->writeln('Time: ' . date('Y-m-d H:i:s'));
+        $this->writeln('Time: ' . now()->toDateTimeString());
         $this->writeln('Timezone: ' . date_default_timezone_get());
         $this->line('=', 80);
     }
@@ -95,7 +95,7 @@ final class ScheduleRunCommand extends Command
     {
         $this->newLine();
         $this->line('=', 80);
-        $this->writeln('Completed at: ' . date('Y-m-d H:i:s'));
+        $this->writeln('Completed at: ' . now()->toDateTimeString());
         $this->line('=', 80);
     }
 }

@@ -211,7 +211,7 @@ abstract class AbstractTransport implements TransportInterface
     {
         $headers = [
             'MIME-Version' => '1.0',
-            'Date' => date('r'),
+            'Date' => now()->toRfc2822String(),
             'Message-ID' => '<' . uniqid() . '@' . gethostname() . '>',
             'From' => $this->formatAddress($message->getFrom(), $message->getFromName()),
             'Subject' => $this->encodeHeader($message->getSubject()),

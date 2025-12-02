@@ -389,7 +389,7 @@ final class Scheduler
                 \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
                     'task' => $task->getDescription(),
                     'event' => 'before',
-                    'time' => date('Y-m-d H:i:s')
+                    'time' => now()->toDateTimeString()
                 ], $httpClient);
             }
 
@@ -461,7 +461,7 @@ final class Scheduler
                 \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
                     'task' => $task->getDescription(),
                     'event' => 'success',
-                    'time' => date('Y-m-d H:i:s')
+                    'time' => now()->toDateTimeString()
                 ], $httpClient);
             }
 
@@ -481,7 +481,7 @@ final class Scheduler
                     'task' => $task->getDescription(),
                     'event' => 'after',
                     'success' => $success,
-                    'time' => date('Y-m-d H:i:s')
+                    'time' => now()->toDateTimeString()
                 ], $httpClient);
             }
         } catch (\Throwable $e) {
@@ -499,7 +499,7 @@ final class Scheduler
                     'task' => $task->getDescription(),
                     'event' => 'failure',
                     'error' => $e->getMessage(),
-                    'time' => date('Y-m-d H:i:s')
+                    'time' => now()->toDateTimeString()
                 ], $httpClient);
             }
 
@@ -659,7 +659,7 @@ final class Scheduler
 
         $body = "Task: {$task->getDescription()}\n";
         $body .= "Status: " . ($success ? 'Success' : 'Failed') . "\n";
-        $body .= "Time: " . date('Y-m-d H:i:s') . "\n\n";
+        $body .= "Time: " . now()->toDateTimeString() . "\n\n";
 
         if ($exception) {
             $body .= "Error: {$exception->getMessage()}\n\n";

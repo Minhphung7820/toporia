@@ -100,7 +100,7 @@ final class ResponseServiceProvider extends ServiceProvider
                 'success' => $status < 400,
                 'message' => $message,
                 'data' => $data,
-                'timestamp' => date('c') // ISO 8601 format
+                'timestamp' => now()->toIso8601String() // ISO 8601 format
             ], $status);
         });
 

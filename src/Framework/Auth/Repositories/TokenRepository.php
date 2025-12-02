@@ -216,7 +216,7 @@ final class TokenRepository implements TokenRepositoryInterface
             ->where('tokenable_type', $tokenableType)
             ->where('tokenable_id', $tokenableId)
             ->update([
-                'expires_at' => date('Y-m-d H:i:s', time() - 1),
+                'expires_at' => now()->subSecond()->toDateTimeString(),
             ]);
 
         // Clear cache for user (tag-based)
@@ -237,7 +237,7 @@ final class TokenRepository implements TokenRepositoryInterface
     public function deleteExpired(): int
     {
         return $this->connection->table('personal_access_tokens')
-            ->where('expires_at', '<', date('Y-m-d H:i:s'))
+            ->where('expires_at', '<', now()->toDateTimeString())
             ->delete();
     }
 
@@ -254,7 +254,7 @@ final class TokenRepository implements TokenRepositoryInterface
         $affected = $this->connection->table('personal_access_tokens')
             ->where('id', $tokenId)
             ->update([
-                'last_used_at' => date('Y-m-d H:i:s'),
+                'last_used_at' => now()->toDateTimeString(),
             ]);
 
         return $affected > 0;

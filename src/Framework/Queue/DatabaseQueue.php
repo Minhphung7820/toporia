@@ -65,8 +65,8 @@ final class DatabaseQueue implements QueueInterface
             $queue,
             serialize($job),
             0,
-            time(),
-            time(),
+            now()->getTimestamp(),
+            now()->getTimestamp(),
             $priority
         ]);
 
@@ -94,8 +94,8 @@ final class DatabaseQueue implements QueueInterface
             $queue,
             serialize($job),
             0,
-            time() + $delay,
-            time(),
+            now()->getTimestamp() + $delay,
+            now()->getTimestamp(),
             $priority
         ]);
 
@@ -108,7 +108,7 @@ final class DatabaseQueue implements QueueInterface
         // This prevents "MySQL server has gone away" errors in long-running workers
         $this->connection->ensureConnected();
 
-        $currentTime = time();
+        $currentTime = now()->getTimestamp();
 
         // BEGIN TRANSACTION to prevent race conditions
         // Use database transactions + row locking for atomic pop operations
@@ -308,7 +308,7 @@ final class DatabaseQueue implements QueueInterface
             $job->getQueue(),
             serialize($job),
             $exceptionData,
-            time()
+            now()->getTimestamp()
         ]);
     }
 

@@ -42,7 +42,7 @@ final class FileCache implements CacheInterface
         $data = unserialize(file_get_contents($file));
 
         // Check if expired
-        if ($data['expires_at'] !== null && $data['expires_at'] < time()) {
+        if ($data['expires_at'] !== null && $data['expires_at'] < now()->getTimestamp()) {
             $this->delete($key);
             return $default;
         }
@@ -53,7 +53,7 @@ final class FileCache implements CacheInterface
     public function set(string $key, mixed $value, ?int $ttl = null): bool
     {
         $file = $this->getFilePath($key);
-        $expiresAt = $ttl !== null ? time() + $ttl : null;
+        $expiresAt = $ttl !== null ? now()->getTimestamp() + $ttl : null;
 
         $data = [
             'value' => $value,
@@ -204,7 +204,7 @@ final class FileCache implements CacheInterface
         }
 
         // Try to create file exclusively (atomic operation)
-        $expiresAt = $ttl !== null ? time() + $ttl : null;
+        $expiresAt = $ttl !== null ? now()->getTimestamp() + $ttl : null;
         $data = [
             'value' => $value,
             'expires_at' => $expiresAt,

@@ -115,7 +115,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
         $this->getTable()->insert([
             'email' => $email,
             'token' => $this->hasher->make($token),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => now()->toDateTimeString(),
         ]);
 
         return $token;
@@ -175,7 +175,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
     {
         $createdTime = strtotime($createdAt);
 
-        return ($createdTime + $this->expires) < time();
+        return ($createdTime + $this->expires) < now()->getTimestamp();
     }
 
     /**
@@ -196,7 +196,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
 
         $createdTime = strtotime($record['created_at']);
 
-        return ($createdTime + $this->throttle) > time();
+        return ($createdTime + $this->throttle) > now()->getTimestamp();
     }
 
     /**
@@ -217,7 +217,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
      */
     public function deleteExpired(): void
     {
-        $expiredAt = date('Y-m-d H:i:s', time() - $this->expires);
+        $expiredAt = now()->subSeconds($this->expires)->toDateTimeString();
 
         $this->getTable()
             ->where('created_at', '<', $expiredAt)

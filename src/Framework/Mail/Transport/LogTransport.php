@@ -88,7 +88,7 @@ final class LogTransport extends AbstractTransport
             mkdir($dir, 0755, true);
         }
 
-        $filename = date('Y-m-d_H-i-s') . "_{$messageId}.eml";
+        $filename = now()->format('Y-m-d_H-i-s') . "_{$messageId}.eml";
         $path = $dir . DIRECTORY_SEPARATOR . $filename;
 
         $mime = $this->buildMimeMessage($message);
@@ -143,7 +143,7 @@ final class LogTransport extends AbstractTransport
     private function formatLogEntry(MessageInterface $message, string $messageId): string
     {
         $separator = str_repeat('=', 80);
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = now()->toDateTimeString();
 
         $entry = "\n{$separator}\n";
         $entry .= "[{$timestamp}] Mail Message: {$messageId}\n";

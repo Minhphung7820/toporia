@@ -58,7 +58,7 @@ final class WebhookDelivery extends Model
         $this->fill([
             'status_code' => $statusCode,
             'response_body' => $responseBody,
-            'succeeded_at' => date('Y-m-d H:i:s'),
+            'succeeded_at' => now()->toDateTimeString(),
             'failed_at' => null,
             'error_message' => null,
         ]);
@@ -79,7 +79,7 @@ final class WebhookDelivery extends Model
 
         $this->fill([
             'attempts' => $currentAttempts + 1,
-            'failed_at' => date('Y-m-d H:i:s'),
+            'failed_at' => now()->toDateTimeString(),
             'error_message' => $errorMessage,
         ]);
 

@@ -154,7 +154,7 @@ final class ScheduleWorkCommand extends Command
         $this->line('=', 80);
         $this->writeln('Schedule Worker');
         $this->line('=', 80);
-        $this->writeln('Started:   ' . date('Y-m-d H:i:s'));
+        $this->writeln('Started:   ' . now()->toDateTimeString());
         $this->writeln('Timezone:  ' . date_default_timezone_get());
         $this->writeln('Sleep:     ' . $sleep . ' second(s)');
         $this->writeln('PID:       ' . getmypid());
@@ -174,7 +174,7 @@ final class ScheduleWorkCommand extends Command
         $this->newLine();
         $this->line('=', 80);
         $this->writeln('Scheduler Worker Stopped');
-        $this->writeln("Stopped at:    " . date('Y-m-d H:i:s'));
+        $this->writeln("Stopped at:    " . now()->toDateTimeString());
         $this->writeln("Cycles run:    {$runCount}");
         $this->writeln("Tasks executed: {$totalTasks}");
         $this->line('=', 80);

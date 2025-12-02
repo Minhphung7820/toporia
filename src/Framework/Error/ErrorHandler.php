@@ -137,7 +137,7 @@ final class ErrorHandler implements ErrorHandlerInterface
         // For now, just error_log
         error_log(sprintf(
             "[%s] %s: %s in %s:%d\n%s",
-            date('Y-m-d H:i:s'),
+            now()->toDateTimeString(),
             get_class($exception),
             $exception->getMessage(),
             $exception->getFile(),

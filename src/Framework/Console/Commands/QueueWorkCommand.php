@@ -230,7 +230,7 @@ final class QueueWorkCommand extends Command
         $this->writeln("Memory Limit:  {$memoryLimit} MB");
         $this->writeln("Runtime Limit: " . ($maxRuntime > 0 ? "{$maxRuntime} seconds" : 'unlimited'));
         $this->writeln("Stop when empty: " . ($stopWhenEmpty ? 'yes' : 'no'));
-        $this->writeln("Time:          " . date('Y-m-d H:i:s'));
+        $this->writeln("Time:          " . now()->toDateTimeString());
         $this->writeln("PID:           " . getmypid());
         $this->line('=', 80);
         $this->newLine();
