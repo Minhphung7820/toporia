@@ -57,4 +57,11 @@ interface RedirectResponseInterface extends ResponseInterface
      * @return $this
      */
     public function withErrors(array|string $errors): static;
+
+    /**
+     * Send the redirect response.
+     *
+     * @return void
+     */
+    public function sendResponse(): void;
 }

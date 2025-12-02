@@ -77,4 +77,11 @@ interface ResponseInterface
      * @return void
      */
     public function send(string $content): void;
+
+    /**
+     * Get the response content.
+     *
+     * @return string Response body content.
+     */
+    public function getContent(): string;
 }

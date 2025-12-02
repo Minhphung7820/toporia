@@ -85,4 +85,11 @@ interface JsonResponseInterface extends ResponseInterface
      * @return bool
      */
     public function isValidJson(): bool;
+
+    /**
+     * Send the complete JSON response.
+     *
+     * @return void
+     */
+    public function sendResponse(): void;
 }
