@@ -87,12 +87,17 @@ trait HasRelations
     public function hasAttached(Factory $factory, int $count, string $relationship): static
     {
         return $this->afterCreating(function (Model $parent) use ($factory, $count, $relationship) {
-            $related = $factory->count($count)->create();
+            // createMany returns array of Models when count > 1
+            $related = $factory->createMany($count);
 
             if (method_exists($parent, $relationship)) {
                 $relation = $parent->$relationship();
                 if (method_exists($relation, 'attach')) {
-                    $relation->attach($related->pluck('id')->toArray());
+                    // Extract IDs from array of models
+                    $ids = is_array($related)
+                        ? array_map(fn(Model $model) => $model->getAttribute('id'), $related)
+                        : [$related->getAttribute('id')];
+                    $relation->attach($ids);
                 }
             }
         });

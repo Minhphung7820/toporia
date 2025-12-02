@@ -62,11 +62,16 @@ final class ProcessPool
      */
     public function map(array $jobs, callable $callback): array
     {
+        // Handle empty array case
+        if (empty($jobs)) {
+            return [];
+        }
+
         $results = [];
         $manager = new ProcessManager();
 
         // Chunk jobs for each worker
-        $chunks = array_chunk($jobs, (int) ceil(count($jobs) / $this->workerCount));
+        $chunks = array_chunk($jobs, max(1, (int) ceil(count($jobs) / $this->workerCount)));
 
         foreach ($chunks as $chunk) {
             $manager->add(function ($jobs, $callback) {
@@ -187,8 +192,13 @@ final class ProcessPool
      */
     public function reduce(array $items, callable $callback, mixed $initial = null): mixed
     {
+        // Handle empty array case
+        if (empty($items)) {
+            return $initial;
+        }
+
         // Parallel map-reduce
-        $chunks = array_chunk($items, (int) ceil(count($items) / $this->workerCount));
+        $chunks = array_chunk($items, max(1, (int) ceil(count($items) / $this->workerCount)));
         $manager = new ProcessManager();
 
         // Reduce each chunk in parallel
