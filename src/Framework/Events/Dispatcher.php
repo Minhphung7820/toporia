@@ -416,7 +416,7 @@ final class Dispatcher implements EventDispatcherInterface
             return false;
         }
 
-        $reflection = reflection()->getClass($listenerClass);
+        $reflection = new \ReflectionClass($listenerClass);
         return $reflection->implementsInterface(ShouldQueue::class);
     }
 
