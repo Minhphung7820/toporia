@@ -631,7 +631,6 @@ final class Scheduler
             mkdir($directory, 0755, true);
         }
 
-        $mode = $append ? 'a' : 'w';
         file_put_contents($file, $output, $append ? FILE_APPEND : 0);
     }
 
