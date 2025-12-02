@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Container\Contracts;
 
+use Closure;
 use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException};
-
 
 /**
  * Interface ContainerInterface
@@ -13,18 +13,17 @@ use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException
  * Contract defining the interface for ContainerInterface implementations
  * in the Dependency Injection container layer of the Toporia Framework.
  *
+ * PSR-11 compliant with Laravel-style extensions for advanced DI features.
+ *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
- * @version     1.0.0
+ * @version     2.0.0
  * @package     toporia/framework
  * @subpackage  Container\Contracts
  * @since       2025-01-10
  *
  * @link        https://github.com/Minhphung7820/toporia
- *
- * @internal    This class is a core component and should not be extended
- *              directly unless you know what you're doing.
  */
 interface ContainerInterface
 {
@@ -71,9 +70,9 @@ interface ContainerInterface
      *
      * @param string $id Service identifier.
      * @param mixed $instance The service instance.
-     * @return void
+     * @return mixed The instance
      */
-    public function instance(string $id, mixed $instance): void;
+    public function instance(string $id, mixed $instance): mixed;
 
     /**
      * Resolve and call a callable with dependency injection.
@@ -84,4 +83,126 @@ interface ContainerInterface
      * @throws ContainerException
      */
     public function call(callable|array|string $callable, array $parameters = []): mixed;
+
+    /**
+     * Resolve a service from the container (alias for get with parameters).
+     *
+     * @param string $abstract Service identifier.
+     * @param array<string, mixed> $parameters Override parameters.
+     * @return mixed Resolved instance.
+     * @throws NotFoundException
+     * @throws ContainerException
+     */
+    public function make(string $abstract, array $parameters = []): mixed;
+
+    /**
+     * Register an alias for an abstract type.
+     *
+     * @param string $abstract The abstract type.
+     * @param string $alias The alias name.
+     * @return void
+     */
+    public function alias(string $abstract, string $alias): void;
+
+    /**
+     * Determine if an alias is registered.
+     *
+     * @param string $name The alias name.
+     * @return bool
+     */
+    public function isAlias(string $name): bool;
+
+    /**
+     * Get the alias for an abstract if available.
+     *
+     * @param string $abstract The abstract type.
+     * @return string The resolved abstract (original or aliased).
+     */
+    public function getAlias(string $abstract): string;
+
+    /**
+     * Register a binding if it hasn't already been registered.
+     *
+     * @param string $abstract Service identifier.
+     * @param callable|string|null $concrete Concrete implementation.
+     * @param bool $shared Whether singleton.
+     * @return void
+     */
+    public function bindIf(string $abstract, callable|string|null $concrete = null, bool $shared = false): void;
+
+    /**
+     * Register a singleton if it hasn't already been registered.
+     *
+     * @param string $abstract Service identifier.
+     * @param callable|string|null $concrete Concrete implementation.
+     * @return void
+     */
+    public function singletonIf(string $abstract, callable|string|null $concrete = null): void;
+
+    /**
+     * Register a scoped binding (cleared at end of request/scope).
+     *
+     * @param string $abstract Service identifier.
+     * @param callable|string|null $concrete Concrete implementation.
+     * @return void
+     */
+    public function scoped(string $abstract, callable|string|null $concrete = null): void;
+
+    /**
+     * Get a factory closure for the given abstract type.
+     *
+     * @param string $abstract Service identifier.
+     * @return Closure Factory closure.
+     */
+    public function factory(string $abstract): Closure;
+
+    /**
+     * Wrap a closure so that it is shared (singleton pattern).
+     *
+     * @param Closure $closure The closure to wrap.
+     * @return Closure Wrapped singleton closure.
+     */
+    public function wrap(Closure $closure): Closure;
+
+    /**
+     * Refresh an instance on a given target and method.
+     *
+     * @param string $abstract Service identifier.
+     * @param object $target Target object.
+     * @param string $method Method to call with refreshed instance.
+     * @return mixed
+     */
+    public function refresh(string $abstract, object $target, string $method): mixed;
+
+    /**
+     * Register a callback to be called after resolving.
+     *
+     * @param string|callable $abstract Service identifier or callback.
+     * @param callable|null $callback Callback to fire.
+     * @return void
+     */
+    public function afterResolving(string|callable $abstract, ?callable $callback = null): void;
+
+    /**
+     * Clear all scoped instances.
+     *
+     * @return void
+     */
+    public function forgetScopedInstances(): void;
+
+    /**
+     * Check if a binding exists.
+     *
+     * @param string $abstract Service identifier.
+     * @return bool
+     */
+    public function bound(string $abstract): bool;
+
+    /**
+     * Check if a service has been resolved.
+     *
+     * @param string $abstract Service identifier.
+     * @return bool
+     */
+    public function resolved(string $abstract): bool;
 }

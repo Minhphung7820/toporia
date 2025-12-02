@@ -166,8 +166,8 @@ abstract class BaseRepository implements
     protected function createModelInstance(): Model
     {
         // Try to resolve from container if available, otherwise instantiate directly
-        if ($this->container !== null && $this->container->has($this->model)) {
-            $model = $this->container->get($this->model);
+        if ($this->container !== null) {
+            $model = $this->container->make($this->model);
         } else {
             $model = new $this->model();
         }
