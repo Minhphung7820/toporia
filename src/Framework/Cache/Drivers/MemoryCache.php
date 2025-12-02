@@ -151,6 +151,34 @@ final class MemoryCache implements CacheInterface
     }
 
     /**
+     * {@inheritdoc}
+     *
+     * In-memory operation is inherently atomic in single-threaded PHP.
+     * For multi-process scenarios, use RedisCache or FileCache instead.
+     */
+    public function add(string $key, mixed $value, ?int $ttl = null): bool
+    {
+        // Check if key exists and is not expired
+        if (isset($this->storage[$key])) {
+            $data = $this->storage[$key];
+            // If no expiration or not expired, key exists
+            if ($data['expires_at'] === null || $data['expires_at'] >= time()) {
+                return false; // Key already exists
+            }
+            // Key expired, will be overwritten
+        }
+
+        // Key doesn't exist or is expired - set it
+        $expiresAt = $ttl !== null ? time() + $ttl : null;
+        $this->storage[$key] = [
+            'value' => $value,
+            'expires_at' => $expiresAt,
+        ];
+
+        return true;
+    }
+
+    /**
      * Get all cached data (for debugging)
      *
      * @return array

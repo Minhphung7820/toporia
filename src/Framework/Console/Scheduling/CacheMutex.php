@@ -21,20 +21,18 @@ final class CacheMutex implements MutexInterface
 
     /**
      * {@inheritdoc}
+     *
+     * CRITICAL: Uses atomic add() operation to prevent TOCTOU race condition.
+     * In distributed systems, the old has() + set() pattern would allow
+     * multiple servers to acquire the same lock simultaneously.
      */
     public function create(string $name, int $expiresAfter = 1440): bool
     {
         $key = $this->getKey($name);
 
-        // Check if lock already exists
-        if ($this->cache->has($key)) {
-            return false;
-        }
-
-        // Create lock with expiration
-        $this->cache->set($key, time(), $expiresAfter * 60); // Convert minutes to seconds
-
-        return true;
+        // Use atomic add() - returns false if key already exists
+        // This prevents race condition where two processes both pass has() check
+        return $this->cache->add($key, time(), $expiresAfter * 60); // Convert minutes to seconds
     }
 
     /**

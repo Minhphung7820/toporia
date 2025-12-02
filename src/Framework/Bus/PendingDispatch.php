@@ -22,6 +22,7 @@ use Toporia\Framework\Bus\Contracts\QueueableInterface;
 final class PendingDispatch
 {
     private bool $afterResponse = false;
+    private bool $dispatched = false;
 
     /**
      * @param DispatcherInterface $dispatcher Dispatcher instance
@@ -75,14 +76,53 @@ final class PendingDispatch
     }
 
     /**
+     * Explicitly dispatch the command now.
+     *
+     * Call this to dispatch immediately instead of waiting for destructor.
+     * Prevents duplicate dispatch on destruct.
+     *
+     * @return mixed Dispatch result
+     */
+    public function dispatch(): mixed
+    {
+        if ($this->dispatched) {
+            return null; // Already dispatched
+        }
+
+        $this->dispatched = true;
+
+        if ($this->afterResponse) {
+            $this->dispatcher->dispatchAfterResponse($this->command);
+            return null;
+        }
+
+        return $this->dispatcher->dispatch($this->command);
+    }
+
+    /**
      * Handle the object's destruction (auto-dispatch).
+     *
+     * Only dispatches if not already explicitly dispatched.
+     * Exceptions in destructors are converted to fatal errors by PHP,
+     * so we wrap in try-catch to prevent silent failures.
      */
     public function __destruct()
     {
-        if ($this->afterResponse) {
-            $this->dispatcher->dispatchAfterResponse($this->command);
-        } else {
-            $this->dispatcher->dispatch($this->command);
+        if ($this->dispatched) {
+            return; // Already dispatched explicitly
+        }
+
+        $this->dispatched = true;
+
+        try {
+            if ($this->afterResponse) {
+                $this->dispatcher->dispatchAfterResponse($this->command);
+            } else {
+                $this->dispatcher->dispatch($this->command);
+            }
+        } catch (\Throwable $e) {
+            // Log error - exceptions in destructors cause fatal errors
+            error_log("PendingDispatch auto-dispatch failed: " . $e->getMessage());
         }
     }
 }

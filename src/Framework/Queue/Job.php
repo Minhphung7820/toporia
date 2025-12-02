@@ -138,7 +138,7 @@ abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\Que
         return $this->id;
     }
 
-    public function getQueue(): ?string
+    public function getQueue(): string
     {
         return $this->queue;
     }

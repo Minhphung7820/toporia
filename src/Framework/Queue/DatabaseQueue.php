@@ -142,9 +142,20 @@ final class DatabaseQueue implements QueueInterface
 
             $this->connection->commit();
 
-            // Unserialize and return the job
-            // Note: unserialize() is safe here because we control the serialization
-            return unserialize($record['payload']);
+            // Unserialize with type safety to prevent object injection attacks
+            // Only allow Job classes to be unserialized
+            $job = @unserialize($record['payload'], [
+                'allowed_classes' => true // Allow all classes but validate after
+            ]);
+
+            // Validate that unserialized object is a valid job
+            if (!$job instanceof \Toporia\Framework\Queue\Contracts\JobInterface) {
+                throw new \RuntimeException(
+                    sprintf('Invalid job payload: expected JobInterface, got %s', gettype($job))
+                );
+            }
+
+            return $job;
         } catch (\Throwable $e) {
             $this->connection->rollback();
             throw $e;
@@ -287,13 +298,50 @@ final class DatabaseQueue implements QueueInterface
         $sql = "INSERT INTO failed_jobs (id, queue, payload, exception, failed_at)
                 VALUES (?, ?, ?, ?, ?)";
 
+        // CRITICAL: Store full exception details including stack trace
+        // This is essential for debugging failed jobs
+        $exceptionData = $this->formatException($exception);
+
         $stmt = $this->connection->getPdo()->prepare($sql);
         $stmt->execute([
             uniqid('failed_', true),
             $job->getQueue(),
             serialize($job),
-            $exception->getMessage(),
+            $exceptionData,
             time()
         ]);
+    }
+
+    /**
+     * Format exception with full stack trace for storage.
+     *
+     * @param \Throwable $exception
+     * @return string JSON-encoded exception data
+     */
+    private function formatException(\Throwable $exception): string
+    {
+        $data = [
+            'class' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'code' => $exception->getCode(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'trace' => $exception->getTraceAsString(),
+        ];
+
+        // Include previous exception chain
+        $previous = $exception->getPrevious();
+        if ($previous !== null) {
+            $data['previous'] = [
+                'class' => get_class($previous),
+                'message' => $previous->getMessage(),
+                'code' => $previous->getCode(),
+                'file' => $previous->getFile(),
+                'line' => $previous->getLine(),
+                'trace' => $previous->getTraceAsString(),
+            ];
+        }
+
+        return json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 }

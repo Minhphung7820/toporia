@@ -112,25 +112,21 @@ final class WithoutOverlapping implements JobMiddleware
     }
 
     /**
-     * Try to acquire distributed lock.
+     * Try to acquire distributed lock atomically.
      *
-     * Uses cache as distributed lock mechanism.
+     * Uses cache add() for atomic lock acquisition (SETNX in Redis).
+     * This prevents race conditions where two processes both pass has() check.
      *
      * @param string $key
      * @return bool True if lock acquired, false if already locked
      */
     private function acquireLock(string $key): bool
     {
-        // Check if lock exists
-        if ($this->cache->has($key)) {
-            return false; // Already locked
-        }
-
-        // Try to set lock (atomic operation)
-        // Store timestamp of when lock was acquired
-        $this->cache->set($key, time(), $this->expireAfter);
-
-        return true;
+        // Use atomic add() operation to acquire lock
+        // This prevents TOCTOU race condition:
+        // - OLD: has() returns false for both workers, both call set()
+        // - NEW: add() is atomic - only one worker succeeds
+        return $this->cache->add($key, time(), $this->expireAfter);
     }
 
     /**

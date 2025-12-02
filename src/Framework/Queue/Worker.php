@@ -87,6 +87,12 @@ final class Worker
                 pcntl_signal_dispatch();
             }
 
+            // CRITICAL: Check restart conditions BEFORE processing next job
+            // This prevents OOM crashes by stopping before a memory-heavy job runs
+            if ($this->shouldRestart()) {
+                break;
+            }
+
             $job = $this->getNextJob($queueArray);
 
             // Check shouldQuit again after getNextJob (may have been set during blocking wait)
@@ -103,11 +109,6 @@ final class Worker
 
             $this->processJob($job);
             $this->processed++;
-
-            // Check auto-restart conditions
-            if ($this->shouldRestart()) {
-                break;
-            }
 
             // Check if we've hit max jobs limit
             if ($this->maxJobs > 0 && $this->processed >= $this->maxJobs) {
@@ -366,8 +367,12 @@ final class Worker
      */
     private function executeJobThroughMiddleware(JobInterface $job): mixed
     {
-        // Get job middleware
-        $middleware = $job->middleware();
+        // Get job middleware (if job supports it)
+        // Only Job class has middleware() method
+        $middleware = [];
+        if ($job instanceof \Toporia\Framework\Queue\Job) {
+            $middleware = $job->middleware();
+        }
 
         // Auto-apply EnsureUnique middleware if job has uniqueId
         if ($job instanceof \Toporia\Framework\Queue\Job && $job->getUniqueId() !== null) {
@@ -411,12 +416,21 @@ final class Worker
      */
     private function executeJob(JobInterface $job): mixed
     {
+        // Verify job has handle() method
+        if (!method_exists($job, 'handle')) {
+            throw new \BadMethodCallException(
+                sprintf('Job class %s must implement handle() method', get_class($job))
+            );
+        }
+
         // Use container to call handle() with dependency injection
         if ($this->container) {
             return $this->container->call([$job, 'handle']);
         }
 
-        return $job->handle();
+        /** @var callable $handler */
+        $handler = [$job, 'handle'];
+        return $handler();
     }
 
     /**

@@ -145,4 +145,17 @@ interface CacheInterface
      * @return mixed
      */
     public function pull(string $key, mixed $default = null): mixed;
+
+    /**
+     * Set a value in cache only if the key does not exist (atomic operation).
+     *
+     * This is essential for distributed locking and preventing race conditions.
+     * The operation must be atomic - check and set happen as one operation.
+     *
+     * @param string $key Cache key
+     * @param mixed $value Value to cache
+     * @param int|null $ttl Time to live in seconds (null = forever)
+     * @return bool True if value was set, false if key already exists
+     */
+    public function add(string $key, mixed $value, ?int $ttl = null): bool;
 }

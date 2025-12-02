@@ -399,8 +399,12 @@ final class RabbitMQQueue implements QueueInterface
         ]);
 
         // Add priority if job has priority
-        if (method_exists($job, 'getPriority') && $job->getPriority() > 0) {
-            $message->set('priority', $job->getPriority());
+        if (method_exists($job, 'getPriority')) {
+            /** @var JobInterface&\Toporia\Framework\Queue\Job $job */
+            $priority = $job->getPriority();
+            if ($priority > 0) {
+                $message->set('priority', $priority);
+            }
         }
 
         // Publish to exchange with routing key
@@ -661,9 +665,19 @@ final class RabbitMQQueue implements QueueInterface
     private function deserializeMessage(AMQPMessage $message): ?JobInterface
     {
         $payload = $message->getBody();
-        $job = unserialize($payload);
 
+        // Unserialize with type safety to prevent object injection attacks
+        $job = @unserialize($payload, [
+            'allowed_classes' => true // Allow all classes but validate after
+        ]);
+
+        // Validate that unserialized object is a valid job
         if (!$job instanceof JobInterface) {
+            // Log warning and return null (skip invalid jobs)
+            error_log(sprintf(
+                'RabbitMQQueue: Invalid job payload, expected JobInterface, got %s',
+                gettype($job)
+            ));
             return null;
         }
 

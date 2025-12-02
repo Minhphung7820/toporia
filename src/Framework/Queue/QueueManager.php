@@ -210,7 +210,7 @@ final class QueueManager implements QueueManagerInterface
     }
 
     /**
-     * Mark a job as failed
+     * Mark a job as failed and store in failed jobs table.
      *
      * @param JobInterface $job
      * @param \Throwable $exception
@@ -218,7 +218,16 @@ final class QueueManager implements QueueManagerInterface
      */
     public function failed(JobInterface $job, \Throwable $exception): void
     {
-        $this->driver()->failed($job, $exception);
+        $driver = $this->driver();
+
+        // Store failed job if driver supports it
+        if (method_exists($driver, 'storeFailed')) {
+            /** @var DatabaseQueue|RedisQueue $driver */
+            $driver->storeFailed($job, $exception);
+        }
+
+        // Call job's failed() method
+        $job->failed($exception);
     }
 
     /**

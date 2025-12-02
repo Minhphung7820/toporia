@@ -181,6 +181,50 @@ final class FileCache implements CacheInterface
     }
 
     /**
+     * {@inheritdoc}
+     *
+     * Uses exclusive file locking (LOCK_EX) with O_EXCL flag for atomic operation.
+     * This prevents race conditions when multiple processes try to acquire the same lock.
+     */
+    public function add(string $key, mixed $value, ?int $ttl = null): bool
+    {
+        $file = $this->getFilePath($key);
+
+        // Check if file exists and is not expired
+        if (file_exists($file)) {
+            $data = @unserialize(file_get_contents($file));
+            if ($data !== false) {
+                // If no expiration or not expired, key exists
+                if ($data['expires_at'] === null || $data['expires_at'] >= time()) {
+                    return false; // Key already exists
+                }
+                // Key expired, delete it
+                @unlink($file);
+            }
+        }
+
+        // Try to create file exclusively (atomic operation)
+        $expiresAt = $ttl !== null ? time() + $ttl : null;
+        $data = [
+            'value' => $value,
+            'expires_at' => $expiresAt,
+        ];
+
+        // Use file locking with exclusive flag
+        $fp = @fopen($file, 'x'); // 'x' = exclusive create, fails if file exists
+        if ($fp === false) {
+            return false; // File was created by another process
+        }
+
+        flock($fp, LOCK_EX);
+        fwrite($fp, serialize($data));
+        flock($fp, LOCK_UN);
+        fclose($fp);
+
+        return true;
+    }
+
+    /**
      * Get the file path for a cache key
      *
      * @param string $key

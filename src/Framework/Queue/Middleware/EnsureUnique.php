@@ -33,6 +33,11 @@ final class EnsureUnique implements JobMiddleware
      */
     public function handle(JobInterface $job, callable $next): mixed
     {
+        // Only Job class supports unique constraints
+        if (!$job instanceof \Toporia\Framework\Queue\Job) {
+            return $next($job);
+        }
+
         $uniqueId = $job->getUniqueId();
 
         if ($uniqueId === null) {
@@ -43,15 +48,15 @@ final class EnsureUnique implements JobMiddleware
         $lockKey = "job_unique:{$uniqueId}";
         $uniqueFor = $job->getUniqueFor();
 
-        // Check if job with this unique ID is already queued
-        if ($this->cache->has($lockKey)) {
+        // Try to acquire lock atomically using add() (SETNX in Redis)
+        // This prevents race conditions where two workers both pass has() check
+        // and then both set the lock - with add() only one will succeed
+        if (!$this->cache->add($lockKey, time(), $uniqueFor)) {
+            // Lock already exists - job is already queued/running
             throw new JobAlreadyRunningException(
                 "Job with unique ID '{$uniqueId}' is already queued"
             );
         }
-
-        // Acquire lock
-        $this->cache->set($lockKey, time(), $uniqueFor);
 
         try {
             $result = $next($job);

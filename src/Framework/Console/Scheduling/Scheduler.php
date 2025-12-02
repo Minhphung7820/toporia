@@ -365,7 +365,18 @@ final class Scheduler
         // Set memory limit if specified
         $originalMemoryLimit = ini_get('memory_limit');
         if ($task->getMemoryLimit() > 0) {
-            ini_set('memory_limit', $task->getMemoryLimit() . 'M');
+            $memoryLimit = $task->getMemoryLimit();
+            // Validate memory limit is a positive integer
+            if (!is_int($memoryLimit) || $memoryLimit <= 0) {
+                throw new \InvalidArgumentException(
+                    "Invalid memory limit: {$memoryLimit}. Must be a positive integer."
+                );
+            }
+            $result = ini_set('memory_limit', $memoryLimit . 'M');
+            if ($result === false) {
+                // Log warning but continue - memory limit couldn't be set
+                error_log("Warning: Failed to set memory limit to {$memoryLimit}M for task: {$task->getDescription()}");
+            }
         }
 
         // Set timeout if specified
@@ -396,28 +407,42 @@ final class Scheduler
             if ($timeout !== null) {
                 // Use pcntl_alarm for timeout (if available)
                 if (function_exists('pcntl_alarm') && function_exists('pcntl_signal')) {
-                    $timedOut = false;
-                    pcntl_signal(SIGALRM, function () use (&$timedOut) {
-                        $timedOut = true;
+                    // Enable async signals for immediate interruption (PHP 7.1+)
+                    if (function_exists('pcntl_async_signals')) {
+                        pcntl_async_signals(true);
+                    }
+
+                    $taskDescription = $task->getDescription();
+                    pcntl_signal(SIGALRM, function () use ($timeout, $taskDescription) {
+                        // Throw exception directly in signal handler
+                        // This works with pcntl_async_signals(true)
+                        throw new \RuntimeException(
+                            "Task '{$taskDescription}' exceeded timeout of {$timeout} seconds"
+                        );
                     });
                     pcntl_alarm($timeout);
 
                     try {
                         $task->execute();
                         pcntl_alarm(0); // Cancel alarm
-                        if ($timedOut) {
-                            throw new \RuntimeException("Task execution exceeded timeout of {$timeout} seconds");
-                        }
                     } catch (\Throwable $e) {
                         pcntl_alarm(0); // Cancel alarm
+                        // Restore default signal handler
+                        pcntl_signal(SIGALRM, SIG_DFL);
                         throw $e;
                     }
+
+                    // Restore default signal handler
+                    pcntl_signal(SIGALRM, SIG_DFL);
                 } else {
-                    // Fallback: Check timeout manually
+                    // Fallback: Check timeout after execution (limited effectiveness)
+                    // Note: This only detects timeout AFTER task completes
                     $task->execute();
                     $elapsed = microtime(true) - $startTime;
                     if ($elapsed > $timeout) {
-                        throw new \RuntimeException("Task execution exceeded timeout of {$timeout} seconds");
+                        throw new \RuntimeException(
+                            "Task '{$task->getDescription()}' exceeded timeout of {$timeout} seconds"
+                        );
                     }
                 }
             } else {
@@ -515,7 +540,9 @@ final class Scheduler
     /**
      * Handle task retry with exponential backoff.
      *
-     * Performance: O(1) per retry attempt
+     * Uses iterative approach instead of recursion to prevent stack overflow.
+     *
+     * Performance: O(R) where R = number of retry attempts
      *
      * @param ScheduledTask $task
      * @param \Throwable $exception
@@ -528,8 +555,9 @@ final class Scheduler
         $retryDelay = $task->getRetryDelay();
         $exponentialBackoff = $task->hasExponentialBackoff();
 
-        // Get retry count from cache (simple implementation)
+        // Get retry count from cache
         $retryKey = 'schedule-retry-' . $task->getTaskId();
+        $cache = null;
         $retryCount = 0;
 
         if ($this->container && $this->container->has('cache')) {
@@ -537,25 +565,30 @@ final class Scheduler
             $retryCount = (int)($cache->get($retryKey) ?? 0);
         }
 
-        if ($retryCount < $maxRetries) {
+        $lastException = $exception;
+
+        // Use loop instead of recursion to prevent stack overflow
+        while ($retryCount < $maxRetries) {
             $retryCount++;
             $delay = $exponentialBackoff
                 ? $retryDelay * (2 ** ($retryCount - 1))
                 : $retryDelay;
 
+            // Cap maximum delay at 1 hour to prevent excessive waits
+            $delay = min($delay, 3600);
+
             echo "Task failed, retrying ({$retryCount}/{$maxRetries}) in {$delay} seconds: {$task->getDescription()}\n";
 
             // Store retry count
-            if ($this->container && $this->container->has('cache')) {
-                $cache = $this->container->get('cache');
+            if ($cache) {
                 $cache->set($retryKey, $retryCount, 3600); // Store for 1 hour
             }
 
-            // Schedule retry (simple sleep for now - could be improved with queue)
+            // Wait before retry
             sleep($delay);
 
             try {
-                // Release mutex before retry
+                // Release mutex before retry to allow re-acquisition
                 if ($mutexName && $this->mutex) {
                     $this->mutex->forget($mutexName);
                 }
@@ -563,29 +596,24 @@ final class Scheduler
                 // Retry execution
                 $this->executeTask($task);
 
-                // Clear retry count on success
-                if ($this->container && $this->container->has('cache')) {
-                    $cache = $this->container->get('cache');
+                // Success - clear retry count and exit
+                if ($cache) {
                     $cache->delete($retryKey);
                 }
 
                 echo "Task succeeded on retry: {$task->getDescription()}\n";
+                return; // Exit on success
             } catch (\Throwable $e) {
-                if ($retryCount >= $maxRetries) {
-                    // Max retries reached
-                    if ($this->container && $this->container->has('cache')) {
-                        $cache = $this->container->get('cache');
-                        $cache->delete($retryKey);
-                    }
-                    echo "Task failed after {$maxRetries} retries: {$task->getDescription()} - {$e->getMessage()}\n";
-                } else {
-                    // Recursive retry
-                    $this->handleRetry($task, $e, $mutexName);
-                }
+                $lastException = $e;
+                // Continue to next iteration (retry again if attempts remain)
             }
-        } else {
-            echo "Task failed after {$maxRetries} retries: {$task->getDescription()} - {$exception->getMessage()}\n";
         }
+
+        // All retries exhausted
+        if ($cache) {
+            $cache->delete($retryKey);
+        }
+        echo "Task failed after {$maxRetries} retries: {$task->getDescription()} - {$lastException->getMessage()}\n";
     }
 
     /**

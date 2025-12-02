@@ -49,6 +49,12 @@ final class PendingDispatch
     public function onQueue(string $queue): self
     {
         $this->queue = $queue;
+
+        // Also update the job's queue property for consistency
+        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+            $this->job->onQueue($queue);
+        }
+
         return $this;
     }
 
@@ -61,6 +67,13 @@ final class PendingDispatch
     public function delay(int $seconds): self
     {
         $this->delay = $seconds;
+
+        // CRITICAL: Also update the job's delay property
+        // This ensures the delay is preserved when the job is serialized
+        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+            $this->job->delay($seconds);
+        }
+
         return $this;
     }
 

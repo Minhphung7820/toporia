@@ -120,9 +120,26 @@ final class PendingBatch
 
     /**
      * Generate unique batch ID.
+     *
+     * Uses random_bytes() for cryptographically secure ID generation.
+     * This prevents collisions in high-throughput batch creation scenarios.
+     *
+     * @return string UUID-like batch ID
      */
     private function generateId(): string
     {
-        return uniqid('batch_', true);
+        // Generate 16 random bytes (128 bits) for UUID-like uniqueness
+        // This is cryptographically secure and collision-resistant
+        $bytes = random_bytes(16);
+
+        // Format as batch_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        return sprintf(
+            'batch_%s-%s-%s-%s-%s',
+            bin2hex(substr($bytes, 0, 4)),
+            bin2hex(substr($bytes, 4, 2)),
+            bin2hex(substr($bytes, 6, 2)),
+            bin2hex(substr($bytes, 8, 2)),
+            bin2hex(substr($bytes, 10, 6))
+        );
     }
 }

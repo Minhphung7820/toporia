@@ -304,6 +304,28 @@ final class RedisCache implements CacheInterface
     }
 
     /**
+     * {@inheritdoc}
+     *
+     * Uses Redis SETNX (SET if Not eXists) for atomic operation.
+     * This is the most reliable way to prevent race conditions in distributed systems.
+     */
+    public function add(string $key, mixed $value, ?int $ttl = null): bool
+    {
+        $prefixedKey = $this->prefixKey($key);
+        $serialized = serialize($value);
+
+        if ($ttl === null) {
+            // SETNX: Set if Not eXists (atomic)
+            return (bool) $this->redis->setnx($prefixedKey, $serialized);
+        }
+
+        // SET with NX (not exists) and EX (expire) options - atomic operation
+        // This is available in Redis 2.6.12+
+        $result = $this->redis->set($prefixedKey, $serialized, ['NX', 'EX' => $ttl]);
+        return $result === true;
+    }
+
+    /**
      * Get Redis instance for advanced operations
      *
      * @return Redis

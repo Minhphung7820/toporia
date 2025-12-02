@@ -74,15 +74,35 @@ final class Bus
     }
 
     /**
-     * Create a pending dispatch (fluent API).
+     * Create a pending dispatch with fluent API.
+     *
+     * Unlike dispatch() which executes immediately, this returns
+     * a PendingDispatch for configuration before execution.
+     *
+     * Usage:
+     * ```php
+     * Bus::pending(new SendEmailCommand())
+     *     ->onQueue('emails')
+     *     ->delay(60)
+     *     ->dispatch();
+     * ```
      *
      * @template T
      * @param T $command Command instance
      * @return PendingDispatch<T>
      */
-    public static function dispatch2(mixed $command): PendingDispatch
+    public static function pending(mixed $command): PendingDispatch
     {
         return new PendingDispatch(self::getDispatcher(), $command);
+    }
+
+    /**
+     * @deprecated Use pending() instead
+     * @see Bus::pending()
+     */
+    public static function dispatch2(mixed $command): PendingDispatch
+    {
+        return self::pending($command);
     }
 
     /**

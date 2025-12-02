@@ -53,16 +53,17 @@ final class DatabaseBatchRepository implements BatchRepositoryInterface
      */
     public function find(string $batchId): ?Batch
     {
-        $row = $this->connection->fetchOne(
+        // Use query() and get first result - Connection doesn't have fetchOne()
+        $results = $this->connection->query(
             "SELECT * FROM {$this->table} WHERE id = ? LIMIT 1",
             [$batchId]
         );
 
-        if (!$row) {
+        if (empty($results)) {
             return null;
         }
 
-        return $this->hydrate($row);
+        return $this->hydrate($results[0]);
     }
 
     /**
@@ -99,40 +100,66 @@ final class DatabaseBatchRepository implements BatchRepositoryInterface
 
     /**
      * {@inheritdoc}
+     *
+     * CRITICAL: Uses atomic SQL to prevent race conditions.
+     * The finish detection is done in a single UPDATE statement
+     * to avoid TOCTOU (Time-of-check to Time-of-use) race condition.
      */
     public function incrementCounts(string $batchId, int $processed, int $failed): void
     {
-        // Atomic increment
+        // CRITICAL: Atomic increment AND finish detection in single query
+        // This prevents race condition where multiple workers could:
+        // 1. Both increment counter
+        // 2. Both read batch (seeing different states)
+        // 3. Both try to set finished_at
+        //
+        // With this approach, only one UPDATE sets finished_at atomically
         $this->connection->execute(
             "UPDATE {$this->table}
              SET processed_jobs = processed_jobs + ?,
-                 failed_jobs = failed_jobs + ?
+                 failed_jobs = failed_jobs + ?,
+                 finished_at = CASE
+                     WHEN finished_at IS NULL
+                          AND (processed_jobs + ?) >= total_jobs
+                     THEN ?
+                     ELSE finished_at
+                 END
              WHERE id = ?",
-            [$processed, $failed, $batchId]
+            [$processed, $failed, $processed, time(), $batchId]
         );
-
-        // Check if finished (all jobs processed)
-        $batch = $this->find($batchId);
-        if ($batch && $batch->processedJobs() >= $batch->totalJobs() && !$batch->finished()) {
-            $this->connection->execute(
-                "UPDATE {$this->table} SET finished_at = ? WHERE id = ?",
-                [time(), $batchId]
-            );
-        }
     }
 
     /**
      * Hydrate batch from database row.
+     *
+     * @param array $row Database row
+     * @return Batch
+     * @throws \RuntimeException If options JSON is corrupted
      */
     private function hydrate(array $row): Batch
     {
+        // CRITICAL: Validate JSON decode result to prevent silent data loss
+        $optionsJson = $row['options'] ?? '{}';
+        $options = json_decode($optionsJson, true);
+
+        if ($options === null && $optionsJson !== 'null' && $optionsJson !== '') {
+            // JSON decode failed - data is corrupted
+            throw new \RuntimeException(
+                sprintf(
+                    'Batch %s has corrupted options JSON: %s',
+                    $row['id'],
+                    json_last_error_msg()
+                )
+            );
+        }
+
         return new Batch(
             id: $row['id'],
             name: $row['name'],
             totalJobs: (int) $row['total_jobs'],
             processedJobs: (int) $row['processed_jobs'],
             failedJobs: (int) $row['failed_jobs'],
-            options: json_decode($row['options'] ?? '{}', true),
+            options: $options ?? [],
             createdAt: $row['created_at'] ? (int) $row['created_at'] : null,
             finishedAt: $row['finished_at'] ? (int) $row['finished_at'] : null,
             cancelledAt: $row['cancelled_at'] ? (int) $row['cancelled_at'] : null

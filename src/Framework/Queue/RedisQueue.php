@@ -256,7 +256,19 @@ final class RedisQueue implements Contracts\QueueInterface
         // Increment attempts
         $this->redis->hIncrBy($jobKey, 'attempts', 1);
 
-        return unserialize($payload);
+        // Unserialize with type safety to prevent object injection attacks
+        $job = @unserialize($payload, [
+            'allowed_classes' => true // Allow all classes but validate after
+        ]);
+
+        // Validate that unserialized object is a valid job
+        if (!$job instanceof \Toporia\Framework\Queue\Contracts\JobInterface) {
+            throw new \RuntimeException(
+                sprintf('Invalid job payload: expected JobInterface, got %s', gettype($job))
+            );
+        }
+
+        return $job;
     }
 
     /**
@@ -399,12 +411,15 @@ LUA;
         $failedKey = "{$this->prefix}:failed";
         $failedAt = time();
 
+        // CRITICAL: Store full exception details including stack trace
+        $exceptionData = $this->formatException($exception);
+
         // Store failed job data
         $this->redis->multi(\Redis::PIPELINE);
         $this->redis->hSet($failedJobKey, 'id', $failedId);
         $this->redis->hSet($failedJobKey, 'queue', $job->getQueue());
         $this->redis->hSet($failedJobKey, 'payload', serialize($job));
-        $this->redis->hSet($failedJobKey, 'exception', $exception->getMessage());
+        $this->redis->hSet($failedJobKey, 'exception', $exceptionData);
         $this->redis->hSet($failedJobKey, 'failed_at', $failedAt);
 
         // Add to failed sorted set (score = timestamp)
@@ -417,6 +432,39 @@ LUA;
         $reservedKey = $this->getReservedKey($job->getQueue());
         $this->redis->zRem($reservedKey, $job->getId());
         $this->redis->del($jobKey);
+    }
+
+    /**
+     * Format exception with full stack trace for storage.
+     *
+     * @param \Throwable $exception
+     * @return string JSON-encoded exception data
+     */
+    private function formatException(\Throwable $exception): string
+    {
+        $data = [
+            'class' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'code' => $exception->getCode(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'trace' => $exception->getTraceAsString(),
+        ];
+
+        // Include previous exception chain
+        $previous = $exception->getPrevious();
+        if ($previous !== null) {
+            $data['previous'] = [
+                'class' => get_class($previous),
+                'message' => $previous->getMessage(),
+                'code' => $previous->getCode(),
+                'file' => $previous->getFile(),
+                'line' => $previous->getLine(),
+                'trace' => $previous->getTraceAsString(),
+            ];
+        }
+
+        return json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     /**

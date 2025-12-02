@@ -53,6 +53,7 @@ final class HttpPing
      * Send async HTTP ping (fire-and-forget).
      *
      * Uses background cURL execution to avoid blocking.
+     * Includes proper error handling for cURL operations.
      *
      * @param string $url
      * @param array $data
@@ -60,12 +61,31 @@ final class HttpPing
      */
     private static function sendAsync(string $url, array $data): void
     {
+        // Check if cURL extension is available
+        if (!function_exists('curl_init')) {
+            error_log("Schedule ping skipped: cURL extension not available");
+            return;
+        }
+
         $ch = curl_init();
 
-        curl_setopt_array($ch, [
+        // curl_init can return false on failure
+        if ($ch === false) {
+            error_log("Schedule ping failed: curl_init() returned false");
+            return;
+        }
+
+        $jsonData = json_encode($data);
+        if ($jsonData === false) {
+            error_log("Schedule ping failed: JSON encode error - " . json_last_error_msg());
+            curl_close($ch);
+            return;
+        }
+
+        $optionsSet = curl_setopt_array($ch, [
             CURLOPT_URL => $url,
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_POSTFIELDS => $jsonData,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 5, // Short timeout
             CURLOPT_CONNECTTIMEOUT => 2,
@@ -75,10 +95,20 @@ final class HttpPing
             ],
         ]);
 
-        // Execute in background (non-blocking)
-        if (function_exists('curl_exec')) {
-            curl_exec($ch);
+        if (!$optionsSet) {
+            error_log("Schedule ping failed: curl_setopt_array() failed");
             curl_close($ch);
+            return;
         }
+
+        // Execute and check for errors
+        $result = curl_exec($ch);
+
+        if ($result === false) {
+            $error = curl_error($ch);
+            error_log("Schedule ping failed for {$url}: {$error}");
+        }
+
+        curl_close($ch);
     }
 }

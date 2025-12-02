@@ -67,4 +67,26 @@ interface JobInterface
      * @return void
      */
     public function failed(\Throwable $exception): void;
+
+    /**
+     * Get the job execution timeout in seconds.
+     *
+     * @return int Timeout in seconds (0 = no timeout)
+     */
+    public function getTimeout(): int;
+
+    /**
+     * Handle job timeout.
+     * Called when job execution exceeds the timeout limit.
+     *
+     * @return void
+     */
+    public function timeout(): void;
+
+    /**
+     * Get the backoff delay for retry in seconds.
+     *
+     * @return int Delay in seconds before next retry
+     */
+    public function getBackoffDelay(): int;
 }
