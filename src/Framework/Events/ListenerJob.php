@@ -49,11 +49,20 @@ final class ListenerJob implements JobInterface
     /**
      * @param ListenerInterface|callable|string $listener Listener to execute
      * @param EventInterface $event Event instance
+     * @throws \InvalidArgumentException If listener is a Closure (not serializable)
      */
     public function __construct(
         ListenerInterface|callable|string $listener,
         EventInterface $event
     ) {
+        // CRITICAL: Closures cannot be serialized for queue storage
+        // Only class-based listeners or string class names can be queued
+        if ($listener instanceof \Closure) {
+            throw new \InvalidArgumentException(
+                'Closures cannot be queued. Use a class-based listener implementing ListenerInterface instead.'
+            );
+        }
+
         $this->id = uniqid('listener_job_', true);
         $this->listener = $listener;
         $this->event = $event;
@@ -122,6 +131,31 @@ final class ListenerJob implements JobInterface
     public function failed(\Throwable $exception): void
     {
         // Log failure or handle as needed
+        error_log("ListenerJob failed: " . $exception->getMessage());
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getTimeout(): int
+    {
+        return 60; // Default 60 seconds timeout for event listeners
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function timeout(): void
+    {
+        error_log("ListenerJob timed out: " . $this->displayName());
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getBackoffDelay(): int
+    {
+        return 3; // Default 3 seconds backoff delay
     }
 
     /**

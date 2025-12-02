@@ -179,7 +179,7 @@ abstract class AbstractObserver implements ObserverInterface
     protected function wasChanged(?string $field = null, array $data = []): bool
     {
         if ($field === null) {
-            return $this->isDirty($data);
+            return $this->isDirty(null, $data);
         }
 
         return $this->isDirtyField($field, $data);

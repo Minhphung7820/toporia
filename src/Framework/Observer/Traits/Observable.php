@@ -48,8 +48,8 @@ trait Observable
         $eventKey = $event ?? '*';
         $priority = 0; // Default priority
 
-        // Extract priority if observer has getPriority method
-        if (method_exists($observer, 'getPriority')) {
+        // Extract priority if observer has getPriority method (AbstractObserver)
+        if ($observer instanceof \Toporia\Framework\Observer\AbstractObserver) {
             $priority = $observer->getPriority();
         }
 
@@ -213,7 +213,12 @@ trait Observable
             }
 
             // Also load event-specific observers
-            $events = ['created', 'updated', 'deleted', 'saving', 'saved'];
+            // Complete list of model lifecycle events
+            $events = [
+                'retrieved', 'creating', 'created', 'updating', 'updated',
+                'saving', 'saved', 'deleting', 'deleted',
+                'restoring', 'restored', 'replicating'
+            ];
             foreach ($events as $event) {
                 $eventObservers = $manager->getObservers($observableClass, $event);
                 foreach ($eventObservers as $observer) {
