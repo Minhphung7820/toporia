@@ -114,7 +114,7 @@ class MorphedByMany extends Relation
     /**
      * {@inheritdoc}
      */
-    protected function getRelatedClass(): string
+    public function getRelatedClass(): string
     {
         return $this->relatedClass;
     }
@@ -186,7 +186,11 @@ class MorphedByMany extends Relation
             $parentId = $result->getAttribute("pivot_{$this->parentPivotKey}");
 
             if ($parentId !== null) {
-                $dictionary[(string) $parentId][] = $result;
+                $key = (string) $parentId;
+                if (!isset($dictionary[$key])) {
+                    $dictionary[$key] = [];
+                }
+                $dictionary[$key][] = $result;
             }
         }
 

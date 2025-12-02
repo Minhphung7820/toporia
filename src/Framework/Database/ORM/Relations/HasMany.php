@@ -37,7 +37,7 @@ class HasMany extends Relation
     /**
      * {@inheritdoc}
      */
-    protected function getRelatedClass(): string
+    public function getRelatedClass(): string
     {
         return $this->relatedClass;
     }

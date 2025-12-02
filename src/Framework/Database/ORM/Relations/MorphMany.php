@@ -59,7 +59,7 @@ class MorphMany extends Relation
     /**
      * {@inheritdoc}
      */
-    protected function getRelatedClass(): string
+    public function getRelatedClass(): string
     {
         return $this->relatedClass;
     }
@@ -130,6 +130,9 @@ class MorphMany extends Relation
             $id = $result->getAttribute($this->foreignKey);
             $key = "{$type}:{$id}";
 
+            if (!isset($dictionary[$key])) {
+                $dictionary[$key] = [];
+            }
             $dictionary[$key][] = $result;
         }
 

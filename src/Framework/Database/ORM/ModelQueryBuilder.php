@@ -76,6 +76,19 @@ class ModelQueryBuilder extends QueryBuilder
     }
 
     /**
+     * Check if global scopes are being skipped.
+     *
+     * Used by Relation to determine if soft delete scope should be applied.
+     * This avoids reflection overhead.
+     *
+     * @return bool
+     */
+    public function isSkippingGlobalScopes(): bool
+    {
+        return $this->skipGlobalScopes;
+    }
+
+    /**
      * Apply global scopes to the query.
      *
      * Checks if model uses HasQueryScopes trait and applies all global scopes.
@@ -1572,26 +1585,8 @@ class ModelQueryBuilder extends QueryBuilder
 
         // Ensure SoftDeletes is applied if relation model uses it
         // This is important for withCount/withSum to match Laravel behavior
-        $relatedClass = '';
-        try {
-            // Try to access protected property using reflection
-            $reflection = new \ReflectionClass($relationInstance);
-            if ($reflection->hasProperty('relatedClass')) {
-                $property = $reflection->getProperty('relatedClass');
-                $property->setAccessible(true);
-                $relatedClass = $property->getValue($relationInstance);
-            } elseif ($reflection->hasMethod('getRelatedClass')) {
-                $method = $reflection->getMethod('getRelatedClass');
-                $method->setAccessible(true);
-                $relatedClass = $method->invoke($relationInstance);
-            }
-        } catch (\ReflectionException $e) {
-            // If reflection fails, try alternative methods
-            if (method_exists($relationInstance, 'getRelated')) {
-                $related = $relationInstance->getRelated();
-                $relatedClass = $related ? get_class($related) : '';
-            }
-        }
+        // OPTIMIZED: Use public getRelatedClass() method instead of reflection (O(1) vs O(n))
+        $relatedClass = $relationInstance->getRelatedClass();
 
         if ($relatedClass !== '' && method_exists($relatedClass, 'usesSoftDeletes') && $relatedClass::usesSoftDeletes()) {
             $deletedAtColumn = method_exists($relatedClass, 'getDeletedAtColumn')
@@ -1758,26 +1753,8 @@ class ModelQueryBuilder extends QueryBuilder
 
         // Ensure SoftDeletes is applied if relation model uses it
         // This is important for withSum/withAvg/etc to match Laravel behavior
-        $relatedClass = '';
-        try {
-            // Try to access protected property using reflection
-            $reflection = new \ReflectionClass($relationInstance);
-            if ($reflection->hasProperty('relatedClass')) {
-                $property = $reflection->getProperty('relatedClass');
-                $property->setAccessible(true);
-                $relatedClass = $property->getValue($relationInstance);
-            } elseif ($reflection->hasMethod('getRelatedClass')) {
-                $method = $reflection->getMethod('getRelatedClass');
-                $method->setAccessible(true);
-                $relatedClass = $method->invoke($relationInstance);
-            }
-        } catch (\ReflectionException $e) {
-            // If reflection fails, try alternative methods
-            if (method_exists($relationInstance, 'getRelated')) {
-                $related = $relationInstance->getRelated();
-                $relatedClass = $related ? get_class($related) : '';
-            }
-        }
+        // OPTIMIZED: Use public getRelatedClass() method instead of reflection (O(1) vs O(n))
+        $relatedClass = $relationInstance->getRelatedClass();
 
         if ($relatedClass !== '' && method_exists($relatedClass, 'usesSoftDeletes') && $relatedClass::usesSoftDeletes()) {
             $deletedAtColumn = method_exists($relatedClass, 'getDeletedAtColumn')

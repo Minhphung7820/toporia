@@ -91,4 +91,11 @@ interface RelationInterface
      * @return static New relation instance ready for eager loading
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static;
+
+    /**
+     * Get the related model class name.
+     *
+     * @return string Fully qualified class name of the related model
+     */
+    public function getRelatedClass(): string;
 }

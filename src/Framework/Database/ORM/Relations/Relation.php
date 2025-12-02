@@ -312,15 +312,10 @@ abstract class Relation implements RelationInterface
 
         // Check if query has skipGlobalScopes flag (from withTrashed())
         // If ModelQueryBuilder with skipGlobalScopes = true, don't apply SoftDeletes scope
-        if ($query instanceof \Toporia\Framework\Database\ORM\ModelQueryBuilder) {
-            $reflection = new \ReflectionClass($query);
-            if ($reflection->hasProperty('skipGlobalScopes')) {
-                $property = $reflection->getProperty('skipGlobalScopes');
-                $property->setAccessible(true);
-                if ($property->getValue($query) === true) {
-                    return; // Skip applying SoftDeletes scope when withTrashed() is used
-                }
-            }
+        // Use public method to avoid reflection overhead (O(1) instead of O(n) reflection calls)
+        if ($query instanceof \Toporia\Framework\Database\ORM\ModelQueryBuilder
+            && $query->isSkippingGlobalScopes()) {
+            return; // Skip applying SoftDeletes scope when withTrashed() is used
         }
 
         $deletedAtColumn = $this->getDeletedAtColumn($modelClass);
@@ -334,9 +329,9 @@ abstract class Relation implements RelationInterface
      *
      * Subclasses should override this to return the related model class.
      *
-     * @return string
+     * @return string Fully qualified class name of the related model
      */
-    protected function getRelatedClass(): string
+    public function getRelatedClass(): string
     {
         // Default implementation - subclasses should override
         return '';

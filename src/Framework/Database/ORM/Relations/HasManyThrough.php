@@ -61,7 +61,7 @@ class HasManyThrough extends Relation
     /**
      * {@inheritdoc}
      */
-    protected function getRelatedClass(): string
+    public function getRelatedClass(): string
     {
         return $this->relatedClass;
     }
@@ -362,6 +362,9 @@ class HasManyThrough extends Relation
         $dictionary = [];
         foreach ($results as $result) {
             $key = $result->getAttribute($this->firstKey);
+            if (!isset($dictionary[$key])) {
+                $dictionary[$key] = [];
+            }
             $dictionary[$key][] = $result;
         }
         return $dictionary;
