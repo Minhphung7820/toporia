@@ -497,7 +497,7 @@ class HasManyThrough extends Relation
     {
         $page = 1;
         $relatedKey = $this->relatedClass::getPrimaryKey();
-        $relatedTable = $this->getRelatedTableName();
+        $relatedTable = $this->getRelatedTable();
 
         do {
             // Clone query to avoid mutating the base query

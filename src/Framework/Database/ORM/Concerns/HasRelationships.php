@@ -15,6 +15,7 @@ use Toporia\Framework\Database\ORM\Relations\{
     MorphOne,
     MorphMany,
     MorphToMany,
+    MorphedByMany,
     MorphTo
 };
 
@@ -34,6 +35,7 @@ use Toporia\Framework\Database\ORM\Relations\{
  * - MorphOne: Polymorphic one-to-one (Post has one Image as imageable)
  * - MorphMany: Polymorphic one-to-many (Post has many Comments as commentable)
  * - MorphToMany: Polymorphic many-to-many (Post has many Tags as taggable)
+ * - MorphedByMany: Inverse polymorphic many-to-many (Tag is tagged by many Posts)
  * - MorphTo: Polymorphic inverse (Image belongs to Post/Video as imageable)
  *
  * SOLID Principles:
@@ -466,6 +468,76 @@ trait HasRelationships
             $morphId,
             $relatedKey,
             $parentKey,
+            $relatedPrimaryKey
+        );
+    }
+
+    /**
+     * Define an inverse polymorphic many-to-many relationship.
+     *
+     * This is the inverse of morphToMany. While morphToMany defines the relationship
+     * from the morphable model (Post/Video) to the related model (Tag), morphedByMany
+     * defines the relationship from the related model (Tag) back to the morphable models.
+     *
+     * Example: Tag → Post/Video (Tag is tagged by many Posts or Videos)
+     * Tag::morphedByMany(Post::class, 'taggable')
+     *
+     * Pivot table structure (taggables):
+     * - taggable_type: The class name of the morph model (Post, Video)
+     * - taggable_id: The ID of the morph model
+     * - tag_id: The ID of this model (Tag)
+     *
+     * @param class-string<Model> $related Related model class (Post)
+     * @param string $morphName Morph name ('taggable')
+     * @param string|null $pivotTable Pivot table (taggables)
+     * @param string|null $morphType Type column (taggable_type)
+     * @param string|null $morphId ID column (taggable_id)
+     * @param string|null $parentKey Parent key in pivot (tag_id)
+     * @param string|null $localKey Local key (id)
+     * @param string|null $relatedPrimaryKey Related primary key (id)
+     * @return MorphedByMany
+     *
+     * @example
+     * ```php
+     * // Tag is tagged by many Posts (inverse polymorphic many-to-many)
+     * public function posts(): MorphedByMany
+     * {
+     *     return $this->morphedByMany(Post::class, 'taggable');
+     *     // SQL: SELECT posts.*, taggables.* FROM posts
+     *     //      INNER JOIN taggables ON posts.id = taggables.taggable_id
+     *     //      WHERE taggables.taggable_type = 'App\Models\Post'
+     *     //      AND taggables.tag_id = ?
+     * }
+     *
+     * // Tag is tagged by many Videos
+     * public function videos(): MorphedByMany
+     * {
+     *     return $this->morphedByMany(Video::class, 'taggable');
+     * }
+     * ```
+     */
+    protected function morphedByMany(
+        string $related,
+        string $morphName,
+        ?string $pivotTable = null,
+        ?string $morphType = null,
+        ?string $morphId = null,
+        ?string $parentKey = null,
+        ?string $localKey = null,
+        ?string $relatedPrimaryKey = null
+    ): MorphedByMany {
+        $query = $related::query();
+
+        return new MorphedByMany(
+            $query,
+            $this,
+            $related,
+            $morphName,
+            $pivotTable,
+            $morphType,
+            $morphId,
+            $parentKey,
+            $localKey,
             $relatedPrimaryKey
         );
     }

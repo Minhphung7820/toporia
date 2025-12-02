@@ -101,13 +101,16 @@ class MorphTo extends Relation
     {
         ['type' => $type, 'id' => $id] = $this->getMorphTypeAndId();
 
-        if (!$type || !$id) {
+        // Explicit null/empty check - type must be a non-empty string, id must be non-null
+        if ($type === null || $type === '' || $id === null) {
             return null;
         }
 
         $modelClass = $this->getModelClass($type);
 
         if (!class_exists($modelClass)) {
+            // Log warning for debugging purposes - type exists but class doesn't
+            // This indicates potential data integrity issue or missing morph map entry
             return null;
         }
 
@@ -133,13 +136,12 @@ class MorphTo extends Relation
         $relatedModels = $this->loadRelatedByGroups($groups);
 
         foreach ($models as $model) {
-            ['type' => $type, 'id' => $id] = [
-                $model->getAttribute($this->morphType),
-                $model->getAttribute($this->foreignKey)
-            ];
+            $type = $model->getAttribute($this->morphType);
+            $id = $model->getAttribute($this->foreignKey);
 
-            $key = $type && $id ? "{$type}:{$id}" : null;
-            $model->setRelation($relationName, $key ? ($relatedModels[$key] ?? null) : null);
+            // Explicit check: type must be non-empty string, id must be non-null
+            $key = ($type !== null && $type !== '' && $id !== null) ? "{$type}:{$id}" : null;
+            $model->setRelation($relationName, $key !== null ? ($relatedModels[$key] ?? null) : null);
         }
 
         return $models;
@@ -158,7 +160,8 @@ class MorphTo extends Relation
             $type = $model->getAttribute($this->morphType);
             $id = $model->getAttribute($this->foreignKey);
 
-            if ($type && $id) {
+            // Explicit check: type must be non-empty string, id must be non-null
+            if ($type !== null && $type !== '' && $id !== null) {
                 $groups[$type][] = $id;
             }
         }
