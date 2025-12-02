@@ -211,7 +211,7 @@ class HasOne extends Relation
         }
 
         $related = $this->getResults();
-        if ($related === null) {
+        if (!$related instanceof Model) {
             return false;
         }
 
@@ -221,7 +221,12 @@ class HasOne extends Relation
         }
 
         // Otherwise, perform hard delete
-        return $related->forceDelete();
+        if (method_exists($related, 'forceDelete')) {
+            /** @var Model&\Toporia\Framework\Database\ORM\Concerns\SoftDeletes $related */
+            return $related->forceDelete();
+        }
+
+        return $related->delete();
     }
 
     /**
@@ -257,10 +262,11 @@ class HasOne extends Relation
             ->whereNotNull($deletedAtColumn)
             ->first();
 
-        if ($related === null) {
+        if (!$related instanceof Model || !method_exists($related, 'restore')) {
             return false;
         }
 
+        /** @var Model&\Toporia\Framework\Database\ORM\Concerns\SoftDeletes $related */
         return $related->restore();
     }
 
