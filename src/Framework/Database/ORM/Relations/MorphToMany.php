@@ -130,7 +130,14 @@ class MorphToMany extends Relation
     protected function guessRelatedKey(): string
     {
         $parts = explode('\\', $this->relatedClass);
-        return strtolower(end($parts)) . '_id';
+        $className = end($parts);
+
+        // Strip "Model" suffix if present (e.g., TagModel -> tag_id)
+        if (Str::endsWith($className, 'Model')) {
+            $className = substr($className, 0, -5); // Remove "Model"
+        }
+
+        return strtolower($className) . '_id';
     }
 
     /**
@@ -235,7 +242,18 @@ class MorphToMany extends Relation
             $rowCollection = $this->query->get();
         }
 
+        // If already a ModelCollection, return it directly
+        if ($rowCollection instanceof ModelCollection) {
+            return $rowCollection;
+        }
+
+        // Convert RowCollection to array
         $rows = $rowCollection instanceof RowCollection ? $rowCollection->all() : $rowCollection;
+
+        // Ensure $rows is an array before passing to hydrate
+        if (!is_array($rows)) {
+            $rows = [];
+        }
 
         return empty($rows) ? new ModelCollection([]) : $this->relatedClass::hydrate($rows);
     }

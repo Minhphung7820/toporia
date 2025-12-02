@@ -145,7 +145,14 @@ class MorphedByMany extends Relation
     protected function guessParentKey(): string
     {
         $parts = explode('\\', get_class($this->parent));
-        return strtolower(end($parts)) . '_id';
+        $className = end($parts);
+
+        // Strip "Model" suffix if present (e.g., TagModel -> tag_id)
+        if (Str::endsWith($className, 'Model')) {
+            $className = substr($className, 0, -5); // Remove "Model"
+        }
+
+        return strtolower($className) . '_id';
     }
 
     /**

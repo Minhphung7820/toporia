@@ -1013,79 +1013,177 @@ final class ProductController extends BaseController
 
         $data = $request->all();
 
-        // Create product
-        $product = ProductModel::create([
-            'title' => $data['title'] ?? 'Test Product',
-            'slug' => $data['slug'] ?? strtolower(str_replace(' ', '-', $data['title'] ?? 'test-product')),
-            'price' => $data['price'] ?? 99.99,
-            'sale_price' => $data['sale_price'] ?? null,
-            'stock' => $data['stock'] ?? 100,
-            'description' => $data['description'] ?? null,
-            'category_id' => $data['category_id'] ?? null,
-            'is_active' => $data['is_active'] ?? true,
-            'status' => $data['status'] ?? 'active',
-        ]);
+        $result = DB::transaction(function () use ($data) {
+            // Create product
+            $product = ProductModel::create([
+                'title' => $data['title'] ?? 'Test Product',
+                'slug' => $data['slug'] ?? strtolower(str_replace(' ', '-', $data['title'] ?? 'test-product')),
+                'price' => $data['price'] ?? 99.99,
+                'sale_price' => $data['sale_price'] ?? null,
+                'stock' => $data['stock'] ?? 100,
+                'description' => $data['description'] ?? null,
+                'category_id' => $data['category_id'] ?? null,
+                'is_active' => $data['is_active'] ?? true,
+                'status' => $data['status'] ?? 'active',
+            ]);
 
-        // Attach belongsToMany categories
-        if (isset($data['category_ids']) && is_array($data['category_ids'])) {
-            $product->categories()->attach($data['category_ids']);
-        }
-
-        // Attach belongsToMany tags (with pivot data)
-        if (isset($data['tag_ids']) && is_array($data['tag_ids'])) {
-            $pivotData = [];
-            $createdBy = null;
-
-            // Validate created_by if provided
-            if (isset($data['created_by'])) {
-                $user = UserModel::find($data['created_by']);
-                if ($user) {
-                    $createdBy = $data['created_by'];
+            // Attach belongsToMany categories
+            if (isset($data['category_ids']) && is_array($data['category_ids'])) {
+                // Validate category IDs exist
+                $validCategoryIds = CategoryModel::whereIn('id', $data['category_ids'])
+                    ->get()
+                    ->pluck('id')
+                    ->values()
+                    ->all();
+                if (count($validCategoryIds) !== count($data['category_ids'])) {
+                    $invalidIds = array_diff($data['category_ids'], $validCategoryIds);
+                    throw new \RuntimeException('Invalid category IDs: ' . implode(', ', $invalidIds));
                 }
-                // If user doesn't exist, created_by will be null (foreign key allows NULL)
+                $product->categories()->attach($validCategoryIds);
             }
 
-            foreach ($data['tag_ids'] as $tagId) {
-                $tagPivotData = [
-                    'created_at' => date('Y-m-d H:i:s'),
+            // Attach belongsToMany tags (with pivot data)
+            if (isset($data['tag_ids']) && is_array($data['tag_ids'])) {
+                // Validate tag IDs exist - only attach valid ones
+                $validTagIds = TagModel::whereIn('id', $data['tag_ids'])
+                    ->get()
+                    ->pluck('id')
+                    ->values()
+                    ->all();
+
+                // Skip invalid tag IDs instead of throwing error
+                if (count($validTagIds) !== count($data['tag_ids'])) {
+                    $invalidIds = array_diff($data['tag_ids'], $validTagIds);
+                    // Log warning but continue with valid tags only
+                    // Invalid tag IDs are silently skipped
+                }
+
+                // Only proceed if there are valid tag IDs
+                if (!empty($validTagIds)) {
+                    $pivotData = [];
+                    $createdBy = null;
+
+                    // Validate created_by if provided
+                    if (isset($data['created_by'])) {
+                        $user = UserModel::find($data['created_by']);
+                        if ($user) {
+                            $createdBy = $data['created_by'];
+                        }
+                        // If user doesn't exist, created_by will be null (foreign key allows NULL)
+                    }
+
+                    foreach ($validTagIds as $tagId) {
+                        $tagPivotData = [
+                            'created_at' => date('Y-m-d H:i:s'),
+                        ];
+
+                        // Only add created_by if user exists
+                        if ($createdBy !== null) {
+                            $tagPivotData['created_by'] = $createdBy;
+                        }
+
+                        $pivotData[$tagId] = $tagPivotData;
+                    }
+                    $product->tags()->attach($pivotData);
+                }
+            }
+
+            // Attach polymorphic many-to-many tags (morphToMany)
+            if (isset($data['polymorphic_tag_ids']) && is_array($data['polymorphic_tag_ids'])) {
+
+                // Validate tag IDs exist - only attach valid ones
+                $validTagIds = TagModel::whereIn('id', $data['polymorphic_tag_ids'])
+                    ->get()
+                    ->pluck('id')
+                    ->values()
+                    ->all();
+
+                // Skip invalid tag IDs instead of throwing error
+                if (count($validTagIds) !== count($data['polymorphic_tag_ids'])) {
+                    $invalidIds = array_diff($data['polymorphic_tag_ids'], $validTagIds);
+                    // Log warning but continue with valid tags only
+                    // Invalid tag IDs are silently skipped
+                }
+
+                // Only proceed if there are valid tag IDs
+                if (!empty($validTagIds)) {
+                    $product->allTags()->attach($validTagIds);
+                }
+            }
+
+            // Attach related products (self-referencing many-to-many)
+            if (isset($data['related_product_ids']) && is_array($data['related_product_ids'])) {
+                // Validate product IDs exist
+                $validProductIds = ProductModel::whereIn('id', $data['related_product_ids'])
+                    ->get()
+                    ->pluck('id')
+                    ->values()
+                    ->all();
+                if (count($validProductIds) !== count($data['related_product_ids'])) {
+                    $invalidIds = array_diff($data['related_product_ids'], $validProductIds);
+                    throw new \RuntimeException('Invalid related product IDs: ' . implode(', ', $invalidIds));
+                }
+
+                // Validate relation_type (enum: similar, complementary, alternative, accessory)
+                $allowedRelationTypes = ['similar', 'complementary', 'alternative', 'accessory'];
+
+                // Map common aliases to valid relation types
+                $relationTypeMapping = [
+                    'recommended' => 'similar',
+                    'related' => 'similar',
+                    'suggested' => 'similar',
+                    'upsell' => 'complementary',
+                    'cross-sell' => 'complementary',
                 ];
 
-                // Only add created_by if user exists
-                if ($createdBy !== null) {
-                    $tagPivotData['created_by'] = $createdBy;
+                $relationType = $data['relation_type'] ?? 'similar';
+
+                // If the provided type is in the mapping, use the mapped value
+                if (isset($relationTypeMapping[$relationType])) {
+                    $relationType = $relationTypeMapping[$relationType];
                 }
 
-                $pivotData[$tagId] = $tagPivotData;
+                // Validate that the final relation_type is allowed
+                if (!in_array($relationType, $allowedRelationTypes, true)) {
+                    throw new \RuntimeException(
+                        'Invalid relation_type: "' . ($data['relation_type'] ?? 'null') . '". ' .
+                            'Allowed values are: ' . implode(', ', $allowedRelationTypes) . '. ' .
+                            'Supported aliases: ' . implode(', ', array_keys($relationTypeMapping))
+                    );
+                }
+
+                // Validate strength (must be between 0.00 and 1.00)
+                $strength = $data['strength'] ?? 0.8;
+                $strength = (float) $strength;
+                if ($strength < 0.00 || $strength > 1.00) {
+                    throw new \RuntimeException(
+                        'Invalid strength: ' . $strength . '. ' .
+                            'Strength must be between 0.00 and 1.00'
+                    );
+                }
+
+                $pivotData = [];
+                foreach ($validProductIds as $relatedId) {
+                    $pivotData[$relatedId] = [
+                        'relation_type' => $relationType,
+                        'strength' => $strength,
+                    ];
+                }
+                $product->relatedProducts()->attach($pivotData);
             }
-            $product->tags()->attach($pivotData);
-        }
 
-        // Attach polymorphic many-to-many tags (morphToMany)
-        if (isset($data['polymorphic_tag_ids']) && is_array($data['polymorphic_tag_ids'])) {
-            $product->allTags()->attach($data['polymorphic_tag_ids']);
-        }
+            // Load relationships for response
+            $product->load(['category', 'categories', 'tags', 'allTags', 'relatedProducts']);
 
-        // Attach related products (self-referencing many-to-many)
-        if (isset($data['related_product_ids']) && is_array($data['related_product_ids'])) {
-            $pivotData = [];
-            foreach ($data['related_product_ids'] as $relatedId) {
-                $pivotData[$relatedId] = [
-                    'relation_type' => $data['relation_type'] ?? 'similar',
-                    'strength' => $data['strength'] ?? 0.8,
-                ];
-            }
-            $product->relatedProducts()->attach($pivotData);
-        }
-
-        // Load relationships for response
-        $product->load(['category', 'categories', 'tags', 'allTags', 'relatedProducts']);
+            return $product;
+        });
 
         $queries = $this->formatQueryLogs(DB::getQueryLog());
 
         return response()->json([
             'success' => true,
             'message' => 'Product created successfully',
-            'data' => $product->toArray(),
+            'data' => $result->toArray(),
             'queries' => $queries,
         ], 201);
     }
