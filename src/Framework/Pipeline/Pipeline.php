@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Pipeline;
 
 use Closure;
+use Throwable;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Pipeline\Contracts\PipelineInterface;
 
@@ -18,15 +19,48 @@ use Toporia\Framework\Pipeline\Contracts\PipelineInterface;
  * - Pipe through callbacks (closures)
  * - Pipe through invokable objects
  * - Pipe through class methods (Class@method)
+ * - Pipe with parameters (Class:param1,param2)
  * - Container-based dependency injection
  * - Fluent chainable API
  * - Then/thenReturn for flexible output
+ * - Exception handling with onFailure()
+ * - Finally callback support
+ * - Conditional pipes with when()
  *
  * Performance:
  * - O(N) where N = number of pipes
  * - Lazy evaluation (pipeline built once, executed once)
  * - Zero overhead for unused features
  *
+ * @example
+ * ```php
+ * // Basic usage
+ * $result = Pipeline::make($container)
+ *     ->send($data)
+ *     ->through([
+ *         ValidateData::class,
+ *         TransformData::class,
+ *         'SanitizeData@sanitize',
+ *     ])
+ *     ->thenReturn();
+ *
+ * // With parameters
+ * $result = Pipeline::make()
+ *     ->send($request)
+ *     ->through([
+ *         'ThrottleRequests:60,1',  // 60 requests per minute
+ *         'CacheResponse:3600',      // Cache for 1 hour
+ *     ])
+ *     ->thenReturn();
+ *
+ * // With exception handling
+ * $result = Pipeline::make()
+ *     ->send($data)
+ *     ->through($pipes)
+ *     ->onFailure(fn($e, $passable) => $this->handleError($e))
+ *     ->finally(fn($passable) => $this->cleanup())
+ *     ->thenReturn();
+ * ```
  */
 final class Pipeline implements PipelineInterface
 {
@@ -44,6 +78,16 @@ final class Pipeline implements PipelineInterface
      * @var string Method name to call on pipe objects
      */
     private string $method = 'handle';
+
+    /**
+     * @var Closure|null Exception handler callback
+     */
+    private ?Closure $exceptionHandler = null;
+
+    /**
+     * @var Closure|null Finally callback (always executed)
+     */
+    private ?Closure $finallyCallback = null;
 
     /**
      * @param ContainerInterface|null $container DI container for resolving pipes
@@ -100,6 +144,43 @@ final class Pipeline implements PipelineInterface
     }
 
     /**
+     * Conditionally add pipes to the pipeline.
+     *
+     * @param bool|Closure $condition Condition or callback returning bool
+     * @param mixed|array $pipes Pipe(s) to add if condition is true
+     * @param mixed|array|null $elsePipes Pipe(s) to add if condition is false
+     * @return self
+     *
+     * @example
+     * ```php
+     * Pipeline::make()
+     *     ->send($data)
+     *     ->when($user->isAdmin(), AdminPipe::class)
+     *     ->when(
+     *         fn($passable) => $passable->needsValidation(),
+     *         [ValidatePipe::class, SanitizePipe::class]
+     *     )
+     *     ->thenReturn();
+     * ```
+     */
+    public function when(bool|Closure $condition, mixed $pipes, mixed $elsePipes = null): self
+    {
+        // Evaluate condition if it's a closure
+        $shouldAdd = $condition instanceof Closure
+            ? $condition($this->passable ?? null)
+            : $condition;
+
+        $pipesToAdd = $shouldAdd ? $pipes : $elsePipes;
+
+        if ($pipesToAdd !== null) {
+            $pipesToAdd = is_array($pipesToAdd) ? $pipesToAdd : [$pipesToAdd];
+            $this->pipes = array_merge($this->pipes, $pipesToAdd);
+        }
+
+        return $this;
+    }
+
+    /**
      * Set the method to call on pipe objects.
      *
      * @param string $method Method name (default: 'handle')
@@ -112,15 +193,77 @@ final class Pipeline implements PipelineInterface
     }
 
     /**
+     * Set exception handler for pipeline failures.
+     *
+     * @param Closure $callback Exception handler: fn(Throwable $e, mixed $passable): mixed
+     * @return self
+     *
+     * @example
+     * ```php
+     * Pipeline::make()
+     *     ->send($data)
+     *     ->through($pipes)
+     *     ->onFailure(function (Throwable $e, $passable) {
+     *         Log::error('Pipeline failed', ['error' => $e->getMessage()]);
+     *         return $passable; // Return original data on failure
+     *     })
+     *     ->thenReturn();
+     * ```
+     */
+    public function onFailure(Closure $callback): self
+    {
+        $this->exceptionHandler = $callback;
+        return $this;
+    }
+
+    /**
+     * Set finally callback (always executed regardless of success/failure).
+     *
+     * @param Closure $callback Finally callback: fn(mixed $passable): void
+     * @return self
+     *
+     * @example
+     * ```php
+     * Pipeline::make()
+     *     ->send($data)
+     *     ->through($pipes)
+     *     ->finally(fn($passable) => $this->releaseResources())
+     *     ->thenReturn();
+     * ```
+     */
+    public function finally(Closure $callback): self
+    {
+        $this->finallyCallback = $callback;
+        return $this;
+    }
+
+    /**
      * Run the pipeline with a final destination callback.
      *
      * @param Closure $destination Final callback to execute after all pipes
      * @return mixed Result from destination callback
+     * @throws Throwable If exception occurs and no handler is set
      */
     public function then(Closure $destination): mixed
     {
         $pipeline = $this->buildPipeline($destination);
-        return $pipeline($this->passable);
+
+        try {
+            $result = $pipeline($this->passable);
+            return $result;
+        } catch (Throwable $e) {
+            // If exception handler is set, use it
+            if ($this->exceptionHandler !== null) {
+                return ($this->exceptionHandler)($e, $this->passable);
+            }
+            // Re-throw if no handler
+            throw $e;
+        } finally {
+            // Always execute finally callback if set
+            if ($this->finallyCallback !== null) {
+                ($this->finallyCallback)($this->passable);
+            }
+        }
     }
 
     /**
@@ -196,40 +339,64 @@ final class Pipeline implements PipelineInterface
     /**
      * Execute a pipe class from string name.
      *
-     * Supports both 'Class@method' syntax and plain class names.
+     * Supports:
+     * - Plain class: 'MyPipe'
+     * - Class with method: 'MyPipe@customMethod'
+     * - Class with parameters: 'MyPipe:param1,param2'
+     * - Class with method and parameters: 'MyPipe@customMethod:param1,param2'
      *
-     * @param string $pipe Class name or 'Class@method'
+     * @param string $pipe Class name with optional method/parameters
      * @param mixed $passable Object being passed through
      * @param Closure $next Next layer
      * @return mixed Result from pipe
      */
     private function executePipeClass(string $pipe, mixed $passable, Closure $next): mixed
     {
-        // Parse Class@method syntax
-        [$class, $method] = $this->parsePipeString($pipe);
+        // Parse pipe string into components
+        [$class, $method, $parameters] = $this->parsePipeString($pipe);
 
         // Resolve instance from container or instantiate directly
         $instance = $this->container !== null
             ? $this->container->get($class)
             : new $class();
 
-        // Call the method
-        return $instance->{$method}($passable, $next);
+        // Call the method with parameters
+        return $instance->{$method}($passable, $next, ...$parameters);
     }
 
     /**
-     * Parse pipe string into class and method.
+     * Parse pipe string into class, method, and parameters.
      *
-     * @param string $pipe Class name or 'Class@method'
-     * @return array{0: string, 1: string} [className, methodName]
+     * Supported formats:
+     * - 'MyPipe' -> ['MyPipe', 'handle', []]
+     * - 'MyPipe@method' -> ['MyPipe', 'method', []]
+     * - 'MyPipe:a,b' -> ['MyPipe', 'handle', ['a', 'b']]
+     * - 'MyPipe@method:a,b' -> ['MyPipe', 'method', ['a', 'b']]
+     *
+     * @param string $pipe Pipe string
+     * @return array{0: string, 1: string, 2: array} [className, methodName, parameters]
      */
     private function parsePipeString(string $pipe): array
     {
-        if (str_contains($pipe, '@')) {
-            return explode('@', $pipe, 2);
+        $class = $pipe;
+        $method = $this->method;
+        $parameters = [];
+
+        // Extract parameters first (after :)
+        if (str_contains($pipe, ':')) {
+            [$pipe, $paramString] = explode(':', $pipe, 2);
+            $parameters = str_contains($paramString, ',')
+                ? array_map('trim', explode(',', $paramString))
+                : [$paramString];
+            $class = $pipe;
         }
 
-        return [$pipe, $this->method];
+        // Extract method (after @)
+        if (str_contains($class, '@')) {
+            [$class, $method] = explode('@', $class, 2);
+        }
+
+        return [$class, $method, $parameters];
     }
 
     /**

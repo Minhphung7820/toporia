@@ -50,12 +50,38 @@ interface PipelineInterface
     public function pipe(mixed $pipe): self;
 
     /**
+     * Conditionally add pipes to the pipeline.
+     *
+     * @param bool|Closure $condition Condition or callback returning bool
+     * @param mixed|array $pipes Pipe(s) to add if condition is true
+     * @param mixed|array|null $elsePipes Pipe(s) to add if condition is false
+     * @return self
+     */
+    public function when(bool|Closure $condition, mixed $pipes, mixed $elsePipes = null): self;
+
+    /**
      * Set the method to call on pipe objects.
      *
      * @param string $method Method name (default: 'handle')
      * @return self
      */
     public function via(string $method): self;
+
+    /**
+     * Set exception handler for pipeline failures.
+     *
+     * @param Closure $callback Exception handler: fn(Throwable $e, mixed $passable): mixed
+     * @return self
+     */
+    public function onFailure(Closure $callback): self;
+
+    /**
+     * Set finally callback (always executed regardless of success/failure).
+     *
+     * @param Closure $callback Finally callback: fn(mixed $passable): void
+     * @return self
+     */
+    public function finally(Closure $callback): self;
 
     /**
      * Run the pipeline with a final destination callback.
