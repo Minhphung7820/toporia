@@ -354,26 +354,6 @@ final class JsonResponse extends Response implements JsonResponseInterface
     }
 
     /**
-     * Magic method for Laravel compatibility.
-     *
-     * @param string $method Method name
-     * @param array $parameters Method parameters
-     * @return mixed
-     */
-    public function __call(string $method, array $parameters): mixed
-    {
-        // Check for macro
-        $macro = static::getMacro($method);
-        if ($macro !== null) {
-            // Bind $this to macro callback
-            $boundMacro = $macro->bindTo($this, static::class);
-            return $boundMacro(...$parameters);
-        }
-
-        throw new \BadMethodCallException("Method {$method} does not exist on JsonResponse");
-    }
-
-    /**
      * Clean up resources when object is destroyed.
      */
     public function __destruct()

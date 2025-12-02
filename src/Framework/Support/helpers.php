@@ -129,13 +129,13 @@ if (!function_exists('abort')) {
         $message = $message ?: "HTTP {$code} Error";
 
         // Create JSON response
-        $jsonResponse = response()->json([
+        $jsonResponse = new \Toporia\Framework\Http\JsonResponse([
             'error' => $message,
             'status' => $code
         ], $code, $headers);
 
-        // Send error response with content
-        $jsonResponse->send($jsonResponse->getContent());
+        // Send error response
+        $jsonResponse->sendResponse();
 
         exit($code);
     }

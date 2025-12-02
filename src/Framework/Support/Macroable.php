@@ -79,14 +79,11 @@ trait Macroable
         // Check for macro
         $macro = static::getMacro($method);
         if ($macro !== null) {
-            // Bind $this to macro callback
-            $boundMacro = $macro->bindTo($this, static::class);
-            return $boundMacro(...$parameters);
-        }
-
-        // Check parent class for method
-        if (method_exists($this, $method)) {
-            return $this->$method(...$parameters);
+            // Bind $this to macro callback only if it's a Closure
+            if ($macro instanceof \Closure) {
+                $macro = $macro->bindTo($this, static::class);
+            }
+            return $macro(...$parameters);
         }
 
         throw new \BadMethodCallException(
