@@ -122,22 +122,53 @@ if (!function_exists('abort')) {
      * @param string $message Error message
      * @param array<string, string> $headers Response headers
      * @return never
-     * @throws \Exception
+     * @throws \Toporia\Framework\Http\Exceptions\HttpException
      */
     function abort(int $code, string $message = '', array $headers = []): never
     {
-        $message = $message ?: "HTTP {$code} Error";
+        throw new \Toporia\Framework\Http\Exceptions\HttpException(
+            $code,
+            $message ?: "HTTP {$code} Error",
+            $headers
+        );
+    }
+}
 
-        // Create JSON response
-        $jsonResponse = new \Toporia\Framework\Http\JsonResponse([
-            'error' => $message,
-            'status' => $code
-        ], $code, $headers);
+if (!function_exists('abort_if')) {
+    /**
+     * Throw an HTTP exception if the given condition is true.
+     *
+     * @param bool $condition Condition to check
+     * @param int $code HTTP status code
+     * @param string $message Error message
+     * @param array<string, string> $headers Response headers
+     * @return void
+     * @throws \Toporia\Framework\Http\Exceptions\HttpException
+     */
+    function abort_if(bool $condition, int $code, string $message = '', array $headers = []): void
+    {
+        if ($condition) {
+            abort($code, $message, $headers);
+        }
+    }
+}
 
-        // Send error response
-        $jsonResponse->sendResponse();
-
-        exit($code);
+if (!function_exists('abort_unless')) {
+    /**
+     * Throw an HTTP exception unless the given condition is true.
+     *
+     * @param bool $condition Condition to check
+     * @param int $code HTTP status code
+     * @param string $message Error message
+     * @param array<string, string> $headers Response headers
+     * @return void
+     * @throws \Toporia\Framework\Http\Exceptions\HttpException
+     */
+    function abort_unless(bool $condition, int $code, string $message = '', array $headers = []): void
+    {
+        if (!$condition) {
+            abort($code, $message, $headers);
+        }
     }
 }
 

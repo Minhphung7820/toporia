@@ -1275,6 +1275,40 @@ final class Request implements RequestInterface
     }
 
     /**
+     * Merge new input into the request only if the keys are missing.
+     *
+     * Unlike merge(), this method will not overwrite existing values.
+     * Useful for setting defaults without overriding user input.
+     *
+     * Performance: O(n) where n = number of input keys
+     *
+     * @param array<string, mixed> $input New input data (only added if key missing)
+     * @return $this Fluent interface
+     *
+     * @example
+     * ```php
+     * // Set defaults without overriding user input
+     * $request->mergeIfMissing([
+     *     'status' => 'pending',
+     *     'priority' => 'normal'
+     * ]);
+     *
+     * // User provided status='active' - it won't be overwritten
+     * // But priority will be set to 'normal' if not provided
+     * ```
+     */
+    public function mergeIfMissing(array $input): self
+    {
+        foreach ($input as $key => $value) {
+            if (!$this->has($key)) {
+                $this->body[$key] = $value;
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Merge new input into the request's query parameters.
      *
      * Similar to merge() but specifically targets query parameters (GET data).
@@ -2287,6 +2321,95 @@ final class Request implements RequestInterface
     public function missing(array|string $keys): bool
     {
         return !$this->filled($keys);
+    }
+
+    /**
+     * Execute a callback if the request has the given key.
+     *
+     * @param string $key Input key to check
+     * @param callable $callback Callback to execute if key exists
+     * @param callable|null $default Callback to execute if key doesn't exist
+     * @return mixed Callback result or $this for chaining
+     *
+     * @example
+     * ```php
+     * $request->whenHas('email', function ($email) {
+     *     // Send verification email
+     * });
+     *
+     * $request->whenHas('coupon',
+     *     fn($coupon) => $this->applyCoupon($coupon),
+     *     fn() => $this->useDefaultPricing()
+     * );
+     * ```
+     */
+    public function whenHas(string $key, callable $callback, ?callable $default = null): mixed
+    {
+        if ($this->has($key)) {
+            return $callback($this->input($key), $this);
+        }
+
+        if ($default !== null) {
+            return $default($this);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Execute a callback if the request has a non-empty value for the given key.
+     *
+     * @param string $key Input key to check
+     * @param callable $callback Callback to execute if key is filled
+     * @param callable|null $default Callback to execute if key is not filled
+     * @return mixed Callback result or $this for chaining
+     *
+     * @example
+     * ```php
+     * $request->whenFilled('search', function ($search) {
+     *     return User::where('name', 'like', "%{$search}%")->get();
+     * });
+     * ```
+     */
+    public function whenFilled(string $key, callable $callback, ?callable $default = null): mixed
+    {
+        if ($this->filled($key)) {
+            return $callback($this->input($key), $this);
+        }
+
+        if ($default !== null) {
+            return $default($this);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Execute a callback if the request is missing the given key.
+     *
+     * @param string $key Input key to check
+     * @param callable $callback Callback to execute if key is missing
+     * @param callable|null $default Callback to execute if key exists
+     * @return mixed Callback result or $this for chaining
+     *
+     * @example
+     * ```php
+     * $request->whenMissing('api_key', function () {
+     *     throw new UnauthorizedException('API key required');
+     * });
+     * ```
+     */
+    public function whenMissing(string $key, callable $callback, ?callable $default = null): mixed
+    {
+        if ($this->missing($key)) {
+            return $callback($this);
+        }
+
+        if ($default !== null) {
+            return $default($this->input($key), $this);
+        }
+
+        return $this;
     }
 
     /**

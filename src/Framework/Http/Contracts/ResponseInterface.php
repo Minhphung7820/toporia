@@ -84,4 +84,18 @@ interface ResponseInterface
      * @return string Response body content.
      */
     public function getContent(): string;
+
+    /**
+     * Get all response headers.
+     *
+     * @return array<string, string> Headers as name => value pairs.
+     */
+    public function getHeaders(): array;
+
+    /**
+     * Get the HTTP status code.
+     *
+     * @return int HTTP status code.
+     */
+    public function getStatusCode(): int;
 }

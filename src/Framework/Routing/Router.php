@@ -145,6 +145,97 @@ final class Router implements RouterInterface
     }
 
     /**
+     * Register a RESTful resource controller.
+     *
+     * Creates standard CRUD routes for a resource:
+     * - GET    /photos           -> index
+     * - GET    /photos/create    -> create
+     * - POST   /photos           -> store
+     * - GET    /photos/{id}      -> show
+     * - GET    /photos/{id}/edit -> edit
+     * - PUT    /photos/{id}      -> update
+     * - PATCH  /photos/{id}      -> update
+     * - DELETE /photos/{id}      -> destroy
+     *
+     * @param string $name Resource name (e.g., 'photos', 'users')
+     * @param string $controller Controller class
+     * @param array{
+     *     only?: array<string>,
+     *     except?: array<string>,
+     *     names?: array<string, string>,
+     *     parameters?: array<string, string>,
+     *     middleware?: array<string>
+     * } $options Resource options
+     * @return self
+     *
+     * @example
+     * ```php
+     * Route::resource('photos', PhotoController::class);
+     * Route::resource('photos', PhotoController::class, ['only' => ['index', 'show']]);
+     * Route::resource('photos', PhotoController::class, ['except' => ['destroy']]);
+     * ```
+     */
+    public function resource(string $name, string $controller, array $options = []): self
+    {
+        $name = trim($name, '/');
+        $parameter = $options['parameters'][$name] ?? rtrim($name, 's'); // photos -> photo
+        $middleware = $options['middleware'] ?? [];
+
+        // Define all resource routes
+        $resourceRoutes = [
+            'index'   => ['GET', "/{$name}", 'index'],
+            'create'  => ['GET', "/{$name}/create", 'create'],
+            'store'   => ['POST', "/{$name}", 'store'],
+            'show'    => ['GET', "/{$name}/{{$parameter}}", 'show'],
+            'edit'    => ['GET', "/{$name}/{{$parameter}}/edit", 'edit'],
+            'update'  => [['PUT', 'PATCH'], "/{$name}/{{$parameter}}", 'update'],
+            'destroy' => ['DELETE', "/{$name}/{{$parameter}}", 'destroy'],
+        ];
+
+        // Filter routes based on only/except options
+        $actions = array_keys($resourceRoutes);
+        if (isset($options['only'])) {
+            $actions = array_intersect($actions, $options['only']);
+        }
+        if (isset($options['except'])) {
+            $actions = array_diff($actions, $options['except']);
+        }
+
+        // Register filtered routes
+        foreach ($actions as $action) {
+            [$method, $uri, $controllerMethod] = $resourceRoutes[$action];
+
+            $route = $this->addRoute($method, $uri, [$controller, $controllerMethod], $middleware);
+
+            // Apply custom route name if provided
+            $routeName = $options['names'][$action] ?? "{$name}.{$action}";
+            $route->name($routeName);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Register an API resource controller (without create/edit routes).
+     *
+     * Same as resource() but excludes HTML form routes (create, edit).
+     *
+     * @param string $name Resource name
+     * @param string $controller Controller class
+     * @param array $options Resource options
+     * @return self
+     */
+    public function apiResource(string $name, string $controller, array $options = []): self
+    {
+        $options['except'] = array_merge(
+            $options['except'] ?? [],
+            ['create', 'edit']
+        );
+
+        return $this->resource($name, $controller, $options);
+    }
+
+    /**
      * Register a fallback handler for unmatched routes (404 handler).
      *
      * This handler will be called automatically when no route matches the request.
@@ -254,6 +345,9 @@ final class Router implements RouterInterface
     /**
      * Execute the fallback handler.
      *
+     * Wraps fallback in middleware pipeline to ensure security middleware
+     * (CSRF, CORS, etc.) is applied even to 404 handlers.
+     *
      * @return void
      */
     private function executeFallbackHandler(): void
@@ -263,10 +357,25 @@ final class Router implements RouterInterface
         // Build the core handler
         $coreHandler = $this->buildCoreHandler($handler, []);
 
-        // Execute handler and get result
-        $result = $coreHandler($this->request, $this->response);
+        // Apply global middleware to fallback handler for security
+        // This ensures CSRF, CORS, and other security middleware run on 404s
+        $pipeline = $this->middlewarePipeline->build($this->currentMiddleware, $coreHandler);
 
-        // Handle different result types
+        // Execute pipeline and get result
+        $result = $pipeline($this->request, $this->response);
+
+        // Handle response
+        $this->sendResponse($result);
+    }
+
+    /**
+     * Send the response based on result type.
+     *
+     * @param mixed $result Handler result
+     * @return void
+     */
+    private function sendResponse(mixed $result): void
+    {
         if ($result instanceof \Toporia\Framework\Http\Contracts\JsonResponseInterface) {
             $result->sendResponse();
         } elseif ($result instanceof \Toporia\Framework\Http\Contracts\RedirectResponseInterface) {
@@ -357,26 +466,8 @@ final class Router implements RouterInterface
         // Execute pipeline and get result
         $result = $pipeline($this->request, $this->response);
 
-        // Handle different result types
-        if ($result instanceof \Toporia\Framework\Http\Contracts\JsonResponseInterface) {
-            // JSON Response object - send it directly
-            $result->sendResponse();
-        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\RedirectResponseInterface) {
-            // Redirect Response object - send it directly
-            $result->sendResponse();
-        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\StreamedResponseInterface) {
-            // Streamed Response object - send content directly
-            $result->sendContent();
-        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\ResponseInterface) {
-            // Generic Response object - send it directly
-            $result->send($result->getContent());
-        } elseif (is_string($result)) {
-            // String result - send as HTML
-            $this->response->html($result);
-        } elseif (is_array($result) || is_object($result)) {
-            // Array/Object result - send as JSON
-            $this->response->json($result);
-        }
+        // Handle response
+        $this->sendResponse($result);
     }
 
     /**
