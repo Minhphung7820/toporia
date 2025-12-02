@@ -1005,8 +1005,9 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
         $dirty = $this->getDirty();
 
         // Check if model uses optimistic locking
-        if (method_exists($this, 'usesOptimisticLocking') && static::usesOptimisticLocking()) {
-            // Use optimistic locking save method
+        if (method_exists($this, 'usesOptimisticLocking') && static::usesOptimisticLocking()
+            && method_exists($this, 'saveWithOptimisticLock')) {
+            /** @var Model&\Toporia\Framework\Database\ORM\Concerns\OptimisticLocking $this */
             return $this->saveWithOptimisticLock();
         }
 
