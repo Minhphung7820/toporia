@@ -129,7 +129,7 @@ final class TokenRepository implements TokenRepositoryInterface
             'user_id' => $tokenModel->getAttribute('user_id'),
             'scopes' => $tokenModel->getAttribute('scopes') ?? [],
             'expires_at' => is_string($tokenModel->getAttribute('expires_at'))
-                ? strtotime($tokenModel->getAttribute('expires_at'))
+                ? \Toporia\Framework\DateTime\Chronos::parse($tokenModel->getAttribute('expires_at'))->getTimestamp()
                 : $tokenModel->getAttribute('expires_at')->getTimestamp(),
         ];
     }

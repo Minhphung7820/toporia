@@ -214,7 +214,7 @@ final class GcsFilesystem implements CloudFilesystemInterface
         $metadata = $this->getMetadata($path);
 
         if (isset($metadata['updated'])) {
-            return strtotime($metadata['updated']);
+            return \Toporia\Framework\DateTime\Chronos::parse($metadata['updated'])->getTimestamp();
         }
 
         return null;

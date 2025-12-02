@@ -1227,10 +1227,13 @@ final class Validator implements ValidatorInterface
             $afterDate = $data[$afterDate];
         }
 
-        $valueTime = strtotime($value);
-        $afterTime = strtotime($afterDate);
-
-        return $valueTime !== false && $afterTime !== false && $valueTime > $afterTime;
+        try {
+            $valueTime = \Toporia\Framework\DateTime\Chronos::parse($value)->getTimestamp();
+            $afterTime = \Toporia\Framework\DateTime\Chronos::parse($afterDate)->getTimestamp();
+            return $valueTime > $afterTime;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -1251,10 +1254,13 @@ final class Validator implements ValidatorInterface
             $beforeDate = $data[$beforeDate];
         }
 
-        $valueTime = strtotime($value);
-        $beforeTime = strtotime($beforeDate);
-
-        return $valueTime !== false && $beforeTime !== false && $valueTime < $beforeTime;
+        try {
+            $valueTime = \Toporia\Framework\DateTime\Chronos::parse($value)->getTimestamp();
+            $beforeTime = \Toporia\Framework\DateTime\Chronos::parse($beforeDate)->getTimestamp();
+            return $valueTime < $beforeTime;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -1299,7 +1305,12 @@ final class Validator implements ValidatorInterface
             return true;
         }
 
-        return strtotime($value) !== false;
+        try {
+            \Toporia\Framework\DateTime\Chronos::parse($value);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -1323,7 +1334,12 @@ final class Validator implements ValidatorInterface
             return true;
         }
 
-        return strtotime($value) !== false;
+        try {
+            \Toporia\Framework\DateTime\Chronos::parse($value);
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**

@@ -119,7 +119,7 @@ final class DailyFileChannel implements ChannelInterface
      */
     private function cleanupOldLogs(): void
     {
-        $cutoffTime = strtotime("-{$this->daysToKeep} days");
+        $cutoffTime = now()->subDays($this->daysToKeep)->getTimestamp();
         $pattern = $this->logPath . '/*.log';
 
         foreach (glob($pattern) as $file) {
@@ -127,7 +127,7 @@ final class DailyFileChannel implements ChannelInterface
             $filename = basename($file);
             if (preg_match('/^(\d{4}-\d{2}-\d{2})\.log$/', $filename, $matches)) {
                 $fileDate = $matches[1];
-                $fileTime = strtotime($fileDate);
+                $fileTime = \Toporia\Framework\DateTime\Chronos::parse($fileDate)->getTimestamp();
 
                 if ($fileTime !== false && $fileTime < $cutoffTime) {
                     @unlink($file);

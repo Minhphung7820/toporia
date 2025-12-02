@@ -307,7 +307,7 @@ final class ProductSeeder extends Seeder
     private function generatePivotData(array $productIds, array $categoryIds): array
     {
         $pivotData = [];
-        $now = date('Y-m-d H:i:s');
+        $now = now()->toDateTimeString();
         [$minCategories, $maxCategories] = self::DEFAULTS['pivot_categories_per_product'];
 
         foreach ($productIds as $productId) {

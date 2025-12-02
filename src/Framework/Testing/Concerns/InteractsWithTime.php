@@ -55,7 +55,7 @@ trait InteractsWithTime
      */
     protected function travel(int $seconds): void
     {
-        $current = $this->fakeTime ?? time();
+        $current = $this->fakeTime ?? \now()->getTimestamp();
         $this->setFakeTime($current + $seconds);
     }
 
@@ -66,7 +66,7 @@ trait InteractsWithTime
      */
     protected function now(): int
     {
-        return $this->fakeTime ?? time();
+        return $this->fakeTime ?? \now()->getTimestamp();
     }
 
     /**

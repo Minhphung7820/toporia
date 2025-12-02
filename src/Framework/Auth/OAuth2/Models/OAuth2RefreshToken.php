@@ -60,7 +60,7 @@ final class OAuth2RefreshToken extends Model
         }
 
         return is_string($expiresAt)
-            ? strtotime($expiresAt) < now()->getTimestamp()
+            ? \Toporia\Framework\DateTime\Chronos::parse($expiresAt)->getTimestamp() < now()->getTimestamp()
             : $expiresAt->getTimestamp() < now()->getTimestamp();
     }
 

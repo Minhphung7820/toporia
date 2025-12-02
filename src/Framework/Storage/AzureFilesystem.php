@@ -200,7 +200,7 @@ final class AzureFilesystem implements CloudFilesystemInterface
         $metadata = $this->getMetadata($path);
 
         if (isset($metadata['Last-Modified'])) {
-            return strtotime($metadata['Last-Modified']);
+            return \Toporia\Framework\DateTime\Chronos::parse($metadata['Last-Modified'])->getTimestamp();
         }
 
         return null;

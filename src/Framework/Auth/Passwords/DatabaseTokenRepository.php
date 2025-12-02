@@ -173,7 +173,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
      */
     protected function tokenExpired(string $createdAt): bool
     {
-        $createdTime = strtotime($createdAt);
+        $createdTime = \Toporia\Framework\DateTime\Chronos::parse($createdAt)->getTimestamp();
 
         return ($createdTime + $this->expires) < now()->getTimestamp();
     }
@@ -194,7 +194,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
             return false;
         }
 
-        $createdTime = strtotime($record['created_at']);
+        $createdTime = \Toporia\Framework\DateTime\Chronos::parse($record['created_at'])->getTimestamp();
 
         return ($createdTime + $this->throttle) > now()->getTimestamp();
     }

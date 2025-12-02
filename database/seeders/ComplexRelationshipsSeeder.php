@@ -46,7 +46,7 @@ class ComplexRelationshipsSeeder extends Seeder
             $userData = [
                 'name' => "User " . ($i + 1),
                 'email' => "user" . ($i + 1) . "@example.com",
-                'email_verified_at' => date('Y-m-d H:i:s'),
+                'email_verified_at' => now()->toDateTimeString(),
                 'password' => password_hash('password', PASSWORD_DEFAULT),
             ];
 
@@ -107,8 +107,8 @@ class ComplexRelationshipsSeeder extends Seeder
                     'sort_order' => $index + 1,
                     'is_featured' => rand(0, 1) === 1,
                     'is_active' => true,
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'created_at' => now()->toDateTimeString(),
+                    'updated_at' => now()->toDateTimeString(),
                 ];
             }
 
@@ -126,8 +126,8 @@ class ComplexRelationshipsSeeder extends Seeder
             foreach ($tagIds as $tagId) {
                 $pivotData[$tagId] = [
                     'created_by' => $users[rand(0, count($users) - 1)]->id,
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'created_at' => now()->toDateTimeString(),
+                    'updated_at' => now()->toDateTimeString(),
                 ];
             }
 
@@ -154,8 +154,8 @@ class ComplexRelationshipsSeeder extends Seeder
                 $pivotData[$relatedId] = [
                     'relation_type' => ['similar', 'complementary', 'alternative', 'accessory'][rand(0, 3)],
                     'strength' => round(rand(50, 100) / 100, 2),
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'created_at' => now()->toDateTimeString(),
+                    'updated_at' => now()->toDateTimeString(),
                 ];
             }
 
@@ -175,8 +175,8 @@ class ComplexRelationshipsSeeder extends Seeder
                     'comment' => "This is review comment " . ($i + 1) . " for product " . $product->title,
                     'is_approved' => rand(0, 1) === 1,
                     'helpful_count' => rand(0, 20),
-                    'created_at' => date('Y-m-d H:i:s', strtotime('-' . rand(1, 365) . ' days')),
-                    'updated_at' => date('Y-m-d H:i:s', strtotime('-' . rand(0, 30) . ' days')),
+                    'created_at' => now()->subDays(rand(1, 365))->toDateTimeString(),
+                    'updated_at' => now()->subDays(rand(0, 30))->toDateTimeString(),
                 ]);
             }
         }
@@ -194,8 +194,8 @@ class ComplexRelationshipsSeeder extends Seeder
                     'taggable_type' => CategoryModel::class,
                     'taggable_id' => $category->id,
                     'created_by' => $users[rand(0, count($users) - 1)]->id,
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'created_at' => now()->toDateTimeString(),
+                    'updated_at' => now()->toDateTimeString(),
                 ]]);
             }
         }

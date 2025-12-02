@@ -136,7 +136,7 @@ class PersonalAccessToken extends Model implements PersonalAccessTokenInterface
         }
 
         if (is_string($this->expires_at)) {
-            return strtotime($this->expires_at) < now()->getTimestamp();
+            return \Toporia\Framework\DateTime\Chronos::parse($this->expires_at)->getTimestamp() < now()->getTimestamp();
         }
 
         if ($this->expires_at instanceof \DateTimeInterface) {

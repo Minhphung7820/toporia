@@ -41,7 +41,7 @@ class UserFactoryExtended extends Factory
         return $this->state([
             'role' => 'admin',
             'is_active' => true,
-            'email_verified_at' => date('Y-m-d H:i:s'),
+            'email_verified_at' => now()->toDateTimeString(),
         ]);
     }
 
@@ -51,7 +51,7 @@ class UserFactoryExtended extends Factory
     public function verified(): static
     {
         return $this->state([
-            'email_verified_at' => date('Y-m-d H:i:s'),
+            'email_verified_at' => now()->toDateTimeString(),
             'is_active' => true,
         ]);
     }
