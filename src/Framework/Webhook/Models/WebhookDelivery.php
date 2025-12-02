@@ -51,32 +51,39 @@ final class WebhookDelivery extends Model
      *
      * @param int $statusCode HTTP status code
      * @param string|null $responseBody Response body
-     * @return void
+     * @return bool
      */
-    public function markSucceeded(int $statusCode, ?string $responseBody = null): void
+    public function markSucceeded(int $statusCode, ?string $responseBody = null): bool
     {
-        $this->update([
+        $this->fill([
             'status_code' => $statusCode,
             'response_body' => $responseBody,
-            'succeeded_at' => now(),
+            'succeeded_at' => date('Y-m-d H:i:s'),
             'failed_at' => null,
             'error_message' => null,
         ]);
+
+        return $this->save();
     }
 
     /**
      * Mark delivery as failed.
      *
      * @param string $errorMessage Error message
-     * @return void
+     * @return bool
      */
-    public function markFailed(string $errorMessage): void
+    public function markFailed(string $errorMessage): bool
     {
-        $this->increment('attempts');
-        $this->update([
-            'failed_at' => now(),
+        // Increment attempts
+        $currentAttempts = $this->getAttribute('attempts') ?? 0;
+
+        $this->fill([
+            'attempts' => $currentAttempts + 1,
+            'failed_at' => date('Y-m-d H:i:s'),
             'error_message' => $errorMessage,
         ]);
+
+        return $this->save();
     }
 }
 

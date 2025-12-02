@@ -74,16 +74,32 @@ final class SlackChannel implements ChannelInterface
     private function sendWebhook(string $url, array $payload): void
     {
         $ch = curl_init($url);
+        if ($ch === false) {
+            throw new \RuntimeException('Failed to initialize cURL for Slack webhook');
+        }
+
+        $jsonPayload = json_encode($payload);
+        if ($jsonPayload === false) {
+            throw new \RuntimeException('Failed to encode Slack payload: ' . json_last_error_msg());
+        }
+
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonPayload);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json'
         ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
+
+        if ($response === false) {
+            throw new \RuntimeException("Slack webhook cURL error: {$curlError}");
+        }
 
         if ($httpCode !== 200) {
             throw new \RuntimeException("Slack webhook failed (HTTP {$httpCode}): {$response}");

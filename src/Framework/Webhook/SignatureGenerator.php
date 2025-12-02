@@ -65,6 +65,7 @@ final class SignatureGenerator implements SignatureGeneratorInterface
      *
      * @param array<string, mixed> $payload
      * @return string Serialized payload
+     * @throws \RuntimeException If payload cannot be serialized
      */
     private function serializePayload(array $payload): string
     {
@@ -72,7 +73,13 @@ final class SignatureGenerator implements SignatureGeneratorInterface
         ksort($payload);
 
         // Convert to JSON string (canonical form)
-        return json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if ($json === false) {
+            throw new \RuntimeException('Failed to serialize webhook payload: ' . json_last_error_msg());
+        }
+
+        return $json;
     }
 }
 

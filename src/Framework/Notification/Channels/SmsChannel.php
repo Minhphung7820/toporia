@@ -106,17 +106,28 @@ final class SmsChannel implements ChannelInterface
         ];
 
         $ch = curl_init($url);
+        if ($ch === false) {
+            throw new \RuntimeException('Failed to initialize cURL for Twilio SMS');
+        }
+
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
         curl_setopt($ch, CURLOPT_USERPWD, "{$accountSid}:{$authToken}");
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
+        if ($response === false) {
+            throw new \RuntimeException("Twilio SMS cURL error: {$curlError}");
+        }
+
         if ($httpCode !== 201) {
-            throw new \RuntimeException("Twilio SMS failed: {$response}");
+            throw new \RuntimeException("Twilio SMS failed (HTTP {$httpCode}): {$response}");
         }
     }
 
@@ -149,12 +160,23 @@ final class SmsChannel implements ChannelInterface
         ];
 
         $ch = curl_init($url);
+        if ($ch === false) {
+            throw new \RuntimeException('Failed to initialize cURL for Nexmo SMS');
+        }
+
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
         $response = curl_exec($ch);
+        $curlError = curl_error($ch);
         curl_close($ch);
+
+        if ($response === false) {
+            throw new \RuntimeException("Nexmo SMS cURL error: {$curlError}");
+        }
 
         $result = json_decode($response, true);
 

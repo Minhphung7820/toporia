@@ -42,13 +42,16 @@ trait Notifiable
     /**
      * Send a notification asynchronously via queue.
      *
-     * @param NotificationInterface $notification
+     * @param NotificationInterface|Notification $notification
      * @param string $queueName
      * @return void
      */
     public function notifyLater(NotificationInterface $notification, string $queueName = 'notifications'): void
     {
-        $notification->onQueue($queueName);
+        // onQueue() is available on Notification base class, not interface
+        if ($notification instanceof Notification) {
+            $notification->onQueue($queueName);
+        }
         $this->sendNotification($notification);
     }
 }

@@ -153,12 +153,16 @@ final class WebhookDispatcher implements WebhookDispatcherInterface
             throw new \RuntimeException('Queue manager not available. Install queue service or dispatch synchronously.');
         }
 
-        $this->queue->push(\Toporia\Framework\Webhook\Jobs\DispatchWebhookJob::class, [
-            'event' => $event,
-            'payload' => $payload,
-            'endpoint' => $endpoint,
-            'options' => $options,
-        ]);
+        // Create job instance with proper constructor arguments
+        $job = new \Toporia\Framework\Webhook\Jobs\DispatchWebhookJob(
+            event: $event,
+            payload: $payload,
+            endpoint: $endpoint,
+            options: $options
+        );
+
+        $queueName = $options['queue'] ?? 'webhooks';
+        $this->queue->push($job, $queueName);
     }
 
     /**
