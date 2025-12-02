@@ -1074,7 +1074,7 @@ final class ProductController extends BaseController
 
                     foreach ($validTagIds as $tagId) {
                         $tagPivotData = [
-                            'created_at' => date('Y-m-d H:i:s'),
+                            'created_at' => now()->toDateTimeString(),
                         ];
 
                         // Only add created_by if user exists

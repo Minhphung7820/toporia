@@ -999,7 +999,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
         }
 
         if (static::$timestamps) {
-            $this->attributes['updated_at'] = date('Y-m-d H:i:s');
+            $this->attributes['updated_at'] = now()->toDateTimeString();
         }
 
         $dirty = $this->getDirty();
@@ -1494,7 +1494,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
             return false;
         }
 
-        $this->attributes[$attribute] = date('Y-m-d H:i:s');
+        $this->attributes[$attribute] = now()->toDateTimeString();
         $this->syncOriginal();
 
         return true;
@@ -1543,7 +1543,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      */
     private function updateTimestamps(): void
     {
-        $time = date('Y-m-d H:i:s');
+        $time = now()->toDateTimeString();
 
         if (!$this->exists) {
             $this->attributes['created_at'] = $time;

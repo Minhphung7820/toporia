@@ -620,7 +620,7 @@ class MorphedByMany extends Relation
         ];
 
         if ($this->withTimestamps) {
-            $now = date('Y-m-d H:i:s');
+            $now = now()->toDateTimeString();
             $data['created_at'] ??= $now;
             $data['updated_at'] ??= $now;
         }

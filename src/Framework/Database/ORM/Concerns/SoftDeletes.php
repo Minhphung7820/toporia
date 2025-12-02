@@ -113,7 +113,7 @@ trait SoftDeletes
         }
 
         // Soft delete: set deleted_at timestamp
-        $deletedAt = date('Y-m-d H:i:s');
+        $deletedAt = now()->toDateTimeString();
         $this->setAttribute(static::$deletedAtColumn, $deletedAt);
 
         $result = $this->save();
@@ -275,7 +275,7 @@ trait SoftDeletes
             return 0;
         }
 
-        $deletedAt = date('Y-m-d H:i:s');
+        $deletedAt = now()->toDateTimeString();
         $primaryKey = static::getPrimaryKey();
 
         return static::query()

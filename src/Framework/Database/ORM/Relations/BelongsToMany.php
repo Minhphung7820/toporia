@@ -91,7 +91,8 @@ class BelongsToMany extends Relation
      */
     public function withPivot(string ...$columns): static
     {
-        $this->pivotColumns = [...$this->pivotColumns, ...$columns];
+        // Deduplicate columns to avoid duplicate alias in SQL queries
+        $this->pivotColumns = array_values(array_unique([...$this->pivotColumns, ...$columns]));
         return $this;
     }
 

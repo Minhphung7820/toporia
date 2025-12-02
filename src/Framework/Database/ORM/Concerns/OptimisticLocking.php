@@ -164,7 +164,7 @@ trait OptimisticLocking
 
         // Update timestamp if enabled
         if (property_exists(static::class, 'timestamps') && static::$timestamps) {
-            $this->setAttribute('updated_at', date('Y-m-d H:i:s'));
+            $this->setAttribute('updated_at', now()->toDateTimeString());
         }
 
         $originalVersion = $this->getOriginal(static::$versionColumn) ?? 0;
