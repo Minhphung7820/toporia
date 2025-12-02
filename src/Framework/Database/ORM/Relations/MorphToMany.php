@@ -142,10 +142,24 @@ class MorphToMany extends Relation
 
     /**
      * Get morph class name for parent.
+     *
+     * Normalizes the class name similar to Laravel's getMorphClass().
+     * Returns the class name without namespace, or allows models to override
+     * this method to provide a custom morph class string.
+     *
+     * @return string Normalized morph class name
      */
     protected function getMorphClass(): string
     {
-        return get_class($this->parent);
+        // Allow parent model to override getMorphClass() method
+        if (method_exists($this->parent, 'getMorphClass')) {
+            return $this->parent->getMorphClass();
+        }
+
+        // Default: normalize to class name without namespace (similar to Laravel)
+        $className = get_class($this->parent);
+        $parts = explode('\\', $className);
+        return end($parts);
     }
 
     // =========================================================================
@@ -304,11 +318,29 @@ class MorphToMany extends Relation
 
         // Only select additional pivot columns if we should include pivot object
         if ($this->shouldIncludePivot()) {
+            // Track which columns have already been selected to avoid duplicates
+            $selectedColumns = [
+                $this->morphType => true,
+                $this->foreignKey => true,
+            ];
+
             // Add other pivot columns
             foreach ($this->pivotColumns as $column) {
                 // Skip if already added (morphType or foreignKey might be in pivotColumns)
-                if ($column !== $this->morphType && $column !== $this->foreignKey) {
+                // Also skip timestamps if they're already handled by withTimestamps()
+                if (!isset($selectedColumns[$column])) {
                     $this->query->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                    $selectedColumns[$column] = true;
+                }
+            }
+
+            // Add timestamps if enabled (only if not already in pivotColumns to avoid duplicate)
+            if ($this->withTimestamps) {
+                if (!isset($selectedColumns['created_at'])) {
+                    $this->query->selectRaw("{$this->pivotTable}.created_at as pivot_created_at");
+                }
+                if (!isset($selectedColumns['updated_at'])) {
+                    $this->query->selectRaw("{$this->pivotTable}.updated_at as pivot_updated_at");
                 }
             }
         }
@@ -519,11 +551,29 @@ class MorphToMany extends Relation
 
         // Only select additional pivot columns if we should include pivot object
         if ($this->shouldIncludePivot()) {
+            // Track which columns have already been selected to avoid duplicates
+            $selectedColumns = [
+                $this->morphType => true,
+                $this->foreignKey => true,
+            ];
+
             // Add other pivot columns
             foreach ($this->pivotColumns as $column) {
                 // Skip if already added (morphType or foreignKey might be in pivotColumns)
-                if ($column !== $this->morphType && $column !== $this->foreignKey) {
+                // Also skip timestamps if they're already handled by withTimestamps()
+                if (!isset($selectedColumns[$column])) {
                     $cleanQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                    $selectedColumns[$column] = true;
+                }
+            }
+
+            // Add timestamps if enabled (only if not already in pivotColumns to avoid duplicate)
+            if ($this->withTimestamps) {
+                if (!isset($selectedColumns['created_at'])) {
+                    $cleanQuery->selectRaw("{$this->pivotTable}.created_at as pivot_created_at");
+                }
+                if (!isset($selectedColumns['updated_at'])) {
+                    $cleanQuery->selectRaw("{$this->pivotTable}.updated_at as pivot_updated_at");
                 }
             }
         }
@@ -737,7 +787,8 @@ class MorphToMany extends Relation
         ];
 
         if ($this->withTimestamps) {
-            $now = now()->toDateTimeString();
+            // Use same timestamp format as Model class for consistency
+            $now = date('Y-m-d H:i:s');
             $data['created_at'] = $now;
             $data['updated_at'] = $now;
         }
@@ -756,7 +807,8 @@ class MorphToMany extends Relation
     {
         $attached = [];
         $insertData = [];
-        $now = $this->withTimestamps ? now()->toDateTimeString() : null;
+        // Use same timestamp format as Model class for consistency
+        $now = $this->withTimestamps ? date('Y-m-d H:i:s') : null;
 
         foreach ($ids as $key => $value) {
             [$relatedId, $pivotData] = is_numeric($key)
@@ -855,10 +907,11 @@ class MorphToMany extends Relation
         $deletedAtColumn = $this->getDeletedAtColumn($this->relatedClass);
         $relatedKey = $this->relatedKey;
 
+        // Use same timestamp format as Model class for consistency
         $softDeleted = $this->relatedClass::query()
             ->whereIn($relatedKey, $relatedIds)
             ->whereNull($deletedAtColumn) // Only soft delete non-deleted records
-            ->update([$deletedAtColumn => now()->toDateTimeString()]);
+            ->update([$deletedAtColumn => date('Y-m-d H:i:s')]);
 
         // Detach from pivot table
         if ($softDeleted > 0) {
@@ -976,7 +1029,8 @@ class MorphToMany extends Relation
     public function updateExistingPivot(int|string $id, array $pivotData): bool
     {
         if ($this->withTimestamps && !isset($pivotData['updated_at'])) {
-            $pivotData['updated_at'] = now()->toDateTimeString();
+            // Use same timestamp format as Model class for consistency
+            $pivotData['updated_at'] = date('Y-m-d H:i:s');
         }
 
         $affected = $this->newPivotQuery()
