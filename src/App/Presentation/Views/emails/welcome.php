@@ -115,7 +115,7 @@
             <p>If you have any questions, feel free to reach out to our support team.</p>
         </div>
         <div class="email-footer">
-            <p>&copy; <?= date('Y') ?> <?= htmlspecialchars(config('app.name', 'Toporia')) ?>. All rights reserved.</p>
+            <p>&copy; <?= now()->format('Y') ?> <?= htmlspecialchars(config('app.name', 'Toporia')) ?>. All rights reserved.</p>
             <p><a href="<?= config('app.url', 'http://localhost:8000') ?>">Visit our website</a></p>
         </div>
     </div>

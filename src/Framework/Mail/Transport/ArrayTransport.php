@@ -45,7 +45,7 @@ final class ArrayTransport extends AbstractTransport
         self::$messages[] = [
             'id' => $messageId,
             'message' => $message,
-            'timestamp' => time(),
+            'timestamp' => now()->getTimestamp(),
         ];
 
         return TransportResult::success($messageId, [

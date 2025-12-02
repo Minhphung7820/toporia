@@ -53,7 +53,7 @@ final class DailyFileChannel implements ChannelInterface
     public function write(string $level, string $message, array $context = []): void
     {
         $logFile = $this->getLogFile();
-        $timestamp = date($this->dateFormat);
+        $timestamp = now()->format($this->dateFormat);
         $levelUpper = strtoupper($level);
 
         // Format: [2025-01-11 13:45:23] ERROR: Something went wrong {"user_id":123}
@@ -105,7 +105,7 @@ final class DailyFileChannel implements ChannelInterface
      */
     private function getLogFile(): string
     {
-        $date = date('Y-m-d');
+        $date = now()->format('Y-m-d');
         return $this->logPath . '/' . $date . '.log';
     }
 

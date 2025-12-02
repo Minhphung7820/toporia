@@ -125,7 +125,7 @@ final class DatabaseBatchRepository implements BatchRepositoryInterface
                      ELSE finished_at
                  END
              WHERE id = ?",
-            [$processed, $failed, $processed, time(), $batchId]
+            [$processed, $failed, $processed, now()->getTimestamp(), $batchId]
         );
     }
 

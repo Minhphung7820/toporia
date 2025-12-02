@@ -130,7 +130,7 @@ final class ThrottleRequests implements MiddlewareInterface
         $response->header('Retry-After', (string)$retryAfter);
         $response->header('X-RateLimit-Limit', (string)$maxAttempts);
         $response->header('X-RateLimit-Remaining', '0');
-        $response->header('X-RateLimit-Reset', (string)(time() + $retryAfter));
+        $response->header('X-RateLimit-Reset', (string)(now()->getTimestamp() + $retryAfter));
 
         $response->json([
             'error' => 'Too Many Requests',
@@ -192,7 +192,7 @@ final class ThrottleRequests implements MiddlewareInterface
 
         $response->header('X-RateLimit-Limit', (string)$maxAttempts);
         $response->header('X-RateLimit-Remaining', (string)$remaining);
-        $response->header('X-RateLimit-Reset', (string)(time() + $availableIn));
+        $response->header('X-RateLimit-Reset', (string)(now()->getTimestamp() + $availableIn));
     }
 
     /**

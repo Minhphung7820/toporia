@@ -20,7 +20,7 @@ final class QueueRestartCommand extends Command
             mkdir($cachePath, 0755, true);
         }
 
-        file_put_contents($cachePath . '/queue-restart', (string) time());
+        file_put_contents($cachePath . '/queue-restart', (string) now()->getTimestamp());
 
         $this->success('Broadcasting queue restart signal.');
 

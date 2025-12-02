@@ -135,7 +135,7 @@ abstract class AbstractBatchKafkaConsumer extends AbstractKafkaConsumer implemen
                 'message' => $message,
                 'metadata' => [
                     'topic' => $topic,
-                    'timestamp' => time(),
+                    'timestamp' => now()->getTimestamp(),
                 ],
             ];
 

@@ -15,7 +15,7 @@ final class DownCommand extends Command
     public function handle(): int
     {
         $data = [
-            'time' => time(),
+            'time' => now()->getTimestamp(),
             'message' => $this->option('message') ?: 'Service Unavailable',
             'retry' => $this->option('retry'),
             'secret' => $this->option('secret'),

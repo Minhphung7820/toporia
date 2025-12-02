@@ -105,7 +105,7 @@ final class RabbitMqBroker implements BrokerInterface
         $msg = new AMQPMessage($payload, [
             'content_type' => 'application/json',
             'delivery_mode' => $this->persistentMessages ? AMQPMessage::DELIVERY_MODE_PERSISTENT : AMQPMessage::DELIVERY_MODE_NON_PERSISTENT,
-            'timestamp' => time(),
+            'timestamp' => now()->getTimestamp(),
         ]);
 
         $this->channel?->basic_publish($msg, $this->exchange, $routingKey);

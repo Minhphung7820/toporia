@@ -51,7 +51,7 @@ final class EnsureUnique implements JobMiddleware
         // Try to acquire lock atomically using add() (SETNX in Redis)
         // This prevents race conditions where two workers both pass has() check
         // and then both set the lock - with add() only one will succeed
-        if (!$this->cache->add($lockKey, time(), $uniqueFor)) {
+        if (!$this->cache->add($lockKey, now()->getTimestamp(), $uniqueFor)) {
             // Lock already exists - job is already queued/running
             throw new JobAlreadyRunningException(
                 "Job with unique ID '{$uniqueId}' is already queued"

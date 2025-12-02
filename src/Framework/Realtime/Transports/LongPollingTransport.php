@@ -172,14 +172,14 @@ final class LongPollingTransport implements TransportInterface
 
         // Register polling request
         $this->pollingRequests[$connId] = [
-            'started_at' => time(),
+            'started_at' => now()->getTimestamp(),
             'response' => $response,
         ];
 
         // Wait for messages (long-polling)
-        $startTime = time();
+        $startTime = now()->getTimestamp();
 
-        while ((time() - $startTime) < $this->timeout) {
+        while ((now()->getTimestamp() - $startTime) < $this->timeout) {
             // Check if messages available
             if (!empty($this->messageQueues[$connId])) {
                 $this->flushMessages($connId);
@@ -393,7 +393,7 @@ final class LongPollingTransport implements TransportInterface
     public function cleanupInactiveConnections(int $timeout = 300): int
     {
         $removed = 0;
-        $now = time();
+        $now = now()->getTimestamp();
 
         foreach ($this->manager->getAllConnections() as $connection) {
             if (($now - $connection->getLastActivityAt()) > $timeout) {

@@ -132,7 +132,7 @@ final class DeadLetterQueueHandler
                 'trace' => $exception->getTraceAsString(),
             ],
             'metadata' => $metadata,
-            'failed_at' => time(),
+            'failed_at' => now()->getTimestamp(),
             'retry_count' => $this->retryCounts[$message->getId()] ?? $this->maxRetries,
         ];
 

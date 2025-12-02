@@ -138,7 +138,7 @@ abstract class AbstractBatchAvroKafkaConsumer extends AbstractAvroKafkaConsumer 
                 'metadata' => [
                     'topic' => $this->getTopic(),
                     'schema' => $this->getSchemaName(),
-                    'timestamp' => time(),
+                    'timestamp' => now()->getTimestamp(),
                 ],
             ];
 

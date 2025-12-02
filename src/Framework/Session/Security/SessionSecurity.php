@@ -74,7 +74,7 @@ final class SessionSecurity
     {
         // Store creation time if not exists
         if (!$this->session->has(self::KEY_CREATED_AT)) {
-            $this->session->put(self::KEY_CREATED_AT, time());
+            $this->session->put(self::KEY_CREATED_AT, now()->getTimestamp());
         }
 
         // Store IP if enabled
@@ -208,7 +208,7 @@ final class SessionSecurity
     private function rotateIfNeeded(): void
     {
         $lastRotation = $this->session->get(self::KEY_LAST_ROTATION, 0);
-        $now = time();
+        $now = now()->getTimestamp();
 
         if ($now - $lastRotation >= $this->rotationInterval) {
             $this->session->regenerate();
@@ -224,7 +224,7 @@ final class SessionSecurity
     private function checkLifetime(): bool
     {
         $createdAt = $this->session->get(self::KEY_CREATED_AT, 0);
-        $now = time();
+        $now = now()->getTimestamp();
 
         if ($createdAt > 0 && ($now - $createdAt) > $this->maxLifetime) {
             $this->session->flush();

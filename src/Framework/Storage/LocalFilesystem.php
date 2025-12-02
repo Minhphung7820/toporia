@@ -287,7 +287,7 @@ final class LocalFilesystem implements FilesystemInterface
     public function temporaryUrl(string $path, int $expiration): string
     {
         // For local filesystem, generate signed URL using HMAC
-        $expires = time() + $expiration;
+        $expires = now()->getTimestamp() + $expiration;
         $signature = hash_hmac('sha256', $path . $expires, 'app-secret');
 
         return $this->url($path) . '?expires=' . $expires . '&signature=' . $signature;

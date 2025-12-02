@@ -126,7 +126,7 @@ final class WithoutOverlapping implements JobMiddleware
         // This prevents TOCTOU race condition:
         // - OLD: has() returns false for both workers, both call set()
         // - NEW: add() is atomic - only one worker succeeds
-        return $this->cache->add($key, time(), $this->expireAfter);
+        return $this->cache->add($key, now()->getTimestamp(), $this->expireAfter);
     }
 
     /**

@@ -189,27 +189,27 @@ final class DatabaseSessionDriver implements SessionStoreInterface
         }
 
         $payload = serialize($this->data);
-        $expiresAt = time() + $this->lifetime;
+        $expiresAt = now()->getTimestamp() + $this->lifetime;
 
         if ($this->exists) {
             // Update existing session
             $this->connection->execute(
                 "UPDATE {$this->table} SET payload = ?, last_activity = ?, expires_at = ? WHERE id = ?",
-                [$payload, time(), $expiresAt, $this->id]
+                [$payload, now()->getTimestamp(), $expiresAt, $this->id]
             );
         } else {
             // Insert new session
             try {
                 $this->connection->execute(
                     "INSERT INTO {$this->table} (id, payload, last_activity, expires_at) VALUES (?, ?, ?, ?)",
-                    [$this->id, $payload, time(), $expiresAt]
+                    [$this->id, $payload, now()->getTimestamp(), $expiresAt]
                 );
                 $this->exists = true;
             } catch (\Exception $e) {
                 // Session might exist, try update
                 $this->connection->execute(
                     "UPDATE {$this->table} SET payload = ?, last_activity = ?, expires_at = ? WHERE id = ?",
-                    [$payload, time(), $expiresAt, $this->id]
+                    [$payload, now()->getTimestamp(), $expiresAt, $this->id]
                 );
                 $this->exists = true;
             }
@@ -237,7 +237,7 @@ final class DatabaseSessionDriver implements SessionStoreInterface
         }
 
         // Check expiration
-        if (isset($result['expires_at']) && $result['expires_at'] < time()) {
+        if (isset($result['expires_at']) && $result['expires_at'] < now()->getTimestamp()) {
             $this->connection->execute("DELETE FROM {$this->table} WHERE id = ?", [$this->id]);
             $this->data = [];
             $this->exists = false;

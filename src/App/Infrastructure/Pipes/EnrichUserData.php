@@ -31,8 +31,8 @@ final class EnrichUserData implements PipeInterface
     public function handle(mixed $user, Closure $next): mixed
     {
         // Add timestamps
-        $user->created_at = $user->created_at ?? time();
-        $user->updated_at = time();
+        $user->created_at = $user->created_at ?? now()->toDateTimeString();
+        $user->updated_at = now()->toDateTimeString();
 
         // Add default role
         $user->role = $user->role ?? 'user';

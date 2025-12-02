@@ -32,7 +32,7 @@ final class CacheMutex implements MutexInterface
 
         // Use atomic add() - returns false if key already exists
         // This prevents race condition where two processes both pass has() check
-        return $this->cache->add($key, time(), $expiresAfter * 60); // Convert minutes to seconds
+        return $this->cache->add($key, now()->getTimestamp(), $expiresAfter * 60); // Convert minutes to seconds
     }
 
     /**

@@ -192,7 +192,7 @@ final class SessionGuard implements GuardInterface
         setcookie(
             $this->getRememberTokenName(),
             $user->getAuthIdentifier() . '|' . $token,
-            time() + (86400 * 30),
+            now()->getTimestamp() + (86400 * 30),
             '/',
             '',
             false,
@@ -243,7 +243,7 @@ final class SessionGuard implements GuardInterface
             setcookie(
                 $this->getRememberTokenName(),
                 '',
-                time() - 3600,
+                now()->getTimestamp() - 3600,
                 '/'
             );
         }

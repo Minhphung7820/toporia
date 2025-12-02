@@ -2840,7 +2840,7 @@ class BelongsToMany extends Relation
     protected function getCachedTableColumns(string $tableName, $connection): array
     {
         $cacheKey = $tableName;
-        $now = time();
+        $now = now()->getTimestamp();
 
         // Check cache
         if (isset(self::$schemaCache[$cacheKey])) {

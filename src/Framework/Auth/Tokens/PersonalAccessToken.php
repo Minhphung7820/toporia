@@ -136,11 +136,11 @@ class PersonalAccessToken extends Model implements PersonalAccessTokenInterface
         }
 
         if (is_string($this->expires_at)) {
-            return strtotime($this->expires_at) < time();
+            return strtotime($this->expires_at) < now()->getTimestamp();
         }
 
         if ($this->expires_at instanceof \DateTimeInterface) {
-            return $this->expires_at->getTimestamp() < time();
+            return $this->expires_at->getTimestamp() < now()->getTimestamp();
         }
 
         return false;

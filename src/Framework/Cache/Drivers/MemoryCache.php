@@ -162,7 +162,7 @@ final class MemoryCache implements CacheInterface
         if (isset($this->storage[$key])) {
             $data = $this->storage[$key];
             // If no expiration or not expired, key exists
-            if ($data['expires_at'] === null || $data['expires_at'] >= time()) {
+            if ($data['expires_at'] === null || $data['expires_at'] >= now()->getTimestamp()) {
                 return false; // Key already exists
             }
             // Key expired, will be overwritten

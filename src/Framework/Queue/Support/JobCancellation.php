@@ -45,7 +45,7 @@ final class JobCancellation
     {
         $this->cache->set(
             self::CACHE_PREFIX . $jobId,
-            time(),
+            now()->getTimestamp(),
             self::DEFAULT_TTL
         );
     }

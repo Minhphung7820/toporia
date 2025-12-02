@@ -151,8 +151,8 @@ final class TokenGuard implements GuardInterface
     {
         $payload = [
             'sub' => $user->getAuthIdentifier(),
-            'iat' => time(),
-            'exp' => time() + $expiresIn,
+            'iat' => now()->getTimestamp(),
+            'exp' => now()->getTimestamp() + $expiresIn,
             'guard' => $this->name,
         ];
 
@@ -192,7 +192,7 @@ final class TokenGuard implements GuardInterface
             $payload = $this->decodeJWT($token);
 
             // Check expiration
-            if (isset($payload['exp']) && $payload['exp'] < time()) {
+            if (isset($payload['exp']) && $payload['exp'] < now()->getTimestamp()) {
                 return null; // Token expired
             }
 

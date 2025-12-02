@@ -269,8 +269,8 @@ final class AzureFilesystem implements CloudFilesystemInterface
     public function temporaryUrl(string $path, int $expiration): string
     {
         $path = $this->prefixPath($path);
-        $start = gmdate('Y-m-d\TH:i:s\Z', time() - 60);
-        $expiry = gmdate('Y-m-d\TH:i:s\Z', time() + $expiration);
+        $start = now()->subSeconds(60)->toIso8601String();
+        $expiry = now()->addSeconds($expiration)->toIso8601String();
 
         $sasParams = [
             'sv' => self::API_VERSION,

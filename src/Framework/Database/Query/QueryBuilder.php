@@ -2828,7 +2828,7 @@ class QueryBuilder implements QueryBuilderInterface
         $data = [
             'column' => $column,
             'value' => $value,
-            'ts' => time(), // Optional: for cursor expiration
+            'ts' => now()->getTimestamp(), // Optional: for cursor expiration
         ];
 
         return base64_encode(json_encode($data, JSON_UNESCAPED_UNICODE));

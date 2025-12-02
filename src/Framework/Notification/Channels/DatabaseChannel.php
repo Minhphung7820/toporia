@@ -84,7 +84,7 @@ final class DatabaseChannel implements ChannelInterface
             'notifiable_id' => (string) $notifiableId,
             'data' => json_encode($data),
             'read_at' => null,
-            'created_at' => time()
+            'created_at' => now()->getTimestamp()
         ]);
     }
 
@@ -98,7 +98,7 @@ final class DatabaseChannel implements ChannelInterface
     {
         $this->connection->table($this->table)
             ->where('id', $notificationId)
-            ->update(['read_at' => time()]);
+            ->update(['read_at' => now()->getTimestamp()]);
     }
 
     /**
@@ -118,7 +118,7 @@ final class DatabaseChannel implements ChannelInterface
             $query->where('notifiable_type', $notifiableType);
         }
 
-        $query->update(['read_at' => time()]);
+        $query->update(['read_at' => now()->getTimestamp()]);
     }
 
     /**
@@ -129,7 +129,7 @@ final class DatabaseChannel implements ChannelInterface
      */
     public function deleteOld(int $days = 30): int
     {
-        $timestamp = time() - ($days * 86400);
+        $timestamp = now()->getTimestamp() - ($days * 86400);
 
         return $this->connection->table($this->table)
             ->where('created_at', '<', $timestamp)

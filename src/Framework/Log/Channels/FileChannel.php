@@ -33,7 +33,7 @@ final class FileChannel implements ChannelInterface
 
     public function write(string $level, string $message, array $context = []): void
     {
-        $timestamp = date($this->dateFormat);
+        $timestamp = now()->format($this->dateFormat);
         $levelUpper = strtoupper($level);
 
         // Format: [2025-01-11 13:45:23] ERROR: Something went wrong {"user_id":123}

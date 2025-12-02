@@ -50,7 +50,7 @@ final class ProductObserver
             '[Product Created] ID: %s, Title: %s, Created At: %s',
             $product->getKey(),
             $product->title ?? 'N/A',
-            $product->created_at ?? date('Y-m-d H:i:s')
+            $product->created_at ?? now()->toDateTimeString()
         );
 
         // Ghi log vào file hoặc system log

@@ -86,7 +86,7 @@ final class RabbitMqEventConsumerCommand extends AbstractBatchRabbitMqConsumer i
     public function handleMessages(Collection $messages): void
     {
         $count = $messages->count();
-        $this->writeln(sprintf("----------- %s -----------", date('Y-m-d H:i:s')));
+        $this->writeln(sprintf("----------- %s -----------", now()->toDateTimeString()));
         $this->writeln(sprintf("[RabbitMQEvents] Processing batch of %s event(s)", $count));
 
         foreach ($messages as $item) {
@@ -106,7 +106,7 @@ final class RabbitMqEventConsumerCommand extends AbstractBatchRabbitMqConsumer i
 
                 $this->writeln(sprintf(
                     "[%s] Channel: %s | Event: %s | Data: %s",
-                    date('H:i:s'),
+                    now()->format('H:i:s'),
                     $channel,
                     $event,
                     json_encode($data, JSON_UNESCAPED_UNICODE)

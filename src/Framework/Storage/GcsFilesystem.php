@@ -283,7 +283,7 @@ final class GcsFilesystem implements CloudFilesystemInterface
     public function temporaryUrl(string $path, int $expiration): string
     {
         $path = $this->prefixPath($path);
-        $expires = time() + $expiration;
+        $expires = now()->getTimestamp() + $expiration;
 
         $stringToSign = implode("\n", [
             'GET',
@@ -469,7 +469,7 @@ final class GcsFilesystem implements CloudFilesystemInterface
      */
     private function getAccessToken(): string
     {
-        if ($this->accessToken && time() < $this->tokenExpires - 60) {
+        if ($this->accessToken && now()->getTimestamp() < $this->tokenExpires - 60) {
             return $this->accessToken;
         }
 
@@ -491,7 +491,7 @@ final class GcsFilesystem implements CloudFilesystemInterface
         $data = json_decode($response, true);
 
         $this->accessToken = $data['access_token'] ?? '';
-        $this->tokenExpires = time() + ($data['expires_in'] ?? 3600);
+        $this->tokenExpires = now()->getTimestamp() + ($data['expires_in'] ?? 3600);
 
         return $this->accessToken;
     }
@@ -508,7 +508,7 @@ final class GcsFilesystem implements CloudFilesystemInterface
             'typ' => 'JWT',
         ]));
 
-        $now = time();
+        $now = now()->getTimestamp();
         $payload = base64_encode(json_encode([
             'iss' => $this->credentials['client_email'] ?? '',
             'scope' => 'https://www.googleapis.com/auth/devstorage.full_control',

@@ -32,7 +32,7 @@ final class Message implements MessageInterface
         ?int $timestamp = null
     ) {
         $this->id = $id ?? uniqid('msg_', true);
-        $this->timestamp = $timestamp ?? time();
+        $this->timestamp = $timestamp ?? now()->getTimestamp();
     }
 
     /**

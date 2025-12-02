@@ -422,7 +422,7 @@ abstract class Relation implements RelationInterface
         $data = [
             'column' => $column,
             'value' => $value,
-            'ts' => time(),
+            'ts' => now()->getTimestamp(),
         ];
 
         return base64_encode(json_encode($data, JSON_UNESCAPED_UNICODE));

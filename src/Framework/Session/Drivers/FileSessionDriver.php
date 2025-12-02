@@ -193,7 +193,7 @@ final class FileSessionDriver implements SessionStoreInterface
         $file = $this->getFilePath($this->id);
         $data = serialize([
             'data' => $this->data,
-            'expires_at' => time() + $this->lifetime,
+            'expires_at' => now()->getTimestamp() + $this->lifetime,
         ]);
 
         return file_put_contents($file, $data, LOCK_EX) !== false;
@@ -229,7 +229,7 @@ final class FileSessionDriver implements SessionStoreInterface
         }
 
         // Check expiration
-        if ($data['expires_at'] < time()) {
+        if ($data['expires_at'] < now()->getTimestamp()) {
             unlink($file);
             return [];
         }

@@ -80,7 +80,7 @@ final class JobMetrics
             'success' => $success,
             'duration' => $duration,
             'memory' => $memory,
-            'timestamp' => time(),
+            'timestamp' => now()->getTimestamp(),
         ];
 
         if (count($metrics['samples']) > self::MAX_SAMPLES) {

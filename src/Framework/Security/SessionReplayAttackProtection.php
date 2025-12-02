@@ -49,7 +49,7 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
      */
     public function generateNonce(int $ttl = self::DEFAULT_TTL): string
     {
-        $timestamp = time() + $ttl;
+        $timestamp = now()->getTimestamp() + $ttl;
         $token = $this->generateRandomToken();
         $nonce = $timestamp . self::NONCE_SEPARATOR . $token;
 
@@ -81,7 +81,7 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
         [$timestamp, $token] = $this->parseNonce($nonce);
 
         // Check expiration
-        if ($timestamp < time()) {
+        if ($timestamp < now()->getTimestamp()) {
             return false; // Expired
         }
 
@@ -115,7 +115,7 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
         [$timestamp, $token] = $this->parseNonce($nonce);
 
         // Check expiration
-        if ($timestamp < time()) {
+        if ($timestamp < now()->getTimestamp()) {
             return false; // Expired
         }
 
@@ -137,7 +137,7 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
     public function cleanupExpired(): int
     {
         $cleaned = 0;
-        $currentTime = time();
+        $currentTime = now()->getTimestamp();
         $sessionKey = $this->getSessionKey('*');
 
         // Get all nonce keys
@@ -220,7 +220,7 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
     {
         $sessionKey = $this->getSessionKey($token);
         $_SESSION[$sessionKey] = [
-            'used_at' => time(),
+            'used_at' => now()->getTimestamp(),
             'expires_at' => $expiresAt,
         ];
     }

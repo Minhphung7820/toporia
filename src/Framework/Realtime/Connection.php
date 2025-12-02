@@ -36,8 +36,8 @@ final class Connection implements ConnectionInterface
     ) {
         $this->id = uniqid('conn_', true);
         $this->metadata = $metadata;
-        $this->connectedAt = time();
-        $this->lastActivityAt = time();
+        $this->connectedAt = now()->getTimestamp();
+        $this->lastActivityAt = now()->getTimestamp();
     }
 
     /**
@@ -149,7 +149,7 @@ final class Connection implements ConnectionInterface
      */
     public function updateLastActivity(): void
     {
-        $this->lastActivityAt = time();
+        $this->lastActivityAt = now()->getTimestamp();
     }
 
     /**

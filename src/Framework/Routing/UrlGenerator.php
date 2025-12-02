@@ -143,7 +143,7 @@ final class UrlGenerator implements UrlGeneratorInterface
 
         // Add expiration if provided
         if ($expiration !== null) {
-            $parameters['expires'] = time() + $expiration;
+            $parameters['expires'] = now()->getTimestamp() + $expiration;
         }
 
         // Generate signature
@@ -180,7 +180,7 @@ final class UrlGenerator implements UrlGeneratorInterface
         unset($query['signature']);
 
         // Check expiration
-        if (isset($query['expires']) && time() > (int)$query['expires']) {
+        if (isset($query['expires']) && now()->getTimestamp() > (int)$query['expires']) {
             return false;
         }
 

@@ -212,7 +212,7 @@ abstract class AbstractRedisConsumer extends Command
      */
     protected function logRedisEvent(string $label, string $message, string $style = 'info'): void
     {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = now()->toDateTimeString();
         $label = strtoupper($label);
 
         $styleMap = [

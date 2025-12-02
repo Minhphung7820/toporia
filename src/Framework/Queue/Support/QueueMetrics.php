@@ -53,7 +53,7 @@ final class QueueMetrics
             'total_duration' => 0.0,
             'min_duration' => PHP_FLOAT_MAX,
             'max_duration' => 0.0,
-            'last_updated' => time(),
+            'last_updated' => now()->getTimestamp(),
         ]);
 
         switch ($operation) {
@@ -71,7 +71,7 @@ final class QueueMetrics
                 break;
         }
 
-        $metrics['last_updated'] = time();
+        $metrics['last_updated'] = now()->getTimestamp();
         $this->cache->set($key, $metrics, self::METRICS_TTL);
     }
 
@@ -98,7 +98,7 @@ final class QueueMetrics
         $processes = $metrics['processes'];
         if ($processes > 0) {
             $metrics['avg_duration'] = $metrics['total_duration'] / $processes;
-            $metrics['throughput'] = $processes / max(1, (time() - $metrics['last_updated']) / 3600); // per hour
+            $metrics['throughput'] = $processes / max(1, (now()->getTimestamp() - $metrics['last_updated']) / 3600); // per hour
         } else {
             $metrics['avg_duration'] = 0.0;
             $metrics['throughput'] = 0.0;

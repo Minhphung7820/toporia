@@ -135,7 +135,7 @@ abstract class AbstractBatchRabbitMqConsumer extends AbstractRabbitMqConsumer im
                     'message' => $message,
                     'metadata' => [
                         'channel' => $channel,
-                        'timestamp' => time(),
+                        'timestamp' => now()->getTimestamp(),
                     ],
                 ];
 
@@ -200,7 +200,7 @@ abstract class AbstractBatchRabbitMqConsumer extends AbstractRabbitMqConsumer im
                     'message' => $message,
                     'metadata' => [
                         'channel' => $channel,
-                        'timestamp' => time(),
+                        'timestamp' => now()->getTimestamp(),
                     ],
                 ];
 

@@ -83,7 +83,7 @@ final class UserCreatedNotification extends Notification
             ->line('**User Details:**')
             ->line('Name: ' . $this->userName)
             ->line('Email: ' . $this->userEmail)
-            ->line('Created at: ' . date('Y-m-d H:i:s'))
+            ->line('Created at: ' . now()->toDateTimeString())
             ->action('View All Users', $this->url('/admin/users'))
             ->salutation('Toporia Framework System');
     }

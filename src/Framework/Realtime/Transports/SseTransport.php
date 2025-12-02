@@ -200,18 +200,18 @@ final class SseTransport implements TransportInterface
         // Send initial connection message
         $this->send($connection, Message::event(null, 'connected', [
             'id' => $connection->getId(),
-            'timestamp' => time()
+            'timestamp' => now()->getTimestamp()
         ]));
 
         // Keep-alive loop
-        $lastKeepAlive = time();
+        $lastKeepAlive = now()->getTimestamp();
 
         while (!connection_aborted() && is_resource($resource)) {
             // Send keep-alive comment every 15 seconds
-            if (time() - $lastKeepAlive >= 15) {
+            if (now()->getTimestamp() - $lastKeepAlive >= 15) {
                 fwrite($resource, ": keep-alive\n\n");
                 fflush($resource);
-                $lastKeepAlive = time();
+                $lastKeepAlive = now()->getTimestamp();
             }
 
             // Sleep to avoid busy-wait

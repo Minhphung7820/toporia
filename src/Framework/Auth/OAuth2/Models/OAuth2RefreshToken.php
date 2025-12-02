@@ -60,8 +60,8 @@ final class OAuth2RefreshToken extends Model
         }
 
         return is_string($expiresAt)
-            ? strtotime($expiresAt) < time()
-            : $expiresAt->getTimestamp() < time();
+            ? strtotime($expiresAt) < now()->getTimestamp()
+            : $expiresAt->getTimestamp() < now()->getTimestamp();
     }
 
     /**

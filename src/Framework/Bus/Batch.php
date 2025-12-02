@@ -31,7 +31,7 @@ final class Batch
         private ?int $finishedAt = null,
         private ?int $cancelledAt = null
     ) {
-        $this->createdAt = $createdAt ?? time();
+        $this->createdAt = $createdAt ?? now()->getTimestamp();
     }
 
     /**
@@ -128,7 +128,7 @@ final class Batch
 
         // Auto-finish when all jobs processed
         if ($this->processedJobs >= $this->totalJobs) {
-            $this->finishedAt = time();
+            $this->finishedAt = now()->getTimestamp();
         }
 
         // Persist to repository
@@ -142,7 +142,7 @@ final class Batch
      */
     public function cancel(): void
     {
-        $this->cancelledAt = time();
+        $this->cancelledAt = now()->getTimestamp();
 
         if ($this->repository) {
             $this->repository->update($this);

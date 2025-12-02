@@ -37,7 +37,7 @@ final class Cookie
         return new self(
             name: $name,
             value: $value,
-            expires: time() + ($minutes * 60),
+            expires: now()->getTimestamp() + ($minutes * 60),
             path: $options['path'] ?? '/',
             domain: $options['domain'] ?? '',
             secure: $options['secure'] ?? false,
@@ -71,7 +71,7 @@ final class Cookie
         return new self(
             name: $name,
             value: '',
-            expires: time() - 3600,
+            expires: now()->getTimestamp() - 3600,
             path: $options['path'] ?? '/',
             domain: $options['domain'] ?? '',
             secure: $options['secure'] ?? false,

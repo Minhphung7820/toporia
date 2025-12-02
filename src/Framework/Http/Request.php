@@ -2033,7 +2033,7 @@ final class Request implements RequestInterface
         static $cache = [];
         static $expiry = [];
 
-        $now = time();
+        $now = now()->getTimestamp();
 
         // Check if cached and not expired
         if (isset($cache[$key])) {

@@ -62,7 +62,7 @@ class DateRangeCriteria implements CriteriaInterface
      */
     public static function today(string $column = 'created_at'): self
     {
-        $today = date('Y-m-d');
+        $today = now()->format('Y-m-d');
         return new self($column, $today . ' 00:00:00', $today . ' 23:59:59');
     }
 
@@ -71,7 +71,7 @@ class DateRangeCriteria implements CriteriaInterface
      */
     public static function yesterday(string $column = 'created_at'): self
     {
-        $yesterday = date('Y-m-d', strtotime('-1 day'));
+        $yesterday = now()->subDay()->format('Y-m-d');
         return new self($column, $yesterday . ' 00:00:00', $yesterday . ' 23:59:59');
     }
 
@@ -80,8 +80,8 @@ class DateRangeCriteria implements CriteriaInterface
      */
     public static function thisWeek(string $column = 'created_at'): self
     {
-        $start = date('Y-m-d', strtotime('monday this week'));
-        $end = date('Y-m-d', strtotime('sunday this week'));
+        $start = now()->startOfWeek()->format('Y-m-d');
+        $end = now()->endOfWeek()->format('Y-m-d');
         return new self($column, $start . ' 00:00:00', $end . ' 23:59:59');
     }
 
@@ -90,8 +90,8 @@ class DateRangeCriteria implements CriteriaInterface
      */
     public static function thisMonth(string $column = 'created_at'): self
     {
-        $start = date('Y-m-01');
-        $end = date('Y-m-t');
+        $start = now()->startOfMonth()->format('Y-m-d');
+        $end = now()->endOfMonth()->format('Y-m-d');
         return new self($column, $start . ' 00:00:00', $end . ' 23:59:59');
     }
 
@@ -100,7 +100,7 @@ class DateRangeCriteria implements CriteriaInterface
      */
     public static function thisYear(string $column = 'created_at'): self
     {
-        $year = date('Y');
+        $year = now()->format('Y');
         return new self($column, "{$year}-01-01 00:00:00", "{$year}-12-31 23:59:59");
     }
 
@@ -109,8 +109,8 @@ class DateRangeCriteria implements CriteriaInterface
      */
     public static function lastDays(int $days, string $column = 'created_at'): self
     {
-        $start = date('Y-m-d', strtotime("-{$days} days"));
-        $end = date('Y-m-d');
+        $start = now()->subDays($days)->format('Y-m-d');
+        $end = now()->format('Y-m-d');
         return new self($column, $start . ' 00:00:00', $end . ' 23:59:59');
     }
 

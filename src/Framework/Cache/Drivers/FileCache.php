@@ -195,7 +195,7 @@ final class FileCache implements CacheInterface
             $data = @unserialize(file_get_contents($file));
             if ($data !== false) {
                 // If no expiration or not expired, key exists
-                if ($data['expires_at'] === null || $data['expires_at'] >= time()) {
+                if ($data['expires_at'] === null || $data['expires_at'] >= now()->getTimestamp()) {
                     return false; // Key already exists
                 }
                 // Key expired, delete it

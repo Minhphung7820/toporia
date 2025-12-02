@@ -108,7 +108,7 @@ abstract class AbstractJsonKafkaConsumer extends AbstractKafkaConsumer implement
             // Extract metadata (if available from Kafka message)
             $metadata = [
                 'topic' => $this->getTopic(),
-                'timestamp' => time(),
+                'timestamp' => now()->getTimestamp(),
             ];
 
             // Call handler

@@ -158,7 +158,7 @@ class EmailVerificationBroker implements EmailVerificationBrokerInterface
         // Check throttle
         $email = $user->getEmailForVerification();
         if (isset($this->lastSent[$email])) {
-            $elapsed = time() - $this->lastSent[$email];
+            $elapsed = now()->getTimestamp() - $this->lastSent[$email];
             if ($elapsed < $this->throttle) {
                 return self::THROTTLED;
             }
@@ -168,7 +168,7 @@ class EmailVerificationBroker implements EmailVerificationBrokerInterface
 
         $this->sendEmail($user, $url);
 
-        $this->lastSent[$email] = time();
+        $this->lastSent[$email] = now()->getTimestamp();
 
         return self::LINK_SENT;
     }
@@ -217,7 +217,7 @@ class EmailVerificationBroker implements EmailVerificationBrokerInterface
         $timestamp = (int) $timestamp;
         $expirationSeconds = $this->expiration * 60;
 
-        if (time() - $timestamp > $expirationSeconds) {
+        if (now()->getTimestamp() - $timestamp > $expirationSeconds) {
             return false;
         }
 
@@ -235,7 +235,7 @@ class EmailVerificationBroker implements EmailVerificationBrokerInterface
      */
     public function createVerificationUrl(VerifiableInterface $user): string
     {
-        $timestamp = time();
+        $timestamp = now()->getTimestamp();
         $signature = $this->createSignature($user, $timestamp);
         $hash = base64_encode($timestamp . ':' . $signature);
 

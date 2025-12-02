@@ -138,7 +138,7 @@
         <div class="email-footer">
             <p>This is an automated message, please do not reply to this email.</p>
             <p>
-                &copy; <?= date('Y') ?> <?= htmlspecialchars($appName ?? 'Toporia Framework') ?>. All rights reserved.
+                &copy; <?= now()->format('Y') ?> <?= htmlspecialchars($appName ?? 'Toporia Framework') ?>. All rights reserved.
             </p>
             <p>
                 <a href="<?= htmlspecialchars($appUrl ?? '#') ?>">Visit our website</a>

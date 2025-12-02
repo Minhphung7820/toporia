@@ -74,7 +74,7 @@ final class CacheRateLimiter implements RateLimiterInterface
             return false; // No limit if maxAttempts <= 0
         }
 
-        $currentTime = time();
+        $currentTime = now()->getTimestamp();
 
         // Get resetTime from cache or request cache
         $resetTime = $this->getResetTime($key);
@@ -187,7 +187,7 @@ final class CacheRateLimiter implements RateLimiterInterface
             return $this->requestCache[$key]['attempts'];
         }
 
-        $currentTime = time();
+        $currentTime = now()->getTimestamp();
         $resetTime = $this->getResetTime($key);
 
         // If resetTime doesn't exist, rate limit window has expired
@@ -255,7 +255,7 @@ final class CacheRateLimiter implements RateLimiterInterface
             return $this->requestCache[$key]['availableIn'];
         }
 
-        $currentTime = time();
+        $currentTime = now()->getTimestamp();
         $resetTime = $this->getResetTime($key);
 
         // If resetTime exists, check if it's still valid
@@ -317,7 +317,7 @@ final class CacheRateLimiter implements RateLimiterInterface
     {
         $attemptsKey = $this->attemptsKey($key);
         $resetTimeKey = $this->resetTimeKey($key);
-        $currentTime = time();
+        $currentTime = now()->getTimestamp();
 
         // Use getResetTime() to leverage request cache
         $resetTime = $this->getResetTime($key);

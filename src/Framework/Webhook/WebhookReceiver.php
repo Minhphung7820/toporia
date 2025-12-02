@@ -82,7 +82,7 @@ final class WebhookReceiver implements WebhookReceiverInterface
             'event' => $event,
             'payload' => $payload,
             'headers' => $request->headers(),
-            'timestamp' => time(),
+            'timestamp' => now()->getTimestamp(),
         ];
 
         // Call handler if provided

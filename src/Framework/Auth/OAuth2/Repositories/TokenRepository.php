@@ -173,11 +173,11 @@ final class TokenRepository implements TokenRepositoryInterface
     {
         $revoked = OAuth2AccessToken::where('user_id', $userId)
             ->whereNull('revoked_at')
-            ->update(['revoked_at' => date('Y-m-d H:i:s')]);
+            ->update(['revoked_at' => now()->toDateTimeString()]);
 
         OAuth2RefreshToken::where('user_id', $userId)
             ->whereNull('revoked_at')
-            ->update(['revoked_at' => date('Y-m-d H:i:s')]);
+            ->update(['revoked_at' => now()->toDateTimeString()]);
 
         return $revoked;
     }
@@ -189,11 +189,11 @@ final class TokenRepository implements TokenRepositoryInterface
     {
         $revoked = OAuth2AccessToken::where('client_id', $clientId)
             ->whereNull('revoked_at')
-            ->update(['revoked_at' => date('Y-m-d H:i:s')]);
+            ->update(['revoked_at' => now()->toDateTimeString()]);
 
         OAuth2RefreshToken::where('client_id', $clientId)
             ->whereNull('revoked_at')
-            ->update(['revoked_at' => date('Y-m-d H:i:s')]);
+            ->update(['revoked_at' => now()->toDateTimeString()]);
 
         return $revoked;
     }
@@ -218,7 +218,7 @@ final class TokenRepository implements TokenRepositoryInterface
             'user_id' => $userId,
             'scopes' => $scopes,
             'exp' => $expiresAt,
-            'iat' => time(),
+            'iat' => now()->getTimestamp(),
         ]));
 
         $signature = hash_hmac('sha256', "{$header}.{$payload}", $secret, true);
@@ -258,7 +258,7 @@ final class TokenRepository implements TokenRepositoryInterface
         }
 
         // Check expiration
-        if (isset($payload['exp']) && $payload['exp'] < time()) {
+        if (isset($payload['exp']) && $payload['exp'] < now()->getTimestamp()) {
             return null;
         }
 

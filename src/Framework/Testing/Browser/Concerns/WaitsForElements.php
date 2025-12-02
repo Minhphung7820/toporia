@@ -28,9 +28,9 @@ trait WaitsForElements
     public function waitFor(string $selector, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             if ($this->elementExists($selector)) {
                 return $this;
             }
@@ -53,9 +53,9 @@ trait WaitsForElements
     public function waitForVisible(string $selector, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             if ($this->isVisible($selector)) {
                 return $this;
             }
@@ -78,9 +78,9 @@ trait WaitsForElements
     public function waitUntilMissing(string $selector, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             if (!$this->isVisible($selector)) {
                 return $this;
             }
@@ -103,9 +103,9 @@ trait WaitsForElements
     public function waitForText(string $text, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             if (str_contains($this->getPageSource(), $text)) {
                 return $this;
             }
@@ -129,9 +129,9 @@ trait WaitsForElements
     public function waitForTextIn(string $selector, string $text, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             try {
                 if (str_contains($this->text($selector), $text)) {
                     return $this;
@@ -158,9 +158,9 @@ trait WaitsForElements
     public function waitForUrl(string $url, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             if ($this->getCurrentUrl() === $url) {
                 return $this;
             }
@@ -183,9 +183,9 @@ trait WaitsForElements
     public function waitForPath(string $path, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             if ($this->getCurrentPath() === $path) {
                 return $this;
             }
@@ -208,9 +208,9 @@ trait WaitsForElements
     public function waitForCondition(string $script, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             $result = $this->script("return {$script}");
 
             if ($result === true) {
@@ -263,9 +263,9 @@ trait WaitsForElements
     public function waitForEnabled(string $selector, ?int $seconds = null): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             if ($this->isEnabled($selector)) {
                 return $this;
             }
@@ -288,9 +288,9 @@ trait WaitsForElements
     public function waitUsing(?int $seconds, callable $callback): static
     {
         $seconds = $seconds ?? $this->defaultWaitTimeout;
-        $end = time() + $seconds;
+        $end = now()->getTimestamp() + $seconds;
 
-        while (time() < $end) {
+        while (now()->getTimestamp() < $end) {
             if ($callback($this) === true) {
                 return $this;
             }

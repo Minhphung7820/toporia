@@ -261,7 +261,7 @@ final class OrderTrackingConsumerCommand extends AbstractBatchKafkaConsumer impl
                                     'dlq.message',
                                     [
                                         'original_payload' => $payload,
-                                        'error_timestamp' => date('Y-m-d H:i:s'),
+                                        'error_timestamp' => now()->toDateTimeString(),
                                         'retry_count' => $metadata['retry_count'] ?? 0,
                                     ]
                                 );
@@ -537,7 +537,7 @@ final class OrderTrackingConsumerCommand extends AbstractBatchKafkaConsumer impl
 
         $this->line(sprintf(
             "[%s] Order #%s | event=%s | user=%s | total=%s",
-            date('H:i:s'),
+            now()->format('H:i:s'),
             $orderId,
             $event,
             $userId,

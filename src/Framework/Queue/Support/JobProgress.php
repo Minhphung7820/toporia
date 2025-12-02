@@ -50,7 +50,7 @@ final class JobProgress
         $data = [
             'progress' => $progress,
             'message' => $message,
-            'updated_at' => time(),
+            'updated_at' => now()->getTimestamp(),
         ];
 
         $this->cache->set(
