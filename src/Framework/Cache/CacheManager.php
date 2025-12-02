@@ -266,6 +266,14 @@ final class CacheManager implements CacheManagerInterface
         return $this->getDefaultDriverInstance()->pull($key, $default);
     }
 
+    /**
+     * {@inheritdoc}
+     */
+    public function add(string $key, mixed $value, ?int $ttl = null): bool
+    {
+        return $this->getDefaultDriverInstance()->add($key, $value, $ttl);
+    }
+
     // =========================================================================
     // Manager-Specific Methods
     // =========================================================================
