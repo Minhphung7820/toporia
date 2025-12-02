@@ -288,7 +288,27 @@ class QueryBuilder implements QueryBuilderInterface
      * @param mixed           $operator Operator or value
      * @param mixed           $value Value (optional)
      */
-    public function where(string|\Closure $column, mixed $operator = null, mixed $value = null): self
+    /**
+     * Add a WHERE clause.
+     *
+     * Accepts column names, Expression objects from DB::raw(), or closures for nested conditions.
+     *
+     * @param string|Expression|\Closure $column Column name, raw SQL expression, or closure
+     * @param mixed $operator Comparison operator or value
+     * @param mixed $value Value to compare (optional)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Simple where
+     * $query->where('status', 'active');
+     *
+     * // With raw SQL expression
+     * $query->where(DB::raw('DATE(created_at)'), '=', '2024-01-01');
+     * $query->where(DB::raw('YEAR(created_at)'), '>', 2023);
+     * ```
+     */
+    public function where(string|Expression|\Closure $column, mixed $operator = null, mixed $value = null): self
     {
         // Handle closure-based WHERE (nested conditions)
         if ($column instanceof \Closure) {
@@ -305,7 +325,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         $this->wheres[] = [
             'type' => 'basic',
-            'column' => $column,
+            'column' => $column instanceof Expression ? (string) $column : $column,
             'operator' => $operator,
             'value' => $value,
             'boolean' => 'AND'
@@ -324,6 +344,7 @@ class QueryBuilder implements QueryBuilderInterface
      * - orWhere('col', '=', 10)       // Basic OR comparison
      * - orWhere('col', 10)            // Operator defaults to '='
      * - orWhere(function($q) { ... }) // Nested OR closure
+     * - orWhere(DB::raw('...'), ...)  // Raw SQL expression
      *
      * Example:
      * ```php
@@ -333,13 +354,16 @@ class QueryBuilder implements QueryBuilderInterface
      *             ->where('verified', true);
      *       });
      * // WHERE status = 'active' OR (role = 'admin' AND verified = true)
+     *
+     * // With raw SQL expression
+     * $query->orWhere(DB::raw('DATE(created_at)'), '=', '2024-01-01');
      * ```
      *
-     * @param string|\Closure $column Column name or closure
+     * @param string|Expression|\Closure $column Column name, raw SQL expression, or closure
      * @param mixed           $operator Operator or value
      * @param mixed           $value Value (optional)
      */
-    public function orWhere(string|\Closure $column, mixed $operator = null, mixed $value = null): self
+    public function orWhere(string|Expression|\Closure $column, mixed $operator = null, mixed $value = null): self
     {
         // Handle closure-based OR WHERE
         if ($column instanceof \Closure) {
@@ -387,12 +411,12 @@ class QueryBuilder implements QueryBuilderInterface
      * - Array: O(n) where n = number of values
      * - Subquery: O(1) + subquery complexity
      *
-     * @param string $column Column name
+     * @param string|Expression $column Column name or raw SQL expression
      * @param array|\Closure $values Array of values OR Closure for subquery
      * @param string $boolean Boolean operator (AND/OR)
      * @param bool $not Whether to negate (NOT IN)
      */
-    public function whereIn(string $column, array|\Closure $values, string $boolean = 'AND', bool $not = false): self
+    public function whereIn(string|Expression $column, array|\Closure $values, string $boolean = 'AND', bool $not = false): self
     {
         $type = $not ? 'notIn' : 'in';
 
@@ -410,7 +434,7 @@ class QueryBuilder implements QueryBuilderInterface
 
             $this->wheres[] = [
                 'type' => $type . 'Sub',
-                'column' => $column,
+                'column' => $column instanceof Expression ? (string) $column : $column,
                 'query' => $subquerySql,
                 'boolean' => strtoupper($boolean)
             ];
@@ -435,7 +459,7 @@ class QueryBuilder implements QueryBuilderInterface
 
             $this->wheres[] = [
                 'type' => $type,
-                'column' => $column,
+                'column' => $column instanceof Expression ? (string) $column : $column,
                 'values' => $values,
                 'boolean' => strtoupper($boolean)
             ];
@@ -463,9 +487,15 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Add OR WHERE IN clause
      *
+     * Accepts Expression objects from DB::raw() for raw SQL expressions.
+     *
      * Performance: Same as whereIn()
+     *
+     * @param string|Expression $column Column name or raw SQL expression
+     * @param array|\Closure $values Array of values or Closure for subquery
+     * @return $this
      */
-    public function orWhereIn(string $column, array|\Closure $values): self
+    public function orWhereIn(string|Expression $column, array|\Closure $values): self
     {
         return $this->whereIn($column, $values, 'OR', false);
     }
@@ -473,21 +503,38 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Add OR WHERE NOT IN clause
      *
+     * Accepts Expression objects from DB::raw() for raw SQL expressions.
+     *
      * Performance: Same as whereIn()
+     *
+     * @param string|Expression $column Column name or raw SQL expression
+     * @param array|\Closure $values Array of values or Closure for subquery
+     * @return $this
      */
-    public function orWhereNotIn(string $column, array|\Closure $values): self
+    public function orWhereNotIn(string|Expression $column, array|\Closure $values): self
     {
         return $this->whereIn($column, $values, 'OR', true);
     }
 
     /**
      * Add a WHERE IS NULL clause.
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL expressions.
+     *
+     * @param string|Expression $column Column name or raw SQL expression
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $query->whereNull('deleted_at');
+     * $query->whereNull(DB::raw('DATE(created_at)'));
+     * ```
      */
-    public function whereNull(string $column): self
+    public function whereNull(string|Expression $column): self
     {
         $this->wheres[] = [
             'type' => 'Null',
-            'column' => $column,
+            'column' => $column instanceof Expression ? (string) $column : $column,
             'boolean' => 'AND'
         ];
 
@@ -562,11 +609,25 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Add a WHERE IS NOT NULL clause.
      */
-    public function whereNotNull(string $column): self
+    /**
+     * Add a WHERE IS NOT NULL clause.
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL expressions.
+     *
+     * @param string|Expression $column Column name or raw SQL expression
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $query->whereNotNull('deleted_at');
+     * $query->whereNotNull(DB::raw('DATE(created_at)'));
+     * ```
+     */
+    public function whereNotNull(string|Expression $column): self
     {
         $this->wheres[] = [
             'type' => 'NotNull',
-            'column' => $column,
+            'column' => $column instanceof Expression ? (string) $column : $column,
             'boolean' => 'AND'
         ];
 
@@ -578,10 +639,29 @@ class QueryBuilder implements QueryBuilderInterface
      *
      * @param string $direction 'ASC' or 'DESC' (case-insensitive)
      */
-    public function orderBy(string $column, string $direction = 'ASC'): self
+    /**
+     * Add an ORDER BY clause.
+     *
+     * Accepts column names or Expression objects from DB::raw().
+     *
+     * @param string|Expression $column Column name or raw SQL expression
+     * @param string $direction Sort direction (ASC or DESC)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Simple column
+     * $query->orderBy('created_at', 'DESC');
+     *
+     * // Raw SQL expression
+     * $query->orderBy(DB::raw('RAND()'));
+     * $query->orderBy(DB::raw('FIELD(status, "active", "pending", "inactive")'));
+     * ```
+     */
+    public function orderBy(string|Expression $column, string $direction = 'ASC'): self
     {
         $this->orders[] = [
-            'column' => $column,
+            'column' => $column instanceof Expression ? (string) $column : $column,
             'direction' => strtoupper($direction)
         ];
         $this->invalidateCache();
@@ -634,11 +714,39 @@ class QueryBuilder implements QueryBuilderInterface
      * @param string|null $second Second column
      * @param string $type JOIN type (INNER, LEFT, RIGHT, CROSS)
      */
+    /**
+     * Add a JOIN clause.
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL in join conditions.
+     *
+     * @param string $table Table to join
+     * @param \Closure|string|Expression $first Closure for complex conditions, first column, or raw SQL expression
+     * @param string|null $operator Comparison operator
+     * @param string|Expression|null $second Second column or raw SQL expression
+     * @param string $type JOIN type (INNER, LEFT, RIGHT, etc.)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Simple join
+     * $query->join('orders', 'users.id', '=', 'orders.user_id');
+     *
+     * // With raw SQL expressions
+     * $query->join('orders', DB::raw('users.id'), '=', DB::raw('orders.user_id'));
+     * $query->join('orders', DB::raw('DATE(users.created_at)'), '=', DB::raw('DATE(orders.created_at)'));
+     *
+     * // Complex join with closure
+     * $query->join('orders', function($join) {
+     *     $join->on('users.id', '=', 'orders.user_id')
+     *          ->on(DB::raw('YEAR(users.created_at)'), '=', DB::raw('YEAR(orders.created_at)'));
+     * });
+     * ```
+     */
     public function join(
         string $table,
-        \Closure|string $first,
+        \Closure|string|Expression $first,
         ?string $operator = null,
-        ?string $second = null,
+        string|Expression|null $second = null,
         string $type = 'INNER'
     ): self {
         // Complex JOIN with Closure
@@ -658,9 +766,9 @@ class QueryBuilder implements QueryBuilderInterface
             $this->joins[] = [
                 'type' => strtoupper($type),
                 'table' => $table,
-                'first' => $first,
+                'first' => $first instanceof Expression ? (string) $first : $first,
                 'operator' => $operator ?? '=',
-                'second' => $second
+                'second' => $second instanceof Expression ? (string) $second : $second
             ];
         }
 
@@ -675,11 +783,22 @@ class QueryBuilder implements QueryBuilderInterface
      *
      * Performance: Same as join()
      */
+    /**
+     * Add a LEFT JOIN clause.
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL in join conditions.
+     *
+     * @param string $table Table to join
+     * @param \Closure|string|Expression $first Closure, first column, or raw SQL expression
+     * @param string|null $operator Comparison operator
+     * @param string|Expression|null $second Second column or raw SQL expression
+     * @return $this
+     */
     public function leftJoin(
         string $table,
-        \Closure|string $first,
+        \Closure|string|Expression $first,
         ?string $operator = null,
-        ?string $second = null
+        string|Expression|null $second = null
     ): self {
         return $this->join($table, $first, $operator, $second, 'LEFT');
     }
@@ -691,11 +810,22 @@ class QueryBuilder implements QueryBuilderInterface
      *
      * Performance: Same as join()
      */
+    /**
+     * Add a RIGHT JOIN clause.
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL in join conditions.
+     *
+     * @param string $table Table to join
+     * @param \Closure|string|Expression $first Closure, first column, or raw SQL expression
+     * @param string|null $operator Comparison operator
+     * @param string|Expression|null $second Second column or raw SQL expression
+     * @return $this
+     */
     public function rightJoin(
         string $table,
-        \Closure|string $first,
+        \Closure|string|Expression $first,
         ?string $operator = null,
-        ?string $second = null
+        string|Expression|null $second = null
     ): self {
         return $this->join($table, $first, $operator, $second, 'RIGHT');
     }
@@ -738,11 +868,22 @@ class QueryBuilder implements QueryBuilderInterface
      * @param string|null $second Second column
      * @return $this
      */
+    /**
+     * Add a FULL OUTER JOIN clause.
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL in join conditions.
+     *
+     * @param string $table Table to join
+     * @param \Closure|string|Expression $first Closure, first column, or raw SQL expression
+     * @param string|null $operator Comparison operator
+     * @param string|Expression|null $second Second column or raw SQL expression
+     * @return $this
+     */
     public function fullOuterJoin(
         string $table,
-        \Closure|string $first,
+        \Closure|string|Expression $first,
         ?string $operator = null,
-        ?string $second = null
+        string|Expression|null $second = null
     ): self {
         return $this->join($table, $first, $operator, $second, 'FULL OUTER');
     }
@@ -750,25 +891,35 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * FULL OUTER JOIN with subquery.
      *
+     * Accepts Expression objects from DB::raw() for raw SQL in join conditions.
+     *
      * @param QueryBuilder|string $query Subquery QueryBuilder or raw SQL
      * @param string $as Alias for the derived table
-     * @param \Closure|string $first Closure for complex conditions OR first column
+     * @param \Closure|string|Expression $first Closure, first column, or raw SQL expression
      * @param string|null $operator Comparison operator
-     * @param string|null $second Second column
+     * @param string|Expression|null $second Second column or raw SQL expression
      * @return $this
+     *
+     * @example
+     * ```php
+     * $query->fullOuterJoinSub($subQuery, 'stats', 'users.id', '=', 'stats.user_id');
+     * $query->fullOuterJoinSub($subQuery, 'stats', DB::raw('users.id'), '=', DB::raw('stats.user_id'));
+     * ```
      */
     public function fullOuterJoinSub(
         QueryBuilder|string $query,
         string $as,
-        \Closure|string $first,
+        \Closure|string|Expression $first,
         ?string $operator = null,
-        ?string $second = null
+        string|Expression|null $second = null
     ): self {
         return $this->joinSub($query, $as, $first, $operator, $second, 'FULL OUTER');
     }
 
     /**
      * Join with a subquery (derived table)
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL in join conditions.
      *
      * Usage:
      * ```php
@@ -788,6 +939,16 @@ class QueryBuilder implements QueryBuilderInterface
      * });
      * ```
      *
+     * With raw SQL expressions:
+     * ```php
+     * $query->joinSub($subQuery, 'order_stats',
+     *     DB::raw('users.id'), '=', DB::raw('order_stats.user_id'));
+     *
+     * $query->joinSub($subQuery, 'order_stats', function($join) {
+     *     $join->on(DB::raw('DATE(users.created_at)'), '=', DB::raw('DATE(order_stats.created_at)'));
+     * });
+     * ```
+     *
      * Architecture:
      * - SOLID: Single Responsibility (handles subquery joins only)
      * - Clean Architecture: Separates subquery logic from simple joins
@@ -799,17 +960,18 @@ class QueryBuilder implements QueryBuilderInterface
      *
      * @param QueryBuilder|string $query Subquery QueryBuilder or raw SQL
      * @param string $as Alias for the derived table
-     * @param \Closure|string $first Closure for complex conditions OR first column
+     * @param \Closure|string|Expression $first Closure for complex conditions, first column, or raw SQL expression
      * @param string|null $operator Comparison operator
-     * @param string|null $second Second column
-     * @param string $type JOIN type (INNER, LEFT, RIGHT)
+     * @param string|Expression|null $second Second column or raw SQL expression
+     * @param string $type JOIN type (INNER, LEFT, RIGHT, FULL OUTER)
+     * @return $this
      */
     public function joinSub(
         QueryBuilder|string $query,
         string $as,
-        \Closure|string $first,
+        \Closure|string|Expression $first,
         ?string $operator = null,
-        ?string $second = null,
+        string|Expression|null $second = null,
         string $type = 'INNER'
     ): self {
         // Convert QueryBuilder to SQL
@@ -836,9 +998,9 @@ class QueryBuilder implements QueryBuilderInterface
             $this->joins[] = [
                 'type' => strtoupper($type),
                 'table' => "($subquerySql) AS $as",
-                'first' => $first,
+                'first' => $first instanceof Expression ? (string) $first : $first,
                 'operator' => $operator ?? '=',
-                'second' => $second,
+                'second' => $second instanceof Expression ? (string) $second : $second,
                 'isSubquery' => true
             ];
         }
@@ -848,31 +1010,61 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
-     * LEFT JOIN with subquery
+     * LEFT JOIN with subquery.
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL in join conditions.
      *
      * Performance: Same as joinSub()
+     *
+     * @param QueryBuilder|string $query Subquery QueryBuilder or raw SQL
+     * @param string $as Alias for the derived table
+     * @param \Closure|string|Expression $first Closure, first column, or raw SQL expression
+     * @param string|null $operator Comparison operator
+     * @param string|Expression|null $second Second column or raw SQL expression
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $query->leftJoinSub($subQuery, 'stats', 'users.id', '=', 'stats.user_id');
+     * $query->leftJoinSub($subQuery, 'stats', DB::raw('users.id'), '=', DB::raw('stats.user_id'));
+     * ```
      */
     public function leftJoinSub(
         QueryBuilder|string $query,
         string $as,
-        \Closure|string $first,
+        \Closure|string|Expression $first,
         ?string $operator = null,
-        ?string $second = null
+        string|Expression|null $second = null
     ): self {
         return $this->joinSub($query, $as, $first, $operator, $second, 'LEFT');
     }
 
     /**
-     * RIGHT JOIN with subquery
+     * RIGHT JOIN with subquery.
+     *
+     * Accepts Expression objects from DB::raw() for raw SQL in join conditions.
      *
      * Performance: Same as joinSub()
+     *
+     * @param QueryBuilder|string $query Subquery QueryBuilder or raw SQL
+     * @param string $as Alias for the derived table
+     * @param \Closure|string|Expression $first Closure, first column, or raw SQL expression
+     * @param string|null $operator Comparison operator
+     * @param string|Expression|null $second Second column or raw SQL expression
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $query->rightJoinSub($subQuery, 'stats', 'users.id', '=', 'stats.user_id');
+     * $query->rightJoinSub($subQuery, 'stats', DB::raw('users.id'), '=', DB::raw('stats.user_id'));
+     * ```
      */
     public function rightJoinSub(
         QueryBuilder|string $query,
         string $as,
-        \Closure|string $first,
+        \Closure|string|Expression $first,
         ?string $operator = null,
-        ?string $second = null
+        string|Expression|null $second = null
     ): self {
         return $this->joinSub($query, $as, $first, $operator, $second, 'RIGHT');
     }
@@ -903,16 +1095,34 @@ class QueryBuilder implements QueryBuilderInterface
      * $query->groupBy('category', 'status');
      * $query->groupBy(['category', 'status']);
      */
-    public function groupBy(string|array ...$columns): self
+    /**
+     * Add GROUP BY clause.
+     *
+     * Accepts column names, arrays, or Expression objects from DB::raw().
+     *
+     * @param string|array|Expression ...$columns Column names, arrays, or raw SQL expressions
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Simple columns
+     * $query->groupBy('category', 'status');
+     *
+     * // With raw SQL expression
+     * $query->groupBy(DB::raw('DATE(created_at)'));
+     * $query->groupBy('category', DB::raw('YEAR(created_at)'));
+     * ```
+     */
+    public function groupBy(string|array|Expression ...$columns): self
     {
         // Flatten arguments: groupBy('a', 'b') or groupBy(['a', 'b'])
         foreach ($columns as $column) {
             if (is_array($column)) {
                 foreach ($column as $col) {
-                    $this->groups[] = $col;
+                    $this->groups[] = $col instanceof Expression ? (string) $col : $col;
                 }
             } else {
-                $this->groups[] = $column;
+                $this->groups[] = $column instanceof Expression ? (string) $column : $column;
             }
         }
 
@@ -926,18 +1136,25 @@ class QueryBuilder implements QueryBuilderInterface
      * Example: having('COUNT(*)', '>', 5)
      *
      * HAVING is used with GROUP BY to filter aggregated results.
+     * Accepts Expression objects from DB::raw() for raw SQL expressions.
      *
-     * @param string $column Column or aggregate expression
+     * @param string|Expression $column Column or aggregate expression
      * @param string $operator Comparison operator
      * @param mixed  $value Value to compare
      * @return $this
      *
      * @example
+     * ```php
+     * // Simple having
      * $query->select(['category', 'COUNT(*) as count'])
      *       ->groupBy('category')
      *       ->having('count', '>', 10);
+     *
+     * // With raw SQL expression
+     * $query->having(DB::raw('COUNT(*)'), '>', 5);
+     * ```
      */
-    public function having(string $column, string $operator, mixed $value): self
+    public function having(string|Expression $column, string $operator, mixed $value): self
     {
         $this->havings[] = [
             'column' => $column,
@@ -1245,10 +1462,30 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Update rows matching the WHERE clauses.
      *
+     * Supports Expression objects from DB::raw() in values (like Laravel).
+     *
      * Uses Grammar pattern for database-specific SQL compilation.
      *
-     * @param array<string,mixed> $data
-     * @return int Number of affected rows.
+     * @param array<string,mixed|Expression> $data Column => value pairs, values can be Expression objects
+     * @return int Number of affected rows
+     *
+     * @example
+     * ```php
+     * // Simple update
+     * DB::table('users')->where('id', 1)->update(['name' => 'John']);
+     *
+     * // With raw SQL expression (like Laravel)
+     * DB::table('users')->where('id', 1)->update([
+     *     'views' => DB::raw('views + 1'),
+     *     'updated_at' => DB::raw('NOW()')
+     * ]);
+     *
+     * // Mixed
+     * DB::table('users')->where('id', 1)->update([
+     *     'name' => 'John',
+     *     'views' => DB::raw('views + 1')
+     * ]);
+     * ```
      */
     public function update(array $data): int
     {
@@ -1256,8 +1493,16 @@ class QueryBuilder implements QueryBuilderInterface
         $grammar = $this->connection->getGrammar();
         $sql = $grammar->compileUpdate($this, $data);
 
-        // Merge SET values and WHERE bindings
-        $bindings = array_merge(array_values($data), $this->bindings);
+        // Filter out Expression values (they don't need bindings)
+        $bindings = [];
+        foreach ($data as $value) {
+            if (!$value instanceof Expression) {
+                $bindings[] = $value;
+            }
+        }
+
+        // Merge SET bindings and WHERE bindings
+        $bindings = array_merge($bindings, $this->bindings);
 
         // Connection::affectingStatement() will log the query automatically
         return $this->connection->affectingStatement($sql, $bindings);
@@ -1397,6 +1642,8 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Increment a column's value.
      *
+     * Accepts Expression objects from DB::raw() for column names and extra values.
+     *
      * Example:
      * ```php
      * // Increment views by 1
@@ -1409,23 +1656,37 @@ class QueryBuilder implements QueryBuilderInterface
      * DB::table('users')->where('id', 1)->increment('login_count', 1, [
      *     'last_login' => now()
      * ]);
+     *
+     * // With raw SQL expression for column
+     * DB::table('users')->where('id', 1)->increment(DB::raw('views'));
+     *
+     * // With raw SQL in extra values
+     * DB::table('users')->where('id', 1)->increment('views', 1, [
+     *     'updated_at' => DB::raw('NOW()')
+     * ]);
      * ```
      *
      * Performance: Single UPDATE query, atomic operation
      *
-     * @param string $column Column to increment
+     * @param string|Expression $column Column to increment (can be Expression)
      * @param int|float $amount Amount to increment by (default: 1)
-     * @param array<string,mixed> $extra Extra columns to update
+     * @param array<string,mixed|Expression> $extra Extra columns to update (values can be Expression)
      * @return int Number of affected rows
      */
-    public function increment(string $column, int|float $amount = 1, array $extra = []): int
+    public function increment(string|Expression $column, int|float $amount = 1, array $extra = []): int
     {
-        $sets = ["{$column} = {$column} + ?"];
+        $columnName = $column instanceof Expression ? (string) $column : $this->connection->getGrammar()->wrapColumn($column);
+        $sets = ["{$columnName} = {$columnName} + ?"];
         $bindings = [$amount];
 
         foreach ($extra as $col => $value) {
-            $sets[] = "{$col} = ?";
-            $bindings[] = $value;
+            $wrappedCol = $this->connection->getGrammar()->wrapColumn($col);
+            if ($value instanceof Expression) {
+                $sets[] = "{$wrappedCol} = " . (string) $value;
+            } else {
+                $sets[] = "{$wrappedCol} = ?";
+                $bindings[] = $value;
+            }
         }
 
         // Add WHERE bindings
@@ -1444,6 +1705,8 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Decrement a column's value.
      *
+     * Accepts Expression objects from DB::raw() for column names and extra values.
+     *
      * Example:
      * ```php
      * // Decrement stock by 1
@@ -1456,23 +1719,37 @@ class QueryBuilder implements QueryBuilderInterface
      * DB::table('products')->where('id', 1)->decrement('stock', 1, [
      *     'updated_at' => now()
      * ]);
+     *
+     * // With raw SQL expression for column
+     * DB::table('products')->where('id', 1)->decrement(DB::raw('stock'));
+     *
+     * // With raw SQL in extra values
+     * DB::table('products')->where('id', 1)->decrement('stock', 1, [
+     *     'updated_at' => DB::raw('NOW()')
+     * ]);
      * ```
      *
      * Performance: Single UPDATE query, atomic operation
      *
-     * @param string $column Column to decrement
+     * @param string|Expression $column Column to decrement (can be Expression)
      * @param int|float $amount Amount to decrement by (default: 1)
-     * @param array<string,mixed> $extra Extra columns to update
+     * @param array<string,mixed|Expression> $extra Extra columns to update (values can be Expression)
      * @return int Number of affected rows
      */
-    public function decrement(string $column, int|float $amount = 1, array $extra = []): int
+    public function decrement(string|Expression $column, int|float $amount = 1, array $extra = []): int
     {
-        $sets = ["{$column} = {$column} - ?"];
+        $columnName = $column instanceof Expression ? (string) $column : $this->connection->getGrammar()->wrapColumn($column);
+        $sets = ["{$columnName} = {$columnName} - ?"];
         $bindings = [$amount];
 
         foreach ($extra as $col => $value) {
-            $sets[] = "{$col} = ?";
-            $bindings[] = $value;
+            $wrappedCol = $this->connection->getGrammar()->wrapColumn($col);
+            if ($value instanceof Expression) {
+                $sets[] = "{$wrappedCol} = " . (string) $value;
+            } else {
+                $sets[] = "{$wrappedCol} = ?";
+                $bindings[] = $value;
+            }
         }
 
         // Add WHERE bindings

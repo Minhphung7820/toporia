@@ -231,9 +231,15 @@ class PostgreSQLGrammar extends Grammar
 
         $index = 1;
         $sets = [];
-        foreach (array_keys($values) as $column) {
+        foreach ($values as $column => $value) {
             $wrappedColumn = $this->wrapColumn($column);
-            $sets[] = "{$wrappedColumn} = \$" . $index++;
+
+            // Support Expression objects from DB::raw() (like Laravel)
+            if ($value instanceof \Toporia\Framework\Database\Query\Expression) {
+                $sets[] = "{$wrappedColumn} = " . (string) $value;
+            } else {
+                $sets[] = "{$wrappedColumn} = \$" . $index++;
+            }
         }
 
         $setClause = implode(', ', $sets);

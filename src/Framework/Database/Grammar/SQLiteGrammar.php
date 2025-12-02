@@ -188,9 +188,15 @@ class SQLiteGrammar extends Grammar
         $table = $this->wrapTable($query->getTable());
 
         $sets = [];
-        foreach (array_keys($values) as $column) {
+        foreach ($values as $column => $value) {
             $wrappedColumn = $this->wrapColumn($column);
-            $sets[] = "{$wrappedColumn} = ?";
+
+            // Support Expression objects from DB::raw() (like Laravel)
+            if ($value instanceof \Toporia\Framework\Database\Query\Expression) {
+                $sets[] = "{$wrappedColumn} = " . (string) $value;
+            } else {
+                $sets[] = "{$wrappedColumn} = ?";
+            }
         }
 
         $setClause = implode(', ', $sets);

@@ -184,14 +184,24 @@ class MySQLGrammar extends Grammar
         $table = $this->wrapTable($query->getTable());
 
         $sets = [];
-        foreach (array_keys($values) as $column) {
+        $bindings = [];
+        foreach ($values as $column => $value) {
             $wrappedColumn = $this->wrapColumn($column);
-            $sets[] = "{$wrappedColumn} = ?";
+
+            // Support Expression objects from DB::raw() (like Laravel)
+            if ($value instanceof \Toporia\Framework\Database\Query\Expression) {
+                $sets[] = "{$wrappedColumn} = " . (string) $value;
+            } else {
+                $sets[] = "{$wrappedColumn} = ?";
+                $bindings[] = $value;
+            }
         }
 
         $setClause = implode(', ', $sets);
         $whereClause = $this->compileWheres($query);
 
+        // Store bindings for later use (only non-Expression values)
+        // Note: This modifies the query's bindings, but that's handled in QueryBuilder::update()
         return "UPDATE {$table} SET {$setClause} {$whereClause}";
     }
 
