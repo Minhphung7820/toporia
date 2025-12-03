@@ -445,21 +445,10 @@ class MorphToMany extends Relation
                 // Only create and attach pivot object if we should include it
                 if ($this->shouldIncludePivot()) {
                     // Build pivot data from pivot_* attributes
-                    // Ensure morphType and foreignKey are always set (fallback to parent values if null)
-                    $morphTypeValue = $matchedResult->getAttribute("pivot_{$this->morphType}");
-                    $foreignKeyValue = $matchedResult->getAttribute("pivot_{$this->foreignKey}");
-
-                    // If values are null, use parent model values (shouldn't happen, but safety check)
-                    if ($morphTypeValue === null) {
-                        $morphTypeValue = $this->getMorphClass();
-                    }
-                    if ($foreignKeyValue === null) {
-                        $foreignKeyValue = $model->getAttribute($this->localKey);
-                    }
-
+                    // Use null coalescing operator for safety (fixes old records with null values)
                     $pivotData = [
-                        $this->morphType => $morphTypeValue,
-                        $this->foreignKey => $foreignKeyValue,
+                        $this->morphType => $matchedResult->getAttribute("pivot_{$this->morphType}") ?? $this->getMorphClass(),
+                        $this->foreignKey => $matchedResult->getAttribute("pivot_{$this->foreignKey}") ?? $model->getAttribute($this->localKey),
                         $this->relatedPivotKey => $relatedId,
                     ];
 
