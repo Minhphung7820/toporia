@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Events;
 
 use Toporia\Framework\Events\Contracts\{EventDispatcherInterface, EventInterface, ListenerInterface, SubscriberInterface, ShouldQueue};
+use Toporia\Framework\Events\Exceptions\{EventException, ListenerException, CircularDispatchException, QueueNotAvailableException};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
@@ -17,29 +18,41 @@ use Toporia\Framework\Queue\Contracts\QueueInterface;
  * - Class-based listeners
  * - Queued listeners
  * - Event subscribers
- * - Event discovery
- * - Performance optimizations (caching, lazy loading)
+ * - Circular dispatch detection
+ * - Performance optimizations (caching, lazy loading, bounded cache)
  *
  * Performance:
  * - O(1) listener registration
  * - O(N) dispatch where N = listeners (with caching)
- * - O(1) wildcard matching (pattern cache)
+ * - O(1) wildcard matching (pattern cache with LRU eviction)
  * - Lazy listener resolution
+ * - Sorted wildcard cache to avoid repeated sorting
  *
  * Clean Architecture:
  * - Single Responsibility: Only handles event dispatching
  * - Dependency Inversion: Uses interfaces
  * - Open/Closed: Extensible via listeners and subscribers
  *
- * SOLID Principles:
- * - S: Only handles event dispatching
- * - O: Extensible via listeners
- * - L: All listeners interchangeable
- * - I: Focused interfaces
- * - D: Depends on abstractions
+ * @package Toporia\Framework\Events
  */
 final class Dispatcher implements EventDispatcherInterface
 {
+    /**
+     * Maximum cache size for wildcard pattern matching.
+     */
+    private const MAX_WILDCARD_CACHE_SIZE = 1000;
+
+    /**
+     * Maximum dispatch depth to prevent infinite loops.
+     */
+    private const MAX_DISPATCH_DEPTH = 10;
+
+    /**
+     * Priority bounds for validation.
+     */
+    private const MIN_PRIORITY = -1000;
+    private const MAX_PRIORITY = 1000;
+
     /**
      * @var array<string, array<int, array<callable|string|ListenerInterface>>> Event listeners
      */
@@ -51,14 +64,29 @@ final class Dispatcher implements EventDispatcherInterface
     private ?array $sortedListeners = null;
 
     /**
-     * @var array<string, array<callable|string|ListenerInterface>> Wildcard listeners
+     * @var array<string, array<int, array<callable|string|ListenerInterface>>> Wildcard listeners
      */
     private array $wildcards = [];
 
     /**
-     * @var array<string, bool> Wildcard pattern cache
+     * @var array<string, array<callable|ListenerInterface>>|null Sorted wildcard listeners cache
+     */
+    private ?array $sortedWildcards = null;
+
+    /**
+     * @var array<string, bool> Wildcard pattern match cache
      */
     private array $wildcardCache = [];
+
+    /**
+     * @var array<string, bool> Cache for hasWildcardListeners results
+     */
+    private array $hasWildcardCache = [];
+
+    /**
+     * @var array<string> Current dispatch stack for circular detection
+     */
+    private array $dispatchStack = [];
 
     /**
      * @param ContainerInterface|null $container Container for resolving listeners
@@ -71,17 +99,28 @@ final class Dispatcher implements EventDispatcherInterface
 
     /**
      * {@inheritdoc}
+     *
+     * @throws EventException If event name is invalid
      */
     public function listen(string $eventName, callable|string|ListenerInterface $listener, int $priority = 0): void
     {
-        // Support wildcard listeners
+        // Validate event name
+        $this->validateEventName($eventName);
+
+        // Validate priority
+        $this->validatePriority($priority);
+
+        // Validate wildcard pattern if applicable
         if ($this->isWildcard($eventName)) {
+            $this->validateWildcardPattern($eventName);
             $this->wildcards[$eventName][$priority][] = $listener;
+            $this->sortedWildcards = null;
+            $this->hasWildcardCache = [];
         } else {
             $this->listeners[$eventName][$priority][] = $listener;
         }
 
-        // Invalidate cache
+        // Invalidate caches
         $this->sortedListeners = null;
         $this->wildcardCache = [];
     }
@@ -93,6 +132,7 @@ final class Dispatcher implements EventDispatcherInterface
      * @param string|ListenerInterface $listener Listener class name or instance
      * @param int $priority Listener priority
      * @return void
+     * @throws EventException If event name is invalid
      */
     public function listenClass(string $eventName, string|ListenerInterface $listener, int $priority = 0): void
     {
@@ -107,11 +147,19 @@ final class Dispatcher implements EventDispatcherInterface
      * @param int $priority Listener priority
      * @param int $delay Delay in seconds
      * @return void
+     * @throws QueueNotAvailableException If queue service not available
+     * @throws ListenerException If listener is a closure
      */
     public function listenQueue(string $eventName, callable|string|ListenerInterface $listener, int $priority = 0, int $delay = 0): void
     {
         if ($this->queue === null) {
-            throw new \RuntimeException('Queue service is required for queued listeners. Please register QueueServiceProvider.');
+            $listenerName = is_string($listener) ? $listener : get_debug_type($listener);
+            throw QueueNotAvailableException::forListener($listenerName);
+        }
+
+        // Prevent queuing closures early (fail fast)
+        if ($listener instanceof \Closure) {
+            throw ListenerException::closureNotQueueable($eventName);
         }
 
         $queuedListener = new QueuedListener($listener, $this->queue, $delay);
@@ -123,6 +171,8 @@ final class Dispatcher implements EventDispatcherInterface
      *
      * @param SubscriberInterface|string $subscriber Subscriber instance or class name
      * @return void
+     * @throws \RuntimeException If container not available for string subscriber
+     * @throws \InvalidArgumentException If subscriber doesn't implement SubscriberInterface
      */
     public function subscribe(SubscriberInterface|string $subscriber): void
     {
@@ -132,10 +182,13 @@ final class Dispatcher implements EventDispatcherInterface
                 throw new \RuntimeException('Container is required for subscriber resolution. Please register ContainerInterface.');
             }
 
-            $subscriber = $this->container->get($subscriber);
-            if (!$subscriber instanceof SubscriberInterface) {
-                throw new \InvalidArgumentException("Subscriber must implement SubscriberInterface: {$subscriber}");
+            $resolved = $this->container->get($subscriber);
+            if (!$resolved instanceof SubscriberInterface) {
+                throw new \InvalidArgumentException(
+                    sprintf('Subscriber "%s" must implement SubscriberInterface.', $subscriber)
+                );
             }
+            $subscriber = $resolved;
         }
 
         // Get subscriptions from subscriber
@@ -154,6 +207,8 @@ final class Dispatcher implements EventDispatcherInterface
 
     /**
      * {@inheritdoc}
+     *
+     * @throws CircularDispatchException If dispatch depth exceeded
      */
     public function dispatch(string|EventInterface $event, array $payload = []): EventInterface
     {
@@ -165,20 +220,31 @@ final class Dispatcher implements EventDispatcherInterface
             $eventName = $event->getName();
         }
 
-        // Get all listeners (direct + wildcard)
-        $listeners = $this->getAllListeners($eventName);
+        // Check for circular dispatch
+        $this->checkCircularDispatch($eventName);
 
-        // Dispatch to each listener
-        foreach ($listeners as $listener) {
-            // Stop if propagation was stopped
-            if ($event->isPropagationStopped()) {
-                break;
+        // Push to dispatch stack
+        $this->dispatchStack[] = $eventName;
+
+        try {
+            // Get all listeners (direct + wildcard)
+            $listeners = $this->getAllListeners($eventName);
+
+            // Dispatch to each listener
+            foreach ($listeners as $listener) {
+                // Stop if propagation was stopped
+                if ($event->isPropagationStopped()) {
+                    break;
+                }
+
+                $this->callListener($listener, $event, $eventName);
             }
 
-            $this->callListener($listener, $event);
+            return $event;
+        } finally {
+            // Pop from dispatch stack
+            array_pop($this->dispatchStack);
         }
-
-        return $event;
     }
 
     /**
@@ -186,13 +252,21 @@ final class Dispatcher implements EventDispatcherInterface
      */
     public function hasListeners(string $eventName): bool
     {
-        // Check direct listeners
+        // Check direct listeners first (O(1))
         if (!empty($this->listeners[$eventName])) {
             return true;
         }
 
-        // Check wildcard listeners
-        return $this->hasWildcardListeners($eventName);
+        // Check cached wildcard result
+        if (isset($this->hasWildcardCache[$eventName])) {
+            return $this->hasWildcardCache[$eventName];
+        }
+
+        // Check wildcard listeners and cache result
+        $hasWildcard = $this->hasWildcardListeners($eventName);
+        $this->hasWildcardCache[$eventName] = $hasWildcard;
+
+        return $hasWildcard;
     }
 
     /**
@@ -201,8 +275,7 @@ final class Dispatcher implements EventDispatcherInterface
     public function removeListeners(string $eventName): void
     {
         unset($this->listeners[$eventName]);
-        $this->sortedListeners = null;
-        $this->wildcardCache = [];
+        $this->invalidateCaches();
     }
 
     /**
@@ -216,6 +289,8 @@ final class Dispatcher implements EventDispatcherInterface
     /**
      * Get all listeners for an event (direct + wildcard).
      *
+     * Performance optimized: Uses spread operator instead of array_merge.
+     *
      * @param string $eventName Event name
      * @return array<callable|ListenerInterface>
      */
@@ -225,14 +300,22 @@ final class Dispatcher implements EventDispatcherInterface
 
         // Get direct listeners
         if (isset($this->listeners[$eventName])) {
-            $listeners = array_merge($listeners, $this->getSortedListeners($eventName));
+            $listeners = $this->getSortedListeners($eventName);
         }
 
         // Get wildcard listeners
         $wildcardListeners = $this->getWildcardListeners($eventName);
-        $listeners = array_merge($listeners, $wildcardListeners);
 
-        return $listeners;
+        if (empty($wildcardListeners)) {
+            return $listeners;
+        }
+
+        if (empty($listeners)) {
+            return $wildcardListeners;
+        }
+
+        // Merge both arrays (spread is efficient for this case)
+        return [...$listeners, ...$wildcardListeners];
     }
 
     /**
@@ -248,15 +331,19 @@ final class Dispatcher implements EventDispatcherInterface
             return $this->sortedListeners[$eventName];
         }
 
+        if (!isset($this->listeners[$eventName])) {
+            return [];
+        }
+
         // Sort listeners by priority (higher priority first)
         $prioritizedListeners = $this->listeners[$eventName];
         krsort($prioritizedListeners);
 
         // Flatten and resolve listeners
         $sorted = [];
-        foreach ($prioritizedListeners as $priority => $listeners) {
+        foreach ($prioritizedListeners as $listeners) {
             foreach ($listeners as $listener) {
-                $sorted[] = $this->resolveListener($listener);
+                $sorted[] = $this->resolveListener($listener, $eventName);
             }
         }
 
@@ -269,20 +356,25 @@ final class Dispatcher implements EventDispatcherInterface
     /**
      * Get wildcard listeners matching event name.
      *
+     * Performance optimized: Caches sorted wildcard listeners per pattern.
+     *
      * @param string $eventName Event name
      * @return array<callable|ListenerInterface>
      */
     private function getWildcardListeners(string $eventName): array
     {
+        if (empty($this->wildcards)) {
+            return [];
+        }
+
         $listeners = [];
 
         foreach ($this->wildcards as $pattern => $prioritizedListeners) {
             if ($this->matchesWildcard($pattern, $eventName)) {
-                krsort($prioritizedListeners);
-                foreach ($prioritizedListeners as $priority => $patternListeners) {
-                    foreach ($patternListeners as $listener) {
-                        $listeners[] = $this->resolveListener($listener);
-                    }
+                // Get sorted listeners for this pattern (cached)
+                $patternListeners = $this->getSortedWildcardListeners($pattern);
+                foreach ($patternListeners as $listener) {
+                    $listeners[] = $listener;
                 }
             }
         }
@@ -291,7 +383,46 @@ final class Dispatcher implements EventDispatcherInterface
     }
 
     /**
+     * Get sorted listeners for a wildcard pattern.
+     *
+     * Performance: Sorts once and caches result.
+     *
+     * @param string $pattern Wildcard pattern
+     * @return array<callable|ListenerInterface>
+     */
+    private function getSortedWildcardListeners(string $pattern): array
+    {
+        // Return cached if available
+        if (isset($this->sortedWildcards[$pattern])) {
+            return $this->sortedWildcards[$pattern];
+        }
+
+        if (!isset($this->wildcards[$pattern])) {
+            return [];
+        }
+
+        // Sort by priority (higher first)
+        $prioritizedListeners = $this->wildcards[$pattern];
+        krsort($prioritizedListeners);
+
+        // Flatten and resolve
+        $sorted = [];
+        foreach ($prioritizedListeners as $listeners) {
+            foreach ($listeners as $listener) {
+                $sorted[] = $this->resolveListener($listener);
+            }
+        }
+
+        // Cache result
+        $this->sortedWildcards[$pattern] = $sorted;
+
+        return $sorted;
+    }
+
+    /**
      * Check if event name matches wildcard pattern.
+     *
+     * Performance: Uses bounded LRU-like cache.
      *
      * @param string $pattern Wildcard pattern
      * @param string $eventName Event name
@@ -300,13 +431,24 @@ final class Dispatcher implements EventDispatcherInterface
     private function matchesWildcard(string $pattern, string $eventName): bool
     {
         $cacheKey = "{$pattern}:{$eventName}";
+
         if (isset($this->wildcardCache[$cacheKey])) {
             return $this->wildcardCache[$cacheKey];
         }
 
         // Convert wildcard pattern to regex
-        $regex = '#^' . str_replace(['*', '.'], ['.*', '\.'], $pattern) . '$#';
+        $regex = '#^' . str_replace(['*', '.'], ['[^.]*', '\.'], $pattern) . '$#';
         $matches = preg_match($regex, $eventName) === 1;
+
+        // Bounded cache: evict oldest half when full
+        if (count($this->wildcardCache) >= self::MAX_WILDCARD_CACHE_SIZE) {
+            $this->wildcardCache = array_slice(
+                $this->wildcardCache,
+                (int)(self::MAX_WILDCARD_CACHE_SIZE / 2),
+                null,
+                true
+            );
+        }
 
         // Cache result
         $this->wildcardCache[$cacheKey] = $matches;
@@ -346,9 +488,11 @@ final class Dispatcher implements EventDispatcherInterface
      * Resolve listener (string to instance).
      *
      * @param callable|string|ListenerInterface $listener Listener
+     * @param string|null $eventName Event name for error context
      * @return callable|ListenerInterface
+     * @throws ListenerException If listener cannot be resolved
      */
-    private function resolveListener(callable|string|ListenerInterface $listener): callable|ListenerInterface
+    private function resolveListener(callable|string|ListenerInterface $listener, ?string $eventName = null): callable|ListenerInterface
     {
         // Already resolved
         if (is_callable($listener) || $listener instanceof ListenerInterface) {
@@ -356,14 +500,22 @@ final class Dispatcher implements EventDispatcherInterface
         }
 
         // Resolve from container
-        if (is_string($listener) && $this->container !== null) {
-            if ($this->container->has($listener)) {
-                return $this->container->get($listener);
+        if (is_string($listener)) {
+            if ($this->container !== null) {
+                if ($this->container->has($listener)) {
+                    return $this->container->get($listener);
+                }
+
+                if (class_exists($listener)) {
+                    return $this->container->get($listener);
+                }
+            } elseif (class_exists($listener)) {
+                // No container, but class exists - instantiate directly
+                return new $listener();
             }
 
-            if (class_exists($listener)) {
-                return $this->container->get($listener);
-            }
+            // Cannot resolve - throw explicit error
+            throw ListenerException::unresolvable($listener, $eventName);
         }
 
         return $listener;
@@ -374,14 +526,21 @@ final class Dispatcher implements EventDispatcherInterface
      *
      * @param callable|ListenerInterface $listener Listener
      * @param EventInterface $event Event instance
+     * @param string $eventName Event name for error context
      * @return void
      */
-    private function callListener(callable|ListenerInterface $listener, EventInterface $event): void
+    private function callListener(callable|ListenerInterface $listener, EventInterface $event, string $eventName): void
     {
-        if ($listener instanceof ListenerInterface) {
-            $listener->handle($event);
-        } elseif (is_callable($listener)) {
-            $listener($event);
+        try {
+            if ($listener instanceof ListenerInterface) {
+                $listener->handle($event);
+            } elseif (is_callable($listener)) {
+                $listener($event);
+            }
+        } catch (\Throwable $e) {
+            // Wrap exception with context
+            $listenerName = is_object($listener) ? get_class($listener) : get_debug_type($listener);
+            throw ListenerException::executionFailed($listenerName, $eventName, $e);
         }
     }
 
@@ -421,6 +580,99 @@ final class Dispatcher implements EventDispatcherInterface
     }
 
     /**
+     * Check for circular dispatch.
+     *
+     * @param string $eventName Event name
+     * @return void
+     * @throws CircularDispatchException If circular dispatch detected
+     */
+    private function checkCircularDispatch(string $eventName): void
+    {
+        // Check max depth
+        if (count($this->dispatchStack) >= self::MAX_DISPATCH_DEPTH) {
+            throw CircularDispatchException::maxDepthExceeded(
+                $this->dispatchStack,
+                $eventName,
+                self::MAX_DISPATCH_DEPTH
+            );
+        }
+
+        // Check self-dispatch (same event already in stack)
+        if (in_array($eventName, $this->dispatchStack, true)) {
+            throw CircularDispatchException::selfDispatch($eventName);
+        }
+    }
+
+    /**
+     * Validate event name.
+     *
+     * @param string $eventName Event name
+     * @return void
+     * @throws EventException If event name is invalid
+     */
+    private function validateEventName(string $eventName): void
+    {
+        if (trim($eventName) === '') {
+            throw EventException::invalidEventName($eventName);
+        }
+    }
+
+    /**
+     * Validate priority value.
+     *
+     * @param int $priority Priority value
+     * @return void
+     * @throws \DomainException If priority out of bounds
+     */
+    private function validatePriority(int $priority): void
+    {
+        if ($priority < self::MIN_PRIORITY || $priority > self::MAX_PRIORITY) {
+            throw new \DomainException(
+                sprintf('Priority must be between %d and %d, got %d.', self::MIN_PRIORITY, self::MAX_PRIORITY, $priority)
+            );
+        }
+    }
+
+    /**
+     * Validate wildcard pattern.
+     *
+     * @param string $pattern Wildcard pattern
+     * @return void
+     * @throws EventException If pattern is invalid
+     */
+    private function validateWildcardPattern(string $pattern): void
+    {
+        // Check for empty segments
+        if (str_contains($pattern, '..')) {
+            throw EventException::invalidWildcardPattern($pattern, 'Pattern contains empty segments (..)');
+        }
+
+        // Check for consecutive wildcards
+        if (str_contains($pattern, '**')) {
+            throw EventException::invalidWildcardPattern($pattern, 'Pattern contains consecutive wildcards (**)');
+        }
+
+        // Validate regex compilation
+        $regex = '#^' . str_replace(['*', '.'], ['[^.]*', '\.'], $pattern) . '$#';
+        if (@preg_match($regex, '') === false) {
+            throw EventException::invalidWildcardPattern($pattern, 'Pattern produces invalid regex');
+        }
+    }
+
+    /**
+     * Invalidate all caches.
+     *
+     * @return void
+     */
+    private function invalidateCaches(): void
+    {
+        $this->sortedListeners = null;
+        $this->sortedWildcards = null;
+        $this->wildcardCache = [];
+        $this->hasWildcardCache = [];
+    }
+
+    /**
      * Get all registered event names.
      *
      * @return array<string>
@@ -453,7 +705,45 @@ final class Dispatcher implements EventDispatcherInterface
     {
         $this->listeners = [];
         $this->wildcards = [];
-        $this->sortedListeners = null;
-        $this->wildcardCache = [];
+        $this->dispatchStack = [];
+        $this->invalidateCaches();
+    }
+
+    /**
+     * Clear only caches (useful for long-running processes).
+     *
+     * This method clears cached data without removing listeners.
+     * Call periodically in queue workers or long-running processes
+     * to prevent memory bloat.
+     *
+     * @return void
+     */
+    public function clearCache(): void
+    {
+        $this->invalidateCaches();
+    }
+
+    /**
+     * Get current dispatch depth.
+     *
+     * Useful for debugging and testing.
+     *
+     * @return int
+     */
+    public function getDispatchDepth(): int
+    {
+        return count($this->dispatchStack);
+    }
+
+    /**
+     * Get current dispatch stack.
+     *
+     * Useful for debugging circular dispatch issues.
+     *
+     * @return array<string>
+     */
+    public function getDispatchStack(): array
+    {
+        return $this->dispatchStack;
     }
 }
