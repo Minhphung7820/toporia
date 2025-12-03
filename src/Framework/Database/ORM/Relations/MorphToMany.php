@@ -445,33 +445,30 @@ class MorphToMany extends Relation
                 // Only create and attach pivot object if we should include it
                 if ($this->shouldIncludePivot()) {
                     // Build pivot data from pivot_* attributes
-                    // Use null coalescing operator for safety (fixes old records with null values)
+                    // Priority: Use database values first, fallback to parent model values only if null
+                    // This fixes corrupted data where morphType/foreignKey might be null in old records
                     $pivotData = [
+                        // Always use DB value if available, fallback to parent model for polymorphic integrity
                         $this->morphType => $matchedResult->getAttribute("pivot_{$this->morphType}") ?? $this->getMorphClass(),
                         $this->foreignKey => $matchedResult->getAttribute("pivot_{$this->foreignKey}") ?? $model->getAttribute($this->localKey),
                         $this->relatedPivotKey => $relatedId,
                     ];
 
-                    // Add other pivot columns
+                    // Add other pivot columns from $this->pivotColumns
+                    // Note: morphType and foreignKey are excluded from $this->pivotColumns when withPivot('*') is called
+                    // but they are always selected separately, so we handle them above
                     foreach ($this->pivotColumns as $column) {
+                        // Skip columns that are already handled above
                         if ($column !== $this->morphType && $column !== $this->foreignKey && $column !== $this->relatedPivotKey) {
-                            $pivotValue = $matchedResult->getAttribute("pivot_{$column}");
-                            if ($pivotValue !== null) {
-                                $pivotData[$column] = $pivotValue;
-                            }
+                            // Include all pivot values, even null (for withPivot('*') completeness)
+                            $pivotData[$column] = $matchedResult->getAttribute("pivot_{$column}");
                         }
                     }
 
-                    // Add timestamps if enabled
+                    // Add timestamps if enabled (always include, even if null)
                     if ($this->withTimestamps) {
-                        $createdAt = $matchedResult->getAttribute('pivot_created_at');
-                        $updatedAt = $matchedResult->getAttribute('pivot_updated_at');
-                        if ($createdAt !== null) {
-                            $pivotData['created_at'] = $createdAt;
-                        }
-                        if ($updatedAt !== null) {
-                            $pivotData['updated_at'] = $updatedAt;
-                        }
+                        $pivotData['created_at'] = $matchedResult->getAttribute('pivot_created_at');
+                        $pivotData['updated_at'] = $matchedResult->getAttribute('pivot_updated_at');
                     }
 
                     // Clear any existing relations on the cloned model
