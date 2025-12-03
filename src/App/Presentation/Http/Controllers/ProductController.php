@@ -1201,7 +1201,6 @@ final class ProductController extends BaseController
      */
     public function updateRelationships(Request $request, int $id): JsonResponseInterface
     {
-        dd($request->all(), ProductModel::with('categories', 'tags', 'allTags', 'relatedProducts')->find($id));
         DB::enableQueryLog();
 
         $product = ProductModel::find($id);

@@ -108,7 +108,7 @@ class BelongsToMany extends Relation
             }
 
             // Filter out excluded columns
-            $pivotColumns = array_diff($allColumns, $excludeColumns);
+            $pivotColumns = array_diff($allColumns ?? [], $excludeColumns);
 
             // Merge with existing pivot columns and remove '*'
             $columns = array_filter($columns, fn($col) => $col !== '*');
