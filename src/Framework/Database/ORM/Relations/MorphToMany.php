@@ -445,9 +445,21 @@ class MorphToMany extends Relation
                 // Only create and attach pivot object if we should include it
                 if ($this->shouldIncludePivot()) {
                     // Build pivot data from pivot_* attributes
+                    // Ensure morphType and foreignKey are always set (fallback to parent values if null)
+                    $morphTypeValue = $matchedResult->getAttribute("pivot_{$this->morphType}");
+                    $foreignKeyValue = $matchedResult->getAttribute("pivot_{$this->foreignKey}");
+
+                    // If values are null, use parent model values (shouldn't happen, but safety check)
+                    if ($morphTypeValue === null) {
+                        $morphTypeValue = $this->getMorphClass();
+                    }
+                    if ($foreignKeyValue === null) {
+                        $foreignKeyValue = $model->getAttribute($this->localKey);
+                    }
+
                     $pivotData = [
-                        $this->morphType => $matchedResult->getAttribute("pivot_{$this->morphType}"),
-                        $this->foreignKey => $matchedResult->getAttribute("pivot_{$this->foreignKey}"),
+                        $this->morphType => $morphTypeValue,
+                        $this->foreignKey => $foreignKeyValue,
                         $this->relatedPivotKey => $relatedId,
                     ];
 
@@ -656,7 +668,7 @@ class MorphToMany extends Relation
             }
 
             // Filter out excluded columns
-            $pivotColumns = array_diff($allColumns, $excludeColumns);
+            $pivotColumns = array_diff($allColumns ?? [], $excludeColumns);
 
             // Merge with existing pivot columns and remove '*'
             $columns = array_filter($columns, fn($col) => $col !== '*');
@@ -1044,10 +1056,10 @@ class MorphToMany extends Relation
 
         foreach ($records as $id => $pivotData) {
             if (in_array($id, $current)) {
-                if ($pivotData !== []) {
-                    $this->updateExistingPivot($id, $pivotData);
-                    $changes['updated'][] = $id;
-                }
+                // Always update existing records to ensure morphType and foreignKey are set correctly
+                // This fixes any existing records that might have null values
+                $this->updateExistingPivot($id, $pivotData);
+                $changes['updated'][] = $id;
             } else {
                 $this->attach($id, $pivotData);
                 $changes['attached'][] = $id;
@@ -1084,6 +1096,11 @@ class MorphToMany extends Relation
      */
     public function updateExistingPivot(int|string $id, array $pivotData): bool
     {
+        // Always ensure morphType and foreignKey are set correctly for polymorphic relationships
+        // This fixes any existing records that might have null values
+        $pivotData[$this->morphType] = $this->getMorphClass();
+        $pivotData[$this->foreignKey] = $this->parent->getAttribute($this->localKey);
+
         if ($this->withTimestamps && !isset($pivotData['updated_at'])) {
             // Use same timestamp format as Model class for consistency
             $pivotData['updated_at'] = now()->toDateTimeString();
