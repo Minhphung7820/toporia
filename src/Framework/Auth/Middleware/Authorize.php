@@ -7,6 +7,7 @@ namespace Toporia\Framework\Auth\Middleware;
 use Toporia\Framework\Auth\AuthorizationException;
 use Toporia\Framework\Auth\Contracts\GateContract;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
+use Toporia\Framework\Http\Exceptions\AccessDeniedHttpException;
 use Toporia\Framework\Http\{Request, Response};
 
 /**
@@ -159,13 +160,8 @@ final class Authorize implements MiddlewareInterface
                 'all' => $this->authorizeAll($request),
             };
         } catch (AuthorizationException $e) {
-            // Return 403 Forbidden
-            $response->json([
-                'error' => 'Forbidden',
-                'message' => $e->getMessage(),
-            ], 403);
-
-            return null; // Short-circuit
+            // Throw AccessDeniedHttpException - will be caught by error handler
+            throw new AccessDeniedHttpException($e->getMessage(), $e);
         }
 
         // Authorized, continue

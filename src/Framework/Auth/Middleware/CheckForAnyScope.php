@@ -7,6 +7,7 @@ namespace Toporia\Framework\Auth\Middleware;
 use Toporia\Framework\Auth\AuthManager;
 use Toporia\Framework\Auth\Contracts\HasApiTokensInterface;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
+use Toporia\Framework\Http\Exceptions\{UnauthorizedHttpException, AccessDeniedHttpException};
 use Toporia\Framework\Http\{Request, Response};
 
 /**
@@ -73,12 +74,8 @@ final class CheckForAnyScope implements MiddlewareInterface
         $user = $this->auth->guard('personal-token')->user();
 
         if ($user === null || !$user instanceof HasApiTokensInterface) {
-            $response->json([
-                'error' => 'Unauthenticated',
-                'message' => 'Valid API token required'
-            ], 401);
-
-            return null;
+            // Throw UnauthorizedHttpException - will be caught by error handler
+            throw new UnauthorizedHttpException('Bearer', 'Valid API token required');
         }
 
         // Check if token has ANY of the required scopes
@@ -92,13 +89,10 @@ final class CheckForAnyScope implements MiddlewareInterface
         }
 
         if (!$hasAnyScope) {
-            $response->json([
-                'error' => 'Forbidden',
-                'message' => 'Token lacks required permissions',
-                'required_any_of' => $this->scopes
-            ], 403);
-
-            return null;
+            // Throw AccessDeniedHttpException - will be caught by error handler
+            throw new AccessDeniedHttpException(
+                sprintf('Token lacks required permissions. Requires any of: %s', implode(', ', $this->scopes))
+            );
         }
 
         // Has at least one scope, continue

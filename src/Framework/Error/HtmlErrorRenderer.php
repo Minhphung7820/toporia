@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Error;
 
 use Toporia\Framework\Error\Contracts\ErrorRendererInterface;
+use Toporia\Framework\Http\Exceptions\HttpException;
 use Throwable;
 
 /**
@@ -44,14 +45,42 @@ final class HtmlErrorRenderer implements ErrorRendererInterface
      */
     public function render(Throwable $exception): void
     {
-        http_response_code(500);
+        $statusCode = $this->getStatusCode($exception);
+        http_response_code($statusCode);
         header('Content-Type: text/html; charset=UTF-8');
+
+        // Set custom headers from HttpException
+        if ($exception instanceof HttpException) {
+            foreach ($exception->getHeaders() as $name => $value) {
+                header("{$name}: {$value}");
+            }
+        }
 
         if ($this->debug) {
             echo $this->renderDebugPage($exception);
         } else {
-            echo $this->renderProductionPage($exception);
+            echo $this->renderProductionPage($exception, $statusCode);
         }
+    }
+
+    /**
+     * Get HTTP status code for exception.
+     *
+     * @param Throwable $exception
+     * @return int
+     */
+    private function getStatusCode(Throwable $exception): int
+    {
+        if ($exception instanceof HttpException) {
+            return $exception->getStatusCode();
+        }
+
+        $code = $exception->getCode();
+        if ($code >= 400 && $code < 600) {
+            return $code;
+        }
+
+        return 500;
     }
 
     /**
@@ -259,17 +288,21 @@ HTML;
      * Render production error page (simple, no details).
      *
      * @param Throwable $exception
+     * @param int $statusCode HTTP status code
      * @return string
      */
-    private function renderProductionPage(Throwable $exception): string
+    private function renderProductionPage(Throwable $exception, int $statusCode = 500): string
     {
+        $title = $this->getStatusTitle($statusCode);
+        $message = $this->getStatusMessage($statusCode);
+
         return <<<HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Server Error</title>
+    <title>{$title}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -299,17 +332,83 @@ HTML;
             font-size: 18px;
             opacity: 0.9;
         }
+        a {
+            color: #fff;
+            text-decoration: none;
+            margin-top: 20px;
+            display: inline-block;
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+        a:hover {
+            background: rgba(255,255,255,0.3);
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>500</h1>
-        <h2>Server Error</h2>
-        <p>Oops! Something went wrong on our end.</p>
+        <h1>{$statusCode}</h1>
+        <h2>{$title}</h2>
+        <p>{$message}</p>
+        <a href="/">Go Home</a>
     </div>
 </body>
 </html>
 HTML;
+    }
+
+    /**
+     * Get title for HTTP status code.
+     *
+     * @param int $statusCode
+     * @return string
+     */
+    private function getStatusTitle(int $statusCode): string
+    {
+        return match ($statusCode) {
+            400 => 'Bad Request',
+            401 => 'Unauthorized',
+            403 => 'Forbidden',
+            404 => 'Page Not Found',
+            405 => 'Method Not Allowed',
+            409 => 'Conflict',
+            419 => 'Page Expired',
+            422 => 'Unprocessable Entity',
+            429 => 'Too Many Requests',
+            500 => 'Server Error',
+            502 => 'Bad Gateway',
+            503 => 'Service Unavailable',
+            504 => 'Gateway Timeout',
+            default => 'Error',
+        };
+    }
+
+    /**
+     * Get user-friendly message for HTTP status code.
+     *
+     * @param int $statusCode
+     * @return string
+     */
+    private function getStatusMessage(int $statusCode): string
+    {
+        return match ($statusCode) {
+            400 => 'The request could not be understood by the server.',
+            401 => 'You need to be authenticated to access this resource.',
+            403 => 'You don\'t have permission to access this resource.',
+            404 => 'The page you\'re looking for doesn\'t exist.',
+            405 => 'This request method is not supported.',
+            409 => 'There was a conflict with the current state of the resource.',
+            419 => 'Your session has expired. Please refresh the page and try again.',
+            422 => 'The request was well-formed but contained invalid data.',
+            429 => 'You\'ve made too many requests. Please try again later.',
+            500 => 'Oops! Something went wrong on our end.',
+            502 => 'The server received an invalid response.',
+            503 => 'The service is temporarily unavailable. Please try again later.',
+            504 => 'The server took too long to respond.',
+            default => 'An unexpected error occurred.',
+        };
     }
 
     /**

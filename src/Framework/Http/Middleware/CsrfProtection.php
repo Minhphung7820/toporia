@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http\Middleware;
 
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
+use Toporia\Framework\Http\Exceptions\TokenMismatchException;
 use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
 
@@ -64,12 +65,10 @@ final class CsrfProtection implements MiddlewareInterface
 
         // Validate token
         if (!$this->validateToken($token)) {
-            $response->setStatus(419);
-            $response->json([
-                'error' => 'CSRF token mismatch',
-                'message' => 'The CSRF token is invalid or has expired. Please reload the page and try again.'
-            ], 419);
-            return null; // Short-circuit
+            // Throw TokenMismatchException - will be caught by error handler
+            throw new TokenMismatchException(
+                'The CSRF token is invalid or has expired. Please reload the page and try again.'
+            );
         }
 
         return $next($request, $response);

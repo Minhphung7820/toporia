@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Error;
 
 use Toporia\Framework\Error\Contracts\ErrorRendererInterface;
+use Toporia\Framework\Http\Exceptions\HttpException;
 use Throwable;
 
 /**
@@ -45,6 +46,13 @@ final class JsonErrorRenderer implements ErrorRendererInterface
         http_response_code($this->getStatusCode($exception));
         header('Content-Type: application/json; charset=UTF-8');
 
+        // Set custom headers from HttpException
+        if ($exception instanceof HttpException) {
+            foreach ($exception->getHeaders() as $name => $value) {
+                header("{$name}: {$value}");
+            }
+        }
+
         echo json_encode($this->formatException($exception), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 
@@ -59,6 +67,26 @@ final class JsonErrorRenderer implements ErrorRendererInterface
         // Handle ValidationException specially
         if ($exception instanceof \Toporia\Framework\Http\ValidationException) {
             return $exception->toArray();
+        }
+
+        // Handle HttpException
+        if ($exception instanceof HttpException) {
+            $statusCode = $exception->getStatusCode();
+            $response = [
+                'error' => [
+                    'message' => $exception->getMessage() ?: $this->getDefaultMessage($statusCode),
+                    'code' => $statusCode,
+                ]
+            ];
+
+            if ($this->debug) {
+                $response['error']['exception'] = get_class($exception);
+                $response['error']['file'] = $exception->getFile();
+                $response['error']['line'] = $exception->getLine();
+                $response['error']['trace'] = $this->formatTrace($exception->getTrace());
+            }
+
+            return $response;
         }
 
         if ($this->debug) {
@@ -107,6 +135,11 @@ final class JsonErrorRenderer implements ErrorRendererInterface
      */
     private function getStatusCode(Throwable $exception): int
     {
+        // HttpException has its own status code
+        if ($exception instanceof HttpException) {
+            return $exception->getStatusCode();
+        }
+
         // ValidationException returns 422
         if ($exception instanceof \Toporia\Framework\Http\ValidationException) {
             return 422;
@@ -119,5 +152,31 @@ final class JsonErrorRenderer implements ErrorRendererInterface
         }
 
         return 500;
+    }
+
+    /**
+     * Get default message for HTTP status code.
+     *
+     * @param int $statusCode
+     * @return string
+     */
+    private function getDefaultMessage(int $statusCode): string
+    {
+        return match ($statusCode) {
+            400 => 'Bad Request',
+            401 => 'Unauthorized',
+            403 => 'Forbidden',
+            404 => 'Not Found',
+            405 => 'Method Not Allowed',
+            409 => 'Conflict',
+            419 => 'Page Expired',
+            422 => 'Unprocessable Entity',
+            429 => 'Too Many Requests',
+            500 => 'Internal Server Error',
+            502 => 'Bad Gateway',
+            503 => 'Service Unavailable',
+            504 => 'Gateway Timeout',
+            default => 'Error',
+        };
     }
 }

@@ -6,6 +6,7 @@ namespace Toporia\Framework\Auth\Middleware;
 
 use Toporia\Framework\Auth\Throttle\LoginThrottle;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
+use Toporia\Framework\Http\Exceptions\TooManyRequestsHttpException;
 use Toporia\Framework\Http\{Request, Response};
 
 /**
@@ -52,10 +53,11 @@ final class ThrottleLogins implements MiddlewareInterface
         if ($this->throttle->isLockedOut($identifier)) {
             $seconds = $this->throttle->getSecondsUntilUnlock($identifier);
 
-            return $response->json([
-                'error' => 'Too many login attempts',
-                'message' => "Please try again in " . $this->formatDuration($seconds) . ".",
-            ], 429); // Too Many Requests
+            // Throw TooManyRequestsHttpException - will be caught by error handler
+            throw new TooManyRequestsHttpException(
+                $seconds,
+                sprintf('Too many login attempts. Please try again in %s.', $this->formatDuration($seconds))
+            );
         }
 
         // Process request

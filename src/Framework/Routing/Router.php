@@ -6,6 +6,7 @@ namespace Toporia\Framework\Routing;
 
 use Toporia\Framework\Routing\Contracts\{RouteCollectionInterface, RouteInterface, RouterInterface};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Http\Exceptions\{NotFoundHttpException, MethodNotAllowedHttpException};
 use Toporia\Framework\Http\Middleware\MiddlewarePipeline;
 use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\Routing\RouteModelBinding;
@@ -291,9 +292,10 @@ final class Router implements RouterInterface
      * Handle 404 Not Found response.
      *
      * If a fallback handler is registered, it will be called.
-     * Otherwise, the default 404 response will be sent.
+     * Otherwise, throws NotFoundHttpException for the error handler.
      *
      * @return void
+     * @throws NotFoundHttpException
      */
     private function handleNotFound(): void
     {
@@ -303,43 +305,38 @@ final class Router implements RouterInterface
             return;
         }
 
-        // Default 404 response
-        $this->response->html('<h1>404 Not Found</h1>', 404);
+        // Throw NotFoundHttpException - will be caught by error handler
+        throw new NotFoundHttpException(
+            sprintf('The requested URL "%s" was not found.', $this->request->path())
+        );
     }
 
     /**
      * Handle 405 Method Not Allowed response.
      *
      * This is called when the path exists but the HTTP method is not allowed.
-     * Includes Allow header with allowed methods (Laravel-style).
+     * Throws MethodNotAllowedHttpException with Allow header.
      *
      * @param string $path Requested path
      * @return void
+     * @throws MethodNotAllowedHttpException
      */
     private function handleMethodNotAllowed(string $path): void
     {
         // Get allowed methods for this path
         $allowedMethods = $this->routes->getAllowedMethods($path);
 
-        // Build Allow header (RFC 7231)
-        $allowHeader = implode(', ', $allowedMethods);
-
-        // Send 405 response with Allow header
-        $this->response->header('Allow', $allowHeader);
-
-        // Check if request expects JSON (API request)
-        if ($this->request->wantsJson() || str_starts_with($this->request->path(), '/api')) {
-            $this->response->json([
-                'success' => false,
-                'message' => 'Method not allowed',
-                'error' => 'The HTTP method is not allowed for this endpoint',
-                'path' => $path,
-                'method' => $this->request->method(),
-                'allowed_methods' => $allowedMethods,
-            ], 405);
-        } else {
-            $this->response->html('<h1>405 Method Not Allowed</h1>', 405);
-        }
+        // Throw MethodNotAllowedHttpException with allowed methods
+        // The exception includes the Allow header automatically
+        throw new MethodNotAllowedHttpException(
+            $allowedMethods,
+            sprintf(
+                'The %s method is not allowed for "%s". Allowed: %s',
+                $this->request->method(),
+                $path,
+                implode(', ', $allowedMethods)
+            )
+        );
     }
 
     /**

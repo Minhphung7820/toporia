@@ -6,6 +6,7 @@ namespace Toporia\Framework\Auth\Middleware;
 
 use Toporia\Framework\Auth\AuthManager;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
+use Toporia\Framework\Http\Exceptions\UnauthorizedHttpException;
 use Toporia\Framework\Http\{Request, Response};
 
 /**
@@ -55,12 +56,8 @@ final class EnsureTokenIsValid implements MiddlewareInterface
         $user = $this->auth->guard('personal-token')->user();
 
         if ($user === null) {
-            $response->json([
-                'error' => 'Unauthenticated',
-                'message' => 'Valid API token required'
-            ], 401);
-
-            return null; // Short-circuit
+            // Throw UnauthorizedHttpException - will be caught by error handler
+            throw new UnauthorizedHttpException('Bearer', 'Valid API token required');
         }
 
         // Continue to next middleware

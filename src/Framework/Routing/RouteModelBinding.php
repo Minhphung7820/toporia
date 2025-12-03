@@ -6,6 +6,7 @@ namespace Toporia\Framework\Routing;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Database\ORM\Model;
+use Toporia\Framework\Http\Exceptions\NotFoundHttpException;
 
 /**
  * Route Model Binding
@@ -314,15 +315,22 @@ class RouteModelBinding
     /**
      * Handle model not found.
      *
+     * Throws NotFoundHttpException for consistent error handling.
+     * The ModelNotFoundException is also thrown for backward compatibility
+     * if error handler is configured to convert it to 404.
+     *
      * @param class-string|string $model
      * @param mixed $value
      * @return never
-     * @throws ModelNotFoundException
+     * @throws NotFoundHttpException
      */
     protected function modelNotFound(string $model, mixed $value): never
     {
-        throw new ModelNotFoundException(
-            sprintf('No query results for model [%s] with value [%s].', $model, $value)
+        // Extract model short name for cleaner error message
+        $shortName = class_exists($model) ? (new \ReflectionClass($model))->getShortName() : $model;
+
+        throw new NotFoundHttpException(
+            sprintf('%s not found.', $shortName)
         );
     }
 

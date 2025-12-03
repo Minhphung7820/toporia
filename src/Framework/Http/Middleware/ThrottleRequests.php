@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http\Middleware;
 
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
+use Toporia\Framework\Http\Exceptions\TooManyRequestsHttpException;
 use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\RateLimit\{Contracts\RateLimiterInterface, RateLimiter, Limit};
 
@@ -61,8 +62,7 @@ final class ThrottleRequests implements MiddlewareInterface
 
         // Check if rate limit exceeded (this will cache results internally)
         if ($this->limiter->tooManyAttempts($key, $maxAttempts, $decaySeconds)) {
-            $this->buildRateLimitResponse($response, $key, $maxAttempts, $decaySeconds);
-            return null; // Short-circuit - response already sent
+            $this->throwRateLimitException($response, $key, $maxAttempts, $decaySeconds);
         }
 
         // Attempt to consume rate limit (will increment attempts)
@@ -105,15 +105,16 @@ final class ThrottleRequests implements MiddlewareInterface
     }
 
     /**
-     * Build and send rate limit exceeded response
+     * Throw rate limit exceeded exception
      *
      * @param Response $response
      * @param string $key
      * @param int $maxAttempts
      * @param int $decaySeconds
-     * @return void
+     * @return never
+     * @throws TooManyRequestsHttpException
      */
-    private function buildRateLimitResponse(Response $response, string $key, int $maxAttempts, int $decaySeconds): void
+    private function throwRateLimitException(Response $response, string $key, int $maxAttempts, int $decaySeconds): never
     {
         // Get the actual retry after time
         $retryAfter = $this->limiter->availableIn($key, $decaySeconds);
@@ -121,24 +122,21 @@ final class ThrottleRequests implements MiddlewareInterface
         // If retryAfter is 0, rate limit has expired - allow the request
         // Don't set fallback to decaySeconds as that would incorrectly extend the rate limit
         if ($retryAfter <= 0) {
-            // Rate limit has expired - this shouldn't happen if tooManyAttempts() was called correctly
-            // But if it does, return 0 to indicate no wait time
             $retryAfter = 0;
         }
 
-        $response->setStatus(429);
-        $response->header('Retry-After', (string)$retryAfter);
+        // Add rate limit headers to response before throwing
         $response->header('X-RateLimit-Limit', (string)$maxAttempts);
         $response->header('X-RateLimit-Remaining', '0');
         $response->header('X-RateLimit-Reset', (string)(now()->getTimestamp() + $retryAfter));
 
-        $response->json([
-            'error' => 'Too Many Requests',
-            'message' => $retryAfter > 0
+        // Throw TooManyRequestsHttpException - will be caught by error handler
+        throw new TooManyRequestsHttpException(
+            $retryAfter > 0 ? $retryAfter : null,
+            $retryAfter > 0
                 ? 'Rate limit exceeded. Please try again in ' . $this->formatDuration($retryAfter) . '.'
-                : 'Rate limit exceeded.',
-            'retry_after' => $retryAfter,
-        ], 429);
+                : 'Rate limit exceeded.'
+        );
     }
 
     /**
