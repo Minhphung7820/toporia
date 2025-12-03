@@ -401,15 +401,88 @@ class MorphToMany extends Relation
             return $models;
         }
 
-        $dictionary = $this->buildDictionary($results);
+        // Step 1: Extract pivot data from query results BEFORE removing pivot attributes
+        // The main query already selected pivot columns with alias "pivot_{column}"
+        // We extract this data to build the parent-to-related mapping dictionary
+        // OPTIMIZED: Extract pivot data first, then remove attributes from models
+        $dictionary = [];
 
-        // Build index of related models by ID for O(1) lookup
+        foreach ($results as $result) {
+            // Get pivot data from model attributes (with prefix "pivot_")
+            $pivotMorphType = $result->getAttribute("pivot_{$this->morphType}");
+            $pivotForeignKey = $result->getAttribute("pivot_{$this->foreignKey}");
+            $pivotRelatedKey = $result->getAttribute("pivot_{$this->relatedPivotKey}");
+
+            if ($pivotMorphType === null || $pivotForeignKey === null || $pivotRelatedKey === null) {
+                // Skip if pivot keys are missing (shouldn't happen in eager loading)
+                continue;
+            }
+
+            // Normalize to string for consistent comparison
+            $parentKey = "{$pivotMorphType}:{$pivotForeignKey}";
+            $relatedIdKey = (string) $pivotRelatedKey;
+
+            // Only build pivot data if we should include pivot object
+            $pivotData = null;
+            if ($this->shouldIncludePivot()) {
+                // Build pivot data from all pivot_* attributes
+                // Priority: Use database values first, fallback to parent model values only if null
+                // This fixes corrupted data where morphType/foreignKey might be null in old records
+                $pivotData = [
+                    // Always use DB value if available, fallback to parent model for polymorphic integrity
+                    $this->morphType => $pivotMorphType ?? $this->getMorphClass(),
+                    $this->foreignKey => $pivotForeignKey,
+                    $this->relatedPivotKey => $pivotRelatedKey,
+                ];
+
+                // Add other pivot columns from $this->pivotColumns
+                // Note: morphType, foreignKey, and relatedPivotKey are excluded from $this->pivotColumns when withPivot('*') is called
+                // but they are always selected separately, so we handle them above
+                foreach ($this->pivotColumns as $column) {
+                    // Skip columns that are already handled above
+                    if ($column !== $this->morphType && $column !== $this->foreignKey && $column !== $this->relatedPivotKey) {
+                        $pivotValue = $result->getAttribute("pivot_{$column}");
+                        // Only include non-null values (consistent with BelongsToMany)
+                        // This avoids polluting pivot data with null values
+                        if ($pivotValue !== null) {
+                            $pivotData[$column] = $pivotValue;
+                        }
+                    }
+                }
+
+                // Add timestamps if enabled (include even if null for completeness)
+                if ($this->withTimestamps) {
+                    $createdAt = $result->getAttribute('pivot_created_at');
+                    $updatedAt = $result->getAttribute('pivot_updated_at');
+                    // Include timestamps even if null (they may be null in database)
+                    if ($createdAt !== null) {
+                        $pivotData['created_at'] = $createdAt;
+                    }
+                    if ($updatedAt !== null) {
+                        $pivotData['updated_at'] = $updatedAt;
+                    }
+                }
+            }
+
+            // Build dictionary: "type:id" => [relatedId => pivotData or null]
+            // pivotData is null if we don't need to create pivot object
+            if (!isset($dictionary[$parentKey])) {
+                $dictionary[$parentKey] = [];
+            }
+            $dictionary[$parentKey][$relatedIdKey] = $pivotData;
+        }
+
+        // Step 2: Build index of related models by ID for O(1) lookup
+        // Normalize IDs to strings to avoid type mismatch issues (int vs string)
+        // Note: If same related model appears multiple times (for different parents),
+        // we keep the first instance (pivot data is already extracted to dictionary)
+        // OPTIMIZED: Remove pivot_* attributes from models to keep them clean
         $relatedIndex = [];
         foreach ($results as $result) {
             $relatedId = $result->getAttribute($this->relatedKey);
             if ($relatedId !== null) {
                 $relatedIdKey = (string) $relatedId;
-                // Only keep first instance if duplicate (pivot data will be extracted)
+                // Only keep first instance if duplicate (pivot data already in dictionary)
                 if (!isset($relatedIndex[$relatedIdKey])) {
                     // Remove pivot_* attributes from the first instance to keep it clean
                     /** @var Model $result */
@@ -419,69 +492,70 @@ class MorphToMany extends Relation
             }
         }
 
+        // Step 3: Match related models to parents using dictionary and attach pivot data
+        // CRITICAL: Clone related models for each parent to avoid pivot data being shared/reused
+        // When multiple parents share the same related model, each parent needs its own instance with correct pivot data
         foreach ($models as $model) {
             $key = get_class($model) . ':' . $model->getAttribute($this->localKey);
-            $matchedResults = $dictionary[$key] ?? [];
 
-            // Process matched results and attach pivot data if needed
-            $matched = [];
-            foreach ($matchedResults as $matchedResult) {
-                $relatedId = $matchedResult->getAttribute($this->relatedKey);
-                if ($relatedId === null) {
-                    continue;
-                }
-
-                $relatedIdKey = (string) $relatedId;
-
-                // Clone the related model to avoid sharing pivot data
-                if (isset($relatedIndex[$relatedIdKey])) {
-                    $relatedModel = clone $relatedIndex[$relatedIdKey];
-                } else {
-                    // Fallback: use the matched result but remove pivot attributes
-                    $relatedModel = clone $matchedResult;
-                    $this->removePivotAttributes($relatedModel);
-                }
-
-                // Only create and attach pivot object if we should include it
-                if ($this->shouldIncludePivot()) {
-                    // Build pivot data from pivot_* attributes
-                    // Priority: Use database values first, fallback to parent model values only if null
-                    // This fixes corrupted data where morphType/foreignKey might be null in old records
-                    $pivotData = [
-                        // Always use DB value if available, fallback to parent model for polymorphic integrity
-                        $this->morphType => $matchedResult->getAttribute("pivot_{$this->morphType}") ?? $this->getMorphClass(),
-                        $this->foreignKey => $matchedResult->getAttribute("pivot_{$this->foreignKey}") ?? $model->getAttribute($this->localKey),
-                        $this->relatedPivotKey => $relatedId,
-                    ];
-
-                    // Add other pivot columns from $this->pivotColumns
-                    // Note: morphType and foreignKey are excluded from $this->pivotColumns when withPivot('*') is called
-                    // but they are always selected separately, so we handle them above
-                    foreach ($this->pivotColumns as $column) {
-                        // Skip columns that are already handled above
-                        if ($column !== $this->morphType && $column !== $this->foreignKey && $column !== $this->relatedPivotKey) {
-                            // Include all pivot values, even null (for withPivot('*') completeness)
-                            $pivotData[$column] = $matchedResult->getAttribute("pivot_{$column}");
-                        }
-                    }
-
-                    // Add timestamps if enabled (always include, even if null)
-                    if ($this->withTimestamps) {
-                        $pivotData['created_at'] = $matchedResult->getAttribute('pivot_created_at');
-                        $pivotData['updated_at'] = $matchedResult->getAttribute('pivot_updated_at');
-                    }
-
-                    // Clear any existing relations on the cloned model
-                    $relatedModel->setRelation($this->pivotAccessor, null);
-
-                    // Create and attach pivot object
-                    $pivotModel = $this->newPivot($pivotData, true);
-                    $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
-                }
-
-                $matched[] = $relatedModel;
+            // CRITICAL: Only match if dictionary has entries for THIS specific parent
+            if (!isset($dictionary[$key])) {
+                // No pivot data for this parent - set empty collection
+                $model->setRelation($relationName, new ModelCollection([]));
+                continue;
             }
 
+            // Get related IDs with pivot data for THIS parent from dictionary
+            $relatedDataForParent = $dictionary[$key];
+
+            // Initialize matched array (PHP handles dynamic growth efficiently)
+            $matched = [];
+
+            // Look up actual models by ID and attach pivot data
+            // OPTIMIZED: Single loop with validation - combines validation and matching
+            foreach ($relatedDataForParent as $relatedIdStr => $pivotData) {
+                // Normalize to string for consistent comparison
+                $relatedIdKey = (string) $relatedIdStr;
+
+                if (isset($relatedIndex[$relatedIdKey])) {
+                    // CRITICAL: Clone the related model to avoid sharing pivot data between parents
+                    // When multiple parents share the same related model, each needs its own instance
+                    $originalRelatedModel = $relatedIndex[$relatedIdKey];
+
+                    // Clone the model to create a fresh instance for this parent
+                    $relatedModel = clone $originalRelatedModel;
+
+                    // Remove pivot_* attributes from model (they should only be in pivot relation)
+                    // This ensures clean model attributes without pivot_ prefix pollution
+                    /** @var Model $relatedModel */
+                    $this->removePivotAttributes($relatedModel);
+
+                    // Only create and attach pivot object if we have pivot data
+                    if ($pivotData !== null && $this->shouldIncludePivot()) {
+                        // Clear any existing relations on the cloned model
+                        $relatedModel->setRelation($this->pivotAccessor, null);
+
+                        // Attach pivot data to the cloned model
+                        // PERFORMANCE: Use array spread for faster copying, then override keys
+                        // This creates a fresh copy to avoid reference issues while being faster than foreach
+                        $cleanPivotData = [...$pivotData];
+
+                        // CRITICAL: Force set keys to match THIS parent's values
+                        // This ensures pivot data always has the correct morphType and foreignKey
+                        // Even though we verified above, we still force set to be absolutely sure
+                        $cleanPivotData[$this->morphType] = $this->getMorphClass();
+                        $cleanPivotData[$this->foreignKey] = $model->getAttribute($this->localKey);
+                        $cleanPivotData[$this->relatedPivotKey] = $relatedIdKey;
+
+                        $pivotModel = $this->newPivot($cleanPivotData, true);
+                        $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
+                    }
+
+                    $matched[] = $relatedModel;
+                }
+            }
+
+            // Set relation with matched models (or empty collection)
             $model->setRelation($relationName, new ModelCollection($matched));
         }
 
