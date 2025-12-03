@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Brokers;
 
-use Toporia\Framework\Realtime\Contracts\{BrokerInterface, MessageInterface};
+use Toporia\Framework\Realtime\Contracts\{BrokerInterface, HealthCheckableInterface, HealthCheckResult, MessageInterface};
+use Toporia\Framework\Realtime\Exceptions\{BrokerException, BrokerTemporaryException};
 use Toporia\Framework\Realtime\RealtimeManager;
 
 /**
@@ -32,7 +33,7 @@ use Toporia\Framework\Realtime\RealtimeManager;
  *
  * @package Toporia\Framework\Realtime\Brokers
  */
-final class RedisBroker implements BrokerInterface
+final class RedisBroker implements BrokerInterface, HealthCheckableInterface
 {
     private \Redis $redis;
     private \Redis $subscriber;
@@ -46,11 +47,11 @@ final class RedisBroker implements BrokerInterface
     ) {
         // Runtime check: Ensure Redis extension is loaded
         if (!extension_loaded('redis')) {
-            throw new \RuntimeException(
-                "Redis extension is not installed. Please install it:\n" .
-                    "  Ubuntu/Debian: sudo apt-get install php-redis\n" .
-                    "  macOS: pecl install redis\n" .
-                    "  See EXTENSION_SETUP.md for detailed instructions."
+            throw BrokerException::invalidConfiguration(
+                'redis',
+                "Redis extension is not installed. Install it with:\n" .
+                "  Ubuntu/Debian: sudo apt-get install php-redis\n" .
+                "  macOS: pecl install redis"
             );
         }
 
@@ -66,8 +67,12 @@ final class RedisBroker implements BrokerInterface
 
         // Authenticate if password provided
         if (!empty($config['password'])) {
-            $this->redis->auth($config['password']);
-            $this->subscriber->auth($config['password']);
+            try {
+                $this->redis->auth($config['password']);
+                $this->subscriber->auth($config['password']);
+            } catch (\RedisException $e) {
+                throw BrokerException::connectionFailed('redis', "Authentication failed: {$e->getMessage()}", $e);
+            }
         }
 
         // Select database
@@ -93,7 +98,7 @@ final class RedisBroker implements BrokerInterface
             $this->redis->connect($host, $port, $timeout);
             $this->subscriber->connect($host, $port, $timeout);
         } catch (\RedisException $e) {
-            throw new \RuntimeException("Failed to connect to Redis: {$e->getMessage()}");
+            throw BrokerException::connectionFailed('redis', "{$host}:{$port} - {$e->getMessage()}", $e);
         }
     }
 
@@ -103,7 +108,7 @@ final class RedisBroker implements BrokerInterface
     public function publish(string $channel, MessageInterface $message): void
     {
         if (!$this->connected) {
-            throw new \RuntimeException('Redis broker not connected');
+            throw BrokerException::notConnected('redis');
         }
 
         // Publish to Redis channel
@@ -111,7 +116,11 @@ final class RedisBroker implements BrokerInterface
         $redisChannel = "realtime:{$channel}";
         $payload = $message->toJson();
 
-        $this->redis->publish($redisChannel, $payload);
+        try {
+            $this->redis->publish($redisChannel, $payload);
+        } catch (\RedisException $e) {
+            throw BrokerException::publishFailed('redis', $channel, $e->getMessage(), $e);
+        }
     }
 
     /**
@@ -120,7 +129,7 @@ final class RedisBroker implements BrokerInterface
     public function subscribe(string $channel, callable $callback): void
     {
         if (!$this->connected) {
-            throw new \RuntimeException('Redis broker not connected');
+            throw BrokerException::notConnected('redis');
         }
 
         $redisChannel = "realtime:{$channel}";
@@ -325,6 +334,58 @@ final class RedisBroker implements BrokerInterface
     public function getName(): string
     {
         return 'redis';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function healthCheck(): HealthCheckResult
+    {
+        if (!$this->connected) {
+            return HealthCheckResult::unhealthy('Redis broker not connected');
+        }
+
+        $start = microtime(true);
+
+        try {
+            // Ping Redis to check connection
+            $pong = $this->redis->ping();
+            $latencyMs = (microtime(true) - $start) * 1000;
+
+            if ($pong === true || $pong === '+PONG' || $pong === 'PONG') {
+                // Get additional info
+                $info = $this->redis->info('server');
+                $version = $info['redis_version'] ?? 'unknown';
+
+                return HealthCheckResult::healthy(
+                    message: 'Redis connection healthy',
+                    details: [
+                        'version' => $version,
+                        'connected_clients' => $info['connected_clients'] ?? 0,
+                    ],
+                    latencyMs: $latencyMs
+                );
+            }
+
+            return HealthCheckResult::degraded(
+                message: 'Redis ping returned unexpected response',
+                details: ['response' => $pong],
+                latencyMs: $latencyMs
+            );
+        } catch (\Throwable $e) {
+            return HealthCheckResult::unhealthy(
+                message: "Redis health check failed: {$e->getMessage()}",
+                details: ['exception' => $e::class]
+            );
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getHealthCheckName(): string
+    {
+        return 'redis-broker';
     }
 
     /**

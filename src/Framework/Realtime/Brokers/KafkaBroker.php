@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Realtime\Brokers;
 
-use Toporia\Framework\Realtime\Contracts\{BrokerInterface, MessageInterface};
+use Toporia\Framework\Realtime\Contracts\{BrokerInterface, HealthCheckableInterface, HealthCheckResult, MessageInterface};
 use Toporia\Framework\Realtime\{Message, RealtimeManager};
 use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
 use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyFactory;
+use Toporia\Framework\Realtime\Brokers\Kafka\Client\{KafkaClientFactory, KafkaClientInterface, KafkaMessage};
+use Toporia\Framework\Realtime\Exceptions\{BrokerException, BrokerTemporaryException};
 
 /**
  * Kafka Broker
@@ -17,17 +19,10 @@ use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyFactory;
  *
  * Performance:
  * - Latency: ~5ms (network dependent)
- * - Throughput: 1M+ messages/sec
+ * - Throughput: 1M+ messages/sec (rdkafka), ~10k/sec (kafka-php)
  * - Persistence: Durable messages with configurable retention
  * - Scalability: Partition-based horizontal scaling
  * - Replay: Message history and replay support
- *
- * Use Cases:
- * - High-throughput realtime systems
- * - Multi-server deployments with message persistence
- * - Event sourcing and audit trails
- * - Microservices architecture
- * - Message replay and recovery
  *
  * Architecture:
  * - Server A publishes to Kafka topic
@@ -35,360 +30,251 @@ use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyFactory;
  * - Each server consumes from its consumer group
  * - Messages are persisted for replay
  *
- * Dependencies:
- * - Requires Kafka PHP client library (e.g., nmred/kafka-php or enqueue/rdkafka)
- * - Kafka server must be running and accessible
- *
- * Configuration:
- * ```php
- * 'kafka' => [
- *     'driver' => 'kafka',
- *     'brokers' => ['localhost:9092'],
- *     'topic_prefix' => 'realtime',
- *     'consumer_group' => 'realtime-servers',
- *     'producer_config' => [...],
- *     'consumer_config' => [...],
- * ]
- * ```
- *
- * SOLID Principles:
- * - Single Responsibility: Only manages Kafka broker communication
- * - Open/Closed: Extensible via custom Kafka client injection
- * - Liskov Substitution: Implements BrokerInterface
- * - Interface Segregation: Minimal, focused interface
- * - Dependency Inversion: Can work with any Kafka client library
+ * Uses adapter pattern for Kafka client libraries:
+ * - rdkafka (librdkafka C extension) - High performance
+ * - kafka-php (nmred/kafka-php) - Pure PHP, portable
  *
  * @package Toporia\Framework\Realtime\Brokers
  */
-final class KafkaBroker implements BrokerInterface
+final class KafkaBroker implements BrokerInterface, HealthCheckableInterface
 {
-    /**
-     * @var object|null Kafka producer instance (client library dependent)
-     */
-    private ?object $producer = null;
+    private KafkaClientInterface $client;
+    private TopicStrategyInterface $topicStrategy;
+    private bool $connected = false;
 
     /**
-     * @var object|null Kafka consumer instance (client library dependent)
-     */
-    private ?object $consumer = null;
-
-    /**
-     * @var array<string, callable> Channel subscriptions
+     * @var array<string, array<string, callable>> Channel subscriptions [topic => [channel => callback]]
      */
     private array $subscriptions = [];
 
     /**
-     * @var bool Connection status
-     */
-    private bool $connected = false;
-
-    /**
-     * @var array Kafka broker configuration
-     */
-    private array $config;
-
-    /**
-     * @var string Topic prefix for all channels (legacy, kept for backward compatibility)
-     */
-    private string $topicPrefix;
-
-    /**
-     * @var string Consumer group ID
-     */
-    private string $consumerGroup;
-
-    /**
-     * @var array<string> Kafka broker addresses
-     */
-    private array $brokers;
-
-    /**
-     * @var TopicStrategyInterface Topic strategy for mapping channels to topics
-     */
-    private TopicStrategyInterface $topicStrategy;
-
-    /**
-     * @var bool Whether to use manual commit (more reliable)
-     */
-    private bool $manualCommit;
-
-    /**
-     * @var array<string, int> Channel → partition mapping cache
+     * @var array<string, int> Partition cache [topic:channel => partition]
      */
     private array $partitionCache = [];
 
     /**
-     * @var string Preferred Kafka client (auto|rdkafka|php)
-     */
-    private string $clientPreference = 'auto';
-
-    /**
-     * @var bool Whether consumer loop is running
-     */
-    private bool $consuming = false;
-
-    /**
-     * @var int|null Consumer process ID (for graceful shutdown)
-     */
-    private ?int $consumerPid = null;
-
-    /**
-     * @var array<string, \RdKafka\ProducerTopic> Cached topic instances (rdkafka only)
-     * Performance: O(1) topic lookup instead of creating new topic each time
-     */
-    private array $topicCache = [];
-
-    /**
-     * @var array<array> Message buffer for batching (rdkafka only)
-     * Accumulates messages before sending to reduce network round-trips
-     */
-    private array $messageBuffer = [];
-
-    /**
-     * @var int Maximum buffer size before flush
-     */
-    private int $bufferSize = 100;
-
-    /**
-     * @var int Last flush timestamp (for periodic flush)
-     */
-    private int $lastFlushTime = 0;
-
-    /**
-     * @var int Flush interval in milliseconds
-     */
-    private int $flushInterval = 100; // 100ms
-
-    /**
-     * @param array $config Kafka configuration
+     * @param array<string, mixed> $config Kafka configuration
      * @param RealtimeManager|null $manager Realtime manager instance
      */
     public function __construct(
-        array $config = [],
+        private readonly array $config = [],
         private readonly ?RealtimeManager $manager = null
     ) {
-        $this->config = $config;
-
-        // Ensure brokers is always an array
-        $brokers = $config['brokers'] ?? ['localhost:9092'];
-        $this->brokers = is_array($brokers) ? $brokers : [$brokers];
-
-        // Validate brokers not empty
-        if (empty($this->brokers) || empty($this->brokers[0])) {
-            throw new \InvalidArgumentException('Kafka brokers configuration is required. Set KAFKA_BROKERS environment variable or configure in config/realtime.php');
-        }
-
-        $this->topicPrefix = $config['topic_prefix'] ?? 'realtime';
-        $this->consumerGroup = $config['consumer_group'] ?? 'realtime-servers';
-        $this->manualCommit = (bool) ($config['manual_commit'] ?? false);
-        $this->clientPreference = strtolower((string) ($config['client'] ?? 'auto'));
-
-        // Initialize topic strategy
+        $this->client = KafkaClientFactory::create($config);
         $this->topicStrategy = TopicStrategyFactory::create($config);
-
-        // Initialize Kafka client
         $this->initialize();
     }
 
     /**
-     * Initialize Kafka producer and consumer.
-     *
-     * Supports multiple Kafka client libraries:
-     * - nmred/kafka-php (pure PHP)
-     * - enqueue/rdkafka (librdkafka C extension)
-     *
-     * @return void
-     * @throws \RuntimeException If Kafka client library not found
+     * Initialize Kafka client connection.
      */
     private function initialize(): void
     {
-        $client = $this->selectClient();
-
-        if ($client === 'rdkafka') {
-            $this->initializeRdKafka();
-        } elseif ($client === 'php') {
-            $this->initializeKafkaPhp();
-        } else {
-            throw new \RuntimeException('No supported Kafka client available.');
-        }
-
+        $this->client->connect();
         $this->connected = true;
     }
 
     /**
-     * Determine which Kafka client to use (rdkafka or nmred/php).
-     *
-     * @return string Client name ('rdkafka' or 'php')
-     * @throws \RuntimeException If no Kafka client is available
+     * {@inheritdoc}
      */
-    private function selectClient(): string
+    public function publish(string $channel, MessageInterface $message): void
     {
-        $rdkafkaAvailable = extension_loaded('rdkafka') && class_exists(\RdKafka\Producer::class);
-        $phpClientAvailable = class_exists(\Kafka\Producer::class);
-
-        // Runtime check: Ensure at least one Kafka client is available
-        if (!$rdkafkaAvailable && !$phpClientAvailable) {
-            throw new \RuntimeException(
-                "No Kafka client library found. Please install one of:\n" .
-                    "  Option 1 (Recommended): Install rdkafka extension + enqueue/rdkafka\n" .
-                    "    - sudo apt-get install librdkafka-dev\n" .
-                    "    - sudo pecl install rdkafka\n" .
-                    "    - composer require enqueue/rdkafka\n" .
-                    "  Option 2: nmred/kafka-php is already in composer.json\n" .
-                    "    - composer install (should already be installed)\n" .
-                    "  See EXTENSION_SETUP.md for detailed instructions."
-            );
+        if (!$this->connected) {
+            throw BrokerException::notConnected('kafka');
         }
 
-        $client = match ($this->clientPreference) {
-            'rdkafka' => $rdkafkaAvailable ? 'rdkafka' : ($phpClientAvailable ? 'php' : ''),
-            'php', 'kafka-php', 'nmred' => $phpClientAvailable ? 'php' : ($rdkafkaAvailable ? 'rdkafka' : ''),
-            default => $rdkafkaAvailable ? 'rdkafka' : ($phpClientAvailable ? 'php' : ''),
-        };
+        $topicName = $this->getTopicName($channel);
+        $partition = $this->getPartition($channel, $topicName);
+        $key = $this->getMessageKey($channel);
+        $payload = $message->toJson();
 
-        // Log which client is being used
-        if ($client === 'rdkafka') {
-            error_log('[Kafka] Using rdkafka extension (high performance)');
-        } elseif ($client === 'php') {
-            error_log('[Kafka] Using nmred/kafka-php (pure PHP)');
-        }
-
-        return $client;
-    }
-
-    /**
-     * Initialize using enqueue/rdkafka (librdkafka).
-     *
-     * @return void
-     */
-    private function initializeRdKafka(): void
-    {
-        $producerConfig = new \RdKafka\Conf();
-        $consumerConfig = new \RdKafka\Conf();
-
-        // Apply custom producer config
-        $producerConfigArray = $this->sanitizeKafkaConfig($this->config['producer_config'] ?? []);
-        foreach ($producerConfigArray as $key => $value) {
-            $producerConfig->set($key, (string) $value);
-        }
-
-        // Apply custom consumer config
-        $consumerConfigArray = $this->sanitizeKafkaConfig($this->config['consumer_config'] ?? []);
-        foreach ($consumerConfigArray as $key => $value) {
-            $consumerConfig->set($key, (string) $value);
-        }
-
-        // Set consumer group
-        $consumerConfig->set('group.id', $this->consumerGroup);
-
-        // Manual commit for better reliability
-        $consumerConfig->set('enable.auto.commit', $this->manualCommit ? 'false' : 'true');
-        $consumerConfig->set('auto.offset.reset', 'earliest');
-
-        // Build broker list once (validated in constructor)
-        $brokerList = implode(',', $this->brokers);
-
-        // Set bootstrap.servers for producer (required for rdkafka)
-        $producerConfig->set('bootstrap.servers', $brokerList);
-        $producerConfig->set('metadata.broker.list', $brokerList);
-
-        // Create producer
-        $producer = new \RdKafka\Producer($producerConfig);
-        $producer->addBrokers($brokerList); // Legacy method, kept for compatibility
-        $this->producer = $producer;
-
-        // Ensure consumer config knows how to reach the cluster
-        $consumerConfig->set('bootstrap.servers', $brokerList);
-        $consumerConfig->set('metadata.broker.list', $brokerList);
-
-        // Create consumer (will be initialized when subscribing)
-        $this->consumer = new \RdKafka\KafkaConsumer($consumerConfig);
-    }
-
-    /**
-     * Initialize using nmred/kafka-php.
-     *
-     * @return void
-     */
-    private function initializeKafkaPhp(): void
-    {
-        if (!class_exists(\Kafka\ProducerConfig::class)) {
-            throw new \RuntimeException('nmred/kafka-php library not found');
-        }
-
-        // Validate brokers format
-        $brokerList = implode(',', array_filter($this->brokers, fn($b) => !empty($b)));
-
-        if (empty($brokerList)) {
-            throw new \InvalidArgumentException(
-                'Kafka brokers list is empty. ' .
-                    'Configure KAFKA_BROKERS environment variable (e.g., KAFKA_BROKERS=localhost:9092) ' .
-                    'or set in config/realtime.php'
-            );
-        }
-
-        // Producer config (singleton - clear first to avoid stale config)
-        /** @var \Kafka\ProducerConfig $producerConfig */
-        $producerConfig = \Kafka\ProducerConfig::getInstance();
-        $producerConfig->clear(); // Clear any existing config
-
-        // Set metadata broker list first (required)
         try {
-            $producerConfig->setMetadataBrokerList($brokerList);
-        } catch (\Kafka\Exception\Config $e) {
-            throw new \InvalidArgumentException(
-                "Invalid Kafka broker configuration: {$e->getMessage()}. " .
-                    "Brokers: {$brokerList}. " .
-                    "Format should be: host:port,host:port (e.g., localhost:9092)"
-            );
+            $this->client->publish($topicName, $payload, $partition, $key);
+        } catch (BrokerException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw BrokerException::publishFailed('kafka', $channel, $e->getMessage(), $e);
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function subscribe(string $channel, callable $callback): void
+    {
+        if (!$this->connected) {
+            throw BrokerException::notConnected('kafka');
         }
 
-        // Verify it was set
-        $actualBrokerList = $producerConfig->getMetadataBrokerList();
-        if (empty($actualBrokerList)) {
-            throw new \RuntimeException(
-                "Failed to set Kafka metadata broker list. " .
-                    "Expected: {$brokerList}, Got: " . var_export($actualBrokerList, true)
-            );
+        $topicName = $this->getTopicName($channel);
+
+        // Store callback with channel mapping
+        if (!isset($this->subscriptions[$topicName])) {
+            $this->subscriptions[$topicName] = [];
+        }
+        $this->subscriptions[$topicName][$channel] = $callback;
+    }
+
+    /**
+     * Start consuming messages from subscribed topics.
+     *
+     * @param int $timeoutMs Poll timeout in milliseconds
+     * @param int $batchSize Maximum messages per batch
+     */
+    public function consume(int $timeoutMs = 1000, int $batchSize = 100): void
+    {
+        if (empty($this->subscriptions)) {
+            return;
         }
 
-        // Apply producer config with performance optimizations
-        $producerConfigArray = $this->sanitizeKafkaConfig($this->config['producer_config'] ?? []);
+        $topics = array_keys($this->subscriptions);
 
-        // Set default performance optimizations if not specified
-        if (!isset($producerConfigArray['compression.type'])) {
-            $producerConfigArray['compression.type'] = 'gzip'; // Safe default compression
-        }
-        if (!isset($producerConfigArray['batch.size'])) {
-            $producerConfigArray['batch.size'] = '16384'; // 16KB batch
-        }
-        if (!isset($producerConfigArray['linger.ms'])) {
-            $producerConfigArray['linger.ms'] = '10'; // Wait 10ms for batch
+        try {
+            $this->client->subscribe($topics);
+        } catch (\Throwable $e) {
+            throw BrokerException::subscribeFailed('kafka', implode(',', $topics), $e->getMessage(), $e);
         }
 
-        // Apply buffer size from config
-        $this->bufferSize = (int) ($this->config['buffer_size'] ?? 100);
-        $this->flushInterval = (int) ($this->config['flush_interval_ms'] ?? 100);
+        $this->client->consume(
+            callback: fn(KafkaMessage $msg) => $this->processMessage($msg),
+            timeoutMs: $timeoutMs,
+            batchSize: $batchSize
+        );
+    }
 
-        foreach ($producerConfigArray as $key => $value) {
-            try {
-                $producerConfig->set($key, $value);
-            } catch (\Throwable $e) {
-                // Ignore invalid config keys
-                error_log("Warning: Invalid producer config key '{$key}': {$e->getMessage()}");
+    /**
+     * Process a consumed Kafka message.
+     *
+     * @param KafkaMessage $kafkaMessage
+     * @return bool True to continue consuming
+     */
+    private function processMessage(KafkaMessage $kafkaMessage): bool
+    {
+        if ($kafkaMessage->hasError()) {
+            return true; // Continue on error (handled by client)
+        }
+
+        $topicName = $kafkaMessage->topic;
+        $payload = $kafkaMessage->payload;
+        $messageKey = $kafkaMessage->key;
+
+        if (empty($topicName) || empty($payload)) {
+            return true;
+        }
+
+        $subscriptions = $this->subscriptions[$topicName] ?? null;
+        if (!$subscriptions) {
+            return true;
+        }
+
+        try {
+            $message = Message::fromJson($payload);
+            $channel = $messageKey ?? $this->extractChannelFromTopic($topicName);
+
+            // Find and execute callback
+            $callback = $subscriptions[$channel] ?? null;
+
+            if ($callback !== null) {
+                $callback($message);
+            } else {
+                // Fallback: execute first available callback
+                foreach ($subscriptions as $cb) {
+                    if (is_callable($cb)) {
+                        $cb($message);
+                        break;
+                    }
+                }
+            }
+
+            // Commit offset after successful processing
+            if ($this->config['manual_commit'] ?? false) {
+                $this->client->commit($kafkaMessage);
+            }
+
+        } catch (\Throwable $e) {
+            error_log("Kafka message processing error on {$topicName}: {$e->getMessage()}");
+            // Don't re-throw - let consumer continue
+        }
+
+        return true;
+    }
+
+    /**
+     * Stop consuming messages.
+     */
+    public function stopConsuming(): void
+    {
+        $this->client->stopConsuming();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function unsubscribe(string $channel): void
+    {
+        $topicName = $this->getTopicName($channel);
+
+        if (isset($this->subscriptions[$topicName][$channel])) {
+            unset($this->subscriptions[$topicName][$channel]);
+
+            if (empty($this->subscriptions[$topicName])) {
+                unset($this->subscriptions[$topicName]);
             }
         }
+    }
 
-        // Producer will be created lazily when needed (on first publish)
-        // This avoids connection errors if Kafka is not running
-        // Consumer will be created when subscribing
-        // (nmred/kafka-php uses separate consumer instances)
+    /**
+     * {@inheritdoc}
+     */
+    public function getSubscriberCount(string $channel): int
+    {
+        $topicName = $this->getTopicName($channel);
+        return isset($this->subscriptions[$topicName][$channel]) ? 1 : 0;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function isConnected(): bool
+    {
+        return $this->connected && $this->client->isConnected();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function disconnect(): void
+    {
+        if (!$this->connected) {
+            return;
+        }
+
+        $this->client->disconnect();
+        $this->connected = false;
+        $this->subscriptions = [];
+        $this->partitionCache = [];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getName(): string
+    {
+        return 'kafka';
+    }
+
+    /**
+     * Get the underlying Kafka client.
+     *
+     * @return KafkaClientInterface
+     */
+    public function getClient(): KafkaClientInterface
+    {
+        return $this->client;
     }
 
     /**
      * Get Kafka topic name for a channel.
-     *
-     * Uses topic strategy for flexible topic mapping.
      *
      * @param string $channel Channel name
      * @return string Topic name
@@ -401,22 +287,20 @@ final class KafkaBroker implements BrokerInterface
     /**
      * Get partition number for a channel.
      *
-     * Uses topic strategy for consistent partitioning.
-     *
      * @param string $channel Channel name
      * @param string $topicName Topic name
      * @return int Partition number
      */
     private function getPartition(string $channel, string $topicName): int
     {
-        // Cache partition calculation
         $cacheKey = "{$topicName}:{$channel}";
+
         if (isset($this->partitionCache[$cacheKey])) {
             return $this->partitionCache[$cacheKey];
         }
 
-        // Get partition count for topic (default to 10 if not configured)
-        $partitionCount = 10; // Default, can be configured per topic
+        $partitionCount = (int) ($this->config['default_partitions'] ?? 10);
+
         if ($this->topicStrategy instanceof \Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\GroupedTopicStrategy) {
             $partitionCount = $this->topicStrategy->getPartitionCount($channel);
         }
@@ -428,9 +312,7 @@ final class KafkaBroker implements BrokerInterface
     }
 
     /**
-     * Get message key for a channel.
-     *
-     * Used for partitioning and message ordering.
+     * Get message key for partitioning.
      *
      * @param string $channel Channel name
      * @return string|null Message key
@@ -441,700 +323,66 @@ final class KafkaBroker implements BrokerInterface
     }
 
     /**
-     * {@inheritdoc}
-     *
-     * Performance Optimizations:
-     * - Topic caching (rdkafka): Reuse topic instances
-     * - Message batching (rdkafka): Accumulate messages before sending
-     * - Lazy producer initialization: Create only when needed
-     * - Async flush: Batch flush instead of per-message
-     *
-     * @param string $channel Channel name
-     * @param MessageInterface $message Message to publish
-     * @return void
-     */
-    public function publish(string $channel, MessageInterface $message): void
-    {
-        if (!$this->connected) {
-            throw new \RuntimeException('Kafka broker not connected');
-        }
-
-        $topicName = $this->getTopicName($channel);
-        $partition = $this->getPartition($channel, $topicName);
-        $key = $this->getMessageKey($channel);
-        $payload = $message->toJson();
-
-        // Publish to Kafka topic
-        if ($this->producer instanceof \RdKafka\Producer) {
-            // Using enqueue/rdkafka - optimized with batching and topic caching
-            $this->publishRdKafka($topicName, $partition, $key, $payload);
-        } elseif (class_exists(\Kafka\Producer::class)) {
-            // Using nmred/kafka-php - lazy initialization
-            if ($this->producer === null) {
-                /** @var \Kafka\Producer $producer */
-                $this->producer = new \Kafka\Producer();
-            }
-
-            /** @var \Kafka\Producer $producer */
-            $producer = $this->producer;
-
-            // Suppress precision warnings (Kafka library handles large values internally)
-            @$producer->send([
-                [
-                    'topic' => $topicName,
-                    'value' => $payload,
-                    'partition' => $partition,
-                    'key' => $key,
-                ]
-            ]);
-        } else {
-            throw new \RuntimeException('Kafka producer not initialized');
-        }
-    }
-
-    /**
-     * Publish using rdkafka with performance optimizations.
-     *
-     * Optimizations:
-     * - Topic caching: Reuse topic instances (O(1) lookup)
-     * - Message batching: Accumulate messages before flush
-     * - Periodic flush: Flush based on time or buffer size
-     *
-     * @param string $topicName Topic name
-     * @param string $payload Message payload
-     * @return void
-     */
-    private function publishRdKafka(string $topicName, int $partition, ?string $key, string $payload): void
-    {
-        /** @var \RdKafka\Producer $producer */
-        $producer = $this->producer;
-
-        // Get or create cached topic (performance: O(1) lookup)
-        if (!isset($this->topicCache[$topicName])) {
-            $this->topicCache[$topicName] = $producer->newTopic($topicName);
-        }
-        $topic = $this->topicCache[$topicName];
-
-        // Add to buffer for batching
-        $this->messageBuffer[] = [
-            'topic' => $topic,
-            'partition' => $partition,
-            'key' => $key,
-            'payload' => $payload,
-            'timestamp' => microtime(true) * 1000 // milliseconds
-        ];
-
-        // Flush if buffer is full (batch optimization)
-        if (count($this->messageBuffer) >= $this->bufferSize) {
-            $this->flushRdKafka($producer);
-            return;
-        }
-
-        // Periodic flush based on time (even if buffer not full)
-        $now = (int) (microtime(true) * 1000);
-        if ($now - $this->lastFlushTime >= $this->flushInterval) {
-            $this->flushRdKafka($producer);
-        }
-    }
-
-    /**
-     * Flush buffered messages to Kafka (rdkafka).
-     *
-     * Performance: Batch send reduces network round-trips.
-     *
-     * @param \RdKafka\Producer $producer Producer instance
-     * @return void
-     */
-    private function flushRdKafka(\RdKafka\Producer $producer): void
-    {
-        if (empty($this->messageBuffer)) {
-            return;
-        }
-
-        // Send all buffered messages
-        foreach ($this->messageBuffer as $item) {
-            /** @var \RdKafka\ProducerTopic $topic */
-            $topic = $item['topic'];
-            $partition = $item['partition'] ?? RD_KAFKA_PARTITION_UA;
-            $key = $item['key'] ?? null;
-            $payload = $item['payload'];
-
-            // Use partition and key for better distribution
-            // producev() signature: producev(partition, msgflags, payload, key, headers)
-            if ($key !== null && method_exists($topic, 'producev')) {
-                $topic->producev($partition, 0, $payload, $key);
-            } else {
-                // Fallback: use produce() with partition
-                // Note: key won't be used, but partition will help distribution
-                $topic->produce($partition, 0, $payload);
-            }
-        }
-
-        // Non-blocking flush: poll multiple times to trigger delivery
-        // This is much faster than blocking flush(1000)
-        for ($i = 0; $i < 5; $i++) {
-            $producer->poll(0); // 0 = non-blocking
-        }
-
-        // Clear buffer
-        $this->messageBuffer = [];
-        $this->lastFlushTime = (int) (microtime(true) * 1000);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function subscribe(string $channel, callable $callback): void
-    {
-        if (!$this->connected) {
-            throw new \RuntimeException('Kafka broker not connected');
-        }
-
-        $topicName = $this->getTopicName($channel);
-
-        // Store callback with channel mapping for later use
-        if (!isset($this->subscriptions[$topicName])) {
-            $this->subscriptions[$topicName] = [];
-        }
-        $this->subscriptions[$topicName][$channel] = $callback;
-
-        // Subscribe to topic (consumer will be started separately via command)
-        // This method just registers the subscription
-    }
-
-    /**
-     * Start consuming messages from subscribed topics.
-     *
-     * This method is called by the Kafka consumer command.
-     * It runs in a loop, consuming messages and invoking callbacks.
-     *
-     * Performance Optimizations:
-     * - Batch processing for high throughput
-     * - Non-blocking poll with timeout
-     * - Graceful shutdown support
-     * - Error handling and retry logic
-     *
-     * @param int $timeoutMs Poll timeout in milliseconds
-     * @param int $batchSize Maximum messages per batch
-     * @return void
-     */
-    public function consume(int $timeoutMs = 1000, int $batchSize = 100): void
-    {
-        if (empty($this->subscriptions)) {
-            return; // No subscriptions
-        }
-
-        $this->consuming = true;
-        $topics = array_keys($this->subscriptions);
-
-        if ($this->consumer instanceof \RdKafka\KafkaConsumer) {
-            // Using enqueue/rdkafka
-            $this->consumeRdKafka($topics, $timeoutMs, $batchSize);
-        } elseif (class_exists(\Kafka\ConsumerConfig::class)) {
-            // Using nmred/kafka-php
-            $this->consumeKafkaPhp($topics, $timeoutMs, $batchSize);
-        } else {
-            throw new \RuntimeException('Kafka consumer not initialized. Please install a Kafka client library.');
-        }
-    }
-
-    /**
-     * Consume using enqueue/rdkafka.
-     *
-     * @param array<string> $topics Topic names
-     * @param int $timeoutMs Poll timeout
-     * @param int $batchSize Batch size
-     * @return void
-     */
-    private function consumeRdKafka(array $topics, int $timeoutMs, int $batchSize): void
-    {
-        /** @var \RdKafka\KafkaConsumer $consumer */
-        $consumer = $this->consumer;
-
-        // Subscribe to topics
-        try {
-            $consumer->subscribe($topics);
-
-            // Wait a bit for metadata to be refreshed after subscription
-            // This helps avoid "Unknown topic or partition" errors
-            usleep(500000); // 500ms delay to allow metadata refresh
-
-            // Force metadata refresh by doing a quick poll
-            // This ensures metadata is up-to-date before we start consuming
-            $consumer->consume(100); // Quick poll to trigger metadata refresh
-        } catch (\Throwable $e) {
-            error_log("Kafka consumer subscribe error: {$e->getMessage()}");
-            throw $e;
-        }
-
-        $processed = 0;
-        $batch = [];
-        $pollCount = 0;
-
-        while ($this->consuming) {
-            // Poll for messages (non-blocking with timeout)
-            // @ suppresses precision warnings from rdkafka (handled internally)
-            $message = @$consumer->consume($timeoutMs);
-
-            $pollCount++;
-
-            if ($message === null) {
-                continue; // Timeout, no message
-            }
-
-            // Handle errors
-            switch ($message->err) {
-                case RD_KAFKA_RESP_ERR_NO_ERROR:
-                    // Valid message
-                    $batch[] = $message;
-
-                    // Process batch when full
-                    if (count($batch) >= $batchSize) {
-                        $this->processBatch($batch);
-                        $batch = [];
-                    }
-                    break;
-
-                case RD_KAFKA_RESP_ERR__PARTITION_EOF:
-                case RD_KAFKA_RESP_ERR__TIMED_OUT:
-                    // End of partition or timeout (normal, continue)
-                    break;
-
-                case RD_KAFKA_RESP_ERR_UNKNOWN_TOPIC_OR_PART:
-                    // Unknown topic or partition - wait for metadata refresh
-                    usleep(1000000); // 1 second delay
-                    break;
-
-                default:
-                    // Error - only log critical errors
-                    if ($pollCount % 100 === 0) {
-                        error_log("Kafka consumer error: {$message->errstr()} (code: {$message->err})");
-                    }
-                    break;
-            }
-
-            // Process remaining batch periodically (every 10 messages or every 100ms)
-            // This ensures messages are processed even if batch not full
-            static $lastBatchFlushTime = 0;
-            $now = (int) (microtime(true) * 1000);
-            $shouldFlush = count($batch) > 0 && (
-                $processed % 10 === 0 || // Every 10 messages
-                ($now - $lastBatchFlushTime) >= 100 // Or every 100ms
-            );
-
-            if ($shouldFlush) {
-                $this->processBatch($batch);
-                $batch = [];
-                $lastBatchFlushTime = $now;
-            }
-
-            $processed++;
-        }
-
-        // Process remaining batch
-        if (!empty($batch)) {
-            $this->processBatch($batch);
-        }
-    }
-
-    /**
-     * Consume using nmred/kafka-php.
-     *
-     * @param array<string> $topics Topic names
-     * @param int $timeoutMs Poll timeout
-     * @param int $batchSize Batch size
-     * @return void
-     */
-    private function consumeKafkaPhp(array $topics, int $timeoutMs, int $batchSize): void
-    {
-        if (!class_exists(\Kafka\ConsumerConfig::class)) {
-            throw new \RuntimeException('nmred/kafka-php library not found');
-        }
-
-        // Create consumer config
-        /** @var \Kafka\ConsumerConfig $consumerConfig */
-        $consumerConfig = \Kafka\ConsumerConfig::getInstance();
-        $consumerConfig->clear(); // Clear any existing config
-
-        $brokerList = implode(',', $this->brokers);
-
-        try {
-            $consumerConfig->setMetadataBrokerList($brokerList);
-        } catch (\Kafka\Exception\Config $e) {
-            throw new \InvalidArgumentException(
-                "Invalid Kafka broker configuration: {$e->getMessage()}. " .
-                    "Brokers: {$brokerList}. " .
-                    "Make sure Kafka server is running and brokers are accessible."
-            );
-        }
-
-        $consumerConfig->setGroupId($this->consumerGroup);
-        $consumerConfig->setTopics($topics);
-        $consumerConfig->setOffsetReset('earliest'); // Always start from earliest for testing
-        $consumerConfig->setMaxBytes(1024 * 1024); // 1MB
-
-        // Verify config was set
-        $actualBrokerList = $consumerConfig->getMetadataBrokerList();
-        if (empty($actualBrokerList)) {
-            throw new \RuntimeException(
-                "Failed to set Kafka consumer metadata broker list. " .
-                    "Expected: {$brokerList}, Got: " . var_export($actualBrokerList, true) . ". " .
-                    "Make sure Kafka server is running at: {$brokerList}"
-            );
-        }
-
-        /** @var \Kafka\Consumer $consumer */
-        $consumer = new \Kafka\Consumer();
-
-        // nmred/kafka-php uses event-driven pattern with start() and callback
-        // Note: This is blocking and runs until stopConsuming() is called
-        // Wrap in try-catch to provide better error messages
-        try {
-            $batch = [];
-            $messageCount = 0;
-            $consumer->start(function ($topic, $partition, $message) use (&$batch, $batchSize, $topics, &$messageCount) {
-                $messageCount++;
-                if (!$this->consuming) {
-                    return false; // Stop consuming
-                }
-
-                try {
-                    // Check if we have subscription for this topic
-                    $subscriptions = $this->subscriptions[$topic] ?? null;
-                    if (!$subscriptions) {
-                        return true; // Continue but skip this message
-                    }
-
-                    // Decode message value
-                    $payload = $message['value'] ?? '';
-                    if (empty($payload)) {
-                        return true;
-                    }
-
-                    // Create message object
-                    $msg = Message::fromJson($payload);
-
-                    // Handle array of callbacks per channel (new format)
-                    if (is_array($subscriptions)) {
-                        // For grouped topics, extract channel from message key or use topic name
-                        // IMPORTANT: For 'orders.events' topic, the channel should be 'orders.events' itself
-                        $channel = $message['key'] ?? $topic;
-
-                        // If no key, try to find callback by topic name first
-                        if (!isset($subscriptions[$channel])) {
-                            // Try topic name as channel
-                            $channel = $topic;
-                        }
-
-                        $callback = $subscriptions[$channel] ?? null;
-
-                        if ($callback) {
-                            $callback($msg);
-                        } else {
-                            // Fallback: try all callbacks (for backward compatibility)
-                            foreach ($subscriptions as $cb) {
-                                if (is_callable($cb)) {
-                                    $cb($msg);
-                                    break; // Use first available callback
-                                }
-                            }
-                        }
-                    } elseif (is_callable($subscriptions)) {
-                        // Old format: single callback
-                        $subscriptions($msg);
-                    }
-
-                    $batch[] = ['topic' => $topic, 'message' => $msg];
-
-                    // Process batch when full
-                    if (count($batch) >= $batchSize) {
-                        $batch = []; // Reset batch (messages already processed via callback)
-                    }
-                } catch (\Throwable $e) {
-                    error_log("Error processing Kafka message on {$topic}: {$e->getMessage()}");
-                    error_log("Stack trace: " . $e->getTraceAsString());
-                }
-
-                return true; // Continue consuming
-            }, true); // isBlock = true (blocking mode)
-        } catch (\Kafka\Exception $e) {
-            throw new \RuntimeException(
-                "Kafka consumer error: {$e->getMessage()}. " .
-                    "Make sure Kafka server is running at: " . implode(',', $this->brokers) . " " .
-                    "and topics exist: " . implode(',', $topics)
-            );
-        }
-    }
-
-    /**
-     * Process batch of messages (rdkafka format).
-     *
-     * @param array<\RdKafka\Message> $batch Message batch
-     * @return void
-     */
-    private function processBatch(array $batch): void
-    {
-        /** @var \RdKafka\KafkaConsumer|null $consumer */
-        $consumer = $this->consumer instanceof \RdKafka\KafkaConsumer ? $this->consumer : null;
-
-        foreach ($batch as $message) {
-            try {
-                // Access message properties safely (offset/partition may be very large floats)
-                // Suppress precision warnings for large Kafka offsets
-                $topicName = @$message->topic_name ?? '';
-                $payload = @$message->payload ?? '';
-                $key = @$message->key ?? null;
-
-                if (empty($topicName) || empty($payload)) {
-                    continue;
-                }
-
-                $this->processMessage($topicName, $payload, $key);
-
-                // Manual commit after successful processing
-                if ($this->manualCommit && $consumer) {
-                    try {
-                        // Suppress precision loss warnings for large offsets
-                        // Kafka offsets can be very large (64-bit), but PHP int is platform-dependent
-                        // The commit() method will handle the conversion internally
-                        @$consumer->commit($message);
-                    } catch (\RdKafka\Exception $e) {
-                        // Log but don't fail the batch - offset commit is best-effort
-                        error_log("Failed to commit offset: {$e->getMessage()}");
-                    } catch (\TypeError $e) {
-                        // Handle precision loss warning for very large offsets
-                        // This can happen with 64-bit offsets on 32-bit PHP or with very large offset values
-                        // Try to commit asynchronously or skip commit for this message
-                        // The consumer will still process messages correctly
-                    } catch (\Throwable $e) {
-                        // Catch any other errors during commit (including precision warnings)
-                        if (!str_contains($e->getMessage(), 'Implicit conversion') && !str_contains($e->getMessage(), 'loses precision')) {
-                            error_log("Error committing offset: {$e->getMessage()}");
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Don't commit on error - message will be retried
-                // Suppress precision warnings from message property access
-                error_log("Error processing message: {$e->getMessage()}");
-                throw $e; // Re-throw to trigger DLQ
-            }
-        }
-    }
-
-    /**
-     * Process batch of messages (kafka-php format).
-     *
-     * @param array<array> $batch Message batch
-     * @return void
-     */
-    private function processBatchKafkaPhp(array $batch): void
-    {
-        foreach ($batch as $message) {
-            $topicName = $message['topic_name'];
-            $payload = $message['message']['value'];
-            $this->processMessage($topicName, $payload);
-        }
-    }
-
-    /**
-     * Process a single message.
-     *
-     * Supports both old format (single callback) and new format (array of callbacks per channel).
-     *
-     * @param string $topicName Topic name
-     * @param string $payload Message payload
-     * @param string|null $messageKey Message key (channel name if using grouped strategy)
-     * @return void
-     */
-    private function processMessage(string $topicName, string $payload, ?string $messageKey = null): void
-    {
-        $subscriptions = $this->subscriptions[$topicName] ?? null;
-
-        if (!$subscriptions) {
-            return; // No subscription for this topic
-        }
-
-        try {
-            // Decode message
-            $message = Message::fromJson($payload);
-
-            // Determine channel from message key or topic name
-            $channel = $messageKey ?? $this->extractChannelFromTopic($topicName);
-
-            // Handle new format: array of callbacks per channel
-            if (is_array($subscriptions)) {
-                $callback = $subscriptions[$channel] ?? null;
-                if ($callback) {
-                    $callback($message);
-                } else {
-                    // Fallback: try all callbacks (for backward compatibility)
-                    foreach ($subscriptions as $cb) {
-                        if (is_callable($cb)) {
-                            $cb($message);
-                        }
-                    }
-                }
-            } elseif (is_callable($subscriptions)) {
-                // Old format: single callback (backward compatibility)
-                $subscriptions($message);
-            }
-        } catch (\Throwable $e) {
-            error_log("Kafka message processing error on {$topicName}: {$e->getMessage()}");
-            throw $e; // Re-throw for batch processing
-        }
-    }
-
-    /**
      * Extract channel name from topic name.
-     *
-     * Used for backward compatibility with old topic naming.
      *
      * @param string $topicName Topic name
      * @return string Channel name
      */
     private function extractChannelFromTopic(string $topicName): string
     {
-        // Remove topic prefix
-        if (str_starts_with($topicName, $this->topicPrefix . '_')) {
-            return str_replace($this->topicPrefix . '_', '', $topicName);
+        $prefix = $this->config['topic_prefix'] ?? 'realtime';
+
+        if (str_starts_with($topicName, $prefix . '_')) {
+            return substr($topicName, strlen($prefix) + 1);
         }
 
-        // For grouped topics, try to extract from message or use topic name
         return $topicName;
     }
 
     /**
-     * Remove invalid/sentinel config values before passing to Kafka clients.
-     *
-     * @param array $config
-     * @return array
-     */
-    private function sanitizeKafkaConfig(array $config): array
-    {
-        foreach (['compression.type', 'compression.codec'] as $compressionKey) {
-            if (!isset($config[$compressionKey])) {
-                continue;
-            }
-
-            $value = (string) $config[$compressionKey];
-            if ($value === '' || strcasecmp($value, 'none') === 0 || strcasecmp($value, 'off') === 0) {
-                unset($config[$compressionKey]);
-            }
-        }
-
-        return $config;
-    }
-
-    /**
-     * Stop consuming messages.
-     *
-     * @return void
-     */
-    public function stopConsuming(): void
-    {
-        $this->consuming = false;
-    }
-
-    /**
      * {@inheritdoc}
      */
-    public function unsubscribe(string $channel): void
-    {
-        $topicName = $this->getTopicName($channel);
-
-        // Handle both old format (single callback) and new format (array of callbacks)
-        if (isset($this->subscriptions[$topicName])) {
-            if (is_array($this->subscriptions[$topicName])) {
-                unset($this->subscriptions[$topicName][$channel]);
-                // Remove topic entry if no more channels
-                if (empty($this->subscriptions[$topicName])) {
-                    unset($this->subscriptions[$topicName]);
-                }
-            } else {
-                // Old format: single callback
-                unset($this->subscriptions[$topicName]);
-            }
-        }
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getSubscriberCount(string $channel): int
-    {
-        $topicName = $this->getTopicName($channel);
-        $subscriptions = $this->subscriptions[$topicName] ?? null;
-
-        if (!$subscriptions) {
-            return 0;
-        }
-
-        // Handle both formats
-        if (is_array($subscriptions)) {
-            return isset($subscriptions[$channel]) ? 1 : 0;
-        }
-
-        return 1; // Old format: single callback
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function isConnected(): bool
-    {
-        return $this->connected;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function disconnect(): void
+    public function healthCheck(): HealthCheckResult
     {
         if (!$this->connected) {
-            return;
+            return HealthCheckResult::unhealthy('Kafka broker not connected');
         }
 
-        $this->stopConsuming();
+        $start = microtime(true);
 
-        // Flush any remaining buffered messages before disconnect
-        if ($this->producer instanceof \RdKafka\Producer && !empty($this->messageBuffer)) {
-            $this->flushRdKafka($this->producer);
-        }
-
-        // Close connections
-        if ($this->producer instanceof \RdKafka\Producer) {
-            // Flush before closing
-            if (method_exists($this->producer, 'flush')) {
-                $this->producer->flush(5000); // 5 second timeout for final flush
+        try {
+            // Check if client is connected
+            if (!$this->client->isConnected()) {
+                return HealthCheckResult::unhealthy('Kafka client connection lost');
             }
-            $this->producer = null;
+
+            $latencyMs = (microtime(true) - $start) * 1000;
+
+            return HealthCheckResult::healthy(
+                message: 'Kafka connection healthy',
+                details: [
+                    'client' => $this->client->getName(),
+                    'subscriptions' => count($this->subscriptions),
+                    'topics' => array_keys($this->subscriptions),
+                ],
+                latencyMs: $latencyMs
+            );
+        } catch (\Throwable $e) {
+            return HealthCheckResult::unhealthy(
+                message: "Kafka health check failed: {$e->getMessage()}",
+                details: ['exception' => $e::class]
+            );
         }
-
-        if ($this->consumer instanceof \RdKafka\KafkaConsumer) {
-            $this->consumer->unsubscribe();
-            $this->consumer = null;
-        }
-
-        // Clear caches
-        $this->topicCache = [];
-        $this->messageBuffer = [];
-
-        $this->connected = false;
-        $this->subscriptions = [];
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getName(): string
+    public function getHealthCheckName(): string
     {
-        return 'kafka';
+        return 'kafka-broker';
     }
 
-    /**
-     * Destructor - ensure clean disconnect.
-     */
     public function __destruct()
     {
         $this->disconnect();

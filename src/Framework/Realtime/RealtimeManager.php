@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime;
 
 use Toporia\Framework\Realtime\Contracts\{BrokerInterface, ChannelInterface, ConnectionInterface, RealtimeManagerInterface, TransportInterface};
+use Toporia\Framework\Realtime\Exceptions\{BrokerException, ChannelException, RateLimitException};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
@@ -84,6 +85,8 @@ final class RealtimeManager implements RealtimeManagerInterface
 
     private string $defaultTransport;
     private ?string $defaultBroker;
+    private ?RateLimiter $rateLimiter = null;
+    private bool $validateInput = true;
 
     /**
      * @param array $config Realtime configuration
@@ -95,6 +98,18 @@ final class RealtimeManager implements RealtimeManagerInterface
     ) {
         $this->defaultTransport = $config['default_transport'] ?? 'memory';
         $this->defaultBroker = $config['default_broker'] ?? null;
+
+        // Initialize rate limiter from config
+        $rateLimitConfig = $config['rate_limit'] ?? [];
+        if ($rateLimitConfig['enabled'] ?? false) {
+            $this->rateLimiter = new RateLimiter(
+                maxMessages: (int) ($rateLimitConfig['messages_per_minute'] ?? 60),
+                windowSeconds: 60,
+                enabled: true
+            );
+        }
+
+        $this->validateInput = (bool) ($config['validate_input'] ?? true);
     }
 
     /**
@@ -128,6 +143,17 @@ final class RealtimeManager implements RealtimeManagerInterface
      */
     public function broadcast(string $channel, string $event, mixed $data): void
     {
+        // Validate input if enabled
+        if ($this->validateInput) {
+            ChannelValidator::validateChannel($channel);
+            ChannelValidator::validateEvent($event);
+        }
+
+        // Check rate limit
+        if ($this->rateLimiter !== null) {
+            $this->rateLimiter->check("channel:{$channel}");
+        }
+
         $message = Message::event($channel, $event, $data);
 
         // Always broadcast locally first (for clients on this server)
@@ -138,7 +164,12 @@ final class RealtimeManager implements RealtimeManagerInterface
         // Producer can be called from anywhere (HTTP, CLI, jobs, events, etc.)
         // Consumer is ONLY in CLI commands (long-lived processes)
         if ($broker = $this->broker()) {
-            $broker->publish($channel, $message);
+            try {
+                $broker->publish($channel, $message);
+            } catch (BrokerException $e) {
+                // Log but don't fail the broadcast - local clients still receive it
+                error_log("Broker publish failed for channel {$channel}: {$e->getMessage()}");
+            }
         }
     }
 
@@ -160,6 +191,12 @@ final class RealtimeManager implements RealtimeManagerInterface
      */
     public function broadcastLocal(string $channel, string $event, mixed $data): void
     {
+        // Validate input if enabled
+        if ($this->validateInput) {
+            ChannelValidator::validateChannel($channel);
+            ChannelValidator::validateEvent($event);
+        }
+
         $message = Message::event($channel, $event, $data);
 
         // Broadcast locally only (no broker publish)
@@ -211,6 +248,11 @@ final class RealtimeManager implements RealtimeManagerInterface
      */
     public function channel(string $name): ChannelInterface
     {
+        // Validate channel name
+        if ($this->validateInput) {
+            ChannelValidator::validateChannel($name);
+        }
+
         // Return cached channel if exists
         if (isset($this->channels[$name])) {
             return $this->channels[$name];
@@ -223,6 +265,36 @@ final class RealtimeManager implements RealtimeManagerInterface
         $this->channels[$name] = new Channel($name, $transport, $authorizer);
 
         return $this->channels[$name];
+    }
+
+    /**
+     * Get rate limiter instance.
+     *
+     * @return RateLimiter|null
+     */
+    public function getRateLimiter(): ?RateLimiter
+    {
+        return $this->rateLimiter;
+    }
+
+    /**
+     * Set rate limiter instance.
+     *
+     * @param RateLimiter|null $rateLimiter
+     */
+    public function setRateLimiter(?RateLimiter $rateLimiter): void
+    {
+        $this->rateLimiter = $rateLimiter;
+    }
+
+    /**
+     * Enable or disable input validation.
+     *
+     * @param bool $validate
+     */
+    public function setValidateInput(bool $validate): void
+    {
+        $this->validateInput = $validate;
     }
 
     /**

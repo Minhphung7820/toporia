@@ -8,7 +8,8 @@ use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
-use Toporia\Framework\Realtime\Contracts\{BrokerInterface, MessageInterface};
+use Toporia\Framework\Realtime\Contracts\{BrokerInterface, HealthCheckableInterface, HealthCheckResult, MessageInterface};
+use Toporia\Framework\Realtime\Exceptions\{BrokerException, BrokerTemporaryException};
 use Toporia\Framework\Realtime\{Message, RealtimeManager};
 
 /**
@@ -17,7 +18,7 @@ use Toporia\Framework\Realtime\{Message, RealtimeManager};
  * Durable AMQP broker with topic exchange routing.
  * Optimized for enterprise messaging with guaranteed delivery.
  */
-final class RabbitMqBroker implements BrokerInterface
+final class RabbitMqBroker implements BrokerInterface, HealthCheckableInterface
 {
     private ?AMQPStreamConnection $connection = null;
     private ?AMQPChannel $channel = null;
@@ -63,19 +64,27 @@ final class RabbitMqBroker implements BrokerInterface
         $password = $this->config['password'] ?? 'guest';
         $vhost = $this->config['vhost'] ?? '/';
 
-        $this->connection = new AMQPStreamConnection($host, $port, $user, $password, $vhost);
-        $this->channel = $this->connection->channel();
+        try {
+            $this->connection = new AMQPStreamConnection($host, $port, $user, $password, $vhost);
+            $this->channel = $this->connection->channel();
+        } catch (\Throwable $e) {
+            throw BrokerException::connectionFailed('rabbitmq', "{$host}:{$port} - {$e->getMessage()}", $e);
+        }
 
         $durable = (bool) ($this->config['exchange_durable'] ?? true);
         $autoDelete = (bool) ($this->config['exchange_auto_delete'] ?? false);
 
-        $this->channel->exchange_declare(
-            $this->exchange,
-            $this->exchangeType,
-            false,
-            $durable,
-            $autoDelete
-        );
+        try {
+            $this->channel->exchange_declare(
+                $this->exchange,
+                $this->exchangeType,
+                false,
+                $durable,
+                $autoDelete
+            );
+        } catch (\Throwable $e) {
+            throw BrokerException::connectionFailed('rabbitmq', "Exchange declare failed: {$e->getMessage()}", $e);
+        }
 
         $prefetch = (int) ($this->config['prefetch_count'] ?? 50);
         if ($prefetch > 0) {
@@ -108,7 +117,11 @@ final class RabbitMqBroker implements BrokerInterface
             'timestamp' => now()->getTimestamp(),
         ]);
 
-        $this->channel?->basic_publish($msg, $this->exchange, $routingKey);
+        try {
+            $this->channel?->basic_publish($msg, $this->exchange, $routingKey);
+        } catch (\Throwable $e) {
+            throw BrokerException::publishFailed('rabbitmq', $channel, $e->getMessage(), $e);
+        }
     }
 
     public function subscribe(string $channel, callable $callback): void
@@ -280,10 +293,28 @@ final class RabbitMqBroker implements BrokerInterface
         $exclusive = (bool) ($this->config['queue_exclusive'] ?? true);
         $autoDelete = (bool) ($this->config['queue_auto_delete'] ?? true);
         $queuePrefix = $this->config['queue_prefix'] ?? 'realtime';
-        $queueName = $exclusive ? '' : sprintf('%s.%s.%d', $queuePrefix, gethostname() ?: 'app', getmypid());
 
-        [$queue] = $this->channel->queue_declare($queueName, false, $durable, $exclusive, $autoDelete);
-        $this->queueName = $queue;
+        // Generate unique queue name for containers
+        // Use multiple sources to ensure uniqueness:
+        // - HOSTNAME env var (Kubernetes/Docker)
+        // - gethostname() (fallback)
+        // - Random suffix for additional uniqueness on restarts
+        $hostname = $_ENV['HOSTNAME'] ?? getenv('HOSTNAME') ?: (gethostname() ?: 'app');
+        $uniqueSuffix = bin2hex(random_bytes(4)); // 8 char random suffix
+
+        $queueName = $exclusive ? '' : sprintf(
+            '%s.%s.%s',
+            $queuePrefix,
+            $hostname,
+            $uniqueSuffix
+        );
+
+        try {
+            [$queue] = $this->channel->queue_declare($queueName, false, $durable, $exclusive, $autoDelete);
+            $this->queueName = $queue;
+        } catch (\Throwable $e) {
+            throw BrokerException::connectionFailed('rabbitmq', "Queue declare failed: {$e->getMessage()}", $e);
+        }
 
         return $this->queueName;
     }
@@ -291,6 +322,59 @@ final class RabbitMqBroker implements BrokerInterface
     private function formatRoutingKey(string $channel): string
     {
         return str_replace(':', '.', $channel);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function healthCheck(): HealthCheckResult
+    {
+        if (!$this->connected || $this->connection === null) {
+            return HealthCheckResult::unhealthy('RabbitMQ broker not connected');
+        }
+
+        $start = microtime(true);
+
+        try {
+            // Check if connection is alive
+            if (!$this->connection->isConnected()) {
+                return HealthCheckResult::unhealthy('RabbitMQ connection lost');
+            }
+
+            // Check channel
+            if ($this->channel === null || !$this->channel->is_open()) {
+                return HealthCheckResult::degraded(
+                    message: 'RabbitMQ channel is closed',
+                    details: ['connection_alive' => true]
+                );
+            }
+
+            $latencyMs = (microtime(true) - $start) * 1000;
+
+            return HealthCheckResult::healthy(
+                message: 'RabbitMQ connection healthy',
+                details: [
+                    'exchange' => $this->exchange,
+                    'exchange_type' => $this->exchangeType,
+                    'queue' => $this->queueName,
+                    'subscriptions' => count($this->subscriptions),
+                ],
+                latencyMs: $latencyMs
+            );
+        } catch (\Throwable $e) {
+            return HealthCheckResult::unhealthy(
+                message: "RabbitMQ health check failed: {$e->getMessage()}",
+                details: ['exception' => $e::class]
+            );
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getHealthCheckName(): string
+    {
+        return 'rabbitmq-broker';
     }
 
     public function __destruct()
