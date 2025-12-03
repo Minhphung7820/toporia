@@ -189,24 +189,11 @@ class BelongsTo extends Relation
             $cleanQuery->select($selects);
         }
 
-        // Copy only SoftDeletes scope from freshQuery (whereNull on deleted_at)
-        // Skip all other constraints - they will be added by addEagerConstraints()
-        $wheres = $freshQuery->getWheres();
-        foreach ($wheres as $where) {
-            // Only copy SoftDeletes scope (whereNull/whereNotNull on deleted_at)
-            // Skip all other constraints including individual localKey constraints
-            if (($where['type'] ?? '') === 'Null' || ($where['type'] ?? '') === 'NotNull') {
-                $column = $where['column'] ?? '';
-                // Only copy if it's a deleted_at column (SoftDeletes scope)
-                if (str_contains(strtolower($column), 'deleted_at')) {
-                    if (($where['type'] ?? '') === 'Null') {
-                        $cleanQuery->whereNull($column, $where['boolean'] ?? 'AND');
-                    } else {
-                        $cleanQuery->whereNotNull($column, $where['boolean'] ?? 'AND');
-                    }
-                }
-            }
-        }
+        // CRITICAL: Copy all where constraints from original query (relationship method)
+        // This ensures constraints like where('is_active', true) are preserved during eager loading
+        // Exclude local key constraint as it will be added by addEagerConstraints()
+        // This allows relationship methods with constraints to work correctly with eager loading
+        $this->copyWhereConstraints($cleanQuery, [$this->localKey]);
 
         // Create a dummy parent model that doesn't exist to prevent initializeConstraints()
         // from adding WHERE localKey = ? constraint. This ensures only WHERE localKey IN (...)

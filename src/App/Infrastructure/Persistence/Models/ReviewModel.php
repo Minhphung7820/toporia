@@ -80,4 +80,3 @@ class ReviewModel extends Model
         return static::query()->where('is_featured', true);
     }
 }
-

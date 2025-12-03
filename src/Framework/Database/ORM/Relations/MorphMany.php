@@ -420,23 +420,15 @@ class MorphMany extends Relation
             $cleanQuery->select($selects);
         }
 
-        // Copy only SoftDeletes scope from freshQuery (whereNull on deleted_at)
-        // Skip all other constraints - they will be added by addEagerConstraints()
-        $wheres = $freshQuery->getWheres();
-        foreach ($wheres as $where) {
-            // Only copy SoftDeletes scope (whereNull/whereNotNull on deleted_at)
-            if (($where['type'] ?? '') === 'Null' || ($where['type'] ?? '') === 'NotNull') {
-                $column = $where['column'] ?? '';
-                // Only copy if it's a deleted_at column (SoftDeletes scope)
-                if (str_contains(strtolower($column), 'deleted_at')) {
-                    if (($where['type'] ?? '') === 'Null') {
-                        $cleanQuery->whereNull($column, $where['boolean'] ?? 'AND');
-                    } else {
-                        $cleanQuery->whereNotNull($column, $where['boolean'] ?? 'AND');
-                    }
-                }
-            }
-        }
+        // CRITICAL: Copy all where constraints from original query (relationship method)
+        // This ensures constraints like where('is_approved', true) are preserved during eager loading
+        // Exclude morph type and foreign key constraints as they will be added by addEagerConstraints()
+        // This allows relationship methods with constraints to work correctly with eager loading
+        $this->copyWhereConstraints($cleanQuery, [
+            $this->morphType,
+            $this->foreignKey,
+            fn($col) => $col === $this->morphType || $col === $this->foreignKey
+        ]);
 
         // Create a dummy parent model that doesn't exist to prevent addConstraints()
         // from adding WHERE morphType = ? AND foreignKey = ? constraints. This ensures only

@@ -775,9 +775,12 @@ class MorphedByMany extends Relation
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
+        // Create a dummy parent without ID to avoid parent-specific constraints
+        $dummyParent = new ($this->parent::class)();
+
         $instance = new static(
             $freshQuery,
-            $this->parent,
+            $dummyParent,
             $this->relatedClass,
             $this->morphName,
             $this->pivotTable,
@@ -788,6 +791,7 @@ class MorphedByMany extends Relation
             $this->relatedKey
         );
 
+        // Preserve all pivot settings from original relation
         $instance->pivotColumns = $this->pivotColumns;
         $instance->withTimestamps = $this->withTimestamps;
         $instance->pivotAccessor = $this->pivotAccessor;
@@ -795,6 +799,67 @@ class MorphedByMany extends Relation
         $instance->pivotWhereIns = $this->pivotWhereIns;
         $instance->pivotOrderBy = $this->pivotOrderBy;
         $instance->pivotClass = $this->pivotClass;
+
+        // Set up the query with proper JOIN but without parent WHERE constraints
+        $relatedTable = $this->getRelatedTable();
+
+        // Create a fresh query from the related model (this ensures table name is set)
+        $cleanQuery = $this->relatedClass::query()
+            ->join(
+                $this->pivotTable,
+                "{$relatedTable}.{$this->relatedKey}",
+                '=',
+                "{$this->pivotTable}.{$this->foreignKey}"
+            );
+
+        // Build SELECT clause with pivot columns using selectRaw for proper alias handling
+        $cleanQuery->select("{$relatedTable}.*");
+
+        // Always select pivot keys for matching in eager loading
+        if ($this->shouldIncludePivot()) {
+            // Always select parentPivotKey, morphType, and foreignKey from pivot table
+            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->parentPivotKey} as pivot_{$this->parentPivotKey}");
+            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
+            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
+
+            // Add other pivot columns
+            foreach ($this->pivotColumns as $column) {
+                // Skip if already added
+                if ($column !== $this->parentPivotKey && $column !== $this->morphType && $column !== $this->foreignKey) {
+                    $cleanQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                }
+            }
+        } else {
+            // Still need pivot keys for matching in eager loading
+            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->parentPivotKey} as pivot_{$this->parentPivotKey}");
+            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
+            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
+        }
+
+        // CRITICAL: Copy all where constraints from original query (relationship method)
+        // This ensures constraints like where('is_active', true) are preserved during eager loading
+        // Exclude pivot and parent-specific constraints as they will be added by addEagerConstraints()
+        $pivotTablePrefix = $this->pivotTable . '.';
+        $this->copyWhereConstraints($cleanQuery, [
+            $this->parentPivotKey,
+            $this->morphType,
+            $this->foreignKey,
+            fn($col) => Str::startsWith($col, $pivotTablePrefix) ||
+                $col === $this->parentPivotKey ||
+                $col === $this->morphType ||
+                $col === $this->foreignKey ||
+                Str::endsWith($col, '.' . $this->parentPivotKey) ||
+                Str::endsWith($col, '.' . $this->morphType) ||
+                Str::endsWith($col, '.' . $this->foreignKey)
+        ]);
+
+        $instance->setQuery($cleanQuery);
+
+        // Apply pivot constraints separately
+        $instance->applyPivotConstraintsToQuery($instance->getQuery());
+
+        // Apply soft delete scope if related model uses soft deletes
+        $instance->applySoftDeleteScope($cleanQuery, $this->relatedClass, $relatedTable);
 
         return $instance;
     }
