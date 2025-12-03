@@ -72,6 +72,12 @@ class MorphedByMany extends Relation
     /** @var string|null Cached related table name */
     private ?string $relatedTableCache = null;
 
+    /** @var array<string, array{columns: array<string>, timestamp: int}> Schema cache for table columns */
+    private static array $schemaCache = [];
+
+    /** @var int Schema cache TTL in seconds (5 minutes) */
+    private static int $schemaCacheTtl = 300;
+
     /**
      * Create a new MorphedByMany relationship instance.
      *
@@ -383,7 +389,33 @@ class MorphedByMany extends Relation
      */
     public function withPivot(string ...$columns): static
     {
-        $this->pivotColumns = [...$this->pivotColumns, ...$columns];
+        // Handle wildcard '*' to select all pivot columns
+        if (in_array('*', $columns, true)) {
+            // Get all columns from pivot table (with caching for performance)
+            $connection = $this->query->getConnection();
+            $allColumns = $this->getCachedTableColumns($this->pivotTable, $connection);
+
+            // Exclude parent pivot key, morph type, and foreign key (they're always selected separately)
+            $excludeColumns = [$this->parentPivotKey, $this->morphType, $this->foreignKey];
+
+            // Exclude timestamps if withTimestamps() will be called separately
+            if (!$this->withTimestamps) {
+                $excludeColumns[] = 'created_at';
+                $excludeColumns[] = 'updated_at';
+            }
+
+            // Filter out excluded columns
+            $pivotColumns = array_diff($allColumns, $excludeColumns);
+
+            // Merge with existing pivot columns and remove '*'
+            $columns = array_filter($columns, fn($col) => $col !== '*');
+            $this->pivotColumns = array_values(array_unique([...$this->pivotColumns, ...$pivotColumns, ...$columns]));
+        } else {
+            // Normal case: just add specified columns
+            // Deduplicate columns to avoid duplicate alias in SQL queries
+            $this->pivotColumns = array_values(array_unique([...$this->pivotColumns, ...$columns]));
+        }
+
         return $this;
     }
 
@@ -862,6 +894,43 @@ class MorphedByMany extends Relation
         $instance->applySoftDeleteScope($cleanQuery, $this->relatedClass, $relatedTable);
 
         return $instance;
+    }
+
+    /**
+     * Get table columns with caching to avoid repeated SHOW COLUMNS queries.
+     *
+     * Performance: Uses static cache with 5-minute TTL to avoid repeated database queries
+     * Clean Architecture: Reusable helper method for schema introspection
+     *
+     * @param string $tableName Table name
+     * @param mixed $connection Database connection
+     * @return array<string> Array of column names
+     */
+    protected function getCachedTableColumns(string $tableName, $connection): array
+    {
+        $cacheKey = $tableName;
+        $now = now()->getTimestamp();
+
+        // Check cache
+        if (isset(self::$schemaCache[$cacheKey])) {
+            $cached = self::$schemaCache[$cacheKey];
+            // Return cached data if still valid
+            if (($now - $cached['timestamp']) < self::$schemaCacheTtl) {
+                return $cached['columns'];
+            }
+        }
+
+        // Cache miss or expired - fetch from database
+        $columns = $connection->select("SHOW COLUMNS FROM `{$tableName}`");
+        $columnNames = array_column($columns, 'Field');
+
+        // Store in cache
+        self::$schemaCache[$cacheKey] = [
+            'columns' => $columnNames,
+            'timestamp' => $now
+        ];
+
+        return $columnNames;
     }
 
     // =========================================================================

@@ -177,7 +177,7 @@ class ProductModel extends Model
             TagModel::class,
             'taggable',
             'taggables'
-        );
+        )->withPivot('*');
     }
 
     /**

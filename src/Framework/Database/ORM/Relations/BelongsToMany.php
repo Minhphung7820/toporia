@@ -91,8 +91,34 @@ class BelongsToMany extends Relation
      */
     public function withPivot(string ...$columns): static
     {
-        // Deduplicate columns to avoid duplicate alias in SQL queries
-        $this->pivotColumns = array_values(array_unique([...$this->pivotColumns, ...$columns]));
+        // Handle wildcard '*' to select all pivot columns
+        if (in_array('*', $columns, true)) {
+            // Get all columns from pivot table (with caching for performance)
+            $connection = $this->query->getConnection();
+            $allColumns = $this->getCachedTableColumns($this->pivotTable, $connection);
+
+            // Exclude foreign and related pivot keys (they're always selected separately)
+            $excludeColumns = [$this->foreignPivotKey, $this->relatedPivotKey];
+
+            // Exclude timestamps if withTimestamps() will be called separately
+            // But include them if they're already in pivotColumns (user explicitly wants them)
+            if (!$this->withTimestamps) {
+                $excludeColumns[] = 'created_at';
+                $excludeColumns[] = 'updated_at';
+            }
+
+            // Filter out excluded columns
+            $pivotColumns = array_diff($allColumns, $excludeColumns);
+
+            // Merge with existing pivot columns and remove '*'
+            $columns = array_filter($columns, fn($col) => $col !== '*');
+            $this->pivotColumns = array_values(array_unique([...$this->pivotColumns, ...$pivotColumns, ...$columns]));
+        } else {
+            // Normal case: just add specified columns
+            // Deduplicate columns to avoid duplicate alias in SQL queries
+            $this->pivotColumns = array_values(array_unique([...$this->pivotColumns, ...$columns]));
+        }
+
         return $this;
     }
 
@@ -1779,8 +1805,11 @@ class BelongsToMany extends Relation
         $query = $qb->table($this->pivotTable)
             ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey));
 
-        // FIXED: Apply stored pivot constraints (wherePivot, wherePivotIn, etc.)
-        $this->applyStoredConstraintsToQuery($query);
+        // CRITICAL: Do NOT apply wherePivot constraints when getting current IDs for sync
+        // Constraints should only apply when querying related models, not when checking existence
+        // This prevents duplicate key errors when records exist but don't match constraints
+        // Example: wherePivot('sort_order', '>=', 89) should filter results, not prevent sync
+        // $this->applyStoredConstraintsToQuery($query);
 
         // Apply limit if specified for safety
         if ($limit !== null) {
@@ -1815,8 +1844,10 @@ class BelongsToMany extends Relation
             ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey))
             ->whereIn($this->relatedPivotKey, $relatedIds);
 
-        // FIXED: Apply stored pivot constraints (wherePivot, wherePivotIn, etc.)
-        $this->applyStoredConstraintsToQuery($query);
+        // CRITICAL: Do NOT apply wherePivot constraints when getting current IDs for sync
+        // Constraints should only apply when querying related models, not when checking existence
+        // This prevents duplicate key errors when records exist but don't match constraints
+        // $this->applyStoredConstraintsToQuery($query);
 
         $results = $query->pluck($this->relatedPivotKey);
 

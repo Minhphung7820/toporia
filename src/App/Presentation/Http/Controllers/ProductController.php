@@ -1214,12 +1214,28 @@ final class ProductController extends BaseController
             ], 404);
         }
 
-        $data = $request->json();
+        $data = $request->all();
         $results = [];
 
         // Sync belongsToMany categories
-        if (isset($data['category_ids'])) {
-            $synced = $product->categories()->sync($data['category_ids']);
+        if (isset($data['category_ids']) && is_array($data['category_ids'])) {
+            // Validate category IDs exist before syncing
+            $validCategoryIds = CategoryModel::whereIn('id', $data['category_ids'])
+                ->get()
+                ->pluck('id')
+                ->values()
+                ->all();
+
+            if (count($validCategoryIds) !== count($data['category_ids'])) {
+                $invalidIds = array_diff($data['category_ids'], $validCategoryIds);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some category IDs do not exist: ' . implode(', ', $invalidIds),
+                    'invalid_ids' => array_values($invalidIds),
+                ], 422);
+            }
+
+            $synced = $product->categories()->sync($validCategoryIds);
             $results['categories'] = [
                 'attached' => $synced['attached'] ?? [],
                 'detached' => $synced['detached'] ?? [],
@@ -1228,8 +1244,24 @@ final class ProductController extends BaseController
         }
 
         // Sync belongsToMany tags
-        if (isset($data['tag_ids'])) {
-            $synced = $product->tags()->sync($data['tag_ids']);
+        if (isset($data['tag_ids']) && is_array($data['tag_ids'])) {
+            // Validate tag IDs exist before syncing
+            $validTagIds = TagModel::whereIn('id', $data['tag_ids'])
+                ->get()
+                ->pluck('id')
+                ->values()
+                ->all();
+
+            if (count($validTagIds) !== count($data['tag_ids'])) {
+                $invalidIds = array_diff($data['tag_ids'], $validTagIds);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some tag IDs do not exist: ' . implode(', ', $invalidIds),
+                    'invalid_ids' => array_values($invalidIds),
+                ], 422);
+            }
+
+            $synced = $product->tags()->sync($validTagIds);
             $results['tags'] = [
                 'attached' => $synced['attached'] ?? [],
                 'detached' => $synced['detached'] ?? [],
@@ -1238,8 +1270,24 @@ final class ProductController extends BaseController
         }
 
         // Sync polymorphic many-to-many tags (morphToMany)
-        if (isset($data['polymorphic_tag_ids'])) {
-            $synced = $product->allTags()->sync($data['polymorphic_tag_ids']);
+        if (isset($data['polymorphic_tag_ids']) && is_array($data['polymorphic_tag_ids'])) {
+            // Validate tag IDs exist before syncing
+            $validTagIds = TagModel::whereIn('id', $data['polymorphic_tag_ids'])
+                ->get()
+                ->pluck('id')
+                ->values()
+                ->all();
+
+            if (count($validTagIds) !== count($data['polymorphic_tag_ids'])) {
+                $invalidIds = array_diff($data['polymorphic_tag_ids'], $validTagIds);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some polymorphic tag IDs do not exist: ' . implode(', ', $invalidIds),
+                    'invalid_ids' => array_values($invalidIds),
+                ], 422);
+            }
+
+            $synced = $product->allTags()->sync($validTagIds);
             $results['polymorphic_tags'] = [
                 'attached' => $synced['attached'] ?? [],
                 'detached' => $synced['detached'] ?? [],
@@ -1248,8 +1296,33 @@ final class ProductController extends BaseController
         }
 
         // Sync related products
-        if (isset($data['related_product_ids'])) {
-            $synced = $product->relatedProducts()->sync($data['related_product_ids']);
+        if (isset($data['related_product_ids']) && is_array($data['related_product_ids'])) {
+            // Validate product IDs exist before syncing (exclude current product)
+            $validProductIds = ProductModel::whereIn('id', $data['related_product_ids'])
+                ->where('id', '!=', $product->id) // Prevent self-reference
+                ->get()
+                ->pluck('id')
+                ->values()
+                ->all();
+
+            if (count($validProductIds) !== count($data['related_product_ids'])) {
+                $invalidIds = array_diff($data['related_product_ids'], $validProductIds);
+                // Check if any invalid ID is the current product itself
+                if (in_array($product->id, $data['related_product_ids'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Cannot relate product to itself. Invalid IDs: ' . implode(', ', $invalidIds),
+                        'invalid_ids' => array_values($invalidIds),
+                    ], 422);
+                }
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some related product IDs do not exist: ' . implode(', ', $invalidIds),
+                    'invalid_ids' => array_values($invalidIds),
+                ], 422);
+            }
+
+            $synced = $product->relatedProducts()->sync($validProductIds);
             $results['related_products'] = [
                 'attached' => $synced['attached'] ?? [],
                 'detached' => $synced['detached'] ?? [],
