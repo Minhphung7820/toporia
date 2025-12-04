@@ -7,10 +7,20 @@ namespace Toporia\Framework\Support\Accessors;
 use Toporia\Framework\Foundation\ServiceAccessor;
 
 /**
- * DB Service Accessor
+ * Class DB
  *
- * Provides static-like access to the database manager.
+ * DB Service Accessor - Provides static-like access to the database manager.
  * All methods are automatically delegated to the underlying service via __callStatic().
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static ConnectionProxy connection(?string $name = null) Get connection proxy
  * @method static ConnectionInterface getConnection(?string $name = null) Get connection directly

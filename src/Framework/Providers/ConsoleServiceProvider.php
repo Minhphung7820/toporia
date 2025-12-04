@@ -9,11 +9,20 @@ use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Console\Application;
 
 /**
- * Console Service Provider
+ * Class ConsoleServiceProvider
  *
  * Binds the console application and registers CLI commands.
  * Framework commands are auto-registered here (framework layer).
- * Application commands are registered in Application Kernel (application layer).
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ConsoleServiceProvider extends ServiceProvider
 {

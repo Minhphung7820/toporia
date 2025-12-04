@@ -5,22 +5,21 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Scheduling\Support;
 
 /**
- * Cron Expression Parser
+ * Class CronExpression
  *
  * Professional cron expression parser with validation and next run calculation.
- * Follows Single Responsibility Principle.
+ * Provides O(1) validation after parsing, O(1) next run calculation with caching,
+ * and supports all standard cron syntax.
  *
- * Performance:
- * - O(1) validation after parsing
- * - O(1) next run calculation with caching
- * - Supports all standard cron syntax
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Scheduling
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Cron expression parsing only
- * - No dependencies on framework components
- * - Reusable across different contexts
- *
- * @package Toporia\Framework\Console\Scheduling\Support
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CronExpression
 {

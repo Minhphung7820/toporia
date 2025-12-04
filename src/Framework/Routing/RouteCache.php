@@ -7,27 +7,20 @@ namespace Toporia\Framework\Routing;
 use Toporia\Framework\Routing\Contracts\RouteCacheInterface;
 
 /**
- * Route Cache Implementation
+ * Class RouteCache
  *
- * File-based route caching for maximum performance.
+ * File-based route caching implementation for maximum performance.
+ * Provides opcache-compatible caching with atomic file writing for safety.
  *
- * Performance Optimizations:
- * - var_export() for faster serialization than serialize()
- * - Opcache compatible (PHP file caching)
- * - Zero overhead on cached routes (include returns array)
- * - Atomic file writing (rename for safety)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Routing
+ * @since       2025-01-10
  *
- * Cache Format:
- * - PHP file returning array (opcache friendly)
- * - Pre-compiled regex patterns
- * - Flattened route structure for O(1) lookup
- *
- * Architecture:
- * - Single Responsibility: File-based caching
- * - Open/Closed: Can extend for Redis/Memory cache
- * - Dependency Inversion: Implements interface
- *
- * @package Toporia\Framework\Routing
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RouteCache implements RouteCacheInterface
 {

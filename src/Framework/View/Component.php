@@ -7,31 +7,20 @@ namespace Toporia\Framework\View;
 use Toporia\Framework\Support\Str;
 
 /**
- * Abstract View Component
+ * Class Component
  *
  * Base class for creating reusable view components.
  * Similar to Laravel's View Components but optimized for performance.
  *
- * Performance:
- * - O(1) attribute access
- * - Lazy view resolution
- * - No reflection overhead in hot paths
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  View
+ * @since       2025-01-10
  *
- * Example:
- * ```php
- * class Alert extends Component
- * {
- *     public function __construct(
- *         public string $type = 'info',
- *         public string $message = ''
- *     ) {}
- *
- *     public function render(): string
- *     {
- *         return '<div class="alert alert-{{ $type }}">{{ $message }}</div>';
- *     }
- * }
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class Component
 {

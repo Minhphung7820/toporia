@@ -7,26 +7,19 @@ namespace Toporia\Framework\Session\Security;
 use Toporia\Framework\Session\Contracts\SessionStoreInterface;
 
 /**
- * Session Security Manager
+ * Class SessionSecurity
  *
- * Enhances session security with:
- * - Session rotation (regenerate ID periodically)
- * - IP binding (bind session to IP address)
- * - Device fingerprinting (bind session to device)
- * - Session timeout enforcement
+ * Enhances session security with rotation, IP binding, device fingerprinting, and timeout enforcement.
  *
- * Performance:
- * - O(1) security checks (session lookups)
- * - O(1) fingerprint generation (hash operation)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session\Security
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only manages session security
- * - Dependency Inversion: Depends on SessionStoreInterface
- *
- * SOLID Principles:
- * - S: Only handles session security
- * - O: Configurable security features
- * - D: Depends on SessionStoreInterface abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SessionSecurity
 {

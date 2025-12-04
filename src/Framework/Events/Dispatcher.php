@@ -10,30 +10,21 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**
- * Event Dispatcher
+ * Class Dispatcher
  *
- * Advanced event dispatcher with support for:
- * - Priority-based listener execution
- * - Wildcard event listeners
- * - Class-based listeners
- * - Queued listeners
- * - Event subscribers
- * - Circular dispatch detection
- * - Performance optimizations (caching, lazy loading, bounded cache)
+ * Advanced event dispatcher with support for priority-based listener execution,
+ * wildcard event listeners, class-based listeners, queued listeners, event subscribers,
+ * circular dispatch detection, and performance optimizations.
  *
- * Performance:
- * - O(1) listener registration
- * - O(N) dispatch where N = listeners (with caching)
- * - O(1) wildcard matching (pattern cache with LRU eviction)
- * - Lazy listener resolution
- * - Sorted wildcard cache to avoid repeated sorting
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Events
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles event dispatching
- * - Dependency Inversion: Uses interfaces
- * - Open/Closed: Extensible via listeners and subscribers
- *
- * @package Toporia\Framework\Events
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Dispatcher implements EventDispatcherInterface
 {

@@ -9,21 +9,20 @@ use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Hashing\HashManager;
 
 /**
- * Hash Service Provider
+ * Class HashServiceProvider
  *
  * Registers hashing services into the container.
  * Provides password hashing functionality across the application.
  *
- * Services Registered:
- * - 'hash' => HashManager instance
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * $hash = app('hash');
- * $hashed = $hash->make('password');
- * ```
- *
- * @package Toporia\Framework\Providers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class HashServiceProvider extends ServiceProvider
 {

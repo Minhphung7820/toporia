@@ -12,29 +12,19 @@ use Toporia\Framework\Realtime\Brokers\Kafka\Client\{KafkaClientFactory, KafkaCl
 use Toporia\Framework\Realtime\Exceptions\{BrokerException, BrokerTemporaryException};
 
 /**
- * Kafka Broker
+ * Class KafkaBroker
  *
- * Apache Kafka broker for high-throughput, persistent realtime communication.
- * Enables horizontal scaling with message replay and history support.
+ * Apache Kafka broker for high-throughput, persistent realtime communication. Enables horizontal scaling with message replay and history support.
  *
- * Performance:
- * - Latency: ~5ms (network dependent)
- * - Throughput: 1M+ messages/sec (rdkafka), ~10k/sec (kafka-php)
- * - Persistence: Durable messages with configurable retention
- * - Scalability: Partition-based horizontal scaling
- * - Replay: Message history and replay support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Brokers
+ * @since       2025-01-10
  *
- * Architecture:
- * - Server A publishes to Kafka topic
- * - Kafka distributes to all consumer groups
- * - Each server consumes from its consumer group
- * - Messages are persisted for replay
- *
- * Uses adapter pattern for Kafka client libraries:
- * - rdkafka (librdkafka C extension) - High performance
- * - kafka-php (nmred/kafka-php) - Pure PHP, portable
- *
- * @package Toporia\Framework\Realtime\Brokers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class KafkaBroker implements BrokerInterface, HealthCheckableInterface
 {

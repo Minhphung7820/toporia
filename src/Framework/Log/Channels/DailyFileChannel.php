@@ -7,6 +7,8 @@ namespace Toporia\Framework\Log\Channels;
 use Toporia\Framework\Log\Contracts\ChannelInterface;
 
 /**
+ * Class DailyFileChannel
+ *
  * Daily File Channel - Rotating daily log files
  *
  * Creates a new log file each day with format: YYYY-MM-DD.log
@@ -23,6 +25,16 @@ use Toporia\Framework\Log\Contracts\ChannelInterface;
  * - Thread-safe with file locking
  *
  * Performance: O(1) write operation
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Log\Channels
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class DailyFileChannel implements ChannelInterface
 {

@@ -8,20 +8,19 @@ use Stringable;
 use Toporia\Framework\View\Contracts\ViewInterface;
 
 /**
- * View Class
+ * Class View
  *
  * Represents a renderable view with data binding.
  *
- * Performance:
- * - Lazy rendering
- * - Data caching
- * - Minimal memory footprint
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  View
+ * @since       2025-01-10
  *
- * Example:
- * ```php
- * $view = new View('users.index', ['users' => $users]);
- * echo $view->render();
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class View implements ViewInterface, Stringable
 {

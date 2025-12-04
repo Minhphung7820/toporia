@@ -7,20 +7,19 @@ namespace Toporia\Framework\View;
 use Toporia\Framework\View\Contracts\ViewFactoryInterface;
 
 /**
- * View Factory
+ * Class ViewFactory
  *
  * Factory for creating and managing views.
  *
- * Performance:
- * - O(1) view creation
- * - Composer caching
- * - Lazy extension loading
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  View
+ * @since       2025-01-10
  *
- * Example:
- * ```php
- * $factory = new ViewFactory('/path/to/views');
- * $view = $factory->make('users.index', ['users' => $users]);
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ViewFactory implements ViewFactoryInterface
 {

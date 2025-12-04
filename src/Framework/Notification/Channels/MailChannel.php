@@ -10,22 +10,19 @@ use Toporia\Framework\Mail\Message;
 use Toporia\Framework\Notification\Messages\MailMessage;
 
 /**
- * Mail Notification Channel
+ * Class MailChannel
  *
  * Sends notifications via email using MailManager.
- * Supports rich HTML emails with action buttons.
  *
- * Performance:
- * - O(1) per notification
- * - Async delivery via mail queue
- * - SMTP connection pooling
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Channels
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Depends on MailManagerInterface abstraction (DIP)
- * - Config injected via constructor (Testable)
- * - No global state dependencies
- *
- * @package Toporia\Framework\Notification\Channels
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MailChannel implements ChannelInterface
 {

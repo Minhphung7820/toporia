@@ -9,18 +9,19 @@ use Toporia\Framework\Http\Request;
 use Toporia\Framework\Log\Contracts\LoggerInterface;
 
 /**
- * Webhook Receiver
+ * Class WebhookReceiver
  *
  * Receives and processes incoming webhooks with signature verification.
  *
- * Performance:
- * - O(1) signature verification
- * - O(1) event extraction
- * - O(1) payload extraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Webhook
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only receives and validates webhooks
- * - Dependency Inversion: Depends on interfaces
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class WebhookReceiver implements WebhookReceiverInterface
 {

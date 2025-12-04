@@ -8,7 +8,7 @@ use Toporia\Framework\Database\Connection;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
 
 /**
- * Database Queue Driver
+ * Class DatabaseQueue
  *
  * Stores jobs in a database table.
  * Requires a 'jobs' table with proper schema.
@@ -27,6 +27,16 @@ use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
  * - Standard table schema
  * - Job serialization format
  * - Retry/failed job logic
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * SOLID Principles:
  * - Single Responsibility: Only manages database queue

@@ -9,23 +9,20 @@ use PHPMailer\PHPMailer\{Exception, PHPMailer};
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**
- * SMTP Mailer
+ * Class SmtpMailer
  *
- * Production-ready SMTP mailer with performance optimizations.
+ * Production-ready SMTP mailer with performance optimizations including lazy PHPMailer instantiation,
+ * configuration caching, connection reuse for batch sending, and minimal object creation overhead.
  *
- * Performance Optimizations:
- * - Lazy PHPMailer instantiation (O(1) when not used)
- * - Configuration caching (avoid repeated array lookups)
- * - Connection reuse for batch sending
- * - Minimal object creation overhead
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Implements MailerInterface (Dependency Inversion)
- * - Single Responsibility: Only sends emails via SMTP
- * - Open/Closed: Extensible via configuration
- * - High Reusability: Works with any SMTP server
- *
- * @package Toporia\Framework\Mail
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SmtpMailer implements MailerInterface
 {

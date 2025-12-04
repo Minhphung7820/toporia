@@ -18,32 +18,17 @@ use Toporia\Framework\Validation\Contracts\ValidatorInterface;
 /**
  * Class DataTransferServiceProvider
  *
- * Registers and boots all DataTransfer components including:
- * - Object Hydrator for entity population
- * - Mapper Registry for type transformations
- * - Transformer Manager for API transformations
- * - RequestDTO validator integration
+ * Registers and boots all DataTransfer components.
  *
- * Configuration (config/datatransfer.php):
- * ```php
- * return [
- *     'hydrator' => [
- *         'type_handlers' => [
- *             DateTime::class => function($value) { return new DateTime($value); },
- *         ],
- *     ],
- *     'transformer' => [
- *         'global_includes' => ['timestamps', 'meta'],
- *         'global_excludes' => ['password', 'secret'],
- *     ],
- *     'mappers' => [
- *         // Auto-discovered from App\Mappers namespace
- *         'namespace' => 'App\\Mappers',
- *     ],
- * ];
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\DataTransfer
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class DataTransferServiceProvider extends ServiceProvider
 {

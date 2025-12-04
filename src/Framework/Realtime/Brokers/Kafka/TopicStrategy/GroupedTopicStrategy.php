@@ -7,27 +7,19 @@ namespace Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy;
 use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
 
 /**
- * Grouped Topic Strategy
+ * Class GroupedTopicStrategy
  *
- * Groups channels into fewer topics with partitioning.
- * Recommended for production use.
+ * Groups channels into fewer topics with partitioning. Recommended for production use.
  *
- * Strategy:
- * - Channels matching patterns → grouped topics
- * - Example: "user.*" → "realtime.user" topic
- * - Uses partitioning for load distribution
- * - Uses message keys for partition assignment
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Brokers\Kafka\TopicStrategy
+ * @since       2025-01-10
  *
- * Performance:
- * - Fewer topics (better for Kafka)
- * - Better partitioning utilization
- * - Scales better (can increase partitions)
- *
- * SOLID Principles:
- * - Single Responsibility: Only maps channels to grouped topics
- * - Open/Closed: Extensible via pattern configuration
- *
- * @package Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class GroupedTopicStrategy implements TopicStrategyInterface
 {

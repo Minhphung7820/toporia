@@ -8,10 +8,21 @@ use Toporia\Framework\Routing\Contracts\{RouteCollectionInterface, UrlGeneratorI
 use Toporia\Framework\Http\Request;
 
 /**
- * URL Generator for generating URLs to routes, assets, and signed URLs.
+ * Class UrlGenerator
  *
- * Performance: O(1) for simple URLs, O(N) for route URLs where N = parameter count
- * Memory: O(1) - caches previous URL only
+ * URL Generator for generating URLs to routes, assets, and signed URLs.
+ * Performance: O(1) for simple URLs, O(N) for route URLs where N = parameter count.
+ * Memory: O(1) - caches previous URL only.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Routing
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class UrlGenerator implements UrlGeneratorInterface
 {

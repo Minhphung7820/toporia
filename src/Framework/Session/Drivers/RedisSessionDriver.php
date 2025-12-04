@@ -8,19 +8,20 @@ use Toporia\Framework\Session\Contracts\SessionStoreInterface;
 use Redis;
 
 /**
- * Redis Session Driver
+ * Class RedisSessionDriver
  *
  * Stores sessions in Redis for high performance.
  * Ideal for distributed systems and horizontal scaling.
  *
- * Performance:
- * - O(1) get/set (in-memory during request)
- * - O(1) save (single Redis SET command)
- * - Sub-millisecond latency
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session\Drivers
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles Redis session storage
- * - Dependency Inversion: Uses Redis abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RedisSessionDriver implements SessionStoreInterface
 {
@@ -88,6 +89,18 @@ final class RedisSessionDriver implements SessionStoreInterface
     public function set(string $key, mixed $value): void
     {
         $this->data[$key] = $value;
+    }
+
+    /**
+     * Put a session value (alias for set).
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
+     */
+    public function put(string $key, mixed $value): void
+    {
+        $this->set($key, $value);
     }
 
     /**

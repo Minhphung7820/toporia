@@ -8,9 +8,9 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
 
 /**
- * Synchronous Queue Driver
+ * Class SyncQueue
  *
- * Executes jobs immediately without queueing.
+ * Synchronous Queue Driver - Executes jobs immediately without queueing.
  * Useful for testing and development.
  *
  * Performance Optimizations:
@@ -23,7 +23,15 @@ use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
  * - Dependency Inversion: Depends on ContainerInterface
  * - Open/Closed: Extend via custom job types
  *
- * @package Toporia\Framework\Queue
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SyncQueue implements QueueInterface
 {

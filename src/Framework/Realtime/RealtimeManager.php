@@ -9,57 +9,19 @@ use Toporia\Framework\Realtime\Exceptions\{BrokerException, ChannelException, Ra
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
- * Realtime Manager
+ * Class RealtimeManager
  *
- * Central coordinator for realtime communication system.
- * Manages transports, brokers, channels, and connections.
+ * Central coordinator for realtime communication system. Manages transports, brokers, channels, and connections.
  *
- * Architecture Overview:
- * ======================
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime
+ * @since       2025-01-10
  *
- * 1. TRANSPORTS (Server <-> Client)
- *    - Purpose: Communication between server and clients
- *    - Direction: Bidirectional (WebSocket) or Server->Client (SSE, Long-polling)
- *    - Types: WebSocket, SSE, Long-polling, Memory (testing)
- *    - Usage: HTTP requests, WebSocket connections
- *
- * 2. BROKERS (Server <-> Server)
- *    - Purpose: Multi-server message distribution
- *    - Direction: Server-to-server only
- *    - Types: Redis Pub/Sub, Kafka, RabbitMQ, NATS, PostgreSQL
- *    - PRODUCER (publish): Can be called from ANYWHERE
- *      - HTTP requests, CLI commands, background jobs, events, etc.
- *      - Via broadcast() method (automatically publishes to broker)
- *    - CONSUMER (consume): ONLY in CLI commands
- *      - Long-lived processes (e.g., realtime:kafka:consume)
- *      - NEVER consume in HTTP requests (blocks request)
- *
- * Flow:
- * -----
- * ANYWHERE → broadcast() → [Publish to Broker] + [Broadcast Local]
- *   (HTTP, CLI, Jobs, Events, etc.)
- * CLI Command → consume() → [Receive from Broker] → broadcastLocal() → Transport → Clients
- *
- * Performance:
- * - O(1) channel lookup via hash table
- * - O(1) connection lookup via hash table
- * - O(N) broadcast where N = subscribers
- * - Lazy channel creation
- * - O(1) broker publish
- *
- * Design Patterns:
- * - Factory pattern for transports/brokers
- * - Repository pattern for channels/connections
- * - Singleton pattern for manager instance
- *
- * SOLID Principles:
- * - Single Responsibility: Manages realtime communication only
- * - Open/Closed: Extensible via new transports/brokers
- * - Liskov Substitution: All transports/brokers implement interfaces
- * - Interface Segregation: Separate interfaces for each concern
- * - Dependency Inversion: Depends on abstractions (interfaces)
- *
- * @package Toporia\Framework\Realtime
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RealtimeManager implements RealtimeManagerInterface
 {

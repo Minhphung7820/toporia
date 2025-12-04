@@ -8,28 +8,19 @@ use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterf
 use Toporia\Framework\Notification\Messages\SmsMessage;
 
 /**
- * SMS Notification Channel
+ * Class SmsChannel
  *
  * Sends SMS notifications via third-party API (Twilio, Nexmo, AWS SNS, etc.)
  *
- * Configuration:
- * ```php
- * 'sms' => [
- *     'driver' => 'sms',
- *     'provider' => 'twilio', // twilio, nexmo, aws_sns
- *     'account_sid' => env('TWILIO_SID'),
- *     'auth_token' => env('TWILIO_TOKEN'),
- *     'from' => env('TWILIO_FROM'),
- * ]
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Channels
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) per SMS
- * - HTTP/2 connection pooling
- * - Async delivery via queue recommended
- * - Batch sending support (100 SMS per request)
- *
- * @package Toporia\Framework\Notification\Channels
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SmsChannel implements ChannelInterface
 {

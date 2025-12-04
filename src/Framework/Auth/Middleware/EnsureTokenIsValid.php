@@ -10,25 +10,19 @@ use Toporia\Framework\Http\Exceptions\UnauthorizedHttpException;
 use Toporia\Framework\Http\{Request, Response};
 
 /**
- * Ensure Token Is Valid Middleware
+ * Class EnsureTokenIsValid
  *
  * Validates that the request contains a valid, non-expired API token.
  *
- * Usage:
- * ```php
- * $router->get('/api/data', [ApiController::class, 'index'])
- *     ->middleware([EnsureTokenIsValid::class]);
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Middleware
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Framework layer middleware
- * - Depends on AuthManager abstraction
- *
- * SOLID Principles:
- * - Single Responsibility: Token validation only
- * - Dependency Inversion: Depends on AuthManager interface
- *
- * @package Toporia\Framework\Auth\Middleware
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class EnsureTokenIsValid implements MiddlewareInterface
 {

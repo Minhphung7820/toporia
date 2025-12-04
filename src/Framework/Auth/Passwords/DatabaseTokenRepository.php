@@ -10,23 +10,19 @@ use Toporia\Framework\Database\Connection;
 use Toporia\Framework\Hashing\Contracts\HasherInterface;
 
 /**
- * Database Token Repository
+ * Class DatabaseTokenRepository
  *
  * Stores password reset tokens in the database.
  *
- * Performance:
- * - Indexed lookups for token validation
- * - Automatic cleanup of expired tokens
- * - Secure token hashing with bcrypt
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Passwords
+ * @since       2025-01-10
  *
- * Table schema:
- * ```sql
- * CREATE TABLE password_reset_tokens (
- *     email VARCHAR(255) PRIMARY KEY,
- *     token VARCHAR(255) NOT NULL,
- *     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
- * );
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class DatabaseTokenRepository implements TokenRepositoryInterface
 {

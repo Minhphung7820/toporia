@@ -9,9 +9,19 @@ use Toporia\Framework\Auth\Contracts\GateContract;
 use Toporia\Framework\Auth\Authenticatable;
 
 /**
- * Gate Service Accessor
+ * Class Gate
  *
- * Provides static-like access to the authorization gate.
+ * Gate Service Accessor - Provides static-like access to the authorization gate.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static void define(string $ability, callable $callback) Define ability
  * @method static bool allows(string $ability, mixed ...$arguments) Check if ability is allowed

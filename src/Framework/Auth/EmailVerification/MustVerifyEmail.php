@@ -11,16 +11,15 @@ use Toporia\Framework\Auth\EmailVerification\Contracts\VerifiableInterface;
  *
  * Add this trait to your User model to enable email verification.
  *
- * Example:
- * ```php
- * class User extends Model implements VerifiableInterface
- * {
- *     use MustVerifyEmail;
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\EmailVerification
+ * @since       2025-01-10
  *
- *     protected string $emailColumn = 'email';
- *     protected string $emailVerifiedAtColumn = 'email_verified_at';
- * }
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait MustVerifyEmail
 {

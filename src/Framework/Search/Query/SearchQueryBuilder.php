@@ -6,6 +6,21 @@ namespace Toporia\Framework\Search\Query;
 
 use Toporia\Framework\Search\Contracts\SearchQueryBuilderInterface;
 
+/**
+ * Class SearchQueryBuilder
+ *
+ * Fluent query builder for constructing Elasticsearch search queries with filtering, sorting, and pagination support.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Search\Query
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class SearchQueryBuilder implements SearchQueryBuilderInterface
 {
     private array $must = [];

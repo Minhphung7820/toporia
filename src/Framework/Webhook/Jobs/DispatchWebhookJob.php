@@ -8,9 +8,19 @@ use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Webhook\Contracts\WebhookDispatcherInterface;
 
 /**
- * Dispatch Webhook Job
+ * Class DispatchWebhookJob
  *
  * Async job for dispatching webhooks via queue.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Webhook\Jobs
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class DispatchWebhookJob extends Job
 {

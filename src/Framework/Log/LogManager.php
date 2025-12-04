@@ -8,6 +8,8 @@ use Toporia\Framework\Log\Contracts\{ChannelInterface, LoggerInterface};
 use Toporia\Framework\Log\Channels\{DailyFileChannel, FileChannel, StackChannel, StderrChannel, SyslogChannel};
 
 /**
+ * Class LogManager
+ *
  * Log Manager - Multi-channel logger factory
  *
  * Manages multiple named log channels with lazy loading.
@@ -42,6 +44,16 @@ use Toporia\Framework\Log\Channels\{DailyFileChannel, FileChannel, StackChannel,
  * Performance:
  * - O(1) channel lookup (cached)
  * - O(1) lazy channel creation
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Log
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class LogManager
 {

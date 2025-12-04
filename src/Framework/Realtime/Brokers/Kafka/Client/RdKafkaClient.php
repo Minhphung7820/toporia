@@ -8,17 +8,19 @@ use Toporia\Framework\Realtime\Exceptions\BrokerException;
 use Toporia\Framework\Realtime\Exceptions\BrokerTemporaryException;
 
 /**
- * Kafka client adapter using rdkafka extension.
+ * Class RdKafkaClient
  *
- * High-performance client using librdkafka C library.
- * Provides better throughput and lower latency than pure PHP clients.
+ * Kafka client adapter using rdkafka extension. High-performance client using librdkafka C library.
  *
- * Performance characteristics:
- * - Throughput: 1M+ messages/sec
- * - Latency: ~5ms
- * - Memory efficient with batching
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Brokers\Kafka\Client
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Realtime\Brokers\Kafka\Client
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RdKafkaClient implements KafkaClientInterface
 {

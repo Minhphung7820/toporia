@@ -13,7 +13,7 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
 
 /**
- * RabbitMQ Queue Driver
+ * Class RabbitMQQueue
  *
  * High-performance queue implementation using RabbitMQ message broker.
  * Optimized for reliability, scalability, and enterprise-grade messaging.
@@ -57,7 +57,15 @@ use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
  * - Interface Segregation: Minimal, focused interface
  * - Dependency Inversion: Depends on abstractions (ContainerInterface)
  *
- * @package Toporia\Framework\Queue
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RabbitMQQueue implements QueueInterface
 {

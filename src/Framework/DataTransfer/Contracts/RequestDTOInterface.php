@@ -10,7 +10,15 @@ namespace Toporia\Framework\DataTransfer\Contracts;
  * Contract for request-specific DTOs with validation support.
  * Used to encapsulate and validate incoming request data.
  *
- * @package Toporia\Framework\DataTransfer\Contracts
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface RequestDTOInterface extends DTOInterface
 {

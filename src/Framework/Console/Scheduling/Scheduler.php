@@ -8,20 +8,21 @@ use Toporia\Framework\Console\Scheduling\Contracts\MutexInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
- * Task Scheduler
+ * Class Scheduler
  *
- * Manages scheduled tasks (cron-like functionality).
- * Provides fluent interface for defining task schedules.
+ * Manages scheduled tasks (cron-like functionality). Provides fluent
+ * interface for defining task schedules with O(N) get due tasks,
+ * O(1) mutex operations, and cached cron expression evaluation.
  *
- * Performance:
- * - O(N) get due tasks where N = total tasks
- * - O(1) mutex operations
- * - Cached cron expression evaluation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Scheduling
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Task orchestration only
- * - Dependency Inversion: Uses interfaces
- * - Open/Closed: Extensible via tasks
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Scheduler
 {

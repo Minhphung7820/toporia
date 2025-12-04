@@ -50,6 +50,15 @@ interface SessionStoreInterface
     public function set(string $key, mixed $value): void;
 
     /**
+     * Put a session value (alias for set).
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
+     */
+    public function put(string $key, mixed $value): void;
+
+    /**
      * Check if a session key exists.
      *
      * @param string $key

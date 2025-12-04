@@ -10,25 +10,19 @@ use Toporia\Framework\Notification\NotificationManager;
 use Toporia\Framework\Notification\Contracts\NotificationManagerInterface;
 
 /**
- * Notification Service Provider
+ * Class NotificationServiceProvider
  *
  * Registers notification services with multi-channel support.
  *
- * Services Registered:
- * - NotificationManager: Manages notification channels (mail, database, SMS, Slack)
- * - Channel drivers: Mail, Database, SMS, Slack
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
  *
- * Performance Optimizations:
- * - Singleton pattern for NotificationManager (reuses instances)
- * - Lazy loading of channels (only creates when needed)
- * - Container-based DI (auto-resolves dependencies)
- *
- * SOLID Principles:
- * - Single Responsibility: Only registers notification services
- * - Dependency Inversion: Binds interfaces to implementations
- * - Open/Closed: Extend via custom channels
- *
- * @package Toporia\Framework\Providers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class NotificationServiceProvider extends ServiceProvider
 {

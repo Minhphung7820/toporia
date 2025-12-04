@@ -7,26 +7,19 @@ namespace Toporia\Framework\Validation;
 use Toporia\Framework\Validation\Contracts\RuleInterface;
 
 /**
- * Rule Manager
+ * Class RuleManager
  *
  * Manages rule registration, resolution, and caching for optimal performance.
  *
- * Clean Architecture:
- * - Service Layer: Manages rule lifecycle
- * - Dependency Inversion: Depends on RuleInterface abstraction
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only manages rules
- * - Open/Closed: Extensible via rule registration
- * - Dependency Inversion: Works with RuleInterface, not concrete rules
- *
- * Performance Optimizations:
- * - Rule instance caching (reuse stateless rules)
- * - Lazy rule resolution (only resolve when needed)
- * - String rule caching (avoid repeated parsing)
- * - Singleton pattern for shared rules
- *
- * @package Toporia\Framework\Validation
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RuleManager
 {

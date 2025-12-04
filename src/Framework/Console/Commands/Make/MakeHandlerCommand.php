@@ -6,6 +6,21 @@ namespace Toporia\Framework\Console\Commands\Make;
 
 use Toporia\Framework\Console\Generator\GeneratorCommand;
 
+/**
+ * Class MakeHandlerCommand
+ *
+ * Create a new handler class for processing commands.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands\Make
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class MakeHandlerCommand extends GeneratorCommand
 {
     protected string $signature = 'make:handler {name : The name of the handler} {--command= : The command class that this handler handles}';

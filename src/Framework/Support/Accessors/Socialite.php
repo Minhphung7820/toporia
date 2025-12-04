@@ -8,9 +8,19 @@ use Toporia\Framework\Foundation\Application;
 use Toporia\Framework\Socialite\{SocialiteManager, Contracts\ProviderInterface};
 
 /**
- * Socialite Facade
+ * Class Socialite
  *
- * Provides static access to socialite manager.
+ * Socialite Facade - Provides static access to socialite manager.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static ProviderInterface driver(string $provider)
  */

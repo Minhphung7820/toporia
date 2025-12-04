@@ -8,7 +8,7 @@ use Toporia\Framework\Console\Command;
 use Toporia\Framework\Console\Scheduling\Scheduler;
 
 /**
- * Schedule Work Command
+ * Class ScheduleWorkCommand
  *
  * Run the scheduler continuously in the foreground (development mode).
  * Similar to queue:work, this keeps the scheduler running and checks for due tasks every minute.
@@ -20,6 +20,16 @@ use Toporia\Framework\Console\Scheduling\Scheduler;
  *   php console schedule:work                # Run continuously
  *   php console schedule:work --verbose      # Verbose output
  *   php console schedule:work --sleep=30     # Check every 30 seconds
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ScheduleWorkCommand extends Command
 {

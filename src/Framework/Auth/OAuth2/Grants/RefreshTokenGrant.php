@@ -8,29 +8,19 @@ use Toporia\Framework\Auth\OAuth2\Contracts\ClientInterface;
 use Toporia\Framework\Http\Request;
 
 /**
- * Refresh Token Grant
+ * Class RefreshTokenGrant
  *
  * OAuth2 grant type for refreshing access tokens.
- * Uses a refresh token to obtain a new access token.
  *
- * Usage:
- * POST /oauth/token
- * grant_type=refresh_token
- * client_id=xxx
- * client_secret=xxx
- * refresh_token=xxx
- * scope=read write (optional - can request different scopes)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\OAuth2\Grants
+ * @since       2025-01-10
  *
- * Performance: O(1) - Single token lookup + new token creation
- *
- * Clean Architecture:
- * - Strategy Pattern: One of multiple grant implementations
- * - Single Responsibility: Only handles refresh token flow
- *
- * SOLID Principles:
- * - S: Only handles refresh token grant
- * - O: Extensible via inheritance
- * - L: Interchangeable with other grants
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RefreshTokenGrant extends AbstractGrant
 {

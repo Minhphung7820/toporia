@@ -8,47 +8,19 @@ use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterfac
 use Toporia\Framework\Realtime\{Connection, Message};
 
 /**
- * Socket.IO Gateway Transport
+ * Class SocketIOGateway
  *
- * Socket.IO compatible gateway for real-time bidirectional communication.
- * Implements Engine.IO protocol v4 with Socket.IO namespace support.
+ * Socket.IO compatible gateway for real-time bidirectional communication. Implements Engine.IO protocol v4 with Socket.IO namespace support.
  *
- * Performance:
- * - Latency: 2-10ms (slightly higher than pure WebSocket due to protocol overhead)
- * - Throughput: 80k+ messages/sec
- * - Concurrent connections: 8k+
- * - Memory per connection: ~1.5KB
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Transports
+ * @since       2025-01-10
  *
- * Features:
- * - Socket.IO v4 client compatibility
- * - Namespace support (/chat, /notifications, etc.)
- * - Room management (built on channels)
- * - Event acknowledgments (callback support)
- * - Automatic reconnection handling
- * - Binary data support (via MessagePack)
- * - Fallback transports (polling → websocket)
- *
- * Protocol Support:
- * - Engine.IO v4 protocol
- * - WebSocket transport (primary)
- * - HTTP long-polling transport (fallback)
- * - Packet types: CONNECT, DISCONNECT, EVENT, ACK, ERROR, BINARY_EVENT
- *
- * Architecture:
- * - Swoole WebSocket server for transport
- * - Engine.IO protocol handler
- * - Socket.IO packet encoder/decoder
- * - Namespace routing
- * - Room/channel management
- *
- * Use Cases:
- * - JavaScript/TypeScript client apps
- * - React/Vue/Angular real-time features
- * - Mobile apps (Socket.IO client libraries)
- * - Existing Socket.IO migration
- * - Maximum client compatibility
- *
- * @package Toporia\Framework\Realtime\Transports
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SocketIOGateway implements TransportInterface
 {

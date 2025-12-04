@@ -9,29 +9,19 @@ use Toporia\Framework\Auth\Passwords\Contracts\PasswordBrokerInterface;
 use Toporia\Framework\Auth\Passwords\Contracts\TokenRepositoryInterface;
 
 /**
- * Password Broker
+ * Class PasswordBroker
  *
  * Handles password reset flow similar to Laravel's Password Broker.
  *
- * Performance:
- * - O(1) token operations
- * - Secure token generation with SHA-256
- * - Configurable expiration and throttling
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Passwords
+ * @since       2025-01-10
  *
- * Example:
- * ```php
- * // Send reset link
- * $status = $broker->sendResetLink(['email' => 'user@example.com']);
- *
- * // Reset password
- * $status = $broker->reset(
- *     ['email' => 'user@example.com', 'token' => $token, 'password' => $newPassword],
- *     function ($user, $password) {
- *         $user->password = Hash::make($password);
- *         $user->save();
- *     }
- * );
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class PasswordBroker implements PasswordBrokerInterface
 {

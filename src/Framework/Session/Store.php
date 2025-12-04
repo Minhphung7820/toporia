@@ -7,27 +7,20 @@ namespace Toporia\Framework\Session;
 use Toporia\Framework\Session\Contracts\SessionStoreInterface;
 
 /**
- * Session Store
+ * Class Store
  *
  * Wrapper around PHP native session with driver support.
  * Provides unified interface for session management.
  *
- * Performance:
- * - O(1) get/set operations (array access)
- * - Lazy session start (only when needed)
- * - Efficient serialization
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles session storage
- * - Dependency Inversion: Uses SessionStoreInterface
- * - Open/Closed: Extensible via drivers
- *
- * SOLID Principles:
- * - S: Only handles session operations
- * - O: Extensible via drivers
- * - L: Implements interface correctly
- * - I: Focused interface
- * - D: Depends on driver abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Store implements SessionStoreInterface
 {
@@ -92,6 +85,20 @@ final class Store implements SessionStoreInterface
     {
         $this->ensureStarted();
         $this->driver->set($key, $value);
+    }
+
+    /**
+     * Put a session value (alias for set).
+     *
+     * Performance: O(1) - Array assignment
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
+     */
+    public function put(string $key, mixed $value): void
+    {
+        $this->set($key, $value);
     }
 
     /**

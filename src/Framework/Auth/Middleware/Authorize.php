@@ -11,38 +11,19 @@ use Toporia\Framework\Http\Exceptions\AccessDeniedHttpException;
 use Toporia\Framework\Http\{Request, Response};
 
 /**
- * Authorize Middleware
+ * Class Authorize
  *
  * Authorizes requests based on Gate abilities before reaching the controller.
  *
- * Usage:
- * ```php
- * // Simple ability check
- * $router->put('/posts/{id}', [PostController::class, 'update'])
- *     ->middleware([Authorize::using('update-post')]);
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Middleware
+ * @since       2025-01-10
  *
- * // With resource from route parameter
- * $router->delete('/posts/{post}', [PostController::class, 'destroy'])
- *     ->middleware([Authorize::using('delete', Post::class)]);
- *
- * // Multiple abilities (ANY)
- * $router->get('/admin', [AdminController::class, 'index'])
- *     ->middleware([Authorize::any(['admin', 'moderator'])]);
- *
- * // Multiple abilities (ALL)
- * $router->post('/posts/{id}/publish', [PostController::class, 'publish'])
- *     ->middleware([Authorize::all(['update-post', 'publish-post'])]);
- * ```
- *
- * Clean Architecture:
- * - Framework layer middleware
- * - Depends on GateContract abstraction
- *
- * SOLID Principles:
- * - Single Responsibility: Request authorization
- * - Dependency Inversion: Depends on GateContract interface
- *
- * @package Toporia\Framework\Auth\Middleware
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Authorize implements MiddlewareInterface
 {

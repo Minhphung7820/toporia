@@ -5,11 +5,21 @@ declare(strict_types=1);
 namespace Toporia\Framework\Mail;
 
 use Toporia\Framework\Mail\Contracts\MessageInterface;
+
 /**
- * Email Message
+ * Class Message
  *
- * Fluent builder for constructing email messages.
- * Follows Builder pattern for ease of use.
+ * Fluent builder for constructing email messages following the Builder pattern.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Message implements MessageInterface
 {

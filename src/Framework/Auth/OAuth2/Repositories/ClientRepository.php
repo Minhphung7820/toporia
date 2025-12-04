@@ -8,22 +8,19 @@ use Toporia\Framework\Auth\OAuth2\Contracts\{ClientInterface, ClientRepositoryIn
 use Toporia\Framework\Auth\OAuth2\Models\OAuth2Client;
 
 /**
- * OAuth2 Client Repository
+ * Class ClientRepository
  *
  * Manages OAuth2 clients (applications).
  *
- * Performance:
- * - O(1) lookup by ID (indexed query)
- * - O(1) authentication check (indexed query)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\OAuth2\Repositories
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Infrastructure Layer: Database implementation of ClientRepositoryInterface
- * - Dependency Inversion: Implements domain contract
- *
- * SOLID Principles:
- * - S: Only manages OAuth2 clients
- * - I: Implements focused ClientRepositoryInterface
- * - D: Depends on ClientInterface abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ClientRepository implements ClientRepositoryInterface
 {

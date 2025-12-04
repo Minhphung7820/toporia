@@ -5,12 +5,19 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Scheduling\Support;
 
 /**
- * Maintenance Mode Helper
+ * Class MaintenanceMode
  *
- * Utility class for checking maintenance mode status.
- * Follows Single Responsibility Principle.
+ * Utility class for checking maintenance mode status with O(1) performance.
  *
- * @package Toporia\Framework\Console\Scheduling\Support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Scheduling
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MaintenanceMode
 {

@@ -7,24 +7,19 @@ namespace Toporia\Framework\Notification;
 use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationInterface};
 
 /**
- * Anonymous Notifiable
+ * Class AnonymousNotifiable
  *
  * Allows sending notifications to arbitrary channels without a model.
- * Useful for sending notifications to specific emails, phone numbers, etc.
  *
- * Usage:
- * ```php
- * // Send to specific email
- * Notification::route('mail', 'admin@example.com')
- *     ->notify(new OrderPlaced($order));
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification
+ * @since       2025-01-10
  *
- * // Multiple channels
- * Notification::route('mail', 'admin@example.com')
- *     ->route('sms', '+1234567890')
- *     ->notify(new Alert());
- * ```
- *
- * @package Toporia\Framework\Notification
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class AnonymousNotifiable implements NotifiableInterface
 {

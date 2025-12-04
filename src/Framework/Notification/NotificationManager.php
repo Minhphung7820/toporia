@@ -8,31 +8,19 @@ use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterf
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
- * Notification Manager
+ * Class NotificationManager
  *
  * Multi-channel notification dispatcher with driver management.
- * Supports: Mail, Database, SMS, Slack, and custom channels.
  *
- * Features:
- * - Multi-channel delivery (send to multiple channels simultaneously)
- * - Lazy channel loading (channels loaded only when used)
- * - Queue support for async delivery
- * - Bulk sending optimization
- * - Event dispatching (NotificationSending, NotificationSent, NotificationFailed)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification
+ * @since       2025-01-10
  *
- * Performance Optimizations:
- * - O(1) channel resolution via array lookup
- * - O(C) notification sending where C = number of channels
- * - Singleton pattern for channel instances
- * - Minimal object creation
- *
- * Clean Architecture:
- * - Depends on abstractions (ChannelInterface, NotificationInterface)
- * - Factory pattern for channel creation
- * - Strategy pattern for channel selection
- * - Observer pattern for events
- *
- * @package Toporia\Framework\Notification
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class NotificationManager implements NotificationManagerInterface
 {

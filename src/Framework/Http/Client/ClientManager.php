@@ -8,10 +8,20 @@ use Toporia\Framework\Http\Contracts\{ClientManagerInterface, HttpClientInterfac
 use Toporia\Framework\Http\Client\Exceptions\HttpClientException;
 
 /**
- * HTTP Client Manager
+ * Class ClientManager
  *
  * Factory for creating and managing HTTP clients with different configurations.
  * Supports multiple protocols: REST, GraphQL, etc.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http\Client
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ClientManager implements ClientManagerInterface
 {

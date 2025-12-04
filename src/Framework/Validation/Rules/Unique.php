@@ -10,41 +10,20 @@ use Toporia\Framework\Validation\ValidationAttribute;
 use Toporia\Framework\Validation\ValidationData;
 
 /**
- * Unique Rule
+ * Class Unique
  *
  * Validates that a value is unique in a database table.
  * Supports multiple ignore conditions for update scenarios.
  *
- * Clean Architecture:
- * - Single Responsibility: Only validates uniqueness
- * - Dependency Inversion: Works with any database connection
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation\Rules
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles unique validation
- * - Open/Closed: Extensible via ignore conditions
- * - Dependency Inversion: Uses database abstraction
- *
- * Performance Optimizations:
- * - Single indexed query
- * - Prepared statements
- * - Batch validation for arrays
- *
- * Usage Examples:
- * ```php
- * // Simple unique
- * new Unique('users', 'email')
- *
- * // With single ignore condition
- * new Unique('users', 'email', ['id' => 1])
- *
- * // With multiple ignore conditions
- * new Unique('users', 'email', ['id' => 1, 'status' => 'deleted'])
- *
- * // In array validation
- * 'emails.*' => [new Unique('users', 'email')]
- * ```
- *
- * @package Toporia\Framework\Validation\Rules
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Unique implements RuleInterface, DataAwareRuleInterface
 {

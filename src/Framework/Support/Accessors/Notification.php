@@ -9,9 +9,19 @@ use Toporia\Framework\Notification\NotificationManager;
 use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationInterface};
 
 /**
- * Notification Service Accessor
+ * Class Notification
  *
- * Provides static-like access to the notification manager.
+ * Notification Service Accessor - Provides static-like access to the notification manager.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static void send(NotifiableInterface $notifiable, NotificationInterface $notification) Send notification
  * @method static void sendToMany(iterable $notifiables, NotificationInterface $notification) Send to multiple
@@ -28,8 +38,6 @@ use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationI
  *
  * // Access specific channel
  * $mailChannel = Notification::channel('mail');
- *
- * @package Toporia\Framework\Support\Accessors
  */
 final class Notification extends ServiceAccessor
 {

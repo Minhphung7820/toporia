@@ -7,16 +7,19 @@ namespace Toporia\Framework\Mail\Transport;
 use Toporia\Framework\Mail\Contracts\MessageInterface;
 
 /**
- * Resend Transport
+ * Class ResendTransport
  *
- * Send emails via Resend API.
+ * Send emails via Resend API with modern API design, React email support, webhooks, domain verification, and analytics.
  *
- * Features:
- * - Modern API design
- * - React email support
- * - Webhooks
- * - Domain verification
- * - Analytics
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail\Transport
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ResendTransport extends AbstractTransport
 {

@@ -7,6 +7,21 @@ namespace Toporia\Framework\Search\Elasticsearch;
 use Elastic\Elasticsearch\Client;
 use Toporia\Framework\Search\Contracts\SearchClientInterface;
 
+/**
+ * Class ElasticsearchClient
+ *
+ * Provides Elasticsearch client implementation with bulk operation buffering and index management capabilities.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Search\Elasticsearch
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class ElasticsearchClient implements SearchClientInterface
 {
     private array $bulkBuffer = [];

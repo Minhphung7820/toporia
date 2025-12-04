@@ -5,54 +5,19 @@ declare(strict_types=1);
 namespace Toporia\Framework\Notification\Messages;
 
 /**
- * Broadcast Message
+ * Class BroadcastMessage
  *
  * Fluent builder for realtime broadcast notifications via WebSocket/SSE.
- * Integrates with Toporia's Realtime system for push notifications.
  *
- * Usage:
- * ```php
- * // User-specific notification (most common)
- * return (new BroadcastMessage)
- *     ->event('order.shipped')
- *     ->data([
- *         'title' => 'Order Shipped!',
- *         'message' => 'Your order #123 has been shipped',
- *         'action_url' => url('/orders/123')
- *     ]);
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Messages
+ * @since       2025-01-10
  *
- * // Custom channel (public/presence)
- * return (new BroadcastMessage)
- *     ->channel('announcements')
- *     ->event('announcement.new')
- *     ->data([
- *         'title' => 'System Maintenance',
- *         'message' => 'Scheduled maintenance tonight',
- *         'type' => 'warning'
- *     ]);
- *
- * // Chat room notification
- * return (new BroadcastMessage)
- *     ->channel("presence-chat.{$roomId}")
- *     ->event('message.sent')
- *     ->data([
- *         'user' => $this->user->name,
- *         'text' => $this->message,
- *         'timestamp' => time()
- *     ]);
- * ```
- *
- * Performance:
- * - O(1) for each fluent call
- * - Lazy evaluation (data built only when needed)
- * - Minimal memory footprint (< 1KB)
- *
- * Channel Routing:
- * - No channel specified: Defaults to `user.{id}` (private channel)
- * - `channel('foo')`: Broadcast to specific channel
- * - User-specific is more efficient (sends only to user's connections)
- *
- * @package Toporia\Framework\Notification\Messages
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class BroadcastMessage
 {

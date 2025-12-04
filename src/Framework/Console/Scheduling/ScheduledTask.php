@@ -5,20 +5,21 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Scheduling;
 
 /**
- * Scheduled Task
+ * Class ScheduledTask
  *
- * Represents a task that runs on a schedule.
- * Provides fluent interface for configuring task frequency.
+ * Represents a task that runs on a schedule. Provides fluent interface
+ * for configuring task frequency with O(1) configuration methods,
+ * cached cron expression evaluation, and lazy constraint evaluation.
  *
- * Performance:
- * - O(1) configuration methods
- * - Cached cron expression evaluation
- * - Lazy constraint evaluation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Scheduling
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Task configuration only
- * - Open/Closed: Extensible via constraints and hooks
- * - Dependency Inversion: No hard dependencies
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ScheduledTask
 {

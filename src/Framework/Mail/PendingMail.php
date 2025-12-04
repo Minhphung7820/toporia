@@ -7,19 +7,19 @@ namespace Toporia\Framework\Mail;
 use Toporia\Framework\Mail\Contracts\MailerInterface;
 
 /**
- * Pending Mail
+ * Class PendingMail
  *
- * Fluent builder for composing and sending emails.
+ * Fluent builder for composing and sending emails with support for recipients, CC, BCC, and queue operations.
  *
- * Usage:
- * ```php
- * Mail::to('user@example.com')
- *     ->cc('manager@example.com')
- *     ->send(new WelcomeMail($user));
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail
+ * @since       2025-01-10
  *
- * Mail::to(['user1@example.com', 'user2@example.com'])
- *     ->queue(new NewsletterMail($content));
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class PendingMail
 {

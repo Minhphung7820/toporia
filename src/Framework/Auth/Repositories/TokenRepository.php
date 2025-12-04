@@ -11,24 +11,19 @@ use Toporia\Framework\Database\Connection;
 use Toporia\Framework\Support\Collection\Collection;
 
 /**
- * Token Repository
+ * Class TokenRepository
  *
  * Database-backed token repository with caching layer.
  *
- * Clean Architecture:
- * - Infrastructure layer implementation
- * - Implements domain contract (TokenRepositoryInterface)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Repositories
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Token persistence operations
- * - Dependency Inversion: Depends on abstractions (CacheInterface, Connection)
- *
- * Performance Optimizations:
- * - Redis/File cache for token lookups (5-minute TTL)
- * - Batch operations support
- * - Index on token column for O(1) lookup
- *
- * @package Toporia\Framework\Auth\Repositories
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class TokenRepository implements TokenRepositoryInterface
 {

@@ -6,6 +6,21 @@ namespace Toporia\Framework\Console\Commands\Make;
 
 use Toporia\Framework\Console\Command;
 
+/**
+ * Class MakeMigrationCommand
+ *
+ * Create a new database migration file.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands\Make
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class MakeMigrationCommand extends Command
 {
     protected string $signature = 'make:migration {name : The name of the migration} {--create= : The table to be created} {--table= : The table to be modified} {--path= : The location where the migration file should be created}';

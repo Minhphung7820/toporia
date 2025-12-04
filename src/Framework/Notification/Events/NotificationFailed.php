@@ -8,29 +8,19 @@ use Toporia\Framework\Events\Event;
 use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationInterface};
 
 /**
- * Notification Failed Event
+ * Class NotificationFailed
  *
  * Dispatched when a notification fails to send via a specific channel.
- * Useful for monitoring, logging, and retry logic.
  *
- * Use Cases:
- * - Log failures to monitoring system (Sentry, Bugsnag)
- * - Implement retry logic with backoff
- * - Send alerts to administrators
- * - Track delivery metrics
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Events
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * event()->listen(NotificationFailed::class, function($event) {
- *     logger()->error("Notification failed", [
- *         'notification' => $event->notification->getId(),
- *         'channel' => $event->channel,
- *         'error' => $event->exception->getMessage()
- *     ]);
- * });
- * ```
- *
- * @package Toporia\Framework\Notification\Events
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class NotificationFailed extends Event
 {

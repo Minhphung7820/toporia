@@ -10,16 +10,18 @@ namespace Toporia\Framework\DataTransfer\Contracts;
  * Contract for transforming entities to resources/DTOs.
  * Transformers convert domain entities to presentation-layer representations.
  *
- * Key Features:
- * - Type-safe transformation with generics
- * - Context-aware transformation
- * - Batch transformation support
- * - Include/exclude relations support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @template TEntity The source entity type
  * @template TResource The target resource type
- *
- * @package Toporia\Framework\DataTransfer\Contracts
  */
 interface TransformerInterface
 {

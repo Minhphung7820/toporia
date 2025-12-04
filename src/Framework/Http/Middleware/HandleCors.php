@@ -8,36 +8,20 @@ use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Http\{Request, Response};
 
 /**
- * CORS (Cross-Origin Resource Sharing) Middleware
+ * Class HandleCors
  *
- * Handles CORS requests by adding appropriate headers to responses.
+ * CORS (Cross-Origin Resource Sharing) Middleware. Handles CORS requests by adding appropriate headers to responses.
  * Supports preflight requests (OPTIONS) and validates origins.
  *
- * Features:
- * - Origin validation (whitelist/blacklist)
- * - Method validation
- * - Header validation
- * - Credentials support
- * - Max-Age caching
- * - Preflight request handling
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http\Middleware
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) origin validation (array lookup)
- * - O(1) header setting
- * - Minimal overhead per request
- * - Preflight requests handled early (no route processing)
- *
- * Clean Architecture:
- * - Single Responsibility: Only handles CORS headers
- * - Dependency Injection: Receives config via constructor
- * - Open/Closed: Extensible via config, don't modify code
- *
- * SOLID Principles:
- * - S: Only handles CORS
- * - O: Extensible via configuration
- * - L: Behaves like other middleware
- * - I: Uses focused interface
- * - D: Depends on Request/Response abstractions
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class HandleCors implements MiddlewareInterface
 {

@@ -6,6 +6,21 @@ namespace Toporia\Framework\Console\Commands\Make;
 
 use Toporia\Framework\Console\Generator\GeneratorCommand;
 
+/**
+ * Class MakeControllerCommand
+ *
+ * Create a new controller class for handling HTTP requests.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands\Make
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class MakeControllerCommand extends GeneratorCommand
 {
     protected string $signature = 'make:controller {name : The name of the controller} {--resource : Generate a resource controller} {--api : Generate an API controller} {--invokable : Generate a single action controller}';

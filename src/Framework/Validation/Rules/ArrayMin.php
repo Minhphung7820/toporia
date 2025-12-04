@@ -7,13 +7,19 @@ namespace Toporia\Framework\Validation\Rules;
 use Toporia\Framework\Validation\Contracts\RuleInterface;
 
 /**
- * Array Min Rule
+ * Class ArrayMin
  *
  * Validates that an array has at least N elements.
  *
- * Performance: O(1) - Simple count check
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation\Rules
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Validation\Rules
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ArrayMin implements RuleInterface
 {

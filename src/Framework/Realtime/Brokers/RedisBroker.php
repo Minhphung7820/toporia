@@ -9,29 +9,19 @@ use Toporia\Framework\Realtime\Exceptions\{BrokerException, BrokerTemporaryExcep
 use Toporia\Framework\Realtime\RealtimeManager;
 
 /**
- * Redis Broker
+ * Class RedisBroker
  *
- * Redis Pub/Sub broker for multi-server realtime communication.
- * Enables horizontal scaling by broadcasting messages across servers.
+ * Redis Pub/Sub broker for multi-server realtime communication. Enables horizontal scaling by broadcasting messages across servers.
  *
- * Performance:
- * - Latency: ~0.1ms
- * - Throughput: 100k+ messages/sec
- * - Memory: Ephemeral (no persistence)
- * - Scalability: Unlimited subscribers
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Brokers
+ * @since       2025-01-10
  *
- * Use Cases:
- * - Multi-server deployments
- * - Load-balanced applications
- * - Microservices architecture
- * - Fan-out to multiple backend nodes
- *
- * Architecture:
- * - Server A publishes to Redis
- * - Redis broadcasts to all subscribed servers (A, B, C)
- * - Each server broadcasts to its local WebSocket connections
- *
- * @package Toporia\Framework\Realtime\Brokers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RedisBroker implements BrokerInterface, HealthCheckableInterface
 {

@@ -15,6 +15,21 @@ use Toporia\Framework\Console\Scheduling\Scheduler;
  * Usage:
  *   php console schedule:list
  */
+/**
+ * Class ScheduleListCommand
+ *
+ * List all scheduled commands.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class ScheduleListCommand extends Command
 {
     protected string $signature = 'schedule:list';

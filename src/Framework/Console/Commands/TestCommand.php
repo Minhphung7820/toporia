@@ -27,6 +27,21 @@ use Toporia\Framework\Console\Command;
  * - Single Responsibility: Only runs tests
  * - Open/Closed: Extensible via options
  */
+/**
+ * Class TestCommand
+ *
+ * Run application tests.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class TestCommand extends Command
 {
     protected string $signature = 'test {--filter=} {--testsuite=} {--coverage} {--coverage-html} {--parallel} {--stop-on-failure} {--verbose}';

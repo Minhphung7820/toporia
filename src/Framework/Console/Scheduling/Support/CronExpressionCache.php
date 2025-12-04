@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Scheduling\Support;
 
 /**
- * Cron Expression Cache
+ * Class CronExpressionCache
  *
  * Caches parsed cron expression results for performance optimization.
- * Follows Single Responsibility Principle.
+ * Provides O(1) cache lookup after first evaluation with reduced
+ * repeated parsing overhead and memory-efficient LRU eviction.
  *
- * Performance:
- * - O(1) cache lookup after first evaluation
- * - Reduces repeated parsing overhead
- * - Memory-efficient (LRU eviction for large caches)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Scheduling
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Console\Scheduling\Support
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CronExpressionCache
 {

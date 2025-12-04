@@ -7,6 +7,8 @@ namespace Toporia\Framework\Log\Channels;
 use Toporia\Framework\Log\Contracts\ChannelInterface;
 
 /**
+ * Class StackChannel
+ *
  * Stack Channel - Multiple channels aggregator
  *
  * Writes logs to multiple channels simultaneously.
@@ -21,6 +23,16 @@ use Toporia\Framework\Log\Contracts\ChannelInterface;
  * ```
  *
  * Performance: O(N) where N = number of channels
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Log\Channels
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class StackChannel implements ChannelInterface
 {

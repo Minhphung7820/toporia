@@ -13,35 +13,19 @@ use Toporia\Framework\DataTransfer\Exceptions\TransformationException;
  * Base class for object-to-object mappers.
  * Provides common mapping functionality with caching and batch support.
  *
- * Features:
- * - Bidirectional mapping
- * - Batch mapping with memory efficiency
- * - Context-aware mapping
- * - Result caching
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Mapper
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * class UserToUserDTOMapper extends AbstractMapper
- * {
- *     protected string $sourceType = User::class;
- *     protected string $targetType = UserDTO::class;
- *
- *     protected function doMap(User $source, array $context): UserDTO
- *     {
- *         return new UserDTO(
- *             id: $source->getId(),
- *             name: $source->getName(),
- *             email: $source->getEmail(),
- *         );
- *     }
- * }
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @template TSource
  * @template TTarget
  * @implements MapperInterface<TSource, TTarget>
- *
- * @package Toporia\Framework\DataTransfer\Mapper
  */
 abstract class AbstractMapper implements MapperInterface
 {

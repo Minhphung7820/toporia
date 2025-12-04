@@ -5,21 +5,20 @@ declare(strict_types=1);
 namespace Toporia\Framework\Validation;
 
 /**
- * Validation Data
+ * Class ValidationData
  *
  * Immutable container for all data being validated.
  * Provides efficient access to nested data via dot notation.
  *
- * Clean Architecture:
- * - Value Object: Immutable data container
- * - No framework dependencies
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation
+ * @since       2025-01-10
  *
- * Performance:
- * - Lazy dot notation parsing (cached after first access)
- * - O(1) direct key access
- * - O(n) dot notation access (n = depth)
- *
- * @package Toporia\Framework\Validation
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ValidationData
 {

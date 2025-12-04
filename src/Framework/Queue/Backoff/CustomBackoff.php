@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Queue\Backoff;
 
 /**
- * Custom Backoff Strategy
+ * Class CustomBackoff
  *
  * Uses custom array or callable for flexible retry delays.
  * Maximum flexibility for complex retry scenarios.
@@ -18,7 +18,15 @@ namespace Toporia\Framework\Queue\Backoff;
  * - Progressive backoff patterns
  * - Domain-specific retry logic
  *
- * @package Toporia\Framework\Queue\Backoff
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue\Backoff
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CustomBackoff implements BackoffStrategy
 {

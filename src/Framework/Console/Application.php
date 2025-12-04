@@ -10,13 +10,21 @@ use Toporia\Framework\Console\Output;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
- * Console Application
+ * Class Application
  *
- * Minimal command dispatcher that:
- * - Registers console commands by signature
- * - Resolves command instances via the container
- * - Routes argv to the appropriate command
- * - Injects Input/Output into commands
+ * Minimal command dispatcher that registers console commands by signature,
+ * resolves command instances via the container, routes argv to appropriate
+ * commands, and injects Input/Output into commands.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Application
 {

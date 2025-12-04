@@ -9,9 +9,19 @@ use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Process\{ProcessManager, ProcessPool};
 
 /**
- * Process Service Provider
+ * Class ProcessServiceProvider
  *
  * Registers multi-process services.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ProcessServiceProvider extends ServiceProvider
 {

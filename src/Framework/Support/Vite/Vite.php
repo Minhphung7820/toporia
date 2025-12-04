@@ -5,10 +5,20 @@ declare(strict_types=1);
 namespace Toporia\Framework\Support\Vite;
 
 /**
- * Vite Asset Loader
+ * Class Vite
  *
- * Integrates Vite with Toporia Framework for seamless asset management.
+ * Vite Asset Loader - Integrates Vite with Toporia Framework for seamless asset management.
  * Supports both development (HMR) and production (manifest) modes.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Vite
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * Features:
  * - Automatic dev/prod mode detection

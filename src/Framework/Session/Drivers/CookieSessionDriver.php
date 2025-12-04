@@ -8,24 +8,20 @@ use Toporia\Framework\Session\Contracts\SessionStoreInterface;
 use Toporia\Framework\Http\CookieJar;
 
 /**
- * Cookie Session Driver
+ * Class CookieSessionDriver
  *
  * Stores sessions in encrypted cookies.
  * Stateless sessions - no server-side storage needed.
  *
- * Performance:
- * - O(1) get/set (in-memory during request)
- * - O(N) save where N = session data size (cookie size limit ~4KB)
- * - No server-side storage overhead
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session\Drivers
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles cookie-based session storage
- * - Dependency Inversion: Uses CookieJar abstraction
- *
- * Limitations:
- * - Cookie size limit (~4KB)
- * - All data sent with every request
- * - Encryption overhead
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CookieSessionDriver implements SessionStoreInterface
 {
@@ -94,6 +90,18 @@ final class CookieSessionDriver implements SessionStoreInterface
     public function set(string $key, mixed $value): void
     {
         $this->data[$key] = $value;
+    }
+
+    /**
+     * Put a session value (alias for set).
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
+     */
+    public function put(string $key, mixed $value): void
+    {
+        $this->set($key, $value);
     }
 
     /**

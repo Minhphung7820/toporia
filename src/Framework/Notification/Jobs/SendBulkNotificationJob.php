@@ -8,27 +8,19 @@ use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Notification\Contracts\NotificationInterface;
 
 /**
- * Send Bulk Notification Job
+ * Class SendBulkNotificationJob
  *
  * Optimized queue job for sending notifications to multiple recipients.
- * Uses single job instead of N separate jobs for better performance.
  *
- * Performance Benefits:
- * - Single job dispatch instead of N jobs
- * - Reduced queue overhead
- * - Batch processing for efficiency
- * - O(N) processing where N = number of recipients
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Jobs
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * $users = User::where('active', true)->get();
- * $notification = new WelcomeNotification();
- *
- * // Instead of N jobs, dispatch 1 bulk job
- * SendBulkNotificationJob::dispatch($users, $notification);
- * ```
- *
- * @package Toporia\Framework\Notification\Jobs
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SendBulkNotificationJob extends Job
 {

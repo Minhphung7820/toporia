@@ -10,10 +10,19 @@ use Toporia\Framework\Routing\UrlGenerator;
 use Toporia\Framework\Routing\Contracts\UrlGeneratorInterface;
 
 /**
- * URL Service Provider.
+ * Class UrlServiceProvider
  *
- * Registers the URL generator service for generating URLs to routes,
- * assets, and signed URLs.
+ * Registers the URL generator service for generating URLs to routes, assets, and signed URLs.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class UrlServiceProvider extends ServiceProvider
 {

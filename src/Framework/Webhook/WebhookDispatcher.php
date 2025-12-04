@@ -10,19 +10,19 @@ use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
 use Toporia\Framework\Log\Contracts\LoggerInterface;
 
 /**
- * Webhook Dispatcher
+ * Class WebhookDispatcher
  *
  * Dispatches webhooks to external endpoints with retry, signature, and async support.
  *
- * Performance:
- * - O(1) signature generation
- * - O(N) dispatch where N = number of endpoints
- * - Async dispatch via queue (non-blocking)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Webhook
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only dispatches webhooks
- * - Dependency Inversion: Depends on interfaces
- * - Open/Closed: Extensible via signature generators
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class WebhookDispatcher implements WebhookDispatcherInterface
 {

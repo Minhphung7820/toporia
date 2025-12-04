@@ -8,22 +8,19 @@ use Toporia\Framework\Console\Command;
 use Toporia\Framework\Foundation\Application;
 
 /**
- * Config Cache Command
+ * Class ConfigCacheCommand
  *
  * Compile all configuration files into a single cached file for faster loading.
  *
- * Performance Benefits:
- * - 90% faster config loading (single file vs multiple files)
- * - Zero overhead file I/O during bootstrap
- * - Opcache-friendly PHP file format
- * - All configs loaded at once (no lazy loading overhead)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
  *
- * Usage:
- *   php console config:cache
- *
- * Architecture:
- * - Single Responsibility: Config caching only
- * - Clean Architecture: Framework layer
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ConfigCacheCommand extends Command
 {

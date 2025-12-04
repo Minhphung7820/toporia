@@ -9,7 +9,7 @@ use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Toporia\Framework\Queue\Exceptions\JobAlreadyRunningException;
 
 /**
- * Without Overlapping Middleware
+ * Class WithoutOverlapping
  *
  * Ensures only one instance of a job runs at a time.
  * Prevents concurrent execution of the same job.
@@ -35,7 +35,15 @@ use Toporia\Framework\Queue\Exceptions\JobAlreadyRunningException;
  * - I: Focused interface
  * - D: Depends on CacheInterface abstraction
  *
- * @package Toporia\Framework\Queue\Middleware
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue\Middleware
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class WithoutOverlapping implements JobMiddleware
 {

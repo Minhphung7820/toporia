@@ -8,28 +8,19 @@ use Toporia\Framework\Auth\OAuth2\Contracts\ClientInterface;
 use Toporia\Framework\Http\Request;
 
 /**
- * Client Credentials Grant
+ * Class ClientCredentialsGrant
  *
  * OAuth2 grant type for machine-to-machine authentication.
- * No user involved - client authenticates itself.
  *
- * Usage:
- * POST /oauth/token
- * grant_type=client_credentials
- * client_id=xxx
- * client_secret=xxx
- * scope=read write
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\OAuth2\Grants
+ * @since       2025-01-10
  *
- * Performance: O(1) - Single token creation
- *
- * Clean Architecture:
- * - Strategy Pattern: One of multiple grant implementations
- * - Single Responsibility: Only handles client credentials flow
- *
- * SOLID Principles:
- * - S: Only handles client credentials grant
- * - O: Extensible via inheritance
- * - L: Interchangeable with other grants
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ClientCredentialsGrant extends AbstractGrant
 {

@@ -7,26 +7,19 @@ namespace Toporia\Framework\Auth\Tokens;
 use Toporia\Framework\Auth\Contracts\{NewAccessTokenInterface, PersonalAccessTokenInterface};
 
 /**
- * New Access Token Value Object
+ * Class NewAccessToken
  *
- * Wrapper for newly created access tokens containing both:
- * - The token model (PersonalAccessToken)
- * - The plain text token (only available at creation time!)
+ * Wrapper for newly created access tokens containing both the token model and plain text token.
  *
- * Clean Architecture:
- * - Value Object pattern
- * - Immutable data structure
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Tokens
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Wraps token + plain text
- * - Interface Segregation: Implements focused contract
- *
- * Security:
- * - Plain text token ONLY available once at creation
- * - After this object is discarded, plain text is lost forever
- * - Only hashed token stored in database
- *
- * @package Toporia\Framework\Auth\Tokens
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class NewAccessToken implements NewAccessTokenInterface
 {

@@ -135,6 +135,15 @@ interface ConnectionInterface
     public function reconnect(): void;
 
     /**
+     * Execute query and return results as array.
+     *
+     * @param string $query SQL query.
+     * @param array $bindings Parameter bindings.
+     * @return array<int, array<string, mixed>>
+     */
+    public function query(string $query, array $bindings = []): array;
+
+    /**
      * Execute a SELECT query and return all rows.
      *
      * @param string $query SQL query.

@@ -7,19 +7,20 @@ namespace Toporia\Framework\Session\Drivers;
 use Toporia\Framework\Session\Contracts\SessionStoreInterface;
 
 /**
- * File-based Session Driver
+ * Class FileSessionDriver
  *
  * Stores sessions as files in the filesystem.
  * Uses PHP's native session handler with custom save path.
  *
- * Performance:
- * - O(1) get/set (in-memory during request)
- * - O(N) save where N = session data size
- * - File I/O only on save/load
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session\Drivers
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles file-based session storage
- * - Dependency Inversion: Implements SessionStoreInterface
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class FileSessionDriver implements SessionStoreInterface
 {
@@ -83,6 +84,18 @@ final class FileSessionDriver implements SessionStoreInterface
     public function set(string $key, mixed $value): void
     {
         $this->data[$key] = $value;
+    }
+
+    /**
+     * Put a session value (alias for set).
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
+     */
+    public function put(string $key, mixed $value): void
+    {
+        $this->set($key, $value);
     }
 
     /**

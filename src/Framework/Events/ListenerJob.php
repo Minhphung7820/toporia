@@ -10,25 +10,20 @@ use Toporia\Framework\Events\Exceptions\ListenerException;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
- * Listener Job
+ * Class ListenerJob
  *
- * Job for executing queued event listeners.
- * Serializes listener and event for queue processing.
+ * Job for executing queued event listeners with efficient serialization
+ * and lazy listener resolution.
  *
- * Performance:
- * - Efficient serialization
- * - Lazy listener resolution
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Events
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles listener job execution
- * - Dependency Inversion: Uses ContainerInterface
- *
- * SOLID Principles:
- * - S: Only executes queued listeners
- * - O: Extensible via different job implementations
- * - L: Implements JobInterface correctly
- * - I: Focused interface
- * - D: Depends on ContainerInterface abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ListenerJob implements JobInterface
 {

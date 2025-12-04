@@ -7,27 +7,20 @@ namespace Toporia\Framework\Validation;
 use Toporia\Framework\Validation\Contracts\ValidatorInterface;
 
 /**
- * Array Validator
+ * Class ArrayValidator
  *
  * Handles validation for array fields with nested structures.
  * Supports wildcard notation (items.*.name) and indexed arrays (items.0.name).
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles array validation
- * - No framework dependencies beyond Validation layer
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only validates array structures
- * - Open/Closed: Extensible via custom array rules
- * - Dependency Inversion: Works with ValidatorInterface
- *
- * Performance Optimizations:
- * - Lazy array expansion (only when needed)
- * - Cached array structure parsing
- * - Batch validation for array elements
- * - Early exit on first error (optional)
- *
- * @package Toporia\Framework\Validation
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ArrayValidator
 {

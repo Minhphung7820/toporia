@@ -5,10 +5,21 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console;
 
 use Toporia\Framework\Console\Contracts\InputInterface;
+
 /**
- * Console Input
+ * Class Input
  *
  * Parses and provides access to command-line arguments and options.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Input implements InputInterface
 {

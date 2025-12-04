@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace Toporia\Framework\Validation;
 
 /**
- * Validation Attribute
+ * Class ValidationAttribute
  *
  * Value object representing an attribute being validated.
  * Provides metadata about the attribute (name, display name, etc.).
  *
- * Clean Architecture:
- * - Value Object: Immutable data container
- * - No framework dependencies
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation
+ * @since       2025-01-10
  *
- * Performance:
- * - Immutable (can be cached/shared)
- * - O(1) property access
- *
- * @package Toporia\Framework\Validation
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final readonly class ValidationAttribute
 {

@@ -10,24 +10,19 @@ use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\RateLimit\{Contracts\RateLimiterInterface, RateLimiter, Limit};
 
 /**
- * Throttle Requests Middleware
+ * Class ThrottleRequests
  *
- * Rate limits HTTP requests based on configurable criteria.
- * Supports named limiters (like Laravel) and direct configuration.
+ * Rate limits HTTP requests based on configurable criteria. Supports named limiters (like Laravel) and direct configuration.
  *
- * Usage with named limiter:
- * ```php
- * Route::middleware('throttle:api-per-user')->group(function () {
- *     Route::get('/orders', fn() => 'orders');
- * });
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http\Middleware
+ * @since       2025-01-10
  *
- * Usage with direct limits:
- * ```php
- * Route::middleware('throttle:60,1')->group(function () {
- *     Route::get('/api', fn() => 'api');
- * });
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ThrottleRequests implements MiddlewareInterface
 {

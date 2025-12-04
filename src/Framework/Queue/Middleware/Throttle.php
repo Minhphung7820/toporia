@@ -9,7 +9,7 @@ use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Toporia\Framework\Queue\Exceptions\RateLimitExceededException;
 
 /**
- * Throttle Middleware
+ * Class Throttle
  *
  * Throttles job execution per time window (e.g., max 10 jobs per minute).
  * Different from RateLimited: Throttle is simpler, per-job-class based.
@@ -24,7 +24,15 @@ use Toporia\Framework\Queue\Exceptions\RateLimitExceededException;
  * - Dependency Inversion: Uses CacheInterface
  * - High Reusability: Can be used across different contexts
  *
- * @package Toporia\Framework\Queue\Middleware
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue\Middleware
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Throttle implements JobMiddleware
 {

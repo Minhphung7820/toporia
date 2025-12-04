@@ -8,19 +8,20 @@ use Toporia\Framework\Session\Contracts\SessionStoreInterface;
 use Toporia\Framework\Database\Contracts\ConnectionInterface;
 
 /**
- * Database Session Driver
+ * Class DatabaseSessionDriver
  *
  * Stores sessions in database table.
  * Better for distributed systems and scalability.
  *
- * Performance:
- * - O(1) get/set (in-memory during request)
- * - O(1) save (single UPDATE query)
- * - Database I/O only on save/load
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session\Drivers
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles database session storage
- * - Dependency Inversion: Uses ConnectionInterface
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class DatabaseSessionDriver implements SessionStoreInterface
 {
@@ -79,6 +80,18 @@ final class DatabaseSessionDriver implements SessionStoreInterface
     public function set(string $key, mixed $value): void
     {
         $this->data[$key] = $value;
+    }
+
+    /**
+     * Put a session value (alias for set).
+     *
+     * @param string $key
+     * @param mixed $value
+     * @return void
+     */
+    public function put(string $key, mixed $value): void
+    {
+        $this->set($key, $value);
     }
 
     /**

@@ -17,32 +17,15 @@ use ReflectionProperty;
  * Abstract base class for all DTOs.
  * Provides immutable, type-safe data containers.
  *
- * Features:
- * - Immutability by default
- * - Automatic property mapping from arrays
- * - Type coercion support
- * - Array access interface
- * - JSON serialization
- * - Reflection caching for performance
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\DTO
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) property access
- * - Reflection cached per class
- * - Lazy initialization support
- *
- * Usage:
- * ```php
- * class UserDTO extends DataTransferObject
- * {
- *     public readonly int $id;
- *     public readonly string $name;
- *     public readonly ?string $email;
- * }
- *
- * $dto = UserDTO::fromArray(['id' => 1, 'name' => 'John', 'email' => 'john@example.com']);
- * ```
- *
- * @package Toporia\Framework\DataTransfer\DTO
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class DataTransferObject implements DTOInterface, ArrayAccess, JsonSerializable
 {

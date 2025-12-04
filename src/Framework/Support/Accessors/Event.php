@@ -8,10 +8,20 @@ use Toporia\Framework\Foundation\ServiceAccessor;
 use Toporia\Framework\Events\Contracts\{EventDispatcherInterface, EventInterface};
 
 /**
- * Event Service Accessor
+ * Class Event
  *
- * Provides static-like access to the event dispatcher.
+ * Event Service Accessor - Provides static-like access to the event dispatcher.
  * Supports all dispatcher methods including wildcards, queued listeners, and subscribers.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static void listen(string $eventName, callable|string|ListenerInterface $listener, int $priority = 0) Register listener
  * @method static void listenClass(string $eventName, string|ListenerInterface $listener, int $priority = 0) Register class-based listener

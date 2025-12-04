@@ -16,6 +16,16 @@ use Toporia\Framework\Foundation\Application;
  * - Single Responsibility: Only handles provider booting
  * - Late execution: Called after all providers are registered
  * - Performance: O(P) where P = number of providers
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Foundation\Bootstrap
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class BootProviders
 {

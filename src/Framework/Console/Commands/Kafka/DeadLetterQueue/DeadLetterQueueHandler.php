@@ -7,22 +7,20 @@ namespace Toporia\Framework\Console\Commands\Kafka\DeadLetterQueue;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 
 /**
- * Dead Letter Queue Handler
+ * Class DeadLetterQueueHandler
  *
  * Handles failed messages by sending them to a Dead Letter Queue (DLQ).
  * Provides retry logic, error tracking, and message persistence.
  *
- * Performance:
- * - DLQ publish: ~1ms per message
- * - Error tracking: In-memory + optional persistence
- * - Retry logic: Configurable backoff strategies
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands\Kafka\DeadLetterQueue
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles DLQ operations
- * - Open/Closed: Extensible via strategy pattern
- * - Dependency Inversion: Depends on broker abstraction
- *
- * @package Toporia\Framework\Console\Commands\Kafka\DeadLetterQueue
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class DeadLetterQueueHandler
 {

@@ -11,24 +11,20 @@ use Toporia\Framework\Testing\Browser\Concerns\MakesAssertions;
 use Toporia\Framework\Testing\Browser\Concerns\WaitsForElements;
 
 /**
- * Browser Testing Class
+ * Class Browser
  *
- * Provides browser automation similar to Laravel Dusk.
- * Uses WebDriver protocol for browser control.
+ * Browser Testing Class - Provides browser automation similar to Laravel Dusk.
+ * Uses WebDriver protocol for browser control with connection pooling, lazy element resolution, and screenshot caching.
  *
- * Performance:
- * - Connection pooling for WebDriver sessions
- * - Lazy element resolution
- * - Screenshot caching
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Testing\Browser
+ * @since       2025-01-10
  *
- * Example:
- * ```php
- * $browser->visit('/login')
- *     ->type('email', 'user@example.com')
- *     ->type('password', 'secret')
- *     ->press('Login')
- *     ->assertPathIs('/dashboard');
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Browser
 {

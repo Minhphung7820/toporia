@@ -8,16 +8,20 @@ use Toporia\Framework\Storage\Contracts\CloudFilesystemInterface;
 use Toporia\Framework\Storage\Concerns\ManagesVisibility;
 
 /**
- * Google Cloud Storage Filesystem
+ * Class GcsFilesystem
  *
- * GCS implementation using REST API.
+ * Google Cloud Storage implementation using REST API with resumable uploads,
+ * object versioning, ACL management, signed URLs, and encryption key support.
  *
- * Features:
- * - Resumable uploads for large files
- * - Object versioning support
- * - ACL management
- * - Signed URLs
- * - Customer-managed encryption keys
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Storage
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class GcsFilesystem implements CloudFilesystemInterface
 {

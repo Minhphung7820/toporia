@@ -9,13 +9,19 @@ use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\Migration\Migrator;
 
 /**
- * Show migration status.
+ * Class MigrateStatusCommand
  *
- * Displays which migrations have been executed and which are pending.
- * Shows batch numbers for executed migrations.
+ * Show migration status displaying executed and pending migrations.
  *
- * Usage:
- * - php console migrate:status
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MigrateStatusCommand extends Command
 {

@@ -11,37 +11,20 @@ use Toporia\Framework\View\View;
 use Toporia\Framework\View\Contracts\ViewFactoryInterface;
 
 /**
- * View Service Provider
+ * Class ViewServiceProvider
  *
  * Registers view and component services into the container.
  * Provides templating and view component functionality.
  *
- * Services Registered:
- * - 'view' => ViewFactory instance
- * - ViewFactoryInterface => ViewFactory instance
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
  *
- * Configuration (config/view.php):
- * ```php
- * 'paths' => [resource_path('views')],
- * 'compiled' => storage_path('framework/views'),
- * 'components' => [
- *     'alert' => \App\View\Components\Alert::class,
- * ],
- * 'namespaces' => [
- *     'mail' => \App\View\Components\Mail::class,
- * ],
- * ```
- *
- * Usage:
- * ```php
- * $view = app('view')->make('users.index', ['users' => $users]);
- * echo $view->render();
- *
- * // With facade/helper
- * return view('users.index', ['users' => $users]);
- * ```
- *
- * @package Toporia\Framework\Providers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ViewServiceProvider extends ServiceProvider
 {

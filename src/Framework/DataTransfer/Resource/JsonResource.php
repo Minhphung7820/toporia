@@ -14,40 +14,15 @@ use Toporia\Framework\Database\ORM\Model;
  * Laravel-style JSON Resource for API responses.
  * Wraps entities/data for consistent JSON serialization.
  *
- * Features:
- * - Automatic model wrapping
- * - Conditional attributes
- * - Relationship loading
- * - Additional metadata
- * - Response customization
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Resource
+ * @since       2025-01-10
  *
- * Performance:
- * - Lazy evaluation of conditional attributes
- * - Memory-efficient collection handling
- *
- * Usage:
- * ```php
- * class UserResource extends JsonResource
- * {
- *     public function toArray(): array
- *     {
- *         return [
- *             'id' => $this->id,
- *             'name' => $this->name,
- *             'email' => $this->email,
- *             'created_at' => $this->created_at?->toISOString(),
- *             'posts' => $this->whenLoaded('posts', fn() => PostResource::collection($this->posts)),
- *             'is_admin' => $this->when($this->isAdmin(), true),
- *         ];
- *     }
- * }
- *
- * // Usage in controller
- * return new UserResource($user);
- * return UserResource::collection($users);
- * ```
- *
- * @package Toporia\Framework\DataTransfer\Resource
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class JsonResource implements ResourceInterface
 {

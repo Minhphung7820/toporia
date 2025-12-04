@@ -176,6 +176,14 @@ class ConnectionProxy implements ConnectionInterface
     /**
      * {@inheritdoc}
      */
+    public function query(string $query, array $bindings = []): array
+    {
+        return $this->connection->query($query, $bindings);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public function select(string $query, array $bindings = []): array
     {
         return $this->connection->select($query, $bindings);

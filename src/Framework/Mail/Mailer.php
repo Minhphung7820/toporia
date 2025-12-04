@@ -10,17 +10,20 @@ use Toporia\Framework\Mail\Jobs\SendMailJob;
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**
- * Mailer
+ * Class Mailer
  *
- * High-level mailer using transport abstraction.
- * Provides fluent API for sending emails.
+ * High-level mailer using transport abstraction with features including transport abstraction,
+ * queue integration for async sending, global from/reply-to configuration, mailable support, and event hooks.
  *
- * Features:
- * - Transport abstraction (SMTP, Mailgun, SES, etc.)
- * - Queue integration for async sending
- * - Global from/reply-to configuration
- * - Mailable support
- * - Event hooks
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Mailer implements MailerInterface
 {

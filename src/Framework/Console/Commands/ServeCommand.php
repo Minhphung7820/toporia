@@ -36,6 +36,21 @@ use Toporia\Framework\Foundation\Application;
  * - I: Uses Command interface
  * - D: Depends on Application abstraction
  */
+/**
+ * Class ServeCommand
+ *
+ * Serve the application using PHP built-in server.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class ServeCommand extends Command
 {
     protected string $signature = 'serve {--port=8000} {--host=127.0.0.1}';

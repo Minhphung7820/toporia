@@ -8,32 +8,19 @@ use Toporia\Framework\Auth\OAuth2\Contracts\{ClientRepositoryInterface, GrantInt
 use Toporia\Framework\Http\Request;
 
 /**
- * OAuth2 Authorization Server
+ * Class OAuth2Server
  *
  * Full OAuth2 server implementation supporting multiple grant types.
  *
- * Supported Grant Types:
- * - client_credentials: Machine-to-machine authentication
- * - password: Resource owner password credentials (trusted apps)
- * - refresh_token: Token refresh flow
- * - authorization_code: Authorization code flow (can be added later)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\OAuth2
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) grant lookup (cached)
- * - O(1) client authentication (indexed query)
- * - O(1) token issuance (single insert)
- *
- * Clean Architecture:
- * - Application Layer: Orchestrates OAuth2 flows
- * - Dependency Inversion: Depends on abstractions
- * - Strategy Pattern: Different grants are interchangeable
- *
- * SOLID Principles:
- * - S: Only orchestrates OAuth2 flows
- * - O: Extensible via new grant types
- * - L: All grants are interchangeable
- * - I: Focused interfaces
- * - D: Depends on abstractions
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class OAuth2Server implements OAuth2ServerInterface
 {

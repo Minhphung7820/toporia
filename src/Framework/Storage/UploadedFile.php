@@ -7,19 +7,20 @@ namespace Toporia\Framework\Storage;
 use Toporia\Framework\Storage\Contracts\UploadedFileInterface;
 
 /**
- * Uploaded File Handler
+ * Class UploadedFile
  *
- * Handles HTTP file uploads with standard API.
+ * Handles HTTP file uploads with stream-based operations, lazy loading,
+ * hash caching, upload validation, and security features.
  *
- * Performance:
- * - Stream-based for large files (memory efficient)
- * - Lazy loading of file info
- * - Hash caching
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Storage
+ * @since       2025-01-10
  *
- * Security:
- * - Validates file uploads
- * - Prevents path traversal
- * - MIME type detection
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class UploadedFile implements UploadedFileInterface
 {

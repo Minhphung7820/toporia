@@ -9,7 +9,17 @@ use PHPUnit\Framework\Assert;
 /**
  * Trait MakesAssertions
  *
- * Provides assertion methods for browser testing.
+ * Provides comprehensive assertion methods for browser testing including URL, element, and content assertions.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Testing\Browser\Concerns
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait MakesAssertions
 {

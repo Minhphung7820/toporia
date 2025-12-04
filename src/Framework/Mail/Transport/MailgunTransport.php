@@ -7,16 +7,19 @@ namespace Toporia\Framework\Mail\Transport;
 use Toporia\Framework\Mail\Contracts\MessageInterface;
 
 /**
- * Mailgun Transport
+ * Class MailgunTransport
  *
- * Send emails via Mailgun API.
+ * Send emails via Mailgun API with HTTP API support, batch sending, templates, tracking, tags, and metadata.
  *
- * Features:
- * - HTTP API (faster than SMTP)
- * - Batch sending support
- * - Template support
- * - Tracking (opens, clicks)
- * - Tags and metadata
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail\Transport
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MailgunTransport extends AbstractTransport
 {

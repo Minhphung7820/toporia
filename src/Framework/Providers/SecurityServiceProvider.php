@@ -14,12 +14,19 @@ use Toporia\Framework\Http\CookieJar;
 use Toporia\Framework\RateLimit\{CacheRateLimiter, Contracts\RateLimiterInterface, RateLimiter};
 
 /**
- * Security Service Provider
+ * Class SecurityServiceProvider
  *
- * Registers security-related services:
- * - CSRF protection
- * - Authorization (Gates)
- * - Cookie management
+ * Registers security-related services including CSRF protection, Authorization (Gates), and Cookie management.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SecurityServiceProvider extends ServiceProvider
 {

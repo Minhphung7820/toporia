@@ -7,16 +7,19 @@ namespace Toporia\Framework\Realtime;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
 
 /**
- * Realtime Message
+ * Class Message
  *
  * Immutable message object for realtime communication.
  *
- * Performance:
- * - JSON encode/decode: ~0.01ms
- * - Memory: ~500 bytes per message
- * - Immutable (safe for concurrent use)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Realtime
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Message implements MessageInterface
 {

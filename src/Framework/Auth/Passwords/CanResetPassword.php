@@ -9,13 +9,15 @@ namespace Toporia\Framework\Auth\Passwords;
  *
  * Add this trait to your User model to enable password reset.
  *
- * Example:
- * ```php
- * class User extends Model implements CanResetPasswordInterface
- * {
- *     use CanResetPassword;
- * }
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Passwords
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 trait CanResetPassword
 {

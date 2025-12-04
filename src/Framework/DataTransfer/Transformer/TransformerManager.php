@@ -15,31 +15,15 @@ use Toporia\Framework\DataTransfer\Resource\ResourceCollection;
  * Central manager for entity transformers.
  * Provides automatic transformer resolution and registration.
  *
- * Features:
- * - Automatic transformer discovery
- * - Type-based transformer resolution
- * - Transformer factory support
- * - Global includes management
- * - Resource creation helpers
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Transformer
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * $manager = new TransformerManager();
- *
- * // Register transformer
- * $manager->register(User::class, new UserTransformer());
- *
- * // Transform entity
- * $data = $manager->transform($user);
- *
- * // Transform collection
- * $data = $manager->collection($users);
- *
- * // With includes
- * $data = $manager->transform($user, ['include' => ['posts', 'profile']]);
- * ```
- *
- * @package Toporia\Framework\DataTransfer\Transformer
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class TransformerManager
 {

@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace Toporia\Framework\Foundation;
 
 /**
- * Load Environment Variables
+ * Class LoadEnvironmentVariables
  *
  * Loads environment variables from .env file and merges with system environment.
  * This should be called early in the bootstrap process, before any configuration
  * or service providers are loaded.
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles environment variable loading
- * - No dependencies: Pure function, no framework dependencies
- * - Early execution: Called before Application instance creation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Foundation
+ * @since       2025-01-10
  *
- * Performance: O(N) where N = number of .env lines
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class LoadEnvironmentVariables
 {

@@ -7,11 +7,19 @@ namespace Toporia\Framework\Realtime\Brokers\Kafka\Client;
 use Toporia\Framework\Realtime\Exceptions\BrokerException;
 
 /**
- * Factory for creating Kafka client instances.
+ * Class KafkaClientFactory
  *
- * Automatically selects the best available Kafka client library.
+ * Factory for creating Kafka client instances. Automatically selects the best available Kafka client library.
  *
- * @package Toporia\Framework\Realtime\Brokers\Kafka\Client
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Brokers\Kafka\Client
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class KafkaClientFactory
 {

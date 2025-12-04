@@ -9,29 +9,20 @@ use Toporia\Framework\Events\Exceptions\ListenerException;
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**
- * Queued Listener Wrapper
+ * Class QueuedListener
  *
- * Wraps a listener to queue it for asynchronous execution.
- * Implements ShouldQueue marker interface.
+ * Wraps a listener to queue it for asynchronous execution with support
+ * for delayed execution and background processing.
  *
- * Performance:
- * - Offloads listener execution to background
- * - Improves response time
- * - Supports delayed execution
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Events
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles queuing
- * - Decorator pattern: Wraps existing listener
- * - Dependency Inversion: Uses QueueInterface
- *
- * SOLID Principles:
- * - S: Only handles queuing
- * - O: Extensible via different queue implementations
- * - L: Behaves like ListenerInterface
- * - I: Focused interface
- * - D: Depends on QueueInterface abstraction
- *
- * @package Toporia\Framework\Events
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class QueuedListener implements ListenerInterface, ShouldQueue
 {

@@ -10,18 +10,17 @@ namespace Toporia\Framework\DataTransfer\Contracts;
  * Contract for hydrating objects from arrays/DTOs.
  * Hydrators populate domain entities from external data sources.
  *
- * Key Features:
- * - Type-safe hydration with generics
- * - Bidirectional conversion (hydrate/extract)
- * - Strategy pattern for different hydration methods
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - Reflection caching for repeated hydrations
- * - Lazy property population
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @template T The target object type
- *
- * @package Toporia\Framework\DataTransfer\Contracts
  */
 interface HydratorInterface
 {

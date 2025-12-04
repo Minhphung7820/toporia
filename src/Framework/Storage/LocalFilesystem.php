@@ -7,20 +7,20 @@ namespace Toporia\Framework\Storage;
 use Toporia\Framework\Storage\Contracts\FilesystemInterface;
 
 /**
- * Local Filesystem Driver
+ * Class LocalFilesystem
  *
- * High-performance local disk storage implementation.
- * Local filesystem implementation with optimizations.
+ * High-performance local disk storage implementation with direct filesystem calls,
+ * stream support for large files, and atomic operations where possible.
  *
- * Performance Optimizations:
- * - Direct filesystem calls (no abstraction overhead)
- * - Stream support for large files (memory efficient)
- * - Atomic operations where possible
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Storage
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles local filesystem operations
- * - Open/Closed: Extend via inheritance
- * - Liskov Substitution: Implements FilesystemInterface contract
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class LocalFilesystem implements FilesystemInterface
 {

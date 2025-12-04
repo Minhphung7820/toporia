@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Migration;
 
-use Toporia\Framework\Database\Connection;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 
 /**
  * Migration Repository
@@ -21,17 +21,25 @@ use Toporia\Framework\Database\Connection;
  * - Database agnostic (works with MySQL, PostgreSQL, SQLite)
  * - Clean separation from migration execution
  *
- * @package Toporia\Framework\Database\Migration
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database\Migration
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MigrationRepository
 {
     private const TABLE = 'migrations';
 
     /**
-     * @param Connection $connection Database connection
+     * @param ConnectionInterface $connection Database connection
      */
     public function __construct(
-        private readonly Connection $connection
+        private readonly ConnectionInterface $connection
     ) {
     }
 

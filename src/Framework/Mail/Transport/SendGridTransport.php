@@ -7,16 +7,20 @@ namespace Toporia\Framework\Mail\Transport;
 use Toporia\Framework\Mail\Contracts\MessageInterface;
 
 /**
- * SendGrid Transport
+ * Class SendGridTransport
  *
- * Send emails via SendGrid API v3.
+ * Send emails via SendGrid API v3 with support for dynamic templates, categories, custom arguments,
+ * scheduled sending, unsubscribe groups, and click/open tracking.
  *
- * Features:
- * - Dynamic templates
- * - Categories and custom arguments
- * - Send at specific time
- * - Unsubscribe groups
- * - Click/open tracking
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail\Transport
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SendGridTransport extends AbstractTransport
 {

@@ -9,17 +9,20 @@ use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\Routing\Contracts\UrlGeneratorInterface;
 
 /**
- * Validate signed URL signatures.
+ * Class ValidateSignature
  *
- * This middleware ensures that URLs with signatures are valid and not expired.
+ * Validates signed URL signatures. Ensures that URLs with signatures are valid and not expired.
  * Use this on routes that should only be accessible via signed URLs.
  *
- * Usage:
- * ```php
- * $router->get('/unsubscribe/{email}', [NewsletterController::class, 'unsubscribe'])
- *     ->name('unsubscribe')
- *     ->middleware([ValidateSignature::class]);
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http\Middleware
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ValidateSignature implements MiddlewareInterface
 {

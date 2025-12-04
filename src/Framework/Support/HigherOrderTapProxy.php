@@ -7,8 +7,17 @@ namespace Toporia\Framework\Support;
 /**
  * Class HigherOrderTapProxy
  *
- * Proxy class for higher-order tap calls.
- * Enables fluent syntax like: tap($object)->method()
+ * Proxy class for higher-order tap calls - Enables fluent syntax like: tap($object)->method()
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * This allows method calls on an object while still returning
  * the original object, useful for chaining side effects.

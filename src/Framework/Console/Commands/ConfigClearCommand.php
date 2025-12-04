@@ -8,16 +8,19 @@ use Toporia\Framework\Console\Command;
 use Toporia\Framework\Foundation\Application;
 
 /**
- * Config Clear Command
+ * Class ConfigClearCommand
  *
  * Clear compiled configuration cache.
  *
- * Usage:
- *   php console config:clear
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
  *
- * Architecture:
- * - Single Responsibility: Config cache clearing only
- * - Clean Architecture: Framework layer
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ConfigClearCommand extends Command
 {

@@ -9,64 +9,19 @@ use Toporia\Framework\Notification\Messages\BroadcastMessage;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 
 /**
- * Broadcast Notification Channel
+ * Class BroadcastChannel
  *
  * Sends realtime notifications via WebSocket/SSE to connected clients.
- * Integrates with Toporia's Realtime system for push notifications.
  *
- * Features:
- * - Realtime delivery to connected clients
- * - Multi-transport support (WebSocket, SSE, Long-polling)
- * - Multi-server scaling via broker (Redis, RabbitMQ)
- * - Automatic channel routing per user
- * - Fallback gracefully if user offline
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Channels
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) user lookup via RealtimeManager
- * - O(C) broadcast where C = user's active connections
- * - Non-blocking (async via WebSocket)
- * - Minimal memory footprint
- *
- * Clean Architecture:
- * - Depends on RealtimeManagerInterface (DIP)
- * - Config injected via constructor (Testable)
- * - No global state dependencies
- * - Single Responsibility: Only handles broadcast delivery
- *
- * Usage:
- * ```php
- * class OrderShippedNotification extends Notification
- * {
- *     public function via($notifiable): array
- *     {
- *         return ['mail', 'database', 'broadcast'];
- *     }
- *
- *     public function toBroadcast($notifiable): BroadcastMessage
- *     {
- *         return (new BroadcastMessage)
- *             ->channel("user.{$notifiable->id}")
- *             ->event('order.shipped')
- *             ->data([
- *                 'order_id' => $this->order->id,
- *                 'tracking' => $this->order->tracking_number,
- *                 'title' => 'Order Shipped!',
- *                 'message' => 'Your order has been shipped.',
- *                 'action_url' => url("/orders/{$this->order->id}")
- *             ]);
- *     }
- * }
- *
- * // Notification sent to browser immediately via WebSocket
- * $user->notify(new OrderShippedNotification($order));
- * ```
- *
- * Channel Types:
- * - User-specific: `user.{id}` - Private channel per user
- * - Presence: `presence-room.{id}` - Chat rooms with online status
- * - Public: `announcements` - Broadcast to all users
- *
- * @package Toporia\Framework\Notification\Channels
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class BroadcastChannel implements ChannelInterface
 {

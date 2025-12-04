@@ -10,24 +10,19 @@ use Toporia\Framework\Http\Exceptions\TooManyRequestsHttpException;
 use Toporia\Framework\Http\{Request, Response};
 
 /**
- * Throttle Logins Middleware
+ * Class ThrottleLogins
  *
- * Middleware to throttle authentication attempts.
- * Prevents brute force attacks by limiting login attempts.
+ * Middleware to throttle authentication attempts and prevent brute force attacks.
  *
- * Usage:
- * Apply to login routes:
- * $router->post('/login', [AuthController::class, 'login'])->middleware([ThrottleLogins::class]);
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Middleware
+ * @since       2025-01-10
  *
- * Performance: O(1) - Single cache lookup
- *
- * Clean Architecture:
- * - Presentation Layer: HTTP middleware
- * - Single Responsibility: Only handles login throttling
- *
- * SOLID Principles:
- * - S: Only throttles login attempts
- * - D: Depends on LoginThrottle abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ThrottleLogins implements MiddlewareInterface
 {

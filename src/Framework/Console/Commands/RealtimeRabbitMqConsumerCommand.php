@@ -53,6 +53,21 @@ use Toporia\Framework\Support\Collection\Collection;
  *
  * @package Toporia\Framework\Console\Commands
  */
+/**
+ * Class RealtimeRabbitMqConsumerCommand
+ *
+ * Consume messages from RabbitMQ for realtime broadcasting.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class RealtimeRabbitMqConsumerCommand extends AbstractBatchRabbitMqConsumer implements BatchingMessagesHandlerInterface
 {
     protected string $signature = 'realtime:rabbitmq:consume {--broker=rabbitmq} {--channels=*} {--batch-size=100} {--timeout=1000} {--max-messages=0} {--stop-when-empty}';

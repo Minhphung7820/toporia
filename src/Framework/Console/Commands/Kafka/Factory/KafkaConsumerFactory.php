@@ -8,17 +8,20 @@ use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 use Toporia\Framework\Realtime\Brokers\KafkaBroker;
 
 /**
- * Kafka Consumer Factory
+ * Class KafkaConsumerFactory
  *
  * Factory for creating and configuring Kafka consumers.
  * Provides centralized configuration and broker management.
  *
- * SOLID Principles:
- * - Single Responsibility: Only creates and configures consumers
- * - Open/Closed: Extensible via factory methods
- * - Dependency Inversion: Depends on RealtimeManagerInterface
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands\Kafka\Factory
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Console\Commands\Kafka\Factory
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class KafkaConsumerFactory
 {

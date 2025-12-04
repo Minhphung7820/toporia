@@ -9,9 +9,19 @@ use Toporia\Framework\Mail\Contracts\{MailManagerInterface, MailerInterface, Mes
 use Toporia\Framework\Mail\{Mailable, PendingMail};
 
 /**
- * Mail Accessor
+ * Class Mail
  *
- * Provides static-like access to the mail system.
+ * Mail Accessor - Provides static-like access to the mail system.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * Supported drivers:
  * - smtp: SMTP server (with TLS/STARTTLS)

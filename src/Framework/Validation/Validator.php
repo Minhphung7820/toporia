@@ -10,26 +10,19 @@ use Toporia\Framework\Validation\Contracts\ImplicitRuleInterface;
 use Toporia\Framework\Validation\Contracts\DataAwareRuleInterface;
 
 /**
- * Validator
+ * Class Validator
  *
  * Powerful validation engine with comprehensive rule support.
  *
- * Features:
- * - 20+ built-in validation rules
- * - Custom error messages
- * - Nested validation (dot notation)
- * - Custom rules support (extend())
- * - Database validation (unique, exists)
- * - Conditional validation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation
+ * @since       2025-01-10
  *
- * Performance: O(N*R) where N = fields, R = rules per field
- *
- * Clean Architecture:
- * - Single Responsibility: Only validates data
- * - Open/Closed: Extensible via custom rules
- * - Dependency Inversion: Implements ValidatorInterface
- *
- * @package Toporia\Framework\Validation
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Validator implements ValidatorInterface
 {

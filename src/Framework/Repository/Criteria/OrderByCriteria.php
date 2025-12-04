@@ -9,9 +9,19 @@ use Toporia\Framework\Repository\Contracts\CriteriaInterface;
 use Toporia\Framework\Repository\Contracts\RepositoryInterface;
 
 /**
+ * Class OrderByCriteria
+ *
  * Criteria for ordering query results.
  *
- * @package Toporia\Framework\Repository\Criteria
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Repository\Criteria
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class OrderByCriteria implements CriteriaInterface
 {

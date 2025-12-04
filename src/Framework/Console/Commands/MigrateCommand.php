@@ -9,18 +9,19 @@ use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\Migration\Migrator;
 
 /**
- * Run database migrations.
+ * Class MigrateCommand
  *
- * Migration system with:
- * - Batch tracking (only run new migrations)
- * - Rollback support
- * - Beautiful colored output
- * - Transaction safety
+ * Run database migrations with batch tracking and rollback support.
  *
- * Usage:
- * - php console migrate            # Run pending migrations
- * - php console migrate --step=1   # Run one migration at a time
- * - php console migrate --force    # Force run in production
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MigrateCommand extends Command
 {

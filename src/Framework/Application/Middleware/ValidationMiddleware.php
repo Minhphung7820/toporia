@@ -14,7 +14,15 @@ use Toporia\Framework\Application\Exception\{CommandValidationException, QueryVa
  * Automatically validates commands and queries before they reach handlers.
  * This middleware is typically added to the global middleware stack.
  *
- * @package Toporia\Framework\Application\Middleware
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Application\Middleware
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ValidationMiddleware implements MiddlewareInterface
 {

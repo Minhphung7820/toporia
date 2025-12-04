@@ -14,6 +14,21 @@ use Toporia\Framework\Realtime\Exceptions\BrokerException;
  *
  * Supports Redis, RabbitMQ, and Kafka brokers.
  */
+/**
+ * Class RealtimePublishCommand
+ *
+ * Publish a message to a realtime channel.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands\Realtime
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class RealtimePublishCommand extends Command
 {
     protected string $signature = 'realtime:publish {channel : The channel to publish to} {message : The message to publish (JSON or plain text)} {--driver= : The broadcast driver (redis, rabbitmq, kafka)} {--event=test : The event name}';

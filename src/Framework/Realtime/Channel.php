@@ -7,21 +7,19 @@ namespace Toporia\Framework\Realtime;
 use Toporia\Framework\Realtime\Contracts\{ChannelInterface, ConnectionInterface, MessageInterface, TransportInterface};
 
 /**
- * Realtime Channel
+ * Class Channel
  *
  * Manages connections subscribed to a specific channel/topic.
  *
- * Channel Types:
- * - Public: open to all (e.g., "news", "announcements")
- * - Private: requires auth (e.g., "private-chat.123", "user.456")
- * - Presence: tracks online users (e.g., "presence-room.1")
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) subscribe/unsubscribe
- * - O(N) broadcast where N = subscribers
- * - Memory: ~100 bytes per subscriber
- *
- * @package Toporia\Framework\Realtime
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Channel implements ChannelInterface
 {

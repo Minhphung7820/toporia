@@ -7,29 +7,19 @@ namespace Toporia\Framework\Auth\Throttle;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
- * Login Throttle
+ * Class LoginThrottle
  *
  * Throttles authentication attempts to prevent brute force attacks.
- * Tracks failed login attempts per identifier (email, username, IP).
  *
- * Features:
- * - Configurable max attempts and decay time
- * - Multiple throttle keys (email, username, IP)
- * - Automatic lockout after max attempts
- * - Clear attempts on successful login
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Throttle
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) attempt tracking (cache operations)
- * - O(1) lockout check (cache lookup)
- *
- * Clean Architecture:
- * - Single Responsibility: Only handles login throttling
- * - Dependency Inversion: Depends on CacheInterface abstraction
- *
- * SOLID Principles:
- * - S: Only manages login throttling
- * - O: Configurable via constructor parameters
- * - D: Depends on CacheInterface abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class LoginThrottle
 {

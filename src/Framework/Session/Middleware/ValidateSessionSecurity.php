@@ -10,36 +10,19 @@ use Toporia\Framework\Session\Security\SessionSecurity;
 use Toporia\Framework\Session\Contracts\SessionStoreInterface;
 
 /**
- * Validate Session Security Middleware
+ * Class ValidateSessionSecurity
  *
  * Automatically initializes and validates session security on each request.
- * Enhances session security with:
- * - Session rotation (regenerate ID periodically)
- * - IP binding (bind session to IP address)
- * - Device fingerprinting (bind session to device)
- * - Session timeout enforcement
  *
- * Usage:
- * Apply to routes that require secure sessions:
- * $router->group(['middleware' => [ValidateSessionSecurity::class]], function() {
- *     // Protected routes
- * });
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session\Middleware
+ * @since       2025-01-10
  *
- * Or in config/middleware.php:
- * 'web' => [
- *     ValidateSessionSecurity::class,
- *     // ... other middleware
- * ],
- *
- * Performance: O(1) - Single session lookup per request
- *
- * Clean Architecture:
- * - Presentation Layer: HTTP middleware
- * - Single Responsibility: Only handles session security
- *
- * SOLID Principles:
- * - S: Only validates session security
- * - D: Depends on SessionSecurity abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ValidateSessionSecurity implements MiddlewareInterface
 {

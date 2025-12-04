@@ -7,16 +7,20 @@ namespace Toporia\Framework\Mail\Transport;
 use Toporia\Framework\Mail\Contracts\MessageInterface;
 
 /**
- * SMTP Transport
+ * Class SmtpTransport
  *
- * High-performance SMTP transport with connection pooling.
+ * High-performance SMTP transport with connection pooling, TLS/SSL support, STARTTLS upgrade,
+ * connection keep-alive, multiple authentication methods, and pipelining support.
  *
- * Features:
- * - TLS/SSL support
- * - STARTTLS upgrade
- * - Connection keep-alive
- * - AUTH PLAIN, LOGIN, CRAM-MD5
- * - Pipelining support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail\Transport
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SmtpTransport extends AbstractTransport
 {

@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace Toporia\Framework\Testing\Browser;
 
 /**
- * WebDriver
+ * Class WebDriver
  *
- * WebDriver protocol implementation for browser automation.
- * Communicates with browser drivers (ChromeDriver, GeckoDriver, etc.)
+ * WebDriver protocol implementation for browser automation with support for ChromeDriver, GeckoDriver, and other WebDriver-compatible drivers.
  *
- * Performance:
- * - Connection reuse
- * - Efficient command batching
- * - Response caching where applicable
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Testing\Browser
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class WebDriver
 {

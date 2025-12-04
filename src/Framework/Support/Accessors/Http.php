@@ -9,9 +9,19 @@ use Toporia\Framework\Http\Contracts\{ClientManagerInterface, HttpClientInterfac
 use Toporia\Framework\Http\Client\GraphQLClient;
 
 /**
- * HTTP Accessor
+ * Class Http
  *
- * Static-like access to HTTP client services.
+ * HTTP Accessor - Static-like access to HTTP client services.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static HttpClientInterface client(?string $name = null)
  * @method static GraphQLClient graphql(?string $name = null)

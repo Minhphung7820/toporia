@@ -7,7 +7,7 @@ namespace Toporia\Framework\Queue\Support;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
- * Job Metrics Collector
+ * Class JobMetrics
  *
  * Collects and aggregates job execution metrics for monitoring.
  * Tracks execution time, memory usage, success/failure rates.
@@ -22,7 +22,15 @@ use Toporia\Framework\Cache\Contracts\CacheInterface;
  * - Dependency Inversion: Uses CacheInterface
  * - High Reusability: Can be used across different contexts
  *
- * @package Toporia\Framework\Queue\Support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue\Support
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class JobMetrics
 {

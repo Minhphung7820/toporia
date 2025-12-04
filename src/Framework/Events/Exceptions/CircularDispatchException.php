@@ -5,12 +5,20 @@ declare(strict_types=1);
 namespace Toporia\Framework\Events\Exceptions;
 
 /**
- * Circular Dispatch Exception
+ * Class CircularDispatchException
  *
  * Exception thrown when circular event dispatch is detected.
  * This prevents infinite loops caused by listeners dispatching the same event.
  *
- * @package Toporia\Framework\Events\Exceptions
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Events\Exceptions
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class CircularDispatchException extends EventException
 {

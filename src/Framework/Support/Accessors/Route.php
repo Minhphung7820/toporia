@@ -9,10 +9,20 @@ use Toporia\Framework\Routing\Contracts\RouteInterface;
 use Toporia\Framework\Routing\Contracts\RouterInterface;
 
 /**
- * Route Accessor (Facade)
+ * Class Route
  *
- * Static accessor for Router service providing fluent route registration.
+ * Route Accessor (Facade) - Static accessor for Router service providing fluent route registration.
  * Enables static method calls for route definitions.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * Usage:
  * ```php

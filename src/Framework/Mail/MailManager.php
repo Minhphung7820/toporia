@@ -19,20 +19,19 @@ use Toporia\Framework\Mail\Transport\{
 use Toporia\Framework\Queue\Contracts\QueueInterface;
 
 /**
- * Mail Manager
+ * Class MailManager
  *
- * Manages multiple mail drivers with lazy loading.
- * Follows Strategy pattern for driver selection.
+ * Manages multiple mail drivers with lazy loading following the Strategy pattern for driver selection.
  *
- * Supports:
- * - SMTP (with TLS/STARTTLS)
- * - Mailgun API
- * - Amazon SES
- * - Postmark
- * - Resend
- * - SendGrid
- * - Log (development)
- * - Array (testing)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MailManager implements MailManagerInterface
 {

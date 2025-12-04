@@ -10,41 +10,20 @@ use Toporia\Framework\Validation\ValidationAttribute;
 use Toporia\Framework\Validation\ValidationData;
 
 /**
- * Exists Rule
+ * Class Exists
  *
  * Validates that a value exists in a database table.
  * Supports multiple additional conditions for complex validation.
  *
- * Clean Architecture:
- * - Single Responsibility: Only validates existence
- * - Dependency Inversion: Works with any database connection
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Validation\Rules
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only handles existence validation
- * - Open/Closed: Extensible via additional conditions
- * - Dependency Inversion: Uses database abstraction
- *
- * Performance Optimizations:
- * - Single indexed query
- * - Prepared statements
- * - Batch validation for arrays
- *
- * Usage Examples:
- * ```php
- * // Simple exists
- * new Exists('categories', 'id')
- *
- * // With additional conditions
- * new Exists('categories', 'id', ['status' => 'active'])
- *
- * // With multiple conditions
- * new Exists('users', 'email', ['status' => 'active', 'deleted_at' => null])
- *
- * // In array validation
- * 'category_ids.*' => [new Exists('categories', 'id')]
- * ```
- *
- * @package Toporia\Framework\Validation\Rules
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Exists implements RuleInterface, DataAwareRuleInterface
 {

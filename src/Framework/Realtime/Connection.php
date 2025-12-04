@@ -7,16 +7,19 @@ namespace Toporia\Framework\Realtime;
 use Toporia\Framework\Realtime\Contracts\ConnectionInterface;
 
 /**
- * Realtime Connection
+ * Class Connection
  *
  * Represents a client connection with metadata and channel subscriptions.
  *
- * Performance:
- * - O(1) metadata access
- * - O(1) channel subscription/unsubscription (hash table)
- * - Memory: ~1KB per connection
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Realtime
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Connection implements ConnectionInterface
 {

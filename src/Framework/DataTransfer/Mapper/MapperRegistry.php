@@ -13,22 +13,15 @@ use Toporia\Framework\DataTransfer\Exceptions\TransformationException;
  * Central registry for object mappers.
  * Provides automatic mapper resolution based on source/target types.
  *
- * Features:
- * - Automatic mapper discovery
- * - Type-based mapper resolution
- * - Chainable mapper registration
- * - Singleton pattern per source/target pair
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Mapper
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * $registry = new MapperRegistry();
- * $registry->register(new UserToUserDTOMapper());
- *
- * $dto = $registry->map($user, UserDTO::class);
- * $dtos = $registry->mapCollection($users, UserDTO::class);
- * ```
- *
- * @package Toporia\Framework\DataTransfer\Mapper
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class MapperRegistry
 {

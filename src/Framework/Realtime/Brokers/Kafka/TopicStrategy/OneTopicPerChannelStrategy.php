@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy;
 
 use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
+
 /**
- * One Topic Per Channel Strategy
+ * Class OneTopicPerChannelStrategy
  *
- * Legacy strategy: Each channel maps to its own topic.
- * Used for backward compatibility.
+ * Legacy strategy: Each channel maps to its own topic. Used for backward compatibility.
  *
- * Performance:
- * - Simple but creates many topics
- * - Good for small scale (< 100 channels)
- * - Not recommended for large scale
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Brokers\Kafka\TopicStrategy
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class OneTopicPerChannelStrategy implements TopicStrategyInterface
 {

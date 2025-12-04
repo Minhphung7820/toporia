@@ -9,10 +9,20 @@ use Toporia\Framework\Hashing\HashManager;
 use Toporia\Framework\Hashing\Contracts\HasherInterface;
 
 /**
- * Hash Service Accessor
+ * Class Hash
  *
- * Provides static-like access to the hash manager.
+ * Hash Service Accessor - Provides static-like access to the hash manager.
  * All methods are automatically delegated to the underlying service via __callStatic().
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static string make(string $value, array $options = []) Hash a value
  * @method static bool check(string $value, string $hashedValue, array $options = []) Verify a value against a hash

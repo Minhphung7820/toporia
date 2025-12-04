@@ -8,30 +8,19 @@ use Toporia\Framework\Auth\OAuth2\Contracts\ClientInterface;
 use Toporia\Framework\Http\Request;
 
 /**
- * Password Grant (Resource Owner Password Credentials)
+ * Class PasswordGrant
  *
- * OAuth2 grant type for trusted applications.
- * User provides username and password directly.
+ * OAuth2 grant type for trusted applications using username and password.
  *
- * Usage:
- * POST /oauth/token
- * grant_type=password
- * client_id=xxx
- * client_secret=xxx
- * username=user@example.com
- * password=secret
- * scope=read write
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\OAuth2\Grants
+ * @since       2025-01-10
  *
- * Performance: O(1) - Single user lookup + token creation
- *
- * Clean Architecture:
- * - Strategy Pattern: One of multiple grant implementations
- * - Single Responsibility: Only handles password grant flow
- *
- * SOLID Principles:
- * - S: Only handles password grant
- * - O: Extensible via inheritance
- * - L: Interchangeable with other grants
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class PasswordGrant extends AbstractGrant
 {

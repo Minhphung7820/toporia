@@ -9,29 +9,19 @@ use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\Schema\SchemaBuilder;
 
 /**
- * Alter Table Structure Command
+ * Class MigrateAlterCommand
  *
  * Allows altering existing table structure without creating new migrations.
- * Useful for quick schema changes during development.
  *
- * Performance:
- * - Direct ALTER TABLE execution (no migration tracking)
- * - Single transaction for all changes
- * - Efficient SQL compilation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Presentation layer (CLI command)
- * - Delegates to SchemaBuilder (Framework layer)
- *
- * SOLID Principles:
- * - Single Responsibility: Only handles table alterations
- * - Dependency Inversion: Depends on SchemaBuilder abstraction
- *
- * Usage:
- * - php console migrate:alter users --add=email:string:255
- * - php console migrate:alter users --drop=old_column
- * - php console migrate:alter users --modify=name:string:100
- * - php console migrate:alter users --rename=old_name:new_name
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MigrateAlterCommand extends Command
 {

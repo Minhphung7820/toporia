@@ -10,30 +10,20 @@ use Toporia\Framework\Encryption\Encrypter;
 use Toporia\Framework\Encryption\Contracts\EncrypterInterface;
 
 /**
- * Encryption Service Provider
+ * Class EncryptionServiceProvider
  *
  * Registers encryption services into the container.
  * Provides data encryption/decryption functionality across the application.
  *
- * Services Registered:
- * - 'encrypter' => Encrypter instance
- * - EncrypterInterface => Encrypter instance
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
  *
- * Configuration (config/app.php):
- * ```php
- * 'key' => env('APP_KEY'),
- * 'cipher' => 'aes-256-gcm',
- * 'previous_keys' => [], // For key rotation
- * ```
- *
- * Usage:
- * ```php
- * $encrypter = app('encrypter');
- * $encrypted = $encrypter->encrypt('secret data');
- * $decrypted = $encrypter->decrypt($encrypted);
- * ```
- *
- * @package Toporia\Framework\Providers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class EncryptionServiceProvider extends ServiceProvider
 {

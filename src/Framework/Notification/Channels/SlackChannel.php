@@ -8,26 +8,19 @@ use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterf
 use Toporia\Framework\Notification\Messages\SlackMessage;
 
 /**
- * Slack Notification Channel
+ * Class SlackChannel
  *
  * Sends notifications to Slack via webhooks.
- * Supports rich formatting with attachments and fields.
  *
- * Configuration:
- * ```php
- * 'slack' => [
- *     'driver' => 'slack',
- *     'webhook_url' => env('SLACK_WEBHOOK_URL'),
- * ]
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Channels
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) per notification
- * - HTTP/2 webhook delivery
- * - Connection keepalive for bulk sending
- * - Async recommended for production
- *
- * @package Toporia\Framework\Notification\Channels
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SlackChannel implements ChannelInterface
 {

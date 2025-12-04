@@ -7,13 +7,21 @@ namespace Toporia\Framework\Console;
 use Throwable;
 
 /**
- * Console Exception Renderer
+ * Class ExceptionRenderer
  *
- * Renders exceptions beautifully in the console with:
- * - Colored output
- * - Stack trace with file highlighting
- * - Code snippets around error
- * - Clean, readable error formatting
+ * Renders exceptions beautifully in the console with colored output,
+ * stack trace with file highlighting, code snippets around error,
+ * and clean, readable error formatting.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ExceptionRenderer
 {

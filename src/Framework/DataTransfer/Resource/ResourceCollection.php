@@ -17,37 +17,15 @@ use Toporia\Framework\Support\Pagination\Paginator;
  * Collection wrapper for JSON resources.
  * Handles array/collection of resources with pagination support.
  *
- * Features:
- * - Automatic pagination metadata
- * - Collection transformation
- * - Additional data merging
- * - Memory-efficient iteration
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Resource
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * // Simple collection
- * $collection = UserResource::collection($users);
- *
- * // With pagination
- * $collection = UserResource::collection($paginator)
- *     ->additional(['meta' => ['version' => '1.0']]);
- *
- * // Custom collection class
- * class UserCollection extends ResourceCollection
- * {
- *     public $collects = UserResource::class;
- *
- *     public function toArray(): array
- *     {
- *         return [
- *             'data' => $this->collection,
- *             'total_count' => $this->count(),
- *         ];
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\DataTransfer\Resource
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ResourceCollection implements JsonSerializable, Countable, IteratorAggregate
 {

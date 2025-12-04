@@ -10,24 +10,19 @@ use Toporia\Framework\Queue\Contracts\{Dispatcher, QueueInterface, QueueManagerI
 use Toporia\Framework\Queue\{JobDispatcher, QueueManager};
 
 /**
- * Queue Service Provider
+ * Class QueueServiceProvider
  *
  * Registers queue services with multiple driver support.
  *
- * Services Registered:
- * - QueueManager: Manages queue connections (sync, database, redis)
- * - JobDispatcher: Dispatches jobs with dependency injection
- * - PendingDispatch: Fluent API for job dispatch configuration
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
  *
- * Performance Optimizations:
- * - Singleton pattern for QueueManager (reuses instances)
- * - Lazy loading of queue drivers (only creates when needed)
- * - Container-based DI (auto-resolves job dependencies)
- *
- * SOLID Principles:
- * - Single Responsibility: Only registers queue services
- * - Dependency Inversion: Binds interfaces to implementations
- * - Open/Closed: Extend via custom queue drivers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class QueueServiceProvider extends ServiceProvider
 {

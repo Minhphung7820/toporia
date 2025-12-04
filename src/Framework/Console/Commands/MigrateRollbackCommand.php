@@ -9,17 +9,19 @@ use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\Migration\Migrator;
 
 /**
- * Rollback database migrations.
+ * Class MigrateRollbackCommand
  *
- * Rollback system with:
- * - Batch-based rollback (undo last batch by default)
- * - Step-based rollback (--step=N to rollback N batches)
- * - Beautiful colored output
- * - Transaction safety
+ * Rollback database migrations with batch-based or step-based control.
  *
- * Usage:
- * - php console migrate:rollback           # Rollback last batch
- * - php console migrate:rollback --step=2  # Rollback last 2 batches
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MigrateRollbackCommand extends Command
 {

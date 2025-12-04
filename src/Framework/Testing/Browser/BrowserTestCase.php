@@ -7,26 +7,19 @@ namespace Toporia\Framework\Testing\Browser;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Browser Test Case
+ * Class BrowserTestCase
  *
- * Base test case for browser testing.
+ * Base test case for browser testing with WebDriver integration and automatic screenshot capture on failures.
  *
- * Example:
- * ```php
- * class LoginTest extends BrowserTestCase
- * {
- *     public function testUserCanLogin(): void
- *     {
- *         $this->browse(function (Browser $browser) {
- *             $browser->visit('/login')
- *                 ->type('email', 'user@example.com')
- *                 ->type('password', 'password')
- *                 ->press('Login')
- *                 ->assertPathIs('/dashboard');
- *         });
- *     }
- * }
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Testing\Browser
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class BrowserTestCase extends TestCase
 {

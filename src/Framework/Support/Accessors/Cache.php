@@ -8,9 +8,19 @@ use Toporia\Framework\Foundation\ServiceAccessor;
 use Toporia\Framework\Cache\CacheManager;
 
 /**
- * Cache Service Accessor
+ * Class Cache
  *
- * Provides static-like access to the cache service.
+ * Cache Service Accessor - Provides static-like access to the cache service.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static mixed get(string $key, mixed $default = null) Get value from cache
  * @method static bool set(string $key, mixed $value, int|\DateInterval|null $ttl = null) Store value in cache

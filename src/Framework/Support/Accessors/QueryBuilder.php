@@ -7,10 +7,20 @@ namespace Toporia\Framework\Support\Accessors;
 use Toporia\Framework\Foundation\ServiceAccessor;
 
 /**
- * QueryBuilder Service Accessor
+ * Class QueryBuilder
  *
- * Provides static-like access to QueryBuilder via default connection.
+ * QueryBuilder Service Accessor - Provides static-like access to QueryBuilder via default connection.
  * This is a convenience accessor for quick query building.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * All methods are automatically delegated to the underlying ConnectionProxy via __callStatic().
  *

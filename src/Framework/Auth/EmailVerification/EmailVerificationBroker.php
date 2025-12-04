@@ -10,26 +10,19 @@ use Toporia\Framework\Mail\Contracts\MailerInterface;
 use Toporia\Framework\Mail\Message;
 
 /**
- * Email Verification Broker
+ * Class EmailVerificationBroker
  *
  * Handles email verification similar to Laravel's built-in verification.
  *
- * Performance:
- * - O(1) token generation and validation
- * - SHA-256 HMAC for secure tokens
- * - Configurable expiration
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\EmailVerification
+ * @since       2025-01-10
  *
- * Example:
- * ```php
- * // Send verification email
- * $broker->sendVerificationLink($user);
- *
- * // Verify email from callback
- * $broker->verify($user, $hash);
- *
- * // Check if email is verified
- * $user->hasVerifiedEmail();
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class EmailVerificationBroker implements EmailVerificationBrokerInterface
 {

@@ -9,17 +9,19 @@ use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Translation\{Contracts\LoaderInterface, Contracts\TranslatorInterface, Loaders\FileLoader, Translator};
 
 /**
- * Translation Service Provider
+ * Class TranslationServiceProvider
  *
  * Registers translation services in the container.
  *
- * Clean Architecture:
- * - Framework layer service provider
- * - Registers core translation services
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only registers translation services
- * - Dependency Inversion: Registers interfaces, not implementations
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class TranslationServiceProvider extends ServiceProvider
 {

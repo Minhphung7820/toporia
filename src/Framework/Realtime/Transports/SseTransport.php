@@ -8,34 +8,19 @@ use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterfac
 use Toporia\Framework\Realtime\{Connection, Message};
 
 /**
- * Server-Sent Events (SSE) Transport
+ * Class SseTransport
  *
- * One-way server-to-client communication using HTTP streaming.
+ * One-way server-to-client communication using HTTP streaming (Server-Sent Events).
  *
- * Performance:
- * - Latency: 10-50ms (HTTP overhead)
- * - Throughput: 10k messages/sec per worker
- * - Concurrent connections: 1k+ per worker
- * - Memory per connection: ~2KB
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Transports
+ * @since       2025-01-10
  *
- * Use Cases:
- * - Real-time notifications
- * - Live dashboards
- * - Activity feeds
- * - Progress updates
- *
- * Advantages:
- * - Native browser support (EventSource API)
- * - Works through firewalls/proxies
- * - Auto-reconnection
- * - No special server requirements
- *
- * Limitations:
- * - One-way only (server → client)
- * - HTTP/1.1 connection limit (6 per domain)
- * - No binary data support
- *
- * @package Toporia\Framework\Realtime\Transports
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SseTransport implements TransportInterface
 {

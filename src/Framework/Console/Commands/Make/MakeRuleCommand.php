@@ -23,6 +23,21 @@ use Toporia\Framework\Console\Generator\GeneratorCommand;
  * - Rules are stateless by default (can be cached/reused)
  * - Implicit rules run first (fail-fast optimization)
  */
+/**
+ * Class MakeRuleCommand
+ *
+ * Create a new validation rule class.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands\Make
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class MakeRuleCommand extends GeneratorCommand
 {
     protected string $signature = 'make:rule {name : The name of the validation rule}

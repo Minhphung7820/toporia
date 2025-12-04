@@ -7,17 +7,20 @@ namespace Toporia\Framework\Console\Scheduling\Support;
 use Toporia\Framework\Http\Contracts\HttpClientInterface;
 
 /**
- * HTTP Ping Helper
+ * Class HttpPing
  *
- * Utility class for sending HTTP pings.
- * Follows Single Responsibility Principle.
+ * Utility class for sending HTTP pings. Provides O(1) per ping
+ * performance with non-blocking execution and lightweight cURL implementation.
  *
- * Performance:
- * - O(1) per ping
- * - Non-blocking (doesn't wait for response)
- * - Lightweight cURL execution
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Scheduling
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Console\Scheduling\Support
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class HttpPing
 {

@@ -8,41 +8,19 @@ use Toporia\Framework\Notification\Contracts\{ChannelInterface, NotifiableInterf
 use Toporia\Framework\Database\Connection;
 
 /**
- * Database Notification Channel
+ * Class DatabaseChannel
  *
  * Stores notifications in database for in-app notifications.
- * Supports read/unread tracking and notification center.
  *
- * Database Schema:
- * - id: string (notification ID)
- * - type: string (notification class name)
- * - notifiable_type: string (User, Admin, etc.)
- * - notifiable_id: string|int (user ID)
- * - data: json (notification data)
- * - read_at: timestamp (null = unread)
- * - created_at: timestamp
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Channels
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) insert per notification
- * - Indexed on (notifiable_id, read_at) for fast queries
- * - Bulk cleanup of old notifications
- *
- * Usage:
- * ```php
- * // Get unread notifications
- * $notifications = $connection->table('notifications')
- *     ->where('notifiable_id', $userId)
- *     ->whereNull('read_at')
- *     ->orderBy('created_at', 'DESC')
- *     ->get();
- *
- * // Mark as read
- * $connection->table('notifications')
- *     ->where('id', $notificationId)
- *     ->update(['read_at' => time()]);
- * ```
- *
- * @package Toporia\Framework\Notification\Channels
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class DatabaseChannel implements ChannelInterface
 {

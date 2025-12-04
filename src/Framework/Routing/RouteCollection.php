@@ -7,20 +7,20 @@ namespace Toporia\Framework\Routing;
 use Toporia\Framework\Routing\Contracts\{RouteCollectionInterface, RouteInterface};
 
 /**
- * Collection of routes with efficient lookup.
+ * Class RouteCollection
  *
- * Performance Optimizations:
- * - Index routes by HTTP method (O(1) method lookup, O(M) search where M = routes for that method)
- * - Separate exact routes from pattern routes (O(1) exact match vs O(M) pattern match)
- * - Fast rejection if method has no routes
+ * Collection of routes with efficient lookup. Provides optimized route matching
+ * by indexing routes by HTTP method and separating exact routes from pattern routes.
  *
- * Time Complexity:
- * - Before: O(N) where N = total routes
- * - After: O(M) where M = routes for specific method (typically M << N)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Routing
+ * @since       2025-01-10
  *
- * Example: With 200 routes (50 GET, 50 POST, 50 PUT, 50 DELETE):
- * - Before: Check all 200 routes = 200 iterations
- * - After: Check only 50 routes for GET = 50 iterations (4x faster)
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RouteCollection implements RouteCollectionInterface
 {

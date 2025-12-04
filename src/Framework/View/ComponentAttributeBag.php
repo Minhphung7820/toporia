@@ -12,21 +12,19 @@ use Stringable;
 use Traversable;
 
 /**
- * Component Attribute Bag
+ * Class ComponentAttributeBag
  *
  * Manages HTML attributes for view components with fluent interface.
  *
- * Performance:
- * - O(1) attribute access
- * - Lazy string compilation
- * - Immutable merge operations
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  View
+ * @since       2025-01-10
  *
- * Example:
- * ```php
- * $attributes = new ComponentAttributeBag(['class' => 'btn', 'id' => 'submit']);
- * echo $attributes->merge(['class' => 'btn-primary']);
- * // Output: class="btn btn-primary" id="submit"
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ComponentAttributeBag implements ArrayAccess, Countable, IteratorAggregate, Stringable
 {

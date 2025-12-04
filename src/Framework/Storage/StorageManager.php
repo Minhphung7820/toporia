@@ -8,20 +8,20 @@ use Toporia\Framework\Storage\Contracts\FilesystemInterface;
 use Toporia\Framework\Storage\Contracts\CloudFilesystemInterface;
 
 /**
- * Storage Manager
+ * Class StorageManager
  *
- * Multi-driver storage manager with fluent API.
+ * Multi-driver storage manager with fluent API supporting Local, S3, GCS,
+ * Azure Blob Storage, FTP/FTPS, and SFTP with O(1) driver lookup and caching.
  *
- * Supports:
- * - Local filesystem
- * - S3 (AWS/DigitalOcean/Minio/Cloudflare R2)
- * - Google Cloud Storage (GCS)
- * - Azure Blob Storage
- * - FTP/FTPS
- * - SFTP
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Storage
+ * @since       2025-01-10
  *
- * Performance: O(1) driver lookup with caching
- * SOLID: Single Responsibility - manages multiple storage drivers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class StorageManager
 {

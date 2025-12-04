@@ -7,15 +7,19 @@ namespace Toporia\Framework\Mail\Transport;
 use Toporia\Framework\Mail\Contracts\MessageInterface;
 
 /**
- * Abstract Transport
+ * Class AbstractTransport
  *
- * Base class for mail transports providing common functionality.
+ * Base class for mail transports providing message validation, retry logic, logging hooks, and rate limiting support.
  *
- * Features:
- * - Message validation
- * - Retry logic
- * - Logging hooks
- * - Rate limiting support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail\Transport
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractTransport implements TransportInterface
 {

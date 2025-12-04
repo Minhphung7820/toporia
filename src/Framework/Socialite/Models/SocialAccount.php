@@ -7,9 +7,19 @@ namespace Toporia\Framework\Socialite\Models;
 use Toporia\Framework\Database\ORM\Model;
 
 /**
- * Social Account Model
+ * Class SocialAccount
  *
  * Links OAuth provider accounts to application users.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Socialite\Models
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SocialAccount extends Model
 {

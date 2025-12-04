@@ -7,16 +7,20 @@ namespace Toporia\Framework\Storage;
 use Toporia\Framework\Storage\Contracts\FilesystemInterface;
 
 /**
- * SFTP Filesystem
+ * Class SftpFilesystem
  *
- * SSH/SFTP implementation for secure file storage.
+ * SSH/SFTP implementation for secure file storage with password and key-based
+ * authentication, agent support, permission management, and fingerprint verification.
  *
- * Features:
- * - Password and key-based authentication
- * - Agent authentication support
- * - Permission management
- * - Symbolic link support
- * - Fingerprint verification
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Storage
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SftpFilesystem implements FilesystemInterface
 {

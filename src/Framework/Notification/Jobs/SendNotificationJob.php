@@ -8,26 +8,19 @@ use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationI
 use Toporia\Framework\Queue\Job;
 
 /**
- * Send Notification Job
+ * Class SendNotificationJob
  *
  * Queue job for sending notifications asynchronously.
- * Automatically dispatched when notification has shouldQueue() = true.
  *
- * Performance:
- * - O(C) where C = number of channels
- * - Non-blocking for web requests
- * - Supports retry on failure
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Jobs
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * // Automatic via NotificationManager
- * $user->notify((new WelcomeNotification)->onQueue('notifications'));
- *
- * // Manual dispatch
- * SendNotificationJob::dispatch($user, $notification);
- * ```
- *
- * @package Toporia\Framework\Notification\Jobs
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SendNotificationJob extends Job
 {

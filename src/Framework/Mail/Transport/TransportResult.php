@@ -5,10 +5,19 @@ declare(strict_types=1);
 namespace Toporia\Framework\Mail\Transport;
 
 /**
- * Transport Result
+ * Class TransportResult
  *
- * Immutable result object from mail transport operations.
- * Contains message ID, status, and provider-specific metadata.
+ * Immutable result object from mail transport operations containing message ID, status, and provider-specific metadata.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Mail\Transport
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final readonly class TransportResult
 {

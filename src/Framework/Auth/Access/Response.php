@@ -7,22 +7,19 @@ namespace Toporia\Framework\Auth\Access;
 use Stringable;
 
 /**
- * Authorization Response
+ * Class Response
  *
  * Represents the result of an authorization check with optional message/code.
  *
- * Clean Architecture:
- * - Value Object pattern
- * - Immutable data structure
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Access
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Authorization result representation
- *
- * Performance:
- * - Lightweight value object
- * - Zero allocations for simple boolean checks
- *
- * @package Toporia\Framework\Auth\Access
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Response implements Stringable
 {

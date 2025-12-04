@@ -8,27 +8,19 @@ use Toporia\Framework\Console\Command;
 use Toporia\Framework\Foundation\Application;
 
 /**
- * Key Generate Command
+ * Class KeyGenerateCommand
  *
- * Generates a new application encryption key (APP_KEY).
- * This key is used for:
- * - Cookie encryption
- * - Session encryption
- * - Signed URLs
- * - Other cryptographic operations
+ * Generates a new application encryption key (APP_KEY) for secure operations.
  *
- * Usage:
- * php console key:generate
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
  *
- * The key will be written to .env file in base64 format.
- *
- * Clean Architecture:
- * - Presentation Layer: Console command
- * - Single Responsibility: Only generates encryption key
- *
- * SOLID Principles:
- * - S: Only generates APP_KEY
- * - O: Extensible via options
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class KeyGenerateCommand extends Command
 {

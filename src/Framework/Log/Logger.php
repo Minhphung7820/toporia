@@ -7,6 +7,8 @@ namespace Toporia\Framework\Log;
 use Toporia\Framework\Log\Contracts\{ChannelInterface, LoggerInterface};
 
 /**
+ * Class Logger
+ *
  * Logger - PSR-3 compliant logger implementation
  *
  * Professional logging system with channel-based architecture.
@@ -26,6 +28,16 @@ use Toporia\Framework\Log\Contracts\{ChannelInterface, LoggerInterface};
  * ```
  *
  * Performance: O(1) for single channel, O(N) for stack channel
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Log
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Logger implements LoggerInterface
 {

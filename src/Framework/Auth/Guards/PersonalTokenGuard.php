@@ -4,44 +4,33 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\Guards;
 
+use Toporia\Framework\Auth\Authenticatable;
 use Toporia\Framework\Auth\Contracts\{GuardInterface, HasApiTokensInterface, TokenRepositoryInterface, UserProviderInterface};
 use Toporia\Framework\Http\Request;
 
 /**
- * Personal Token Guard
+ * Class PersonalTokenGuard
  *
  * Token-based authentication guard using personal access tokens.
  *
- * Authentication Flow:
- * 1. Extract token from Authorization header (Bearer token)
- * 2. Find token in database (with caching)
- * 3. Verify token not expired
- * 4. Load token owner (user)
- * 5. Set current access token on user
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Guards
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Framework layer guard
- * - Depends on domain contracts
- *
- * SOLID Principles:
- * - Single Responsibility: Token authentication
- * - Dependency Inversion: Depends on interfaces
- *
- * Performance:
- * - O(1) token lookup with cache hit
- * - O(1) database lookup with index on cache miss
- * - Lazy user loading
- *
- * @package Toporia\Framework\Auth\Guards
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class PersonalTokenGuard implements GuardInterface
 {
     /**
      * Authenticated user instance.
      *
-     * @var HasApiTokensInterface|null
+     * @var (Authenticatable&HasApiTokensInterface)|null
      */
-    private ?HasApiTokensInterface $user = null;
+    private (Authenticatable&HasApiTokensInterface)|null $user = null;
 
     /**
      * Create Personal Token guard instance.
@@ -85,9 +74,9 @@ final class PersonalTokenGuard implements GuardInterface
      * - O(1) token lookup with cache
      * - Lazy user loading
      *
-     * @return HasApiTokensInterface|null Authenticated user or null
+     * @return Authenticatable|null Authenticated user or null
      */
-    public function user(): ?HasApiTokensInterface
+    public function user(): ?Authenticatable
     {
         // Return cached user
         if ($this->user !== null) {
@@ -123,7 +112,7 @@ final class PersonalTokenGuard implements GuardInterface
         // Load user via provider
         $user = $this->provider->retrieveById($tokenable['id']);
 
-        if ($user === null || !$user instanceof HasApiTokensInterface) {
+        if ($user === null || !$user instanceof HasApiTokensInterface || !$user instanceof Authenticatable) {
             return null;
         }
 
@@ -148,7 +137,49 @@ final class PersonalTokenGuard implements GuardInterface
     {
         $user = $this->user();
 
-        return $user?->getId();
+        return $user?->getAuthIdentifier();
+    }
+
+    /**
+     * Attempt to authenticate a user with credentials.
+     *
+     * Note: Not applicable for token-based guard.
+     * Use SessionGuard for credential-based authentication.
+     *
+     * @param array<string, mixed> $credentials User credentials
+     * @return bool False (not supported)
+     */
+    public function attempt(array $credentials): bool
+    {
+        return false;
+    }
+
+    /**
+     * Log in a user instance.
+     *
+     * Note: Not applicable for token-based guard.
+     * Token-based auth doesn't maintain session state.
+     *
+     * @param Authenticatable $user User to log in
+     * @return void
+     */
+    public function login(Authenticatable $user): void
+    {
+        // Token-based guard doesn't support login
+        // Users authenticate via tokens, not session login
+    }
+
+    /**
+     * Log out the currently authenticated user.
+     *
+     * Note: For token-based auth, logout means revoking the token.
+     * This implementation clears the cached user for this request.
+     *
+     * @return void
+     */
+    public function logout(): void
+    {
+        $this->user = null;
     }
 
     /**
@@ -178,10 +209,10 @@ final class PersonalTokenGuard implements GuardInterface
     /**
      * Set the current user.
      *
-     * @param HasApiTokensInterface $user User instance
+     * @param Authenticatable&HasApiTokensInterface $user User instance
      * @return self
      */
-    public function setUser(HasApiTokensInterface $user): self
+    public function setUser(Authenticatable&HasApiTokensInterface $user): self
     {
         $this->user = $user;
 

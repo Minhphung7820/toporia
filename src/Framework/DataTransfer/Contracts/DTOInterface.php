@@ -10,17 +10,15 @@ namespace Toporia\Framework\DataTransfer\Contracts;
  * Base contract for all Data Transfer Objects.
  * DTOs are immutable value objects used to transfer data between layers.
  *
- * Key Principles:
- * - Immutability: DTOs should not be modified after creation
- * - Type Safety: All properties should be strongly typed
- * - Validation: DTOs may carry validation rules
- * - Serialization: DTOs should be easily serializable
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Contracts
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) property access
- * - Zero overhead serialization with toArray()
- *
- * @package Toporia\Framework\DataTransfer\Contracts
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface DTOInterface
 {

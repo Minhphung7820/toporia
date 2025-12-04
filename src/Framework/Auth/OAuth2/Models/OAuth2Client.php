@@ -9,17 +9,19 @@ use Toporia\Framework\Auth\OAuth2\Contracts\ClientInterface;
 use Toporia\Framework\Support\Accessors\Hash;
 
 /**
- * OAuth2 Client Model
+ * Class OAuth2Client
  *
  * Represents an OAuth2 client (application).
  *
- * Clean Architecture:
- * - Domain Entity: Represents OAuth2 client domain concept
- * - Implements ClientInterface contract
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\OAuth2\Models
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - S: Only represents OAuth2 client data
- * - I: Implements focused ClientInterface
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class OAuth2Client extends Model implements ClientInterface
 {

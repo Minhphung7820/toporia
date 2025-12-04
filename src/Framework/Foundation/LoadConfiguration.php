@@ -8,18 +8,21 @@ use Toporia\Framework\Config\Repository;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
- * Load Configuration
+ * Class LoadConfiguration
  *
  * Loads all configuration files from config directory into the container.
  * This should be called early in the bootstrap process, right after
  * Application instance is created.
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles configuration loading
- * - Performance: Lazy loading, cached after first load
- * - Early execution: Called before service providers register
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Foundation
+ * @since       2025-01-10
  *
- * Performance: O(N) where N = number of config files
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class LoadConfiguration
 {

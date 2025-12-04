@@ -9,10 +9,20 @@ use Toporia\Framework\Process\{ProcessManager, ProcessPool};
 use Toporia\Framework\Process\Contracts\ProcessInterface;
 
 /**
- * Process Service Accessor
+ * Class Process
  *
- * Provides static-like access to the process manager.
+ * Process Service Accessor - Provides static-like access to the process manager.
  * All methods are automatically delegated to the underlying service via __callStatic().
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static ProcessManager manager() Get ProcessManager instance
  * @method static ProcessPool pool(?int $workerCount = null) Get ProcessPool instance

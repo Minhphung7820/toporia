@@ -5,23 +5,20 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Scheduling\Support;
 
 /**
- * Task History Manager
+ * Class TaskHistory
  *
- * Tracks task execution history, metrics, and statistics.
- * Follows Single Responsibility Principle.
+ * Tracks task execution history, metrics, and statistics with O(1) record
+ * operations, O(1) latest history lookup, and automatic cleanup of old records.
  *
- * Performance:
- * - O(1) record operations
- * - O(1) latest history lookup
- * - O(N) full history (N = history size, typically small)
- * - Automatic cleanup of old records
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Scheduling
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Task history tracking only
- * - No framework dependencies
- * - Reusable across different contexts
- *
- * @package Toporia\Framework\Console\Scheduling\Support
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class TaskHistory
 {

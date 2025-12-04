@@ -14,43 +14,15 @@ use Toporia\Framework\DataTransfer\Contracts\DTOInterface;
  * Standardized API response envelope.
  * Provides consistent response structure across the API.
  *
- * Features:
- * - Consistent response structure
- * - Success/error handling
- * - Metadata support
- * - HATEOAS links
- * - HTTP status code management
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Resource
+ * @since       2025-01-10
  *
- * Response Structure:
- * ```json
- * {
- *     "success": true,
- *     "data": {...},
- *     "message": "Operation successful",
- *     "meta": {...},
- *     "links": {...},
- *     "errors": null
- * }
- * ```
- *
- * Usage:
- * ```php
- * // Success response
- * return ApiResponse::success($data, 'User created successfully');
- *
- * // Error response
- * return ApiResponse::error('Validation failed', 422, $errors);
- *
- * // With metadata
- * return ApiResponse::success($data)
- *     ->withMeta('version', '1.0')
- *     ->withLink('self', '/api/users/1');
- *
- * // Paginated response
- * return ApiResponse::paginated($paginator, UserResource::class);
- * ```
- *
- * @package Toporia\Framework\DataTransfer\Resource
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ApiResponse implements ResponseDTOInterface
 {

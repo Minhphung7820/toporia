@@ -5,10 +5,21 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console;
 
 use Toporia\Framework\Console\Contracts\OutputInterface;
+
 /**
- * Console Output
+ * Class Output
  *
  * Handles formatted output to console with colors and styles.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Output implements OutputInterface
 {

@@ -13,14 +13,21 @@ use Toporia\Framework\Routing\RouteModelBinding;
 use Toporia\Framework\Routing\SubdomainRouter;
 
 /**
- * HTTP Router with middleware support and dependency injection.
+ * Class Router
  *
- * Features:
- * - RESTful route registration (GET, POST, PUT, PATCH, DELETE, ANY)
- * - Route parameter extraction ({id} syntax)
- * - Middleware pipeline
- * - Named routes
- * - Dependency injection for controllers
+ * HTTP Router with middleware support and dependency injection.
+ * Provides RESTful route registration, parameter extraction, middleware pipeline,
+ * named routes, and dependency injection for controllers.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Routing
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Router implements RouterInterface
 {

@@ -9,9 +9,19 @@ use Toporia\Framework\Console\Scheduling\{ScheduledTask, Scheduler};
 use Toporia\Framework\Queue\Contracts\JobInterface;
 
 /**
- * Schedule Service Accessor
+ * Class Schedule
  *
- * Provides static-like access to the task scheduler.
+ * Schedule Service Accessor - Provides static-like access to the task scheduler.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static ScheduledTask call(callable $callback, array $parameters = []) Schedule callback
  * @method static ScheduledTask exec(string $command) Schedule shell command

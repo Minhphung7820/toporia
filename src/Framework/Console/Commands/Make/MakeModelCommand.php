@@ -6,6 +6,21 @@ namespace Toporia\Framework\Console\Commands\Make;
 
 use Toporia\Framework\Console\Generator\GeneratorCommand;
 
+/**
+ * Class MakeModelCommand
+ *
+ * Create a new model class for database entities.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands\Make
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ */
 final class MakeModelCommand extends GeneratorCommand
 {
     protected string $signature = 'make:model {name : The name of the model} {--m|migration : Create a new migration file for the model} {--f|factory : Create a new factory for the model} {--s|seed : Create a new seeder file for the model} {--a|all : Generate migration, factory, and seeder}';

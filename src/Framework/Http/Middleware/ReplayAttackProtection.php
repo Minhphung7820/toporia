@@ -9,33 +9,19 @@ use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\Security\Contracts\ReplayAttackProtectionInterface;
 
 /**
- * Replay Attack Protection Middleware
+ * Class ReplayAttackProtection
  *
- * Prevents replay attacks by validating nonces in requests.
- * Works in conjunction with CSRF protection for comprehensive security.
+ * Prevents replay attacks by validating nonces in requests. Works in conjunction with CSRF protection for comprehensive security.
  *
- * Protection Strategy:
- * - Requires nonce in state-changing requests
- * - Validates nonce expiration (time-based)
- * - Prevents nonce reuse (one-time use)
- * - Automatically cleans up expired nonces
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http\Middleware
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) nonce validation (session lookup)
- * - Minimal overhead per request
- * - Cleanup runs periodically, not on every request
- *
- * Clean Architecture:
- * - Single Responsibility: Only prevents replay attacks
- * - Dependency Injection: Receives ReplayAttackProtectionInterface
- * - Open/Closed: Extensible via different protection implementations
- *
- * SOLID Principles:
- * - S: Only handles replay attack protection
- * - O: Extensible via interface
- * - L: Behaves like other middleware
- * - I: Uses focused interface
- * - D: Depends on ReplayAttackProtectionInterface abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ReplayAttackProtection implements MiddlewareInterface
 {

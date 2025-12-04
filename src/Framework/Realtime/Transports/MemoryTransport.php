@@ -8,29 +8,19 @@ use Toporia\Framework\Realtime\Contracts\{ConnectionInterface, MessageInterface,
 use Toporia\Framework\Realtime\RealtimeManager;
 
 /**
- * Memory Transport
+ * Class MemoryTransport
  *
- * In-memory transport for testing and single-server deployments.
- * Does NOT support actual client connections - used for programmatic testing.
+ * In-memory transport for testing and single-server deployments. Does NOT support actual client connections.
  *
- * Use Cases:
- * - Unit testing
- * - Integration testing
- * - Single-server apps without real WebSocket
- * - Background job → Realtime event broadcasting
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Transports
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) send
- * - O(N) broadcast where N = connections
- * - No network overhead
- * - Memory only: ~1KB per connection
- *
- * Limitations:
- * - No actual client connections (HTTP/WebSocket)
- * - Single PHP process only
- * - Data lost on restart
- *
- * @package Toporia\Framework\Realtime\Transports
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MemoryTransport implements TransportInterface
 {

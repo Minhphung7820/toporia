@@ -11,33 +11,20 @@ use Toporia\Framework\Http\CookieJar;
 use Redis;
 
 /**
- * Session Manager
+ * Class SessionManager
  *
  * Manages session stores with multiple driver support.
  * Provides unified interface for session management across different storage backends.
  *
- * Supported Drivers:
- * - file: File-based sessions (default)
- * - database: Database sessions (scalable)
- * - redis: Redis sessions (high performance)
- * - cookie: Cookie sessions (stateless)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Session
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) driver resolution (cached after first call)
- * - Driver-specific performance characteristics
- * - Lazy driver instantiation
- *
- * Clean Architecture:
- * - Single Responsibility: Only manages session stores
- * - Dependency Inversion: Depends on driver abstractions
- * - Open/Closed: Extensible via new drivers
- *
- * SOLID Principles:
- * - S: Only manages sessions
- * - O: Extensible via drivers
- * - L: All drivers interchangeable
- * - I: Focused interface
- * - D: Depends on abstractions
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SessionManager
 {

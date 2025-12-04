@@ -9,23 +9,20 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Http\{Request, Response};
 
 /**
- * Middleware Pipeline - Builds and executes middleware chains.
+ * Class MiddlewarePipeline
  *
- * Implements the Chain of Responsibility pattern for HTTP middleware.
+ * Builds and executes middleware chains. Implements the Chain of Responsibility pattern for HTTP middleware.
  * Follows Single Responsibility Principle by focusing only on pipeline building.
  *
- * Features:
- * - Lazy middleware resolution from container
- * - Alias resolution for short names
- * - Proper execution order (declaration order)
- * - Type-safe middleware instantiation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http\Middleware
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * $pipeline = new MiddlewarePipeline($container, ['auth' => Authenticate::class]);
- * $handler = $pipeline->build(['auth', RateLimiter::class], $coreHandler);
- * $handler($request, $response);
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MiddlewarePipeline
 {

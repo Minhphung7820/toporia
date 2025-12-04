@@ -9,23 +9,19 @@ use Toporia\Framework\Auth\OAuth2\Models\{OAuth2AccessToken, OAuth2RefreshToken}
 use Toporia\Framework\Hashing\HashManager;
 
 /**
- * OAuth2 Token Repository
+ * Class TokenRepository
  *
  * Manages OAuth2 access and refresh tokens.
  *
- * Performance:
- * - O(1) token lookup (indexed by token hash)
- * - O(1) token creation (single insert)
- * - O(N) revocation where N = number of tokens
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\OAuth2\Repositories
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Infrastructure Layer: Database implementation of TokenRepositoryInterface
- * - Dependency Inversion: Implements domain contract
- *
- * SOLID Principles:
- * - S: Only manages OAuth2 tokens
- * - I: Implements focused TokenRepositoryInterface
- * - D: Depends on TokenRepositoryInterface abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class TokenRepository implements TokenRepositoryInterface
 {

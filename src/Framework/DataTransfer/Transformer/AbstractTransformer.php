@@ -14,37 +14,15 @@ use Toporia\Framework\DataTransfer\Exceptions\TransformationException;
  * Base class for entity transformers.
  * Provides common transformation functionality with includes support.
  *
- * Features:
- * - Include/exclude relationships
- * - Default includes
- * - Context-aware transformation
- * - Batch transformation
- * - Caching support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Transformer
+ * @since       2025-01-10
  *
- * Usage:
- * ```php
- * class UserTransformer extends AbstractTransformer
- * {
- *     protected array $availableIncludes = ['posts', 'profile', 'roles'];
- *     protected array $defaultIncludes = ['profile'];
- *
- *     public function transform(mixed $user, array $context = []): array
- *     {
- *         return [
- *             'id' => $user->id,
- *             'name' => $user->name,
- *             'email' => $user->email,
- *         ];
- *     }
- *
- *     public function includePosts(User $user): array
- *     {
- *         return (new PostTransformer())->transformCollection($user->posts);
- *     }
- * }
- * ```
- *
- * @package Toporia\Framework\DataTransfer\Transformer
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractTransformer implements TransformerInterface
 {

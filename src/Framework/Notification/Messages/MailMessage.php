@@ -5,28 +5,19 @@ declare(strict_types=1);
 namespace Toporia\Framework\Notification\Messages;
 
 /**
- * Mail Message
+ * Class MailMessage
  *
  * Fluent builder for email notifications.
- * Provides a simple API for constructing rich email content.
  *
- * Usage:
- * ```php
- * return (new MailMessage)
- *     ->subject('Order Shipped!')
- *     ->greeting('Hello ' . $user->name)
- *     ->line('Your order has been shipped.')
- *     ->action('Track Shipment', $trackingUrl)
- *     ->line('Thank you for your purchase!')
- *     ->salutation('Regards, ' . config('app.name'));
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Messages
+ * @since       2025-01-10
  *
- * Performance:
- * - O(1) for each fluent call
- * - Lazy rendering (only builds HTML when needed)
- * - Minimal memory footprint
- *
- * @package Toporia\Framework\Notification\Messages
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class MailMessage
 {

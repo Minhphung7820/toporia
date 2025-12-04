@@ -11,29 +11,19 @@ use Toporia\Framework\Http\Exceptions\{UnauthorizedHttpException, AccessDeniedHt
 use Toporia\Framework\Http\{Request, Response};
 
 /**
- * Check Scopes Middleware
+ * Class CheckScopes
  *
  * Ensures the authenticated user's token has ALL specified abilities/scopes.
  *
- * Usage:
- * ```php
- * // Requires BOTH abilities
- * $router->post('/posts', [PostController::class, 'store'])
- *     ->middleware([
- *         EnsureTokenIsValid::class,
- *         CheckScopes::requires('posts:write', 'posts:publish')
- *     ]);
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Middleware
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Framework layer middleware
- * - Uses HasApiTokensInterface contract
- *
- * SOLID Principles:
- * - Single Responsibility: Scope validation
- * - Open/Closed: Extensible via static factory
- *
- * @package Toporia\Framework\Auth\Middleware
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CheckScopes implements MiddlewareInterface
 {

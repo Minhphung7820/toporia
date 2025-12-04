@@ -10,21 +10,19 @@ use Toporia\Framework\Realtime\RealtimeManager;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 
 /**
- * Realtime Service Provider
+ * Class RealtimeServiceProvider
  *
  * Registers realtime services with multi-transport and multi-broker support.
  *
- * Services Registered:
- * - RealtimeManager: Central coordinator for realtime communication
- * - Transports: WebSocket, SSE, Long-polling, Memory
- * - Brokers: Redis, RabbitMQ, NATS, PostgreSQL
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
  *
- * Performance Optimizations:
- * - Singleton pattern for RealtimeManager
- * - Lazy loading of transports/brokers
- * - Container-based DI
- *
- * @package Toporia\Framework\Providers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RealtimeServiceProvider extends ServiceProvider
 {

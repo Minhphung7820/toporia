@@ -8,27 +8,19 @@ use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterfac
 use Toporia\Framework\Realtime\{Connection, Message};
 
 /**
- * WebSocket Transport
+ * Class WebSocketTransport
  *
  * Production-grade WebSocket server using Swoole extension.
  *
- * Performance:
- * - Latency: 1-5ms
- * - Throughput: 100k+ messages/sec
- * - Concurrent connections: 10k+
- * - Memory per connection: ~1KB
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Transports
+ * @since       2025-01-10
  *
- * Requirements:
- * - Swoole extension (pecl install swoole)
- * - PHP 8.1+
- *
- * Architecture:
- * - Event-driven non-blocking I/O
- * - Coroutine-based concurrency
- * - Zero-copy message passing
- * - Automatic ping/pong heartbeat
- *
- * @package Toporia\Framework\Realtime\Transports
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class WebSocketTransport implements TransportInterface
 {

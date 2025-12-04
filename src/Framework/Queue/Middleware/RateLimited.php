@@ -9,7 +9,7 @@ use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
 use Toporia\Framework\Queue\Exceptions\RateLimitExceededException;
 
 /**
- * Rate Limited Middleware
+ * Class RateLimited
  *
  * Prevents jobs from executing too frequently.
  * Useful for API calls, external service requests, or resource-intensive tasks.
@@ -34,7 +34,15 @@ use Toporia\Framework\Queue\Exceptions\RateLimitExceededException;
  * - I: Minimal interface
  * - D: Depends on RateLimiterInterface abstraction
  *
- * @package Toporia\Framework\Queue\Middleware
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue\Middleware
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RateLimited implements JobMiddleware
 {

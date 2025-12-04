@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace Toporia\Framework\Notification\Messages;
 
 /**
- * SMS Message
+ * Class SmsMessage
  *
  * Simple SMS message builder with character count tracking.
  *
- * Usage:
- * ```php
- * return (new SmsMessage)
- *     ->content('Your verification code is: 123456')
- *     ->from('YourApp');
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Messages
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Notification\Messages
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SmsMessage
 {

@@ -16,31 +16,15 @@ use Toporia\Framework\DataTransfer\Exceptions\HydrationException;
  * Hydrates objects from arrays using reflection.
  * Supports nested object hydration, type coercion, and property mapping.
  *
- * Features:
- * - Automatic type coercion
- * - Nested object hydration
- * - Property name mapping (snake_case to camelCase)
- * - Default value support
- * - Strict mode for validation
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Hydrator
+ * @since       2025-01-10
  *
- * Performance:
- * - Reflection caching per class
- * - O(n) hydration where n = number of properties
- *
- * Usage:
- * ```php
- * $hydrator = new ObjectHydrator();
- *
- * $user = $hydrator->hydrate([
- *     'id' => 1,
- *     'name' => 'John',
- *     'created_at' => '2024-01-01',
- * ], User::class);
- *
- * $data = $hydrator->extract($user);
- * ```
- *
- * @package Toporia\Framework\DataTransfer\Hydrator
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class ObjectHydrator implements HydratorInterface
 {

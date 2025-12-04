@@ -9,9 +9,19 @@ use Toporia\Framework\Realtime\RealtimeManager;
 use Toporia\Framework\Realtime\Contracts\{ChannelInterface, TransportInterface, BrokerInterface};
 
 /**
- * Realtime Service Accessor
+ * Class Realtime
  *
- * Provides static-like access to the realtime manager.
+ * Realtime Service Accessor - Provides static-like access to the realtime manager.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Support\Accessors
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @method static void broadcast(string $channel, string $event, mixed $data) Broadcast to channel
  * @method static void send(string $connectionId, string $event, mixed $data) Send to connection
@@ -40,8 +50,6 @@ use Toporia\Framework\Realtime\Contracts\{ChannelInterface, TransportInterface, 
  * // Get channel
  * $channel = Realtime::channel('chat.room.1');
  * $subscribers = $channel->getSubscriberCount();
- *
- * @package Toporia\Framework\Support\Accessors
  */
 final class Realtime extends ServiceAccessor
 {

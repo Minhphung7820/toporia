@@ -7,12 +7,20 @@ namespace Toporia\Framework\Storage;
 use Toporia\Framework\Storage\Contracts\FilesystemInterface;
 
 /**
- * S3 Filesystem Driver (AWS SDK Ready)
+ * Class S3Filesystem
  *
- * Requires: composer require aws/aws-sdk-php
+ * AWS S3 filesystem driver with stream-based operations for large files.
+ * Requires aws/aws-sdk-php package.
  *
- * Performance: Stream-based for large files
- * SOLID: Single Responsibility - S3 operations only
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Storage
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class S3Filesystem implements FilesystemInterface
 {

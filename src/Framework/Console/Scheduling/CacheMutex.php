@@ -8,10 +8,20 @@ use Toporia\Framework\Console\Scheduling\Contracts\MutexInterface;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
- * Cache-based Mutex
+ * Class CacheMutex
  *
  * Implements mutex using cache backend (file, Redis, etc.)
  * for preventing task overlaps across multiple servers.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Scheduling
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CacheMutex implements MutexInterface
 {

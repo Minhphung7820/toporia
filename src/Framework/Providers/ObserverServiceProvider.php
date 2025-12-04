@@ -10,20 +10,19 @@ use Toporia\Framework\Observer\ObserverManager;
 use Toporia\Framework\Observer\Contracts\ObserverManagerInterface;
 
 /**
- * Observer Service Provider
+ * Class ObserverServiceProvider
  *
  * Registers the observer manager and bootstraps observers.
  *
- * Performance:
- * - Singleton observer manager (shared instance)
- * - Lazy observer loading (only when needed)
- * - Efficient observer registration
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Providers
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Only manages observer service registration
- * - Dependency Inversion: Depends on ObserverManagerInterface abstraction
- *
- * @package Toporia\Framework\Providers
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ObserverServiceProvider extends ServiceProvider
 {

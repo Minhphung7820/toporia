@@ -10,26 +10,19 @@ use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
 use Toporia\Framework\Queue\Worker;
 
 /**
- * Queue Work Command
+ * Class QueueWorkCommand
  *
  * Process jobs from the queue with graceful shutdown support.
  *
- * Multi-Queue Support:
- * - Supports comma-separated queue names with priority order
- * - Processes queues in order: first queue has highest priority
- * - Example: --queue=emails,default,notifications
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Console\Commands
+ * @since       2025-01-10
  *
- * Usage:
- *   php console queue:work
- *   php console queue:work --queue=emails
- *   php console queue:work --queue=emails,default,notifications
- *   php console queue:work --max-jobs=100 --sleep=5
- *   php console queue:work --stop-when-empty
- *
- * Performance Optimizations:
- * - O(1) queue lookup per iteration
- * - Priority-based processing (first queue checked first)
- * - Efficient polling with configurable sleep
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class QueueWorkCommand extends Command
 {

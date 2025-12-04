@@ -10,7 +10,15 @@ namespace Toporia\Framework\DataTransfer\Resource;
  * Represents values that should be merged into the resource array.
  * Used by merge() and mergeWhen() methods.
  *
- * @package Toporia\Framework\DataTransfer\Resource
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Resource
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class MergeValue
 {

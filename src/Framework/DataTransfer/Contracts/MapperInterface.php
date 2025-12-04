@@ -10,16 +10,18 @@ namespace Toporia\Framework\DataTransfer\Contracts;
  * Contract for mapping between different object types.
  * Mappers convert objects from one type to another.
  *
- * Use Cases:
- * - Entity to DTO conversion
- * - DTO to Entity conversion
- * - External API response to internal models
- * - Database records to domain entities
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * @template TSource The source type
  * @template TTarget The target type
- *
- * @package Toporia\Framework\DataTransfer\Contracts
  */
 interface MapperInterface
 {

@@ -7,16 +7,19 @@ namespace Toporia\Framework\Realtime\Brokers\Kafka\Client;
 use Toporia\Framework\Realtime\Exceptions\BrokerException;
 
 /**
- * Kafka client adapter using nmred/kafka-php library.
+ * Class KafkaPhpClient
  *
- * Pure PHP client for Kafka. More portable but lower performance than rdkafka.
+ * Kafka client adapter using nmred/kafka-php library. Pure PHP client for Kafka.
  *
- * Performance characteristics:
- * - Throughput: ~10k messages/sec
- * - Latency: ~10-50ms
- * - No C extension required
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Brokers\Kafka\Client
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Realtime\Brokers\Kafka\Client
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class KafkaPhpClient implements KafkaClientInterface
 {

@@ -12,7 +12,7 @@ use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
 use Toporia\Framework\Queue\Events\{JobQueued, JobProcessing, JobProcessed, JobFailed, JobTimedOut, JobRetrying, WorkerStopping};
 
 /**
- * Queue Worker
+ * Class Worker
  *
  * Processes jobs from the queue with multi-queue support.
  * Handles job execution, retries, and failure management.
@@ -26,6 +26,16 @@ use Toporia\Framework\Queue\Events\{JobQueued, JobProcessing, JobProcessed, JobF
  * - O(Q) per iteration where Q = number of queues
  * - Graceful shutdown support (waits for current job)
  * - Configurable sleep between iterations
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Queue
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Worker
 {

@@ -14,28 +14,15 @@ use Toporia\Framework\Validation\ValidationException;
  * Base class for request DTOs with validation support.
  * Validates incoming data before creating DTO instance.
  *
- * Usage:
- * ```php
- * class CreateUserDTO extends RequestDTO
- * {
- *     public readonly string $name;
- *     public readonly string $email;
- *     public readonly ?string $phone;
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DataTransfer\DTO
+ * @since       2025-01-10
  *
- *     public static function rules(): array
- *     {
- *         return [
- *             'name' => 'required|string|max:255',
- *             'email' => 'required|email',
- *             'phone' => 'nullable|string',
- *         ];
- *     }
- * }
- *
- * $dto = CreateUserDTO::fromRequest($request->all());
- * ```
- *
- * @package Toporia\Framework\DataTransfer\DTO
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class RequestDTO extends DataTransferObject implements RequestDTOInterface
 {

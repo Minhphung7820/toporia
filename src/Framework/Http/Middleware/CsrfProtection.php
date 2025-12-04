@@ -10,10 +10,20 @@ use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
 
 /**
- * CSRF Protection Middleware
+ * Class CsrfProtection
  *
- * Validates CSRF tokens for state-changing requests (POST, PUT, PATCH, DELETE).
+ * CSRF Protection Middleware. Validates CSRF tokens for state-changing requests (POST, PUT, PATCH, DELETE).
  * Automatically skips validation for safe methods (GET, HEAD, OPTIONS).
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http\Middleware
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CsrfProtection implements MiddlewareInterface
 {

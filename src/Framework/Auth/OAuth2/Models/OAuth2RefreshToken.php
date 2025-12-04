@@ -7,15 +7,19 @@ namespace Toporia\Framework\Auth\OAuth2\Models;
 use Toporia\Framework\Database\ORM\Model;
 
 /**
- * OAuth2 Refresh Token Model
+ * Class OAuth2RefreshToken
  *
  * Represents an OAuth2 refresh token.
  *
- * Clean Architecture:
- * - Domain Entity: Represents OAuth2 refresh token domain concept
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\OAuth2\Models
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - S: Only represents OAuth2 refresh token data
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class OAuth2RefreshToken extends Model
 {

@@ -8,38 +8,19 @@ use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterfac
 use Toporia\Framework\Realtime\{Connection, Message};
 
 /**
- * Long-Polling Transport
+ * Class LongPollingTransport
  *
  * HTTP-based fallback for environments where WebSocket is blocked.
  *
- * Performance:
- * - Latency: 100-500ms (HTTP round-trip overhead)
- * - Throughput: 1k messages/sec per worker
- * - Concurrent connections: 100+ per worker
- * - Memory per connection: ~3KB
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Transports
+ * @since       2025-01-10
  *
- * Use Cases:
- * - Legacy browser support
- * - Corporate firewalls blocking WebSocket
- * - Fallback when WebSocket fails
- *
- * Architecture:
- * - Client polls server via GET requests
- * - Server holds request until message available (timeout: 30s)
- * - Client sends messages via POST requests
- * - Message queue per connection
- *
- * Advantages:
- * - Works everywhere (plain HTTP)
- * - No special server requirements
- * - Stateless (connection in query params)
- *
- * Limitations:
- * - Higher latency than WebSocket/SSE
- * - More bandwidth (HTTP headers overhead)
- * - More server load (polling requests)
- *
- * @package Toporia\Framework\Realtime\Transports
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class LongPollingTransport implements TransportInterface
 {

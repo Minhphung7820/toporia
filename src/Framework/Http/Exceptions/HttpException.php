@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http\Exceptions;
 
 /**
- * Base HTTP Exception
+ * Class HttpException
  *
- * Base class for all HTTP-related exceptions. Provides status code,
- * headers, and message for HTTP error responses.
+ * Base class for all HTTP-related exceptions. Provides status code, headers, and message for HTTP error responses.
  *
- * Usage:
- * ```php
- * throw new HttpException(500, 'Internal Server Error');
- * throw HttpException::notFound('User not found');
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http\Exceptions
+ * @since       2025-01-10
  *
- * @package Toporia\Framework\Http\Exceptions
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class HttpException extends \RuntimeException
 {
