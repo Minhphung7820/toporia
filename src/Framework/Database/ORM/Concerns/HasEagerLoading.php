@@ -129,21 +129,27 @@ trait HasEagerLoading
                 continue;
             }
 
-            // Handle nested relations (e.g., 'posts.comments')
+            // Handle nested relations (e.g., 'posts.comments', 'reviews.user.profile')
+            // Split only on first dot to support multi-level nesting (handled recursively)
             $parts = explode('.', $relationName, 2);
             $firstLevelRelation = $parts[0];
 
             // Track nested relations for this first-level relation
             if (isset($parts[1])) {
-                $nestedRelation = $parts[1];
+                $nestedRelation = $parts[1]; // Can be 'user' or 'user.profile' (handled recursively)
 
                 if (!isset($nested[$firstLevelRelation])) {
                     $nested[$firstLevelRelation] = [];
                 }
-                $nested[$firstLevelRelation][] = $nestedRelation;
+                // Avoid duplicate nested relations (important for performance)
+                if (!in_array($nestedRelation, $nested[$firstLevelRelation], true)) {
+                    $nested[$firstLevelRelation][] = $nestedRelation;
+                }
 
                 // Store constraint for nested relation (not first-level)
-                // The constraint should apply to the final relationship in the path
+                // IMPORTANT: Constraint applies to the FINAL relationship in the path
+                // Example: 'reviews.user' => fn($q) => $q->where(...) applies to 'user', not 'reviews'
+                // To constrain 'reviews', use: 'reviews' => fn($q) => $q->where(...), 'reviews.user'
                 if ($constraint !== null) {
                     if (!isset($nestedConstraints[$firstLevelRelation])) {
                         $nestedConstraints[$firstLevelRelation] = [];
@@ -152,6 +158,7 @@ trait HasEagerLoading
                 }
             } else {
                 // This is a first-level relation, store constraint for it
+                // Example: 'reviews' => fn($q) => $q->where('helpful_count', '<', 20)
                 if ($constraint !== null) {
                     $constraints[$firstLevelRelation] = $constraint;
                 }
@@ -181,12 +188,35 @@ trait HasEagerLoading
 
         // Store nested relations in context for processing after first level is loaded
         if (!empty($nested)) {
-            $context['nestedRelations'] = array_merge($context['nestedRelations'] ?? [], $nested);
+            $existingNested = $context['nestedRelations'] ?? [];
+            foreach ($nested as $firstLevel => $nestedRels) {
+                if (!isset($existingNested[$firstLevel])) {
+                    $existingNested[$firstLevel] = [];
+                }
+                // Merge and deduplicate nested relations
+                $existingNested[$firstLevel] = array_values(array_unique(
+                    array_merge($existingNested[$firstLevel], $nestedRels),
+                    SORT_REGULAR
+                ));
+            }
+            $context['nestedRelations'] = $existingNested;
         }
 
         // Store nested constraints in context
+        // Use proper merge to avoid array_merge_recursive issues with duplicate keys
         if (!empty($nestedConstraints)) {
-            $context['nestedConstraints'] = array_merge_recursive($context['nestedConstraints'] ?? [], $nestedConstraints);
+            $existingConstraints = $context['nestedConstraints'] ?? [];
+            foreach ($nestedConstraints as $firstLevel => $constraints) {
+                if (!isset($existingConstraints[$firstLevel])) {
+                    $existingConstraints[$firstLevel] = [];
+                }
+                // Merge constraints, later ones override earlier ones (Laravel behavior)
+                $existingConstraints[$firstLevel] = array_merge(
+                    $existingConstraints[$firstLevel],
+                    $constraints
+                );
+            }
+            $context['nestedConstraints'] = $existingConstraints;
         }
 
         // Return grouped relations with constraints
