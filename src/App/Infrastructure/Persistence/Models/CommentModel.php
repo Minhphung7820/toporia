@@ -52,3 +52,4 @@ class CommentModel extends Model
         return $this->belongsTo(UserModel::class, 'user_id');
     }
 }
+

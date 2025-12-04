@@ -49,3 +49,4 @@ class ImageModel extends Model
         return $this->morphTo('imageable');
     }
 }
+

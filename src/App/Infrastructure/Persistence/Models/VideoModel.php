@@ -66,3 +66,4 @@ class VideoModel extends Model
             ->withTimestamps();
     }
 }
+
