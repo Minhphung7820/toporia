@@ -146,12 +146,19 @@ class MorphMany extends Relation
     /**
      * Get morph class name for parent.
      *
-     * @return string
+     * Returns the full namespace class name (e.g., "App\Models\Product").
+     * Models can override getMorphClass() method to provide a custom morph class string.
+     *
+     * @return string Full namespace class name
      */
     protected function getMorphClass(): string
     {
-        // Use full class name to match database storage
-        // Can be customized via getMorphClass() method on model
+        // Allow parent model to override getMorphClass() method
+        if (method_exists($this->parent, 'getMorphClass')) {
+            return $this->parent->getMorphClass();
+        }
+
+        // Default: return full namespace class name
         return get_class($this->parent);
     }
 
@@ -338,7 +345,10 @@ class MorphMany extends Relation
         // Group models by type (full class name) for efficient loading
         $types = [];
         foreach ($models as $model) {
-            $type = get_class($model);
+            // Use getMorphClass() if available, otherwise use get_class()
+            $type = method_exists($model, 'getMorphClass')
+                ? $model->getMorphClass()
+                : get_class($model);
 
             if (!isset($types[$type])) {
                 $types[$type] = [];
@@ -394,7 +404,10 @@ class MorphMany extends Relation
 
         // OPTIMIZATION: Batch set relations with efficient lookup
         foreach ($models as $model) {
-            $type = get_class($model);
+            // Use getMorphClass() if available, otherwise use get_class()
+            $type = method_exists($model, 'getMorphClass')
+                ? $model->getMorphClass()
+                : get_class($model);
             $id = $model->getAttribute($this->localKey);
             $key = "{$type}:{$id}";
 

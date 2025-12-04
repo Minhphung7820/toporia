@@ -342,7 +342,10 @@ class MorphToMany extends Relation
 
         $types = [];
         foreach ($models as $model) {
-            $type = get_class($model);
+            // Use getMorphClass() if available, otherwise use get_class()
+            $type = method_exists($model, 'getMorphClass')
+                ? $model->getMorphClass()
+                : get_class($model);
             $types[$type][] = $model->getAttribute($this->localKey);
         }
 
@@ -624,7 +627,11 @@ class MorphToMany extends Relation
         // When multiple parents share the same related model, each parent needs its own instance with correct pivot data
         // PERFORMANCE: Pre-normalize parent keys to avoid repeated string conversion
         foreach ($models as $model) {
-            $key = get_class($model) . ':' . $model->getAttribute($this->localKey);
+            // Use getMorphClass() if available, otherwise use get_class()
+            $morphType = method_exists($model, 'getMorphClass')
+                ? $model->getMorphClass()
+                : get_class($model);
+            $key = $morphType . ':' . $model->getAttribute($this->localKey);
 
             // CRITICAL: Only match if dictionary has entries for THIS specific parent
             if (!isset($dictionary[$key])) {
@@ -670,8 +677,8 @@ class MorphToMany extends Relation
 
                         // CRITICAL: Force set keys to match THIS parent's values
                         // This ensures pivot data always has the correct morphType and foreignKey
-                        // Even though we verified above, we still force set to be absolutely sure
-                        $cleanPivotData[$this->morphType] = $this->getMorphClass();
+                        // Use the pre-calculated $morphType for consistency and performance
+                        $cleanPivotData[$this->morphType] = $morphType;
                         $cleanPivotData[$this->foreignKey] = $model->getAttribute($this->localKey);
                         $cleanPivotData[$this->relatedPivotKey] = $relatedIdKey;
 

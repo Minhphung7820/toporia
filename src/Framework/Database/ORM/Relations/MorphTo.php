@@ -114,6 +114,11 @@ class MorphTo extends Relation
             return null;
         }
 
+        if (!is_subclass_of($modelClass, Model::class)) {
+            // Skip non-Model classes - security and type safety
+            return null;
+        }
+
         return $modelClass::query()
             ->where($this->localKey, $id)
             ->first();
@@ -282,11 +287,35 @@ class MorphTo extends Relation
             return $this->dissociate();
         }
 
+        // Use morphMap if available, otherwise use full class name
+        $morphType = $this->getMorphTypeForModel($model);
+
         $this->parent->setAttribute($this->foreignKey, $model->getKey());
-        $this->parent->setAttribute($this->morphType, get_class($model));
+        $this->parent->setAttribute($this->morphType, $morphType);
         $this->parent->setRelation($this->getRelationName(), $model);
 
         return $this->parent;
+    }
+
+    /**
+     * Get morph type for a model, using morphMap if available.
+     *
+     * @param Model $model
+     * @return string
+     */
+    protected function getMorphTypeForModel(Model $model): string
+    {
+        $modelClass = get_class($model);
+
+        // Check if there's a reverse mapping in morphMap (value => key)
+        foreach ($this->morphMap as $type => $class) {
+            if ($class === $modelClass) {
+                return $type;
+            }
+        }
+
+        // Fallback to full class name
+        return $modelClass;
     }
 
     /**
@@ -314,6 +343,10 @@ class MorphTo extends Relation
 
         if (!class_exists($modelClass)) {
             throw new \InvalidArgumentException("Model class {$modelClass} does not exist");
+        }
+
+        if (!is_subclass_of($modelClass, Model::class)) {
+            throw new \InvalidArgumentException("Class {$modelClass} is not a valid Model subclass");
         }
 
         $instance = $modelClass::create($attributes);
@@ -357,13 +390,22 @@ class MorphTo extends Relation
     {
         ['type' => $type, 'id' => $id] = $this->getMorphTypeAndId();
 
-        if (!$type || !$id) {
+        // Explicit check: type must be non-empty string, id must be non-null
+        if ($type === null || $type === '' || $id === null) {
             return false;
         }
 
         $modelClass = $this->getModelClass($type);
 
-        return class_exists($modelClass) && $modelClass::where($this->localKey, $id)->exists();
+        if (!class_exists($modelClass)) {
+            return false;
+        }
+
+        if (!is_subclass_of($modelClass, Model::class)) {
+            return false;
+        }
+
+        return $modelClass::where($this->localKey, $id)->exists();
     }
 
     /**
@@ -381,13 +423,18 @@ class MorphTo extends Relation
     {
         ['type' => $type, 'id' => $id] = $this->getMorphTypeAndId();
 
-        if (!$type || !$id) {
+        // Explicit check: type must be non-empty string, id must be non-null
+        if ($type === null || $type === '' || $id === null) {
             return null;
         }
 
         $modelClass = $this->getModelClass($type);
 
         if (!class_exists($modelClass)) {
+            return null;
+        }
+
+        if (!is_subclass_of($modelClass, Model::class)) {
             return null;
         }
 
