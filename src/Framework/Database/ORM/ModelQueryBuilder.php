@@ -3006,4 +3006,203 @@ class ModelQueryBuilder extends QueryBuilder
     {
         return $this->getModels();
     }
+
+    /**
+     * Get a cursor for streaming model results without loading into memory.
+     *
+     * Overrides parent cursor() to hydrate rows into Model instances.
+     * This is the most memory-efficient method for processing large datasets.
+     *
+     * Uses PDO cursor streaming to fetch one row at a time from the database,
+     * hydrating each row into a Model instance on-demand. This prevents loading
+     * all records into memory at once.
+     *
+     * Performance:
+     * - Memory: O(1) - Only one Model in memory at a time
+     * - Time: O(N) - Processes all records
+     * - Database: Single query, PDO streams results
+     * - Hydration: Models are hydrated on-demand during iteration
+     *
+     * Note: Cursor keeps database connection open during iteration.
+     * Don't use for long-running processes that need connection pooling.
+     *
+     * Eager loading: Relationships are NOT automatically loaded. Use with() before
+     * calling cursor() if you need relationships, but be aware this may impact memory usage.
+     *
+     * @return \Generator<int, TModel> Generator of model instances
+     *
+     * @example
+     * ```php
+     * // Process all users without loading into memory
+     * foreach (UserModel::query()->cursor() as $user) {
+     *     echo $user->name;
+     * }
+     *
+     * // With query constraints
+     * foreach (UserModel::query()->where('active', true)->cursor() as $user) {
+     *     processUser($user);
+     * }
+     * ```
+     */
+    public function cursor(): \Generator
+    {
+        $modelClass = $this->modelClass;
+        $eagerLoad = $this->getEagerLoad();
+
+        // Use parent cursor() to get raw rows (PDO streaming)
+        foreach (parent::cursor() as $row) {
+            // Hydrate row into Model instance
+            /** @var callable $hydrate */
+            $hydrate = [$modelClass, 'hydrate'];
+            $models = $hydrate([$row]); // hydrate expects array of rows
+
+            if ($models->isEmpty()) {
+                continue;
+            }
+
+            $model = $models->first();
+
+            // Load eager relationships if configured
+            // Note: For cursor, we load relationships per model
+            // This is less efficient than batch loading but necessary for memory efficiency
+            if (!empty($eagerLoad) && $model !== null) {
+                /** @var callable $eagerLoadRelations */
+                $eagerLoadRelations = [$modelClass, 'eagerLoadRelations'];
+                $eagerLoadRelations($models, $eagerLoad);
+            }
+
+            yield $model;
+        }
+    }
+
+    /**
+     * Get results as a LazyCollection of Models for memory-efficient processing.
+     *
+     * Returns a LazyCollection that uses PDO cursor to stream results one at a time,
+     * hydrating each row into a Model instance. This is ideal for processing large
+     * datasets without loading everything into memory.
+     *
+     * The LazyCollection supports all collection methods (map, filter, etc.) and can be
+     * chained seamlessly, just like regular ModelCollections.
+     *
+     * Example:
+     * ```php
+     * $users = UserModel::query()
+     *     ->where('active', true)
+     *     ->toLazyCollection()
+     *     ->map(fn($user) => $user->name)
+     *     ->filter(fn($name) => strlen($name) > 5)
+     *     ->take(100);
+     *
+     * foreach ($users as $name) {
+     *     echo $name;
+     * }
+     * ```
+     *
+     * Performance:
+     * - Memory: O(1) - Only one Model in memory at a time
+     * - Time: O(N) - Processes all records
+     * - Database: Single query, PDO streams results
+     * - Hydration: Models are hydrated on-demand during iteration
+     *
+     * Note: Cursor keeps database connection open during iteration.
+     * Don't use for long-running processes that need connection pooling.
+     *
+     * Eager loading: Relationships are NOT automatically loaded. Use with() before
+     * calling toLazyCollection() if you need relationships, but be aware this may
+     * impact memory usage.
+     *
+     * @return \Toporia\Framework\Support\Collection\LazyCollection<int, TModel>
+     */
+    public function toLazyCollection(): \Toporia\Framework\Support\Collection\LazyCollection
+    {
+        $modelClass = $this->modelClass;
+        $eagerLoad = $this->getEagerLoad();
+
+        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () use ($modelClass, $eagerLoad) {
+            // Use cursor to stream results
+            foreach (parent::cursor() as $row) {
+                // Hydrate row into Model instance
+                /** @var callable $hydrate */
+                $hydrate = [$modelClass, 'hydrate'];
+                $models = $hydrate([$row]); // hydrate expects array of rows
+
+                if ($models->isEmpty()) {
+                    continue;
+                }
+
+                $model = $models->first();
+
+                // Load eager relationships if configured
+                // Note: For lazy collections, we load relationships per model
+                // This is less efficient than batch loading but necessary for memory efficiency
+                if (!empty($eagerLoad) && $model !== null) {
+                    /** @var callable $eagerLoadRelations */
+                    $eagerLoadRelations = [$modelClass, 'eagerLoadRelations'];
+                    $eagerLoadRelations($models, $eagerLoad);
+                }
+
+                yield $model;
+            }
+        });
+    }
+
+    /**
+     * Get results as a LazyCollection of Models using chunked pagination.
+     *
+     * Alternative to toLazyCollection() that uses chunked queries instead of cursor.
+     * This is useful when cursor() is not available or when you need more control
+     * over memory usage with chunked processing.
+     *
+     * Models are hydrated in chunks, which can be more memory-efficient for certain
+     * use cases, especially when processing relationships.
+     *
+     * Example:
+     * ```php
+     * $users = UserModel::query()
+     *     ->with('posts')
+     *     ->toLazyCollectionByChunk(1000)
+     *     ->map(fn($user) => $user->posts->count())
+     *     ->filter(fn($count) => $count > 10);
+     * ```
+     *
+     * Performance:
+     * - Memory: O(chunkSize) - Only chunkSize Models in memory at a time
+     * - Time: O(N) - Processes all records
+     * - Database: Multiple queries with LIMIT/OFFSET pagination
+     * - Hydration: Models are hydrated in chunks
+     *
+     * @param int $chunkSize Number of records to fetch per database query (default: 1000)
+     * @return \Toporia\Framework\Support\Collection\LazyCollection<int, TModel>
+     */
+    public function toLazyCollectionByChunk(int $chunkSize = 1000): \Toporia\Framework\Support\Collection\LazyCollection
+    {
+        $modelClass = $this->modelClass;
+        $eagerLoad = $this->getEagerLoad();
+
+        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () use ($modelClass, $chunkSize, $eagerLoad) {
+            // Use lazy() generator which handles chunking
+            foreach (parent::lazy($chunkSize) as $row) {
+                // Hydrate row into Model instance
+                /** @var callable $hydrate */
+                $hydrate = [$modelClass, 'hydrate'];
+                $models = $hydrate([$row]); // hydrate expects array of rows
+
+                if ($models->isEmpty()) {
+                    continue;
+                }
+
+                $model = $models->first();
+
+                // Load eager relationships if configured
+                if (!empty($eagerLoad) && $model !== null) {
+                    /** @var callable $eagerLoadRelations */
+                    $eagerLoadRelations = [$modelClass, 'eagerLoadRelations'];
+                    $eagerLoadRelations($models, $eagerLoad);
+                }
+
+                yield $model;
+            }
+        });
+    }
 }

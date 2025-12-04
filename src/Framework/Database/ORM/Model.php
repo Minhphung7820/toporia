@@ -1005,8 +1005,10 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
         $dirty = $this->getDirty();
 
         // Check if model uses optimistic locking
-        if (method_exists($this, 'usesOptimisticLocking') && static::usesOptimisticLocking()
-            && method_exists($this, 'saveWithOptimisticLock')) {
+        if (
+            method_exists($this, 'usesOptimisticLocking') && static::usesOptimisticLocking()
+            && method_exists($this, 'saveWithOptimisticLock')
+        ) {
             /** @var Model&\Toporia\Framework\Database\ORM\Concerns\OptimisticLocking $this */
             return $this->saveWithOptimisticLock();
         }
@@ -1894,6 +1896,99 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
     public static function get(): ModelCollection
     {
         return static::query()->getModels();
+    }
+
+    /**
+     * Get a cursor for streaming model results without loading into memory.
+     *
+     * Returns a Generator that uses PDO cursor to stream results one at a time,
+     * hydrating each row into a Model instance. This is the most memory-efficient
+     * method for processing large datasets.
+     *
+     * Performance:
+     * - Memory: O(1) - Only one Model in memory at a time
+     * - Time: O(N) - Processes all records
+     * - Database: Single query, PDO streams results
+     * - Hydration: Models are hydrated on-demand during iteration
+     *
+     * Note: Cursor keeps database connection open during iteration.
+     * Don't use for long-running processes that need connection pooling.
+     *
+     * Example:
+     * ```php
+     * // Process all users without loading into memory
+     * foreach (UserModel::cursor() as $user) {
+     *     echo $user->name;
+     *     // Process user one at a time
+     * }
+     *
+     * // With query constraints
+     * foreach (UserModel::where('active', true)->cursor() as $user) {
+     *     processUser($user);
+     * }
+     * ```
+     *
+     * @return \Generator<int, static> Generator of model instances
+     */
+    public static function cursor(): \Generator
+    {
+        // Use ModelQueryBuilder's cursor() method which handles hydration
+        yield from static::query()->cursor();
+    }
+
+    /**
+     * Get a lazy collection of models for memory-efficient processing.
+     *
+     * Returns a LazyCollection that uses PDO cursor to stream results one at a time,
+     * hydrating each row into a Model instance. This allows chaining collection methods
+     * like map(), filter(), etc. while maintaining memory efficiency.
+     *
+     * Performance:
+     * - Memory: O(1) - Only one Model in memory at a time
+     * - Time: O(N) - Processes all records
+     * - Database: Single query, PDO streams results
+     * - Hydration: Models are hydrated on-demand during iteration
+     *
+     * Example:
+     * ```php
+     * // Chain collection methods with lazy evaluation
+     * $names = UserModel::lazyCollection()
+     *     ->map(fn($user) => $user->name)
+     *     ->filter(fn($name) => strlen($name) > 5)
+     *     ->take(100);
+     *
+     * foreach ($names as $name) {
+     *     echo $name;
+     * }
+     * ```
+     *
+     * @return \Toporia\Framework\Support\Collection\LazyCollection<int, static>
+     */
+    public static function lazyCollection(): \Toporia\Framework\Support\Collection\LazyCollection
+    {
+        return static::query()->toLazyCollection();
+    }
+
+    /**
+     * Get a lazy collection using chunked pagination.
+     *
+     * Alternative to lazyCollection() that uses chunked queries instead of cursor.
+     * This is useful when cursor() is not available or when you need more control
+     * over memory usage with chunked processing.
+     *
+     * Example:
+     * ```php
+     * $users = UserModel::lazyCollectionByChunk(1000)
+     *     ->map(fn($user) => processUser($user))
+     *     ->filter(fn($user) => $user->isActive());
+     * ```
+     *
+     * @param int $chunkSize Number of records to fetch per database query (default: 1000)
+     * @return \Toporia\Framework\Support\Collection\LazyCollection<int, static>
+     */
+    public static function lazyCollectionByChunk(int $chunkSize = 1000): \Toporia\Framework\Support\Collection\LazyCollection
+    {
+        return static::query()->toLazyCollectionByChunk($chunkSize);
     }
 
     /**

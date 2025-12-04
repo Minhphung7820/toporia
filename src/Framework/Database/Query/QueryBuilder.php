@@ -215,10 +215,12 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         // Skip special cases: *, expressions with parentheses, AS aliases
-        if ($identifier === '*' ||
+        if (
+            $identifier === '*' ||
             str_contains($identifier, '(') ||
             stripos($identifier, ' as ') !== false ||
-            str_contains($identifier, ' AS ')) {
+            str_contains($identifier, ' AS ')
+        ) {
             return $identifier;
         }
 
@@ -1600,6 +1602,76 @@ class QueryBuilder implements QueryBuilderInterface
     public function find(int|string $id, string $column = 'id'): mixed
     {
         return $this->where($column, $id)->first();
+    }
+
+    /**
+     * Get results as a LazyCollection for memory-efficient processing.
+     *
+     * Returns a LazyCollection that uses PDO cursor to stream results one at a time.
+     * This is ideal for processing large datasets without loading everything into memory.
+     *
+     * The LazyCollection supports all collection methods (map, filter, etc.) and can be
+     * chained seamlessly, just like regular collections.
+     *
+     * Example:
+     * ```php
+     * $users = DB::table('users')
+     *     ->where('active', true)
+     *     ->toLazyCollection()
+     *     ->map(fn($user) => $user['name'])
+     *     ->filter(fn($name) => strlen($name) > 5)
+     *     ->take(100);
+     *
+     * foreach ($users as $name) {
+     *     echo $name;
+     * }
+     * ```
+     *
+     * Performance:
+     * - Memory: O(1) - Only one record in memory at a time
+     * - Time: O(N) - Processes all records
+     * - Database: Single query, PDO streams results
+     *
+     * Note: Cursor keeps database connection open during iteration.
+     * Don't use for long-running processes that need connection pooling.
+     *
+     * @return \Toporia\Framework\Support\Collection\LazyCollection<int, array<string, mixed>>
+     */
+    public function toLazyCollection(): \Toporia\Framework\Support\Collection\LazyCollection
+    {
+        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () {
+            yield from $this->cursor();
+        });
+    }
+
+    /**
+     * Get results as a LazyCollection using chunked pagination.
+     *
+     * Alternative to toLazyCollection() that uses chunked queries instead of cursor.
+     * This is useful when cursor() is not available or when you need more control
+     * over memory usage with chunked processing.
+     *
+     * Example:
+     * ```php
+     * $users = DB::table('users')
+     *     ->toLazyCollectionByChunk(1000)
+     *     ->map(fn($user) => processUser($user))
+     *     ->filter(fn($user) => $user['active']);
+     * ```
+     *
+     * Performance:
+     * - Memory: O(chunkSize) - Only chunkSize records in memory at a time
+     * - Time: O(N) - Processes all records
+     * - Database: Multiple queries with LIMIT/OFFSET pagination
+     *
+     * @param int $chunkSize Number of records to fetch per database query (default: 1000)
+     * @return \Toporia\Framework\Support\Collection\LazyCollection<int, array<string, mixed>>
+     */
+    public function toLazyCollectionByChunk(int $chunkSize = 1000): \Toporia\Framework\Support\Collection\LazyCollection
+    {
+        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () use ($chunkSize) {
+            yield from $this->lazy($chunkSize);
+        });
     }
 
     /**
