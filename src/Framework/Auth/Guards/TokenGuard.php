@@ -305,11 +305,48 @@ final class TokenGuard implements GuardInterface
     /**
      * Get JWT secret key.
      *
+     * Security: Throws exception if JWT_SECRET is not configured or uses default value.
+     * This prevents accidentally running in production with an insecure secret.
+     *
      * @return string Secret key.
+     * @throws \RuntimeException If JWT_SECRET is not properly configured.
      */
     private function getSecret(): string
     {
-        // TODO: Move to config
-        return $_ENV['JWT_SECRET'] ?? 'your-secret-key-change-this-in-production';
+        $secret = $_ENV['JWT_SECRET'] ?? null;
+
+        // Security: Reject missing or default secret keys
+        if ($secret === null || $secret === '') {
+            throw new \RuntimeException(
+                'JWT_SECRET environment variable must be configured. ' .
+                'Generate a secure key using: php -r "echo bin2hex(random_bytes(32));"'
+            );
+        }
+
+        // Security: Reject obviously insecure default values
+        $insecureDefaults = [
+            'your-secret-key-change-this-in-production',
+            'secret',
+            'jwt-secret',
+            'change-me',
+            'your-secret-key',
+        ];
+
+        if (in_array(strtolower($secret), $insecureDefaults, true)) {
+            throw new \RuntimeException(
+                'JWT_SECRET is using an insecure default value. ' .
+                'Please generate a secure random key for production.'
+            );
+        }
+
+        // Security: Ensure minimum key length (256 bits = 32 bytes)
+        if (strlen($secret) < 32) {
+            throw new \RuntimeException(
+                'JWT_SECRET must be at least 32 characters long for security. ' .
+                'Current length: ' . strlen($secret)
+            );
+        }
+
+        return $secret;
     }
 }

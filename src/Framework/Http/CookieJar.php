@@ -9,9 +9,29 @@ namespace Toporia\Framework\Http;
  *
  * Manages HTTP cookies with encryption support.
  * Provides a fluent interface for creating and managing cookies.
+ *
+ * Security Features:
+ * - AES-256-GCM authenticated encryption (prevents tampering)
+ * - Random IV per encryption
+ * - HKDF key derivation
  */
 final class CookieJar
 {
+    /**
+     * AES-256-GCM cipher for authenticated encryption.
+     */
+    private const CIPHER = 'aes-256-gcm';
+
+    /**
+     * IV length for AES-GCM (12 bytes recommended by NIST).
+     */
+    private const IV_LENGTH = 12;
+
+    /**
+     * Authentication tag length for GCM (16 bytes = 128 bits).
+     */
+    private const TAG_LENGTH = 16;
+
     private array $queued = [];
     private ?string $encryptionKey = null;
 
@@ -139,11 +159,19 @@ final class CookieJar
     /**
      * Encrypt a cookie value.
      *
-     * Security: Uses AES-256-CBC with random IV for each encryption.
+     * Security: Uses AES-256-GCM (authenticated encryption) with random IV.
+     * This prevents both tampering (via authentication tag) and decryption attacks.
+     *
+     * Format: base64(iv + tag + ciphertext)
+     * - IV: 12 bytes (NIST recommended for GCM)
+     * - Tag: 16 bytes (128-bit authentication)
+     * - Ciphertext: variable length
+     *
      * Performance: O(N) where N = value length
      *
      * @param string $value
      * @return string Encrypted value (base64 encoded)
+     * @throws \RuntimeException If encryption fails
      */
     public function encrypt(string $value): string
     {
@@ -154,24 +182,40 @@ final class CookieJar
         // Derive encryption key from APP_KEY (32 bytes for AES-256)
         $key = $this->deriveKey($this->encryptionKey);
 
-        $iv = random_bytes(16);
-        $encrypted = openssl_encrypt($value, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+        // Generate random IV (12 bytes for GCM as recommended by NIST)
+        $iv = random_bytes(self::IV_LENGTH);
+
+        // Encrypt with AES-256-GCM (authenticated encryption)
+        $tag = '';
+        $encrypted = openssl_encrypt(
+            $value,
+            self::CIPHER,
+            $key,
+            OPENSSL_RAW_DATA,
+            $iv,
+            $tag,
+            '',  // Additional authenticated data (AAD)
+            self::TAG_LENGTH
+        );
+
         if ($encrypted === false) {
             throw new \RuntimeException('Cookie encryption failed');
         }
 
-        // Prepend IV to encrypted data
-        return base64_encode($iv . $encrypted);
+        // Format: IV + Tag + Ciphertext (all base64 encoded together)
+        return base64_encode($iv . $tag . $encrypted);
     }
 
     /**
      * Decrypt a cookie value.
      *
-     * Security: Validates IV and handles decryption errors gracefully.
+     * Security: Uses AES-256-GCM which validates the authentication tag
+     * before returning decrypted data. This prevents tampering attacks.
+     *
      * Performance: O(N) where N = value length
      *
      * @param string $value Encrypted value (base64 encoded)
-     * @return string|null Decrypted value or null on failure
+     * @return string|null Decrypted value or null on failure/tampering
      */
     public function decrypt(string $value): ?string
     {
@@ -180,18 +224,32 @@ final class CookieJar
         }
 
         $data = base64_decode($value, true);
-        if ($data === false || strlen($data) < 16) {
+
+        // Minimum length: IV (12) + Tag (16) + at least 1 byte ciphertext
+        $minLength = self::IV_LENGTH + self::TAG_LENGTH + 1;
+        if ($data === false || strlen($data) < $minLength) {
             return null; // Invalid format
         }
 
-        // Extract IV and encrypted data
-        $iv = substr($data, 0, 16);
-        $encrypted = substr($data, 16);
+        // Extract IV, Tag, and Ciphertext
+        $iv = substr($data, 0, self::IV_LENGTH);
+        $tag = substr($data, self::IV_LENGTH, self::TAG_LENGTH);
+        $encrypted = substr($data, self::IV_LENGTH + self::TAG_LENGTH);
 
         // Derive encryption key from APP_KEY
         $key = $this->deriveKey($this->encryptionKey);
 
-        $decrypted = openssl_decrypt($encrypted, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+        // Decrypt with AES-256-GCM (will fail if tag doesn't match = tampering detected)
+        $decrypted = openssl_decrypt(
+            $encrypted,
+            self::CIPHER,
+            $key,
+            OPENSSL_RAW_DATA,
+            $iv,
+            $tag
+        );
+
+        // Returns false if decryption fails OR if authentication tag is invalid
         return $decrypted !== false ? $decrypted : null;
     }
 

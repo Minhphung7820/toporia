@@ -180,6 +180,11 @@ final class SessionGuard implements GuardInterface
     /**
      * Set remember token cookie.
      *
+     * Security: Uses secure cookie options to prevent token theft.
+     * - Secure: Only sent over HTTPS (auto-detected)
+     * - HttpOnly: Not accessible via JavaScript (XSS protection)
+     * - SameSite: Lax to prevent CSRF while allowing normal navigation
+     *
      * @param Authenticatable $user
      * @return void
      */
@@ -188,16 +193,47 @@ final class SessionGuard implements GuardInterface
         $token = bin2hex(random_bytes(32));
         $this->provider->updateRememberToken($user, $token);
 
-        // Set cookie for 30 days
+        // Security: Auto-detect HTTPS for Secure flag
+        $isSecure = $this->isSecureConnection();
+
+        // Set cookie for 30 days with secure options
         setcookie(
             $this->getRememberTokenName(),
             $user->getAuthIdentifier() . '|' . $token,
-            now()->getTimestamp() + (86400 * 30),
-            '/',
-            '',
-            false,
-            true // httponly
+            [
+                'expires' => now()->getTimestamp() + (86400 * 30),
+                'path' => '/',
+                'domain' => '',
+                'secure' => $isSecure,    // Only send over HTTPS
+                'httponly' => true,        // Not accessible via JavaScript
+                'samesite' => 'Lax',       // CSRF protection
+            ]
         );
+    }
+
+    /**
+     * Check if the current connection is secure (HTTPS).
+     *
+     * @return bool
+     */
+    private function isSecureConnection(): bool
+    {
+        // Direct HTTPS
+        if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            return true;
+        }
+
+        // Behind proxy (e.g., Cloudflare, AWS ELB)
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            return true;
+        }
+
+        // Standard port check
+        if (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -232,19 +268,28 @@ final class SessionGuard implements GuardInterface
     /**
      * Clear user data from session and cookies.
      *
+     * Security: Clears cookie with same options as when it was set
+     * to ensure proper deletion across all browsers.
+     *
      * @return void
      */
     private function clearUserData(): void
     {
         unset($_SESSION[$this->getName()]);
 
-        // Clear remember cookie
+        // Clear remember cookie with secure options
         if (isset($_COOKIE[$this->getRememberTokenName()])) {
             setcookie(
                 $this->getRememberTokenName(),
                 '',
-                now()->getTimestamp() - 3600,
-                '/'
+                [
+                    'expires' => now()->getTimestamp() - 3600,
+                    'path' => '/',
+                    'domain' => '',
+                    'secure' => $this->isSecureConnection(),
+                    'httponly' => true,
+                    'samesite' => 'Lax',
+                ]
             );
         }
     }

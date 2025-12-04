@@ -9,6 +9,11 @@ namespace Toporia\Framework\Http;
  *
  * Represents an HTTP cookie with security options.
  * Immutable value object following Clean Architecture principles.
+ *
+ * Security Features:
+ * - Secure flag auto-detected from HTTPS connection
+ * - HttpOnly enabled by default (XSS protection)
+ * - SameSite=Lax by default (CSRF protection)
  */
 final class Cookie
 {
@@ -24,7 +29,35 @@ final class Cookie
     ) {}
 
     /**
+     * Check if the current connection is secure (HTTPS).
+     *
+     * @return bool
+     */
+    private static function isSecureConnection(): bool
+    {
+        // Direct HTTPS
+        if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            return true;
+        }
+
+        // Behind proxy (e.g., Cloudflare, AWS ELB)
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            return true;
+        }
+
+        // Standard port check
+        if (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Create a cookie that expires in specified minutes
+     *
+     * Security: Auto-detects HTTPS and sets Secure flag accordingly.
+     * This ensures cookies are only sent over HTTPS in production.
      *
      * @param string $name
      * @param string $value
@@ -40,7 +73,7 @@ final class Cookie
             expires: now()->getTimestamp() + ($minutes * 60),
             path: $options['path'] ?? '/',
             domain: $options['domain'] ?? '',
-            secure: $options['secure'] ?? false,
+            secure: $options['secure'] ?? self::isSecureConnection(),
             httpOnly: $options['httpOnly'] ?? true,
             sameSite: $options['sameSite'] ?? 'Lax'
         );
@@ -62,6 +95,8 @@ final class Cookie
     /**
      * Create a cookie that expires immediately (for deletion)
      *
+     * Security: Uses same secure options as make() to ensure proper deletion.
+     *
      * @param string $name
      * @param array $options
      * @return self
@@ -74,7 +109,7 @@ final class Cookie
             expires: now()->getTimestamp() - 3600,
             path: $options['path'] ?? '/',
             domain: $options['domain'] ?? '',
-            secure: $options['secure'] ?? false,
+            secure: $options['secure'] ?? self::isSecureConnection(),
             httpOnly: $options['httpOnly'] ?? true,
             sameSite: $options['sameSite'] ?? 'Lax'
         );
