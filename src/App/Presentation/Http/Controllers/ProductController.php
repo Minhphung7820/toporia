@@ -1942,7 +1942,7 @@ final class ProductController extends BaseController
                         $data['pivot'] = $tag->pivot->toArray();
                     }
                     return $data;
-                })->toArray();
+                })->all();
                 $results['tags_count'] = $post->tags->count();
             } else {
                 $results['error'] = 'Post not found';
@@ -1957,7 +1957,7 @@ final class ProductController extends BaseController
                         $data['pivot'] = $tag->pivot->toArray();
                     }
                     return $data;
-                })->toArray();
+                })->all();
                 $results['tags_count'] = $video->tags->count();
             } else {
                 $results['error'] = 'Video not found';
@@ -2307,19 +2307,21 @@ final class ProductController extends BaseController
 
         // Test MorphMany - Post has many Comments
         if ($post) {
+            $post->load('comments');
             $results['post_with_comments'] = [
                 'post' => $post->toArray(),
-                'comments' => $post->comments->toArray(),
-                'comments_count' => $post->comments->count(),
+                'comments' => $post->comments ? $post->comments->toArray() : [],
+                'comments_count' => $post->comments ? $post->comments->count() : 0,
             ];
         }
 
         // Test MorphMany - Video has many Comments
         if ($video) {
+            $video->load('comments');
             $results['video_with_comments'] = [
                 'video' => $video->toArray(),
-                'comments' => $video->comments->toArray(),
-                'comments_count' => $video->comments->count(),
+                'comments' => $video->comments ? $video->comments->toArray() : [],
+                'comments_count' => $video->comments ? $video->comments->count() : 0,
             ];
         }
 
@@ -2344,7 +2346,7 @@ final class ProductController extends BaseController
                         $data['pivot'] = $tag->pivot->toArray();
                     }
                     return $data;
-                })->toArray(),
+                })->all(),
                 'tags_count' => $post->tags->count(),
             ];
         }
@@ -2360,7 +2362,7 @@ final class ProductController extends BaseController
                         $data['pivot'] = $tag->pivot->toArray();
                     }
                     return $data;
-                })->toArray(),
+                })->all(),
                 'tags_count' => $video->tags->count(),
             ];
         }
