@@ -593,6 +593,342 @@ class ModelQueryBuilder extends QueryBuilder
     }
 
     /**
+     * Filter models that have a polymorphic relation with specific morph types.
+     *
+     * This method is specifically for MorphTo relationships where you want to
+     * filter based on the type of the related model.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array<string> $types Morph type class name(s) to filter by
+     * @param string $operator Comparison operator (>=, =, etc.)
+     * @param int $count Minimum count (default: 1)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Get comments that belong to posts (not videos or other types)
+     * Comment::hasMorph('commentable', Post::class)->get();
+     *
+     * // Get comments that belong to posts OR videos
+     * Comment::hasMorph('commentable', [Post::class, Video::class])->get();
+     *
+     * // Get comments with at least 2 post commentables (edge case)
+     * Comment::hasMorph('commentable', Post::class, '>=', 2)->get();
+     * ```
+     */
+    public function hasMorph(string $relation, string|array $types, string $operator = '>=', int $count = 1): self
+    {
+        return $this->whereHasMorph($relation, $types, null, $operator, $count);
+    }
+
+    /**
+     * Filter models that have a polymorphic relation with constraints.
+     *
+     * This method allows filtering on MorphTo relationships with additional
+     * constraints applied to the related models. Supports:
+     * - Nested queries (whereHas inside callback)
+     * - All query methods (where, whereIn, whereNull, etc.)
+     * - Multiple morph types with OR logic
+     * - Wildcard '*' for all types
+     *
+     * Performance: Uses EXISTS subquery (faster than COUNT for existence checks)
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array<string> $types Morph type class name(s) to filter by
+     * @param callable|null $callback Optional callback to constrain each morph type query
+     * @param string $operator Comparison operator (>=, =, etc.)
+     * @param int $count Minimum count (default: 1)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Simple: Get comments that belong to posts
+     * Comment::hasMorph('commentable', Post::class)->get();
+     *
+     * // With constraints: Get comments on published posts
+     * Comment::whereHasMorph('commentable', Post::class, function($query) {
+     *     $query->where('published', true);
+     * })->get();
+     *
+     * // Multiple types: Get comments on posts OR videos
+     * Comment::whereHasMorph('commentable', [Post::class, Video::class], function($query, $type) {
+     *     $query->where('active', true);
+     *     if ($type === Post::class) {
+     *         $query->where('published', true);
+     *     }
+     * })->get();
+     *
+     * // Nested queries: Get comments on posts that have active authors
+     * Comment::whereHasMorph('commentable', Post::class, function($query) {
+     *     $query->whereHas('author', fn($q) => $q->where('active', true));
+     * })->get();
+     *
+     * // Wildcard: All morph types created in last 30 days
+     * Comment::whereHasMorph('commentable', '*', function($query) {
+     *     $query->where('created_at', '>', now()->subDays(30));
+     * })->get();
+     * ```
+     */
+    public function whereHasMorph(
+        string $relation,
+        string|array $types,
+        ?callable $callback = null,
+        string $operator = '>=',
+        int $count = 1
+    ): self {
+        // Normalize types to array
+        $types = is_array($types) ? $types : [$types];
+
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        // Must be a MorphTo relationship
+        if (!$relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+            throw new \InvalidArgumentException(
+                "Relationship '{$relation}' must be a MorphTo relationship for hasMorph/whereHasMorph"
+            );
+        }
+
+        // Get morph type and id columns
+        $morphType = $this->getRelationProperty($relationInstance, 'morphType');
+        $morphId = $this->getRelationProperty($relationInstance, 'foreignKey');
+
+        // Handle wildcard '*' - get all possible types from the database
+        if (count($types) === 1 && $types[0] === '*') {
+            $distinctTypes = $this->getConnection()->select(
+                "SELECT DISTINCT {$morphType} FROM {$table} WHERE {$morphType} IS NOT NULL"
+            );
+            $types = array_column($distinctTypes, $morphType);
+
+            if (empty($types)) {
+                $this->whereRaw('1 = 0');
+                return $this;
+            }
+        }
+
+        // Filter to only valid classes
+        $validTypes = array_filter($types, fn($type) => class_exists($type));
+
+        if (empty($validTypes)) {
+            $this->whereRaw('1 = 0');
+            return $this;
+        }
+
+        // Build combined OR EXISTS clause for all morph types
+        $this->where(function ($outerQuery) use ($validTypes, $callback, $table, $morphType, $morphId, $operator, $count) {
+            $isFirst = true;
+
+            foreach ($validTypes as $type) {
+                /** @var callable $getRelatedTable */
+                $getRelatedTable = [$type, 'getTableName'];
+                $relatedTable = $getRelatedTable();
+
+                /** @var callable $getPrimaryKey */
+                $getPrimaryKey = [$type, 'getPrimaryKey'];
+                $relatedKey = $getPrimaryKey();
+
+                // Build the EXISTS subquery using a proper QueryBuilder
+                // This ensures full support for nested queries and all query methods
+                $subqueryBuilder = $type::query();
+
+                // Core join condition: related.id = parent.morph_id AND parent.morph_type = 'Type'
+                $subqueryBuilder->whereRaw("{$relatedTable}.{$relatedKey} = {$table}.{$morphId}");
+
+                // Apply callback constraints if provided
+                if ($callback !== null) {
+                    $callback($subqueryBuilder, $type);
+                }
+
+                // Get the compiled subquery SQL and bindings
+                $subquerySql = $subqueryBuilder->toSql();
+                $subqueryBindings = $subqueryBuilder->getBindings();
+
+                // Add morph type binding
+                array_unshift($subqueryBindings, $type);
+
+                // Build final EXISTS clause
+                if ($count === 1 && $operator === '>=') {
+                    // Simple existence check - use EXISTS (faster)
+                    $existsSql = "EXISTS (SELECT 1 FROM ({$subquerySql}) AS morph_sub WHERE {$table}.{$morphType} = ?)";
+
+                    if ($isFirst) {
+                        $outerQuery->whereRaw($existsSql, $subqueryBindings);
+                        $isFirst = false;
+                    } else {
+                        $outerQuery->orWhereRaw($existsSql, $subqueryBindings);
+                    }
+                } else {
+                    // Count-based check
+                    $countSql = "(SELECT COUNT(*) FROM ({$subquerySql}) AS morph_sub WHERE {$table}.{$morphType} = ?) {$operator} ?";
+                    $subqueryBindings[] = $count;
+
+                    if ($isFirst) {
+                        $outerQuery->whereRaw($countSql, $subqueryBindings);
+                        $isFirst = false;
+                    } else {
+                        $outerQuery->orWhereRaw($countSql, $subqueryBindings);
+                    }
+                }
+            }
+        });
+
+        return $this;
+    }
+
+    /**
+     * Filter models that don't have a polymorphic relation with specific morph types.
+     *
+     * Supports:
+     * - Nested queries (whereHas inside callback)
+     * - All query methods (where, whereIn, whereNull, etc.)
+     * - Multiple morph types (AND logic - must not have ANY of the types)
+     *
+     * Performance: Uses NOT EXISTS subquery (optimal for non-existence checks)
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array<string> $types Morph type class name(s) to filter by
+     * @param callable|null $callback Optional callback to constrain each morph type query
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Get comments that don't belong to posts
+     * Comment::whereDoesntHaveMorph('commentable', Post::class)->get();
+     *
+     * // Get comments that don't belong to published posts
+     * Comment::whereDoesntHaveMorph('commentable', Post::class, function($query) {
+     *     $query->where('published', true);
+     * })->get();
+     *
+     * // Nested: Get comments not on posts with active authors
+     * Comment::whereDoesntHaveMorph('commentable', Post::class, function($query) {
+     *     $query->whereHas('author', fn($q) => $q->where('active', true));
+     * })->get();
+     * ```
+     */
+    public function whereDoesntHaveMorph(
+        string $relation,
+        string|array $types,
+        ?callable $callback = null
+    ): self {
+        // Normalize types to array
+        $types = is_array($types) ? $types : [$types];
+
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        // Must be a MorphTo relationship
+        if (!$relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+            throw new \InvalidArgumentException(
+                "Relationship '{$relation}' must be a MorphTo relationship for whereDoesntHaveMorph"
+            );
+        }
+
+        // Get morph type and id columns
+        $morphType = $this->getRelationProperty($relationInstance, 'morphType');
+        $morphId = $this->getRelationProperty($relationInstance, 'foreignKey');
+
+        // Build NOT EXISTS subqueries for each morph type (AND logic)
+        foreach ($types as $type) {
+            if (!class_exists($type)) {
+                continue;
+            }
+
+            /** @var callable $getRelatedTable */
+            $getRelatedTable = [$type, 'getTableName'];
+            $relatedTable = $getRelatedTable();
+
+            /** @var callable $getPrimaryKey */
+            $getPrimaryKey = [$type, 'getPrimaryKey'];
+            $relatedKey = $getPrimaryKey();
+
+            // Build the NOT EXISTS subquery using a proper QueryBuilder
+            // This ensures full support for nested queries and all query methods
+            $subqueryBuilder = $type::query();
+
+            // Core join condition
+            $subqueryBuilder->whereRaw("{$relatedTable}.{$relatedKey} = {$table}.{$morphId}");
+
+            // Apply callback constraints if provided
+            if ($callback !== null) {
+                $callback($subqueryBuilder, $type);
+            }
+
+            // Get the compiled subquery SQL and bindings
+            $subquerySql = $subqueryBuilder->toSql();
+            $subqueryBindings = $subqueryBuilder->getBindings();
+
+            // Add morph type binding
+            array_unshift($subqueryBindings, $type);
+
+            // Build NOT EXISTS clause
+            $notExistsSql = "NOT EXISTS (SELECT 1 FROM ({$subquerySql}) AS morph_sub WHERE {$table}.{$morphType} = ?)";
+
+            $this->whereRaw($notExistsSql, $subqueryBindings);
+        }
+
+        return $this;
+    }
+
+    /**
+     * OR version of hasMorph.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array<string> $types Morph type class name(s)
+     * @param string $operator Comparison operator
+     * @param int $count Minimum count
+     * @return $this
+     */
+    public function orHasMorph(string $relation, string|array $types, string $operator = '>=', int $count = 1): self
+    {
+        return $this->orWhereHasMorph($relation, $types, null, $operator, $count);
+    }
+
+    /**
+     * OR version of whereHasMorph.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array<string> $types Morph type class name(s)
+     * @param callable|null $callback Optional callback
+     * @param string $operator Comparison operator
+     * @param int $count Minimum count
+     * @return $this
+     */
+    public function orWhereHasMorph(
+        string $relation,
+        string|array $types,
+        ?callable $callback = null,
+        string $operator = '>=',
+        int $count = 1
+    ): self {
+        return $this->orWhere(function ($query) use ($relation, $types, $callback, $operator, $count) {
+            $query->whereHasMorph($relation, $types, $callback, $operator, $count);
+        });
+    }
+
+    /**
      * Filter models that have a related model matching the given constraints.
      *
      * Optimized implementation:
