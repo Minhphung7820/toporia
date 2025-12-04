@@ -130,7 +130,8 @@ class HasManyThrough extends Relation
         $wheres = $this->query->getWheres();
         $hasWhereIn = false;
         foreach ($wheres as $where) {
-            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+            // Case-insensitive check for 'in' type (handles 'in', 'In', 'IN')
+            if (strtolower($where['type'] ?? '') === 'in') {
                 $hasWhereIn = true;
                 break;
             }
@@ -191,7 +192,8 @@ class HasManyThrough extends Relation
 
                 // Copy all where conditions from original query
                 foreach ($wheres as $where) {
-                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                    // Case-insensitive check for 'in' type
+                    if (strtolower($where['type'] ?? '') === 'in') {
                         // Skip WHERE IN for firstKey, handled in window function
                         if (($where['column'] ?? '') === "{$throughTable}.{$this->firstKey}") {
                             continue;
@@ -220,7 +222,8 @@ class HasManyThrough extends Relation
                 // Get foreign key values from WHERE IN clause
                 $foreignKeyValues = [];
                 foreach ($wheres as $where) {
-                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                    // Case-insensitive check for 'in' type
+                    if (strtolower($where['type'] ?? '') === 'in') {
                         if (($where['column'] ?? '') === "{$throughTable}.{$this->firstKey}") {
                             $foreignKeyValues = $where['values'] ?? [];
                             break;

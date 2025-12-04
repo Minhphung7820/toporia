@@ -55,9 +55,10 @@ final class CookieSessionDriver implements SessionStoreInterface
         $payload = $this->cookieJar->get(self::COOKIE_NAME);
         if ($payload !== null && is_string($payload)) {
             // CookieJar already decrypts if encryption is enabled
-            $unserialized = unserialize($payload);
-            if (is_array($unserialized)) {
-                $this->data = $unserialized;
+            // Use JSON instead of serialize for security (prevents PHP Object Injection)
+            $decoded = json_decode($payload, true);
+            if (is_array($decoded) && json_last_error() === JSON_ERROR_NONE) {
+                $this->data = $decoded;
                 if (isset($this->data['_id'])) {
                     $this->id = $this->data['_id'];
                 }
@@ -203,8 +204,8 @@ final class CookieSessionDriver implements SessionStoreInterface
         // Store session ID in data
         $this->data['_id'] = $this->id;
 
-        // Serialize data
-        $payload = serialize($this->data);
+        // Use JSON for security (prevents PHP Object Injection attacks)
+        $payload = json_encode($this->data, JSON_THROW_ON_ERROR);
 
         // CookieJar will encrypt automatically if encryption key is set
         $minutes = (int) ($this->lifetime / 60);

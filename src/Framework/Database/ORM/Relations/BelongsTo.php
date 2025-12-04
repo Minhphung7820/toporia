@@ -98,7 +98,8 @@ class BelongsTo extends Relation
         $wheres = $this->query->getWheres();
         $hasWhereIn = false;
         foreach ($wheres as $where) {
-            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+            // Case-insensitive check for 'in' type
+            if (strtolower($where['type'] ?? '') === 'in') {
                 $hasWhereIn = true;
                 break;
             }

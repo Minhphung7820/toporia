@@ -67,6 +67,16 @@ final class Request implements RequestInterface
     private ?\Toporia\Framework\Session\Store $session = null;
 
     /**
+     * @var array<string, mixed> Instance-level cache for nested value lookups
+     */
+    private array $nestedValueCache = [];
+
+    /**
+     * @var string|null Hash of body for cache invalidation
+     */
+    private ?string $bodyCacheHash = null;
+
+    /**
      * Request constructor.
      *
      * @param \Toporia\Framework\Session\Store|null $session Session store instance
@@ -1451,12 +1461,16 @@ final class Request implements RequestInterface
      */
     private function getNestedValue(string $key): mixed
     {
-        static $cache = [];
+        // Compute body hash for cache invalidation (only when body changes)
+        $currentHash = $this->getBodyHash();
+        if ($this->bodyCacheHash !== $currentHash) {
+            $this->nestedValueCache = [];
+            $this->bodyCacheHash = $currentHash;
+        }
 
-        // Cache key for performance
-        $cacheKey = md5($key . serialize($this->body));
-        if (isset($cache[$cacheKey])) {
-            return $cache[$cacheKey];
+        // Check instance cache (bounded to request lifecycle, no memory leak)
+        if (array_key_exists($key, $this->nestedValueCache)) {
+            return $this->nestedValueCache[$key];
         }
 
         $keys = explode('.', $key);
@@ -1464,14 +1478,22 @@ final class Request implements RequestInterface
 
         foreach ($keys as $segment) {
             if (!is_array($value) || !array_key_exists($segment, $value)) {
-                $cache[$cacheKey] = null;
+                $this->nestedValueCache[$key] = null;
                 return null;
             }
             $value = $value[$segment];
         }
 
-        $cache[$cacheKey] = $value;
+        $this->nestedValueCache[$key] = $value;
         return $value;
+    }
+
+    /**
+     * Get hash of body for cache invalidation.
+     */
+    private function getBodyHash(): string
+    {
+        return md5(json_encode($this->body) ?: '');
     }
 
     /**
@@ -1987,10 +2009,11 @@ final class Request implements RequestInterface
 
         return match ($sanitizer) {
             'html' => htmlspecialchars((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-            'sql' => addslashes((string) $value),
             'xss' => $this->sanitizeXss((string) $value),
             'strip_tags' => strip_tags((string) $value),
             'trim' => trim((string) $value),
+            // 'sql' sanitizer removed - ALWAYS use parameterized queries instead
+            // Using addslashes() for SQL is INSECURE and can be bypassed
             default => $value
         };
     }
@@ -1998,27 +2021,30 @@ final class Request implements RequestInterface
     /**
      * Advanced XSS sanitization.
      *
-     * More comprehensive XSS protection than basic htmlspecialchars.
+     * Provides defense-in-depth XSS protection by stripping dangerous
+     * content before encoding. For untrusted HTML, consider using
+     * a dedicated HTML sanitizer library like HTML Purifier.
      *
      * @param string $value Value to sanitize
      * @return string Sanitized value
      */
     private function sanitizeXss(string $value): string
     {
-        // Remove potentially dangerous tags and attributes
-        $dangerous = [
-            '/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/mi',
-            '/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/mi',
-            '/javascript:/i',
-            '/vbscript:/i',
-            '/onload/i',
-            '/onerror/i',
-            '/onclick/i',
-            '/onmouseover/i'
-        ];
+        // Step 1: Remove null bytes (can bypass filters)
+        $value = str_replace("\0", '', $value);
 
-        $value = preg_replace($dangerous, '', $value);
+        // Step 2: Decode HTML entities to catch encoded attacks
+        $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
+        // Step 3: Remove dangerous tags completely using DOM parser for accuracy
+        // Regex-based removal is inherently unsafe; use strip_tags as fallback
+        $dangerousTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'link', 'style', 'base'];
+        $value = strip_tags($value, []); // Remove ALL tags for maximum safety
+
+        // Step 4: Remove dangerous URI schemes
+        $value = preg_replace('/\b(javascript|vbscript|data|expression):/i', '', $value) ?? $value;
+
+        // Step 5: Final encoding - this is the primary defense
         return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 

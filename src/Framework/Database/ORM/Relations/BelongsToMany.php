@@ -467,7 +467,8 @@ class BelongsToMany extends Relation
         $wheres = $this->query->getWheres();
         $hasWhereIn = false;
         foreach ($wheres as $where) {
-            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+            // Case-insensitive check for 'in' type (handles 'in', 'In', 'IN')
+            if (strtolower($where['type'] ?? '') === 'in') {
                 // Check if it's the pivot foreign key WHERE IN (eager loading)
                 $column = $where['column'] ?? '';
                 if (str_contains($column, $this->pivotTable) && str_contains($column, $this->foreignPivotKey)) {
@@ -530,7 +531,8 @@ class BelongsToMany extends Relation
                 // Get foreign key values from WHERE IN clause
                 $foreignKeyValues = [];
                 foreach ($wheres as $where) {
-                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                    // Case-insensitive check for 'in' type
+                    if (strtolower($where['type'] ?? '') === 'in') {
                         $column = $where['column'] ?? '';
                         if (str_contains($column, $this->pivotTable) && str_contains($column, $this->foreignPivotKey)) {
                             $foreignKeyValues = $where['values'] ?? [];
@@ -541,7 +543,8 @@ class BelongsToMany extends Relation
 
                 // Copy all where conditions from original query (except WHERE IN for pivot foreign key)
                 foreach ($wheres as $where) {
-                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                    // Case-insensitive check for 'in' type
+                    if (strtolower($where['type'] ?? '') === 'in') {
                         $column = $where['column'] ?? '';
                         // Skip WHERE IN for pivot foreign key, handled in window function
                         if (str_contains($column, $this->pivotTable) && str_contains($column, $this->foreignPivotKey)) {

@@ -59,11 +59,11 @@ class HasMany extends Relation
         $wheres = $this->query->getWheres();
         $hasWhereIn = false;
         foreach ($wheres as $where) {
-            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
-                if (($where['column'] ?? '') === $this->foreignKey) {
-                    $hasWhereIn = true;
-                    break;
-                }
+            // Case-insensitive check for 'in' type (handles 'in', 'In', 'IN')
+            $whereType = strtolower($where['type'] ?? '');
+            if ($whereType === 'in' && ($where['column'] ?? '') === $this->foreignKey) {
+                $hasWhereIn = true;
+                break;
             }
         }
 
@@ -94,7 +94,8 @@ class HasMany extends Relation
         $wheres = $this->query->getWheres();
         $hasWhereIn = false;
         foreach ($wheres as $where) {
-            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+            // Case-insensitive check for 'in' type (handles 'in', 'In', 'IN')
+            if (strtolower($where['type'] ?? '') === 'in') {
                 $hasWhereIn = true;
                 break;
             }
@@ -184,7 +185,8 @@ class HasMany extends Relation
                 // Get foreign key values from WHERE IN clause
                 $foreignKeyValues = [];
                 foreach ($wheres as $where) {
-                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                    // Case-insensitive check for 'in' type
+                    if (strtolower($where['type'] ?? '') === 'in') {
                         if (($where['column'] ?? '') === $foreignKey) {
                             $foreignKeyValues = $where['values'] ?? [];
                             break;
@@ -198,7 +200,8 @@ class HasMany extends Relation
 
                 // Apply all where conditions except the WHERE IN for foreignKey
                 foreach ($wheres as $where) {
-                    if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+                    // Case-insensitive check for 'in' type
+                    if (strtolower($where['type'] ?? '') === 'in') {
                         if (($where['column'] ?? '') === $foreignKey) {
                             continue; // Skip WHERE IN, handled in window function
                         }

@@ -165,11 +165,12 @@ class MorphMany extends Relation
         $hasWhereIn = false;
         $hasMorphWhere = false;
         foreach ($wheres as $where) {
-            if (($where['type'] ?? '') === 'in' || ($where['type'] ?? '') === 'In') {
+            // Case-insensitive check for 'in' type (handles 'in', 'In', 'IN')
+            if (strtolower($where['type'] ?? '') === 'in') {
                 $hasWhereIn = true;
             }
             // Check for morph type + foreign key IN pattern (from addEagerConstraints)
-            if (($where['type'] ?? '') === 'nested') {
+            if (strtolower($where['type'] ?? '') === 'nested') {
                 $hasMorphWhere = true;
             }
         }
