@@ -47,8 +47,9 @@ abstract class ServiceProvider implements ServiceProviderInterface
 
     /**
      * The paths that should be published.
+     * Structure: [providerClass => [sourcePath => destinationPath, ...], ...]
      *
-     * @var array<string, string>
+     * @var array<string, array<string, string>>
      */
     protected static array $publishes = [];
 
