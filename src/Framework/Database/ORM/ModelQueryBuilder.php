@@ -1005,10 +1005,12 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         // Build EXISTS subquery
-        $existsSubquery = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsResult = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsSql = $existsResult['sql'];
+        $existsBindings = $existsResult['bindings'];
 
         // Add EXISTS clause - much faster than COUNT(*)
-        $this->whereRaw("EXISTS ({$existsSubquery})");
+        $this->whereRaw("EXISTS ({$existsSql})", $existsBindings);
 
         return $this;
     }
@@ -1157,10 +1159,12 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         // Build EXISTS subquery
-        $existsSubquery = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsResult = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsSql = $existsResult['sql'];
+        $existsBindings = $existsResult['bindings'];
 
         // Add OR EXISTS clause - much faster than COUNT(*)
-        $this->orWhereRaw("EXISTS ({$existsSubquery})");
+        $this->orWhereRaw("EXISTS ({$existsSql})", $existsBindings);
 
         return $this;
     }
@@ -1305,14 +1309,14 @@ class ModelQueryBuilder extends QueryBuilder
     }
 
     /**
-     * Build EXISTS subquery for optimal performance (no counting).
+     * Build EXISTS subquery for relationships.
      *
      * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
      * @param string $parentTable Parent table name
      * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
-     * @return string EXISTS subquery SQL
+     * @return array<string, mixed> Array with 'sql' (string) and 'bindings' (array) keys
      */
-    protected function buildExistsSubquery($relation, string $parentTable, $relationQuery): string
+    protected function buildExistsSubquery($relation, string $parentTable, $relationQuery): array
     {
         // Handle different relationship types
         if (
@@ -1331,9 +1335,9 @@ class ModelQueryBuilder extends QueryBuilder
      * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
      * @param string $parentTable Parent table name
      * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
-     * @return string EXISTS subquery SQL
+     * @return array<string, mixed> Array with 'sql' (string) and 'bindings' (array) keys
      */
-    protected function buildSimpleExistsSubquery($relation, string $parentTable, $relationQuery): string
+    protected function buildSimpleExistsSubquery($relation, string $parentTable, $relationQuery): array
     {
         // Get foreign and local keys for simple relationships
         $foreignKey = $relation->getForeignKey();
@@ -1348,36 +1352,48 @@ class ModelQueryBuilder extends QueryBuilder
         // Build EXISTS subquery - SELECT 1 is faster than SELECT COUNT(*)
         $fromClause = $parentTable === $relationTable ? "{$relationTable} AS {$relationAlias}" : $relationTable;
 
+        // Check if this is a polymorphic relationship (MorphOne or MorphMany)
+        $isPolymorphic = $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphOne
+            || $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphMany;
+
+        // Collect bindings array
+        $bindings = [];
+
         // For BelongsTo relationships, the foreign key is on the parent table and local key is on the related table
         // For HasOne/HasMany relationships, the foreign key is on the related table and local key is on the parent table
         if ($relation instanceof BelongsTo) {
             // BelongsTo: relatedTable.localKey = parentTable.foreignKey
             $subquerySql = "SELECT 1 FROM {$fromClause} WHERE {$relationAlias}.{$localKey} = {$parentTable}.{$foreignKey}";
         } else {
-            // HasOne/HasMany: relatedTable.foreignKey = parentTable.localKey
+            // HasOne/HasMany/MorphOne/MorphMany: relatedTable.foreignKey = parentTable.localKey
             $subquerySql = "SELECT 1 FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
         }
 
-        // Add relation constraints
+        // For polymorphic relationships, add the morph_type condition with binding
+        if ($isPolymorphic) {
+            $morphType = $this->getRelationProperty($relation, 'morphType');
+            $morphClass = $this->getMorphClassFromRelation($relation);
+            $subquerySql .= " AND {$relationAlias}.{$morphType} = ?";
+            $bindings[] = $morphClass;
+        }
+
+        // Add relation constraints (keep as bindings, don't inline)
         $relationSql = $relationQuery->toSql();
+        $relationBindings = $relationQuery->getBindings();
+
         if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
             $whereClause = $matches[1];
 
-            // Replace placeholders with actual values (safely quoted)
-            $relationBindings = $relationQuery->getBindings();
-            $boundWhereClause = $whereClause;
-            foreach ($relationBindings as $binding) {
-                $quoted = $this->quoteValue($binding);
-                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
-            }
-
-            $subquerySql .= " AND ({$boundWhereClause})";
+            // Remove unnecessary parentheses and add relation constraints directly
+            // Use bindings instead of inlining values for better plan cache optimization
+            $subquerySql .= " AND {$whereClause}";
+            $bindings = array_merge($bindings, $relationBindings);
         }
 
         // Add LIMIT 1 for maximum performance
         $subquerySql .= " LIMIT 1";
 
-        return $subquerySql;
+        return ['sql' => $subquerySql, 'bindings' => $bindings];
     }
 
     /**
@@ -1386,10 +1402,13 @@ class ModelQueryBuilder extends QueryBuilder
      * @param \Toporia\Framework\Database\Contracts\RelationInterface $relation Relation instance
      * @param string $parentTable Parent table name
      * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
-     * @return string EXISTS subquery SQL
+     * @return array<string, mixed> Array with 'sql' (string) and 'bindings' (array) keys
      */
-    protected function buildPivotExistsSubquery($relation, string $parentTable, $relationQuery): string
+    protected function buildPivotExistsSubquery($relation, string $parentTable, $relationQuery): array
     {
+        // Collect bindings array
+        $bindings = [];
+
         if ($relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany) {
             // Get pivot table and keys for BelongsToMany
             $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
@@ -1423,34 +1442,31 @@ class ModelQueryBuilder extends QueryBuilder
             // Laravel's structure: SELECT * FROM tags INNER JOIN taggables ON tags.id = taggables.tag_id
             // WHERE products.id = taggables.taggable_id AND taggables.taggable_type = ? AND tags.id = ?
             // This is more efficient when filtering by tags because it can use tags table index first
-            // Quote morph class value for safe SQL injection prevention
-            $quotedMorphClass = $this->quoteValue($morphClass);
+            // Use binding for morph class value instead of inline for better plan cache optimization
             $subquerySql = "SELECT 1 FROM {$relatedTable} " .
                 "INNER JOIN {$pivotTable} ON {$relatedTable}.{$relatedKey} = {$pivotTable}.{$relatedPivotKey} " .
                 "WHERE {$parentTable}.{$parentKey} = {$pivotTable}.{$morphId} " .
-                "AND {$pivotTable}.{$morphType} = {$quotedMorphClass}";
+                "AND {$pivotTable}.{$morphType} = ?";
+            $bindings[] = $morphClass;
         }
 
-        // Add relation constraints
+        // Add relation constraints (keep as bindings, don't inline)
         $relationSql = $relationQuery->toSql();
+        $relationBindings = $relationQuery->getBindings();
+
         if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
             $whereClause = $matches[1];
 
-            // Replace placeholders with actual values (safely quoted)
-            $relationBindings = $relationQuery->getBindings();
-            $boundWhereClause = $whereClause;
-            foreach ($relationBindings as $binding) {
-                $quoted = $this->quoteValue($binding);
-                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
-            }
-
-            $subquerySql .= " AND ({$boundWhereClause})";
+            // Remove unnecessary parentheses and add relation constraints directly
+            // Use bindings instead of inlining values for better plan cache optimization
+            $subquerySql .= " AND {$whereClause}";
+            $bindings = array_merge($bindings, $relationBindings);
         }
 
         // Add LIMIT 1 for maximum performance
         $subquerySql .= " LIMIT 1";
 
-        return $subquerySql;
+        return ['sql' => $subquerySql, 'bindings' => $bindings];
     }
 
     /**
@@ -1679,10 +1695,12 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         // Build NOT EXISTS subquery
-        $existsSubquery = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsResult = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsSql = $existsResult['sql'];
+        $existsBindings = $existsResult['bindings'];
 
         // Add NOT EXISTS clause - much faster than COUNT(*)
-        $this->whereRaw("NOT EXISTS ({$existsSubquery})");
+        $this->whereRaw("NOT EXISTS ({$existsSql})", $existsBindings);
 
         return $this;
     }
@@ -1789,10 +1807,12 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         // Build NOT EXISTS subquery
-        $existsSubquery = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsResult = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsSql = $existsResult['sql'];
+        $existsBindings = $existsResult['bindings'];
 
         // Add OR NOT EXISTS clause - much faster than COUNT(*)
-        $this->orWhereRaw("NOT EXISTS ({$existsSubquery})");
+        $this->orWhereRaw("NOT EXISTS ({$existsSql})", $existsBindings);
 
         return $this;
     }

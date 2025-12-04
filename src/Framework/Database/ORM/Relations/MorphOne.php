@@ -42,7 +42,8 @@ class MorphOne extends Relation
         protected string $morphName,
         ?string $morphType = null,
         ?string $morphId = null,
-        ?string $localKey = null
+        ?string $localKey = null,
+        bool $skipConstraints = false
     ) {
         $this->morphType = $morphType ?? "{$morphName}_type";
         $this->foreignKey = $morphId ?? "{$morphName}_id";
@@ -50,7 +51,9 @@ class MorphOne extends Relation
 
         parent::__construct($query, $parent, $this->foreignKey, $this->localKey);
 
-        $this->addConstraints();
+        if (!$skipConstraints) {
+            $this->addConstraints();
+        }
     }
 
     /**
@@ -98,6 +101,69 @@ class MorphOne extends Relation
         }
 
         return $dictionary;
+    }
+
+    /**
+     * Recursively copy WHERE clauses from one query to another.
+     *
+     * This ensures all WHERE clause types (including nested) are properly copied.
+     *
+     * @param QueryBuilder $targetQuery Target query builder to apply constraints to
+     * @param array $wheres Array of WHERE clause definitions
+     * @return void
+     */
+    protected function copyWhereClausesRecursive(QueryBuilder $targetQuery, array $wheres): void
+    {
+        foreach ($wheres as $where) {
+            match ($where['type'] ?? '') {
+                'basic' => $targetQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $targetQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $targetQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $targetQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $targetQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'Raw' => $targetQuery->whereRaw(
+                    $where['sql'] ?? '',
+                    $where['bindings'] ?? [],
+                    $where['boolean'] ?? 'AND'
+                ),
+                'nested' => $this->copyNestedWhereClause($targetQuery, $where),
+                default => null
+            };
+        }
+    }
+
+    /**
+     * Copy a nested WHERE clause to the target query.
+     *
+     * Recursively handles nested WHERE clauses to ensure all types are properly copied.
+     *
+     * @param QueryBuilder $targetQuery Target query builder
+     * @param array $where Nested WHERE clause definition
+     * @return void
+     */
+    protected function copyNestedWhereClause(QueryBuilder $targetQuery, array $where): void
+    {
+        if (!isset($where['query']) || !method_exists($where['query'], 'getWheres')) {
+            return;
+        }
+
+        $nestedWheres = $where['query']->getWheres();
+
+        // Don't create empty nested WHERE clauses - this causes SQL syntax errors
+        if (empty($nestedWheres)) {
+            return;
+        }
+
+        $boolean = $where['boolean'] ?? 'AND';
+
+        $targetQuery->where(function ($q) use ($nestedWheres) {
+            $this->copyWhereClausesRecursive($q, $nestedWheres);
+        }, $boolean);
     }
 
     // =========================================================================
@@ -150,9 +216,29 @@ class MorphOne extends Relation
     /**
      * {@inheritdoc}
      */
-    public function getResults(): ?Model
+    public function getResults(): mixed
     {
-        if (!$this->parent->exists()) {
+        // Check if this is eager loading (has WHERE IN or nested WHERE with morph type)
+        // During eager loading, parent is a dummy model that doesn't exist,
+        // but we still need to execute the query with eager constraints
+        $wheres = $this->query->getWheres();
+        $hasEagerConstraints = false;
+        foreach ($wheres as $where) {
+            // Check for WHERE IN (from addEagerConstraints)
+            if (strtolower($where['type'] ?? '') === 'in') {
+                $hasEagerConstraints = true;
+                break;
+            }
+            // Check for nested WHERE with morph type pattern (from addEagerConstraints)
+            if (strtolower($where['type'] ?? '') === 'nested') {
+                $hasEagerConstraints = true;
+                break;
+            }
+        }
+
+        // For eager loading, skip parent->exists() check and execute query directly
+        // For lazy loading, check parent->exists() first
+        if (!$hasEagerConstraints && !$this->parent->exists()) {
             return null;
         }
 
@@ -166,10 +252,58 @@ class MorphOne extends Relation
             }
         }
 
-        $this->query->where($this->morphType, $this->getMorphClass());
-        $this->query->where($this->foreignKey, $this->parent->getAttribute($this->localKey));
+        // Only add single parent constraints if not eager loading
+        // (eager loading already has constraints from addEagerConstraints)
+        if (!$hasEagerConstraints) {
+            $this->query->where($this->morphType, $this->getMorphClass());
+            $this->query->where($this->foreignKey, $this->parent->getAttribute($this->localKey));
+            // For lazy loading, limit to 1 result
+            $this->query->limit(1);
+            return $this->query->first();
+        }
 
-        return $this->query->first();
+        // For eager loading, return ModelCollection with all results
+        // match() will distribute them to the correct parent models
+        // Note: For MorphOne, if callback has orderBy(), match() will take the first result per parent
+        // We need to get all results (without limit) during eager loading,
+        // then match() will select the first one per parent based on orderBy
+        // Create a new query without limit/offset to avoid modifying the original query
+        $connection = $this->query->getConnection();
+        $eagerQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        // Copy table
+        $table = $this->query->getTable();
+        if ($table !== null) {
+            $eagerQuery->table($table);
+        }
+
+        // Copy selects
+        $selects = $this->query->getColumns();
+        if (!empty($selects)) {
+            $eagerQuery->select($selects);
+        }
+
+        // Copy all where constraints (including eager constraints from addEagerConstraints)
+        $wheres = $this->query->getWheres();
+        $this->copyWhereClausesRecursive($eagerQuery, $wheres);
+
+        // Copy orderBy (important for match() to select correct first result per parent)
+        $orders = $this->query->getOrders();
+        foreach ($orders as $order) {
+            $eagerQuery->orderBy($order['column'] ?? '', $order['direction'] ?? 'ASC');
+        }
+
+        // Execute query without limit/offset to get all results
+        $results = $eagerQuery->get();
+
+        // Convert DatabaseCollection to ModelCollection if needed
+        if (!$results instanceof ModelCollection) {
+            /** @var callable $hydrate */
+            $hydrate = [$this->relatedClass, 'hydrate'];
+            $results = $hydrate($results->all());
+        }
+
+        return $results;
     }
 
     /**
@@ -260,26 +394,49 @@ class MorphOne extends Relation
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
+        // Create a clean query with table and selects from freshQuery
+        $table = $freshQuery->getTable();
+        $connection = $freshQuery->getConnection();
+        $cleanQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+
+        if ($table !== null) {
+            $cleanQuery->table($table);
+        }
+
+        // Copy selects from freshQuery if any
+        $selects = $freshQuery->getColumns();
+        if (!empty($selects)) {
+            $cleanQuery->select($selects);
+        }
+
+        // CRITICAL: Copy all where constraints from original query (relationship method)
+        // This ensures constraints like where('width', '>=', 800) are preserved during eager loading
+        // Exclude morph type and foreign key constraints as they will be added by addEagerConstraints()
+        // This allows relationship methods with constraints to work correctly with eager loading
+        $this->copyWhereConstraints($cleanQuery, [
+            $this->morphType,
+            $this->foreignKey,
+            fn($col) => $col === $this->morphType || $col === $this->foreignKey
+        ]);
+
+        // Create a dummy parent model that doesn't exist to prevent addConstraints()
+        // from adding WHERE morphType = ? AND foreignKey = ? constraints. This ensures only
+        // the constraints from addEagerConstraints() are used during eager loading.
+        // Creating a new instance ensures exists() returns false and localKey is null
+        $parentClass = get_class($this->parent);
+        $dummyParent = new $parentClass();
+
+        // Create instance with clean query and dummy parent
+        // addConstraints() will return early because dummy parent doesn't exist
         $instance = new static(
-            $freshQuery,
-            $this->parent,
+            $cleanQuery,
+            $dummyParent,
             $this->relatedClass,
             $this->morphName,
             $this->morphType,
             $this->foreignKey,
             $this->localKey
         );
-
-        // Use freshQuery directly instead of creating another new query
-        // freshQuery already has the table set from loadRelationBatch
-        $instance->setQuery($freshQuery);
-
-        // Copy where constraints from original query (excluding parent-specific morph constraints)
-        $this->copyWhereConstraints($freshQuery, [
-            $this->morphType,
-            $this->foreignKey,
-            fn($col) => $col === $this->morphType || $col === $this->foreignKey
-        ]);
 
         return $instance;
     }
