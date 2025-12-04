@@ -109,8 +109,9 @@ final class ProductController extends BaseController
             ->with([
                 'categories',
                 'reviews' => function ($q) {
-                    return $q->where('helpful_count', '>', 20);
-                }
+                    return $q->where('helpful_count', '<', 20);
+                },
+                'reviews.user'
             ])
             ->optimizeForLargeResults()
             ->orderBy('id', 'ASC') // Cursor column must be ordered

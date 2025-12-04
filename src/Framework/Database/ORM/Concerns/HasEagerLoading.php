@@ -142,6 +142,7 @@ trait HasEagerLoading
                     $nested[$firstLevelRelation] = [];
                 }
                 // Avoid duplicate nested relations (important for performance)
+                // Using in_array with strict comparison for accuracy
                 if (!in_array($nestedRelation, $nested[$firstLevelRelation], true)) {
                     $nested[$firstLevelRelation][] = $nestedRelation;
                 }
@@ -194,6 +195,7 @@ trait HasEagerLoading
                     $existingNested[$firstLevel] = [];
                 }
                 // Merge and deduplicate nested relations
+                // array_unique with SORT_REGULAR ensures proper deduplication
                 $existingNested[$firstLevel] = array_values(array_unique(
                     array_merge($existingNested[$firstLevel], $nestedRels),
                     SORT_REGULAR
