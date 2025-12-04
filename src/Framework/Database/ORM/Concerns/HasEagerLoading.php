@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 
 use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Database\ORM\ModelCollection;
+use Toporia\Framework\Database\ORM\Exceptions\RelationNotFoundException;
 use Toporia\Framework\Database\Contracts\RelationInterface;
 
 
@@ -161,9 +162,11 @@ trait HasEagerLoading
             $parts = explode('.', $relationName, 2);
             $firstLevelRelation = $parts[0];
 
-            // Early validation: check if relation method exists
+            // CRITICAL: Throw exception if relation method doesn't exist
+            // This helps catch typos and missing relationship definitions early
             if (!method_exists($firstModel, $firstLevelRelation)) {
-                continue;
+                $modelClass = get_class($firstModel);
+                throw RelationNotFoundException::forRelation($modelClass, $firstLevelRelation, $relationName);
             }
 
             // Track nested relations for this first-level relation
@@ -202,8 +205,16 @@ trait HasEagerLoading
 
             // Get relationship instance from first model (only once per relation type)
             $relationInstance = $firstModel->$firstLevelRelation();
+
+            // CRITICAL: Throw exception if method doesn't return a valid relation
+            // This ensures the method is actually a relationship method
             if (!$relationInstance instanceof RelationInterface) {
-                continue;
+                $modelClass = get_class($firstModel);
+                throw RelationNotFoundException::forRelation(
+                    $modelClass,
+                    $firstLevelRelation,
+                    $relationName
+                );
             }
 
             // OPTIMIZATION: Only create relation instances for all models when needed
@@ -212,13 +223,24 @@ trait HasEagerLoading
             // This reduces overhead from creating unnecessary relation instances
             $grouped[$firstLevelRelation] = [];
 
-            // Only create instances for models that actually have the relation method
-            // This avoids unnecessary method calls for models that might not have the relation
+            // Create relation instances for all models
+            // All models should have the same relation method (same model class)
+            // If a model doesn't have it, throw exception to catch inconsistencies
             foreach ($models as $model) {
-                // Quick check: only call if method exists (defensive programming)
-                if (method_exists($model, $firstLevelRelation)) {
-                    $grouped[$firstLevelRelation][] = $model->$firstLevelRelation();
+                // CRITICAL: All models of the same class should have the same relations
+                // If one doesn't, it's likely a programming error
+                if (!method_exists($model, $firstLevelRelation)) {
+                    $modelClass = get_class($model);
+                    throw RelationNotFoundException::forRelation($modelClass, $firstLevelRelation, $relationName);
                 }
+
+                $instance = $model->$firstLevelRelation();
+                if (!$instance instanceof RelationInterface) {
+                    $modelClass = get_class($model);
+                    throw RelationNotFoundException::forRelation($modelClass, $firstLevelRelation, $relationName);
+                }
+
+                $grouped[$firstLevelRelation][] = $instance;
             }
         }
 
@@ -700,15 +722,23 @@ trait HasEagerLoading
             $relationName = is_string($key) ? $key : $value;
             $constraint = is_string($key) && is_callable($value) ? $value : null;
 
-            if (!is_string($relationName) || !method_exists($this, $relationName)) {
+            if (!is_string($relationName) || $relationName === '') {
                 continue;
+            }
+
+            // CRITICAL: Throw exception if relation method doesn't exist
+            if (!method_exists($this, $relationName)) {
+                $modelClass = get_class($this);
+                throw RelationNotFoundException::forRelation($modelClass, $relationName);
             }
 
             // Get relationship instance
             $relationInstance = $this->$relationName();
 
+            // CRITICAL: Throw exception if method doesn't return a valid relation
             if (!$relationInstance instanceof RelationInterface) {
-                continue;
+                $modelClass = get_class($this);
+                throw RelationNotFoundException::forRelation($modelClass, $relationName);
             }
 
             // Get query and apply constraints
@@ -748,14 +778,18 @@ trait HasEagerLoading
      */
     public function loadAggregate(string $relation, string $column, string $function = 'sum'): static
     {
+        // CRITICAL: Throw exception if relation method doesn't exist
         if (!method_exists($this, $relation)) {
-            return $this;
+            $modelClass = get_class($this);
+            throw RelationNotFoundException::forRelation($modelClass, $relation);
         }
 
         $relationInstance = $this->$relation();
 
+        // CRITICAL: Throw exception if method doesn't return a valid relation
         if (!$relationInstance instanceof RelationInterface) {
-            return $this;
+            $modelClass = get_class($this);
+            throw RelationNotFoundException::forRelation($modelClass, $relation);
         }
 
         $query = $relationInstance->getQuery();

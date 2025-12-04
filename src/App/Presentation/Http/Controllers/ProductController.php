@@ -108,8 +108,8 @@ final class ProductController extends BaseController
         $optimizedQuery = ProductModel::query()
             ->with([
                 'categories',
-                'reviews.user' => function ($q) {
-                    return $q->where('id', '=', 12324);
+                'reviews.users' => function ($q) {
+                    return $q->where('role', '=', 'users');
                 },
             ])
             ->optimizeForLargeResults()
