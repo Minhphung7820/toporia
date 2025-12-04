@@ -36,7 +36,7 @@ use Toporia\Framework\Support\Macroable;
  * - Factory Pattern: Centralized response creation
  * - Open/Closed: Extensible via macros and inheritance
  *
- * @author      Toporia Framework Team
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     1.0.0

@@ -10,7 +10,7 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Pipeline\Contracts\PipelineInterface;
 
 /**
- * General-purpose Pipeline for passing data through multiple stages.
+ * Class Pipeline
  *
  * Pipeline implementation for chainable operations.
  * Perfect for filtering, transforming, validating data through multiple steps.
@@ -22,45 +22,16 @@ use Toporia\Framework\Pipeline\Contracts\PipelineInterface;
  * - Pipe with parameters (Class:param1,param2)
  * - Container-based dependency injection
  * - Fluent chainable API
- * - Then/thenReturn for flexible output
- * - Exception handling with onFailure()
- * - Finally callback support
- * - Conditional pipes with when()
  *
- * Performance:
- * - O(N) where N = number of pipes
- * - Lazy evaluation (pipeline built once, executed once)
- * - Zero overhead for unused features
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Pipeline
+ * @since       2025-01-10
  *
- * @example
- * ```php
- * // Basic usage
- * $result = Pipeline::make($container)
- *     ->send($data)
- *     ->through([
- *         ValidateData::class,
- *         TransformData::class,
- *         'SanitizeData@sanitize',
- *     ])
- *     ->thenReturn();
- *
- * // With parameters
- * $result = Pipeline::make()
- *     ->send($request)
- *     ->through([
- *         'ThrottleRequests:60,1',  // 60 requests per minute
- *         'CacheResponse:3600',      // Cache for 1 hour
- *     ])
- *     ->thenReturn();
- *
- * // With exception handling
- * $result = Pipeline::make()
- *     ->send($data)
- *     ->through($pipes)
- *     ->onFailure(fn($e, $passable) => $this->handleError($e))
- *     ->finally(fn($passable) => $this->cleanup())
- *     ->thenReturn();
- * ```
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Pipeline implements PipelineInterface
 {

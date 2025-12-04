@@ -7,13 +7,23 @@ namespace Toporia\Framework\Macro;
 use Toporia\Framework\Macro\Contracts\MacroRegistryInterface;
 
 /**
- * Simple In-Memory Macro Registry
+ * Class SimpleMacroRegistry
  *
  * Default fallback implementation for MacroRegistryInterface.
  * Used when container is not available or MacroRegistryInterface is not registered.
  *
  * This is a Framework-level implementation that provides basic functionality
  * without requiring App-level dependencies.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Macro
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SimpleMacroRegistry implements MacroRegistryInterface
 {

@@ -8,7 +8,7 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Observer\Contracts\{ObserverInterface, ObserverManagerInterface};
 
 /**
- * Observer Manager
+ * Class ObserverManager
  *
  * Central manager for registering and managing observers with performance optimizations.
  *
@@ -19,18 +19,15 @@ use Toporia\Framework\Observer\Contracts\{ObserverInterface, ObserverManagerInte
  * - Priority-based observer sorting (cached)
  * - Observer class name resolution caching
  *
- * Architecture:
- * - Global registry for all observers
- * - Supports class-based and instance-based observers
- * - Priority-based execution order
- * - Event-specific observer registration
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Observer
+ * @since       2025-01-10
  *
- * SOLID Principles:
- * - Single Responsibility: Manages observer registration and lookup
- * - Open/Closed: Extensible via ObserverInterface
- * - Dependency Inversion: Depends on ObserverInterface abstraction
- *
- * @package Toporia\Framework\Observer
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ObserverManager implements ObserverManagerInterface
 {

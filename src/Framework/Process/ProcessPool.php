@@ -7,7 +7,7 @@ namespace Toporia\Framework\Process;
 use Toporia\Framework\Process\Contracts\WorkerInterface;
 
 /**
- * Process Pool
+ * Class ProcessPool
  *
  * High-performance process pool for parallel job processing.
  * Optimized for CPU-intensive tasks with automatic load balancing.
@@ -39,6 +39,16 @@ use Toporia\Framework\Process\Contracts\WorkerInterface;
  * $jobs = range(1, 1000);
  * $results = $pool->map($jobs, fn($n) => $n * 2);
  * ```
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Process
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ProcessPool
 {

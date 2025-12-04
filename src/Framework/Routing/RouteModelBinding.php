@@ -9,7 +9,7 @@ use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Http\Exceptions\NotFoundHttpException;
 
 /**
- * Route Model Binding
+ * Class RouteModelBinding
  *
  * Automatically resolves route parameters to model instances.
  * Provides both implicit and explicit binding similar to Laravel.
@@ -28,6 +28,16 @@ use Toporia\Framework\Http\Exceptions\NotFoundHttpException;
  * // Explicit binding
  * $binding->bind('user', User::class);
  * $binding->bind('post', fn($value) => Post::findOrFail($value));
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Routing
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * // Custom key
  * $binding->bind('user', User::class, 'uuid');

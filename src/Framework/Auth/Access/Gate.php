@@ -9,9 +9,9 @@ use Toporia\Framework\Auth\Contracts\GateContract;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 
 /**
- * Authorization Gate
+ * Class Gate
  *
- * Professional gate implementation with performance optimization.
+ * Professional authorization gate implementation with performance optimization.
  *
  * Clean Architecture:
  * - Framework layer implementation
@@ -28,7 +28,15 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
  * - O(1) ability/policy lookup with hashmaps
  * - Short-circuit evaluation (before callbacks)
  *
- * @package Toporia\Framework\Auth\Access
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Access
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Gate implements GateContract
 {

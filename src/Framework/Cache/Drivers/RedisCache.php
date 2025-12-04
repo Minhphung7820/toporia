@@ -8,7 +8,7 @@ use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Redis;
 
 /**
- * Redis Cache Driver
+ * Class RedisCache
  *
  * High-performance caching using Redis.
  * Requires phpredis extension.
@@ -21,6 +21,16 @@ use Redis;
  * Clean Architecture:
  * - Single Responsibility: Only handles Redis caching
  * - Dependency Inversion: Implements CacheInterface
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Cache\Drivers
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RedisCache implements CacheInterface
 {

@@ -7,7 +7,7 @@ namespace Toporia\Framework\Process;
 use Toporia\Framework\Process\Contracts\{ProcessInterface, ProcessManagerInterface};
 
 /**
- * Process Manager
+ * Class ProcessManager
  *
  * Manages a pool of forked processes with resource limits.
  * Implements efficient parallel execution with automatic cleanup.
@@ -44,6 +44,16 @@ use Toporia\Framework\Process\Contracts\{ProcessInterface, ProcessManagerInterfa
  * // Run with max 4 concurrent processes
  * $results = $manager->run(maxConcurrent: 4);
  * ```
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Process
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ProcessManager implements ProcessManagerInterface
 {

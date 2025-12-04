@@ -32,7 +32,7 @@ use Toporia\Framework\Support\Macroable;
  * - Open/Closed: Extensible via macros
  * - Dependency Inversion: Uses JsonSerializer abstraction
  *
- * @author      Toporia Framework Team
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     1.0.0

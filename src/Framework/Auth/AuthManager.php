@@ -7,16 +7,27 @@ namespace Toporia\Framework\Auth;
 use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, GuardInterface};
 
 /**
- * Auth Manager - Manages multiple authentication guards.
+ * Class AuthManager
  *
- * Implements the Strategy pattern for different authentication mechanisms.
- * Following Open/Closed Principle - extensible with custom guards.
+ * Manages multiple authentication guards implementing the Strategy pattern
+ * for different authentication mechanisms. Follows Open/Closed Principle -
+ * extensible with custom guards.
  *
  * Usage:
  * ```php
  * $authManager->guard('web')->attempt($credentials);
  * $authManager->guard('api')->user();
  * ```
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class AuthManager implements AuthManagerInterface
 {

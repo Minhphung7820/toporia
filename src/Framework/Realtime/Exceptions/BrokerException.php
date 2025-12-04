@@ -5,9 +5,19 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime\Exceptions;
 
 /**
+ * Class BrokerException
+ *
  * Exception for broker-related errors.
  *
- * @package Toporia\Framework\Realtime\Exceptions
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Realtime\Exceptions
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class BrokerException extends RealtimeException
 {

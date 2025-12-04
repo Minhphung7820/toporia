@@ -7,34 +7,20 @@ namespace Toporia\Framework\Hashing;
 use Toporia\Framework\Hashing\Contracts\HasherInterface;
 
 /**
- * Bcrypt Hasher
+ * Class BcryptHasher
  *
  * Bcrypt implementation using PHP's password_hash() with PASSWORD_BCRYPT.
  * Industry standard, battle-tested, widely supported.
  *
- * Algorithm: bcrypt (Blowfish cipher)
- * Cost: 4-31 (default: 12)
- * Output: 60 characters
- * Format: $2y$[cost]$[salt][hash]
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Hashing
+ * @since       2025-01-10
  *
- * Security Features:
- * - Automatic salt generation (128-bit)
- * - Adaptive cost (configurable work factor)
- * - Timing-safe comparison
- * - Truncates at 72 characters (bcrypt limitation)
- *
- * Performance Characteristics:
- * - Cost 10: ~100ms per hash
- * - Cost 12: ~250ms per hash (recommended)
- * - Cost 14: ~1000ms per hash
- * - Higher cost = more secure but slower
- *
- * When to Use:
- * - Default choice for most applications
- * - Maximum compatibility (PHP 5.5+)
- * - Standard web application passwords
- *
- * @package Toporia\Framework\Hashing
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class BcryptHasher implements HasherInterface
 {

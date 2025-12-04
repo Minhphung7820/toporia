@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http;
 
 /**
- * Cookie Value Object
+ * Class Cookie
  *
  * Represents an HTTP cookie with security options.
  * Immutable value object following Clean Architecture principles.
@@ -14,6 +14,16 @@ namespace Toporia\Framework\Http;
  * - Secure flag auto-detected from HTTPS connection
  * - HttpOnly enabled by default (XSS protection)
  * - SameSite=Lax by default (CSRF protection)
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Cookie
 {

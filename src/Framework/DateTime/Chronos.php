@@ -11,7 +11,7 @@ use DateTimeZone;
 use Toporia\Framework\DateTime\Contracts\ChronosInterface;
 
 /**
- * Chronos - Professional Date/Time Library
+ * Class Chronos
  *
  * Immutable date/time manipulation following value object pattern.
  * Similar to Carbon but with Clean Architecture principles.
@@ -24,14 +24,15 @@ use Toporia\Framework\DateTime\Contracts\ChronosInterface;
  * - Comparison methods
  * - Performance optimized with caching
  *
- * Example:
- * ```php
- * $date = Chronos::now();
- * $tomorrow = $date->addDays(1);
- * $diff = $date->diffForHumans(); // "just now"
- * ```
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  DateTime
+ * @since       2025-01-10
  *
- * Performance: O(1) for most operations
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Chronos extends DateTimeImmutable implements ChronosInterface
 {

@@ -7,34 +7,20 @@ namespace Toporia\Framework\Translation;
 use Toporia\Framework\Translation\Contracts\{LoaderInterface, TranslatorInterface};
 
 /**
- * Translation Manager
+ * Class Translator
  *
- * Core translation service with support for:
- * - Multiple locales
- * - Nested keys (dot notation)
- * - Placeholder replacement
- * - Pluralization
- * - Fallback locale
- * - Performance-optimized caching
+ * Core translation service with support for multiple locales,
+ * nested keys, placeholder replacement, and pluralization.
  *
- * Performance Optimizations:
- * - O(1) locale lookup (cached)
- * - O(1) translation cache (in-memory)
- * - Lazy loading (only loads when needed)
- * - Single file read per namespace per locale
- * - Efficient dot notation parsing
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Translation
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Framework layer (core service)
- * - Depends on LoaderInterface abstraction
- * - No dependencies on outer layers
- *
- * SOLID Principles:
- * - Single Responsibility: Translation management only
- * - Open/Closed: Extensible via new loaders
- * - Liskov Substitution: Implements TranslatorInterface
- * - Interface Segregation: Focused interface
- * - Dependency Inversion: Depends on LoaderInterface
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Translator implements TranslatorInterface
 {

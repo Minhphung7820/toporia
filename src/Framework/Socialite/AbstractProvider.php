@@ -9,7 +9,7 @@ use Toporia\Framework\Http\{Request, Contracts\HttpClientInterface};
 use Toporia\Framework\Support\Str;
 
 /**
- * Abstract OAuth Provider
+ * Abstract Class AbstractProvider
  *
  * Base class for OAuth providers with common functionality.
  *
@@ -17,6 +17,16 @@ use Toporia\Framework\Support\Str;
  * - O(1) token exchange
  * - O(1) user data retrieval
  * - Cached token requests
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Socialite
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 abstract class AbstractProvider implements ProviderInterface
 {

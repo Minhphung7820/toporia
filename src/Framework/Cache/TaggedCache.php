@@ -7,7 +7,7 @@ namespace Toporia\Framework\Cache;
 use Toporia\Framework\Cache\Contracts\{CacheInterface, TaggableCacheInterface};
 
 /**
- * Tagged Cache
+ * Class TaggedCache
  *
  * Wraps a cache driver with tag support.
  * Allows grouping related cache entries and clearing by tag.
@@ -27,6 +27,16 @@ use Toporia\Framework\Cache\Contracts\{CacheInterface, TaggableCacheInterface};
  * - L: Behaves like CacheInterface
  * - I: Focused interface
  * - D: Depends on CacheInterface abstraction
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Cache
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class TaggedCache implements TaggableCacheInterface
 {

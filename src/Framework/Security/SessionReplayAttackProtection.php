@@ -5,30 +5,22 @@ declare(strict_types=1);
 namespace Toporia\Framework\Security;
 
 use Toporia\Framework\Security\Contracts\ReplayAttackProtectionInterface;
+
 /**
- * Session-based Replay Attack Protection
+ * Class SessionReplayAttackProtection
  *
- * Prevents replay attacks by:
- * - Generating unique nonces with timestamps
- * - Storing used nonces in session
- * - Validating nonce expiration and uniqueness
+ * Prevents replay attacks by generating unique nonces with timestamps,
+ * storing used nonces in session, and validating nonce expiration.
  *
- * Performance:
- * - O(1) nonce generation (cryptographically secure random)
- * - O(1) validation (session array lookup)
- * - O(N) cleanup where N = stored nonces (called periodically)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Security
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles replay attack protection
- * - Dependency Inversion: Implements ReplayAttackProtectionInterface
- * - Open/Closed: Extend via different storage backends
- *
- * SOLID Principles:
- * - S: Only prevents replay attacks
- * - O: Extensible via interface
- * - L: Implements interface correctly
- * - I: Small, focused interface
- * - D: Depends on interface abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SessionReplayAttackProtection implements ReplayAttackProtectionInterface
 {

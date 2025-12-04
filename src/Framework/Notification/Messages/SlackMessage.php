@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Notification\Messages;
 
 /**
- * Slack Message
+ * Class SlackMessage
  *
  * Fluent builder for Slack notifications.
  * Provides a simple API for constructing rich Slack messages with attachments.
@@ -31,7 +31,15 @@ namespace Toporia\Framework\Notification\Messages;
  * - Lazy evaluation (data built only when needed)
  * - Minimal memory footprint
  *
- * @package Toporia\Framework\Notification\Messages
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Notification\Messages
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SlackMessage
 {

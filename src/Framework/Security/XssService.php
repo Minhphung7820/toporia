@@ -5,22 +5,20 @@ declare(strict_types=1);
 namespace Toporia\Framework\Security;
 
 /**
- * XSS Service Wrapper
+ * Class XssService
  *
  * Wraps static XssProtection methods into an instance-based service
  * for dependency injection and ServiceAccessor compatibility.
  *
- * This follows Clean Architecture principles:
- * - Single Responsibility: Only wraps XssProtection static methods
- * - Dependency Inversion: Can be swapped with mock in tests
- * - Interface Segregation: Provides clean service interface
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Security
+ * @since       2025-01-10
  *
- * Performance:
- * - Zero overhead - direct delegation to static methods
- * - O(1) method calls (no caching needed, static methods are fast)
- * - Memory efficient (no state, just method forwarding)
- *
- * @see XssProtection For detailed method documentation
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class XssService
 {

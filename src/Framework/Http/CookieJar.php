@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http;
 
 /**
- * Cookie Jar
+ * Class CookieJar
  *
  * Manages HTTP cookies with encryption support.
  * Provides a fluent interface for creating and managing cookies.
@@ -14,6 +14,16 @@ namespace Toporia\Framework\Http;
  * - AES-256-GCM authenticated encryption (prevents tampering)
  * - Random IV per encryption
  * - HKDF key derivation
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CookieJar
 {

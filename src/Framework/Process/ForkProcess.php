@@ -7,7 +7,7 @@ namespace Toporia\Framework\Process;
 use Toporia\Framework\Process\Contracts\ProcessInterface;
 
 /**
- * Fork Process
+ * Class ForkProcess
  *
  * Fork-based process using PCNTL for true parallel execution.
  * Each process runs in its own memory space - zero memory sharing.
@@ -27,6 +27,16 @@ use Toporia\Framework\Process\Contracts\ProcessInterface;
  * Requirements:
  * - PHP PCNTL extension
  * - Unix-like OS (Linux, macOS)
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Process
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ForkProcess implements ProcessInterface
 {

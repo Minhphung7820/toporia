@@ -9,19 +9,20 @@ use Toporia\Framework\Http\Exceptions\HttpException;
 use Throwable;
 
 /**
- * HTML Error Renderer
+ * Class HtmlErrorRenderer
  *
  * Beautiful error pages inspired by Whoops/Ignition.
+ * Provides syntax-highlighted code context and full stack trace.
  *
- * Features:
- * - Syntax-highlighted code context
- * - Full stack trace with expandable frames
- * - Request/Server information
- * - Clean, modern UI
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Error
+ * @since       2025-01-10
  *
- * Performance: O(N) where N = stack frames (acceptable for debugging)
- *
- * @package Toporia\Framework\Error
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class HtmlErrorRenderer implements ErrorRendererInterface
 {

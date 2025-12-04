@@ -7,12 +7,20 @@ namespace Toporia\Framework\Http;
 use Toporia\Framework\Http\Contracts\ResponseInterface;
 
 /**
- * HTTP Response implementation.
+ * Class Response
  *
- * Handles HTTP response generation including:
- * - Status codes
- * - Headers
- * - Content output (HTML, JSON, redirects)
+ * HTTP Response implementation handling response generation including
+ * status codes, headers, and content output (HTML, JSON, redirects).
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Response implements ResponseInterface
 {

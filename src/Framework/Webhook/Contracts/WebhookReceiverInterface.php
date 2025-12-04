@@ -7,10 +7,20 @@ namespace Toporia\Framework\Webhook\Contracts;
 use Toporia\Framework\Http\Request;
 
 /**
- * Webhook Receiver Interface
+ * Interface WebhookReceiverInterface
  *
  * Contract for receiving and processing incoming webhooks.
  * Handles signature verification, event routing, and processing.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Webhook\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface WebhookReceiverInterface
 {

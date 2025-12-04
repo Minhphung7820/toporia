@@ -23,6 +23,16 @@ use Toporia\Framework\Database\Query\Expression;
  * - Supports JSON indexes (MySQL 8.0+, PostgreSQL)
  * - O(1) clause addition
  *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Database\Query\Concerns
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
+ *
  * Database Support:
  * - MySQL 5.7+ (JSON_CONTAINS, JSON_EXTRACT, etc.)
  * - PostgreSQL 9.3+ (jsonb operators: @>, ->, #>>)

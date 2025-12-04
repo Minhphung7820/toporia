@@ -7,14 +7,21 @@ namespace Toporia\Framework\Http;
 use Toporia\Framework\Http\Contracts\RequestInterface;
 
 /**
- * HTTP Request implementation.
+ * Class Request
  *
- * Encapsulates all data from an incoming HTTP request including:
- * - HTTP method
- * - URI path
- * - Query parameters
- * - Request body/input
- * - Headers
+ * HTTP Request implementation encapsulating all data from an incoming
+ * HTTP request including method, URI path, query parameters, request
+ * body/input, and headers.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Http
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Request implements RequestInterface
 {

@@ -5,11 +5,22 @@ declare(strict_types=1);
 namespace Toporia\Framework\Security;
 
 use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
+
 /**
- * Session-based CSRF token manager
+ * Class SessionCsrfTokenManager
  *
- * Stores CSRF tokens in the session for validation.
- * Uses cryptographically secure random tokens.
+ * Session-based CSRF token manager.
+ * Stores CSRF tokens in the session for validation using cryptographically secure random tokens.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Security
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SessionCsrfTokenManager implements CsrfTokenManagerInterface
 {

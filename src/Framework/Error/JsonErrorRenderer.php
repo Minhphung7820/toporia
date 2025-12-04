@@ -9,19 +9,20 @@ use Toporia\Framework\Http\Exceptions\HttpException;
 use Throwable;
 
 /**
- * JSON Error Renderer
+ * Class JsonErrorRenderer
  *
  * Renders exceptions as JSON responses for API requests.
+ * Provides clean JSON format with stack trace in debug mode.
  *
- * Features:
- * - Clean JSON format
- * - Stack trace in debug mode
- * - Simple message in production
- * - PSR-7 compatible structure
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Error
+ * @since       2025-01-10
  *
- * Performance: O(N) where N = stack frames (only in debug mode)
- *
- * @package Toporia\Framework\Error
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class JsonErrorRenderer implements ErrorRendererInterface
 {

@@ -9,7 +9,7 @@ use Toporia\Framework\Encryption\Exceptions\DecryptException;
 use Toporia\Framework\Encryption\Exceptions\EncryptException;
 
 /**
- * Encrypter
+ * Class Encrypter
  *
  * Provides encryption and decryption using OpenSSL with AES-256-GCM.
  * Similar to Laravel's Encrypter but with modern cipher support.
@@ -32,6 +32,16 @@ use Toporia\Framework\Encryption\Exceptions\EncryptException;
  * $encrypted = $encrypter->encrypt('secret data');
  * $decrypted = $encrypter->decrypt($encrypted);
  * ```
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Encryption
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 class Encrypter implements EncrypterInterface
 {

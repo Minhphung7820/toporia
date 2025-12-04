@@ -9,6 +9,16 @@ namespace Toporia\Framework\Storage\Contracts;
  *
  * Extended interface for cloud storage providers.
  * Adds cloud-specific features like visibility, temporary URLs, and metadata.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Storage\Contracts
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 interface CloudFilesystemInterface extends FilesystemInterface
 {

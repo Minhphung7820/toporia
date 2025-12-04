@@ -7,35 +7,20 @@ namespace Toporia\Framework\Container;
 use Closure;
 
 /**
- * Needs Binding Builder
+ * Class NeedsBindingBuilder
  *
  * Second part of contextual binding chain.
- *
- * Usage:
- * ```php
- * $container->when(ConcreteClass::class)
- *     ->needs(AbstractInterface::class)
- *     ->give(ConcreteImplementation::class);
- *
- * // With factory closure
- * $container->when(Service::class)
- *     ->needs('$config')
- *     ->give(fn($container) => $container->make('config')->get('service'));
- *
- * // Give tagged services
- * $container->when(EventDispatcher::class)
- *     ->needs(ListenerInterface::class)
- *     ->giveTagged('event.listeners');
- * ```
- *
- * Clean Architecture:
- * - Single Responsibility: Needs binding builder only
- * - Fluent Interface: Method chaining for readability
+ * Provides method chaining for readable binding configuration.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     2.0.0
+ * @package     toporia/framework
+ * @subpackage  Container
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class NeedsBindingBuilder
 {

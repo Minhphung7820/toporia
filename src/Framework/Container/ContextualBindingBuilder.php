@@ -5,31 +5,20 @@ declare(strict_types=1);
 namespace Toporia\Framework\Container;
 
 /**
- * Contextual Binding Builder
+ * Class ContextualBindingBuilder
  *
  * Fluent builder for contextual bindings.
- *
- * Usage:
- * ```php
- * // Single concrete
- * $container->when(ConcreteClass::class)
- *     ->needs(AbstractInterface::class)
- *     ->give(ConcreteImplementation::class);
- *
- * // Multiple concretes
- * $container->when([ConcreteA::class, ConcreteB::class])
- *     ->needs(AbstractInterface::class)
- *     ->give(SharedImplementation::class);
- * ```
- *
- * Clean Architecture:
- * - Single Responsibility: Contextual binding builder only
- * - Fluent Interface: Method chaining for readability
+ * Provides method chaining for readable binding configuration.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  * @version     2.0.0
+ * @package     toporia/framework
+ * @subpackage  Container
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ContextualBindingBuilder
 {

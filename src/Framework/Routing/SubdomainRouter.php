@@ -7,7 +7,7 @@ namespace Toporia\Framework\Routing;
 use Toporia\Framework\Http\Request;
 
 /**
- * Subdomain Router
+ * Class SubdomainRouter
  *
  * Handles subdomain-based routing similar to Laravel's subdomain routing.
  *
@@ -27,6 +27,16 @@ use Toporia\Framework\Http\Request;
  * $router->domain('{tenant}.example.com')->group(function ($router) {
  *     $router->get('/dashboard', [TenantController::class, 'dashboard']);
  * });
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Routing
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  *
  * // Wildcard subdomain
  * $router->domain('*.example.com')->group(function ($router) {

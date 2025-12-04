@@ -9,12 +9,21 @@ use Toporia\Framework\Auth\Contracts\{GuardInterface, UserProviderInterface};
 use Toporia\Framework\Http\Request;
 
 /**
- * Token Guard - Token-based authentication (JWT/Bearer).
+ * Class TokenGuard
  *
- * Authenticates users via Bearer tokens from Authorization header.
- * Stateless authentication suitable for APIs.
+ * Token-based authentication (JWT/Bearer) authenticating users via
+ * Bearer tokens from Authorization header. Stateless authentication
+ * suitable for APIs. Follows Single Responsibility Principle.
  *
- * Following Single Responsibility Principle - only handles token auth.
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Guards
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class TokenGuard implements GuardInterface
 {

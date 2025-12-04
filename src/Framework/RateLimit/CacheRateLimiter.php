@@ -8,7 +8,7 @@ use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
- * Cache-based Rate Limiter
+ * Class CacheRateLimiter
  *
  * Uses cache backend for rate limiting with fixed window algorithm.
  * Works with any cache driver (File, Redis, Memory).
@@ -21,6 +21,16 @@ use Toporia\Framework\Cache\Contracts\CacheInterface;
  * To enable "sliding window" (reset timer on each violation):
  * - Uncomment the code in tooManyAttempts() method
  * - This will reset/extend reset time each time rate limit is exceeded
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  RateLimit
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CacheRateLimiter implements RateLimiterInterface
 {

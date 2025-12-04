@@ -8,10 +8,20 @@ use Toporia\Framework\Auth\Authenticatable;
 use Toporia\Framework\Auth\Contracts\{GuardInterface, UserProviderInterface};
 
 /**
- * Session Guard - Session-based authentication.
+ * Class SessionGuard
  *
- * Stores user ID in PHP session for stateful authentication.
- * Following Single Responsibility Principle - only handles session auth.
+ * Session-based authentication guard storing user ID in PHP session
+ * for stateful authentication. Follows Single Responsibility Principle.
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Auth\Guards
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class SessionGuard implements GuardInterface
 {

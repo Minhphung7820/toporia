@@ -9,27 +9,20 @@ use Throwable;
 use ErrorException;
 
 /**
- * Error Handler
+ * Class ErrorHandler
  *
  * Beautiful error handling inspired by Whoops/Ignition.
+ * Provides HTML error pages with syntax highlighting and JSON responses for API.
  *
- * Features:
- * - Beautiful HTML error pages with syntax highlighting
- * - JSON responses for API requests
- * - Stack trace with code context
- * - Environment-aware (dev/production)
- * - PSR-3 logging support
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Error
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Single Responsibility: Only handles errors
- * - Open/Closed: Extensible via renderers
- * - Dependency Inversion: Depends on renderer abstraction
- *
- * Performance:
- * - O(1) in production (simple error page)
- * - O(N) in development where N = stack frames (acceptable for debugging)
- *
- * @package Toporia\Framework\Error
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class ErrorHandler implements ErrorHandlerInterface
 {

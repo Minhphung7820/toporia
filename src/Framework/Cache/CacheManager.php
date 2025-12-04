@@ -8,7 +8,7 @@ use Toporia\Framework\Cache\Contracts\{CacheInterface, CacheManagerInterface, Ta
 use Toporia\Framework\Cache\TaggedCache;
 
 /**
- * Cache Manager
+ * Class CacheManager
  *
  * Manages multiple cache drivers and provides a unified interface.
  * Supports driver switching, fallback mechanisms, and tag support.
@@ -30,6 +30,16 @@ use Toporia\Framework\Cache\TaggedCache;
  * - L: All drivers interchangeable (Liskov Substitution)
  * - I: Focused interfaces (CacheInterface, CacheManagerInterface)
  * - D: Depends on abstractions, not concrete implementations
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Cache
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class CacheManager implements CacheManagerInterface
 {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\RateLimit;
 
 /**
- * Rate Limit Configuration
+ * Class Limit
  *
  * Represents a rate limit configuration with max attempts, decay time, and key resolver.
  * Similar to Laravel's Limit class but with enhanced features.
@@ -16,6 +16,16 @@ namespace Toporia\Framework\RateLimit;
  * Limit::perHour(1000)->by($request->ip());
  * Limit::perDay(10000)->by($request->user()?->id);
  * ```
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  RateLimit
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Limit
 {

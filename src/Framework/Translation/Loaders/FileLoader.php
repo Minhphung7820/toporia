@@ -8,25 +8,20 @@ use Toporia\Framework\Translation\Contracts\LoaderInterface;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 
 /**
- * File-based Translation Loader
+ * Class FileLoader
  *
  * Loads translations from JSON or PHP array files.
  * Supports nested keys and multiple namespaces.
  *
- * Performance Optimizations:
- * - File existence check before loading (O(1) with opcache)
- * - JSON decode caching (if cache provided)
- * - Lazy loading (only loads when needed)
- * - Single file read per namespace per locale
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Translation\Loaders
+ * @since       2025-01-10
  *
- * Clean Architecture:
- * - Framework layer (can be infrastructure if DB-based loader needed)
- * - Depends on LoaderInterface abstraction
- *
- * SOLID Principles:
- * - Single Responsibility: Only loads translation files
- * - Open/Closed: Extensible via new file formats
- * - Dependency Inversion: Depends on CacheInterface abstraction
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class FileLoader implements LoaderInterface
 {

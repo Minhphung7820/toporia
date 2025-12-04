@@ -7,37 +7,21 @@ namespace Toporia\Framework\Hashing;
 use Toporia\Framework\Hashing\Contracts\HasherInterface;
 
 /**
- * Argon2id Hasher
+ * Class Argon2IdHasher
  *
  * Modern password hashing using Argon2id algorithm.
  * Winner of Password Hashing Competition (2015).
  * Recommended for new applications (PHP 7.3+).
  *
- * Algorithm: Argon2id (hybrid of Argon2i and Argon2d)
- * Memory: Configurable (default: 65536 KB = 64 MB)
- * Time: Configurable (default: 4 iterations)
- * Threads: Configurable (default: 1)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Hashing
+ * @since       2025-01-10
  *
- * Security Features:
- * - Memory-hard (resistant to GPU/ASIC attacks)
- * - Time-cost configurable
- * - Parallelism support
- * - Side-channel resistance (Argon2id hybrid)
- * - Automatic salt generation
- *
- * Performance Characteristics:
- * - Memory-hard: Requires significant RAM per hash
- * - Parallelizable: Can use multiple CPU threads
- * - Default (64MB, 4 iterations): ~250ms per hash
- * - More secure against hardware attacks than bcrypt
- *
- * When to Use:
- * - New applications (best security)
- * - High-security requirements
- * - Server has available RAM
- * - PHP 7.3+ available
- *
- * @package Toporia\Framework\Hashing
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class Argon2IdHasher implements HasherInterface
 {

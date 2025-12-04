@@ -8,7 +8,7 @@ use Toporia\Framework\Http\Request;
 use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
 
 /**
- * Rate Limiter Manager
+ * Class RateLimiter
  *
  * Manages named rate limiters similar to Laravel's RateLimiter.
  * Allows defining reusable rate limit configurations in ServiceProviders.
@@ -26,6 +26,16 @@ use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
  *     Route::get('/orders', fn() => 'orders');
  * });
  * ```
+ *
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  RateLimit
+ * @since       2025-01-10
+ *
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class RateLimiter
 {

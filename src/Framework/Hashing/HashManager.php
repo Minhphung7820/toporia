@@ -7,57 +7,20 @@ namespace Toporia\Framework\Hashing;
 use Toporia\Framework\Hashing\Contracts\HasherInterface;
 
 /**
- * Hash Manager
+ * Class HashManager
  *
  * Manages multiple hashing drivers with automatic fallback and driver caching.
  * Provides unified API for password hashing across different algorithms.
  *
- * Features:
- * - Multi-driver support (bcrypt, argon2id)
- * - Lazy driver instantiation
- * - Driver caching (singleton pattern)
- * - Automatic algorithm detection
- * - Graceful degradation (argon2id → bcrypt fallback)
+ * @author      Phungtruong7820 <minhphung485@gmail.com>
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ * @version     1.0.0
+ * @package     toporia/framework
+ * @subpackage  Hashing
+ * @since       2025-01-10
  *
- * Performance Optimizations:
- * - O(1) driver resolution via array lookup
- * - Singleton caching (drivers instantiated once)
- * - Lazy loading (only creates drivers when used)
- * - Minimal memory footprint
- *
- * Clean Architecture:
- * - Depends on HasherInterface abstraction (DIP)
- * - Factory pattern for driver creation
- * - Strategy pattern for algorithm selection
- * - No global state dependencies
- *
- * SOLID Principles:
- * - Single Responsibility: Only manages hashers
- * - Open/Closed: Extensible via custom drivers
- * - Liskov Substitution: All hashers interchangeable
- * - Interface Segregation: Minimal interface
- * - Dependency Inversion: Depends on abstraction
- *
- * Usage:
- * ```php
- * $hash = new HashManager(['driver' => 'bcrypt']);
- *
- * // Hash password
- * $hashed = $hash->make('secret');
- *
- * // Verify password
- * if ($hash->check('secret', $hashed)) {
- *     // Password correct
- * }
- *
- * // Check if needs rehash (algorithm upgrade)
- * if ($hash->needsRehash($hashed)) {
- *     $newHash = $hash->make('secret');
- *     // Update database with $newHash
- * }
- * ```
- *
- * @package Toporia\Framework\Hashing
+ * @link        https://github.com/Minhphung7820/toporia
  */
 final class HashManager
 {
