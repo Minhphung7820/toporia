@@ -181,6 +181,17 @@ class MorphTo extends Relation
         foreach ($groups as $type => $ids) {
             $modelClass = $this->getModelClass($type);
 
+            // Validate that class exists and is a valid Model subclass
+            if (!class_exists($modelClass)) {
+                // Skip invalid morph types - data integrity issue
+                continue;
+            }
+
+            if (!is_subclass_of($modelClass, Model::class)) {
+                // Skip non-Model classes - security and type safety
+                continue;
+            }
+
             // Apply SoftDeletes scope automatically (respects withTrashed() via ModelQueryBuilder)
             $query = $modelClass::whereIn('id', array_unique($ids));
             $related = $query->get();

@@ -247,33 +247,77 @@ class BelongsToMany extends Relation
 
     /**
      * Add JSON constraints on pivot columns.
+     *
+     * @param string $column Column name
+     * @param mixed $value Value to search for
+     * @param string $path JSON path (validated to prevent SQL injection)
+     * @return static
+     * @throws \InvalidArgumentException If JSON path format is invalid
      */
     public function wherePivotJsonContains(string $column, mixed $value, string $path = '$'): static
     {
+        // Validate JSON path to prevent SQL injection
+        // Valid paths: $, $.key, $.key.subkey, $[0], $.key[0].subkey
+        if (!preg_match('/^\$(\.[a-zA-Z_][a-zA-Z0-9_]*|\[\d+\])*$/', $path)) {
+            throw new \InvalidArgumentException(
+                "Invalid JSON path: '{$path}'. Path must start with '$' and contain only valid property names or array indices."
+            );
+        }
+
         $jsonValue = is_string($value) ? '"' . $value . '"' : json_encode($value);
         $qualifiedColumn = $this->qualifyPivotColumn($column);
 
         $this->query->whereRaw("JSON_CONTAINS({$qualifiedColumn}, ?, ?)", [$jsonValue, $path]);
         $this->pivotWheres[] = [
-            'column' => "JSON_CONTAINS({$column}, '{$jsonValue}', '{$path}')",
+            'column' => $column,
+            'function' => 'JSON_CONTAINS',
+            'json_value' => $jsonValue,
+            'path' => $path,
             'operator' => '=',
             'value' => 1,
-            'type' => 'raw'
+            'type' => 'json'
         ];
 
         return $this;
     }
 
+    /**
+     * Add JSON length constraints on pivot columns.
+     *
+     * @param string $column Column name
+     * @param string $operator Comparison operator
+     * @param int $value Expected length
+     * @param string $path JSON path (validated to prevent SQL injection)
+     * @return static
+     * @throws \InvalidArgumentException If JSON path format is invalid
+     */
     public function wherePivotJsonLength(string $column, string $operator, int $value, string $path = '$'): static
     {
+        // Validate JSON path to prevent SQL injection
+        if (!preg_match('/^\$(\.[a-zA-Z_][a-zA-Z0-9_]*|\[\d+\])*$/', $path)) {
+            throw new \InvalidArgumentException(
+                "Invalid JSON path: '{$path}'. Path must start with '$' and contain only valid property names or array indices."
+            );
+        }
+
+        // Validate operator
+        $allowedOperators = ['=', '!=', '<>', '<', '<=', '>', '>='];
+        if (!in_array($operator, $allowedOperators, true)) {
+            throw new \InvalidArgumentException(
+                "Invalid operator: '{$operator}'. Allowed: " . implode(', ', $allowedOperators)
+            );
+        }
+
         $qualifiedColumn = $this->qualifyPivotColumn($column);
 
         $this->query->whereRaw("JSON_LENGTH({$qualifiedColumn}, ?) {$operator} ?", [$path, $value]);
         $this->pivotWheres[] = [
-            'column' => "JSON_LENGTH({$column}, '{$path}')",
+            'column' => $column,
+            'function' => 'JSON_LENGTH',
+            'path' => $path,
             'operator' => $operator,
             'value' => $value,
-            'type' => 'raw'
+            'type' => 'json'
         ];
 
         return $this;
@@ -1152,6 +1196,7 @@ class BelongsToMany extends Relation
      * @param array<string, mixed> $pivotData Additional pivot data
      * @param bool $touch Whether to touch parent timestamps
      * @return array|bool Array of attached IDs or boolean for single attach
+     * @throws \InvalidArgumentException If pivot data is invalid
      */
     public function attach(int|string|array $id, array $pivotData = [], bool $touch = true): array|bool
     {
@@ -1159,9 +1204,23 @@ class BelongsToMany extends Relation
             return $this->attachMany($id, $touch);
         }
 
+        // Validate related ID
+        if (!is_int($id) && !is_string($id)) {
+            throw new \InvalidArgumentException('Related model ID must be an integer or string');
+        }
+
+        // Validate pivot data - must be associative array with string keys
+        $this->validatePivotData($pivotData);
+
+        // Get parent key with validation
+        $parentKey = $this->parent->getAttribute($this->parentKey);
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot attach: parent model does not have a primary key');
+        }
+
         // PERFORMANCE: Use array spread for faster merging
         $data = [
-            $this->foreignPivotKey => $this->parent->getAttribute($this->parentKey),
+            $this->foreignPivotKey => $parentKey,
             $this->relatedPivotKey => $id,
             ...$pivotData,
         ];
@@ -1181,6 +1240,38 @@ class BelongsToMany extends Relation
         }
 
         return true;
+    }
+
+    /**
+     * Validate pivot data structure.
+     *
+     * @param array<string, mixed> $pivotData Pivot data to validate
+     * @throws \InvalidArgumentException If pivot data is invalid
+     */
+    protected function validatePivotData(array $pivotData): void
+    {
+        foreach ($pivotData as $key => $value) {
+            // Keys must be strings (column names)
+            if (!is_string($key)) {
+                throw new \InvalidArgumentException(
+                    "Pivot data keys must be strings (column names). Got: " . gettype($key)
+                );
+            }
+
+            // Column names must be valid identifiers
+            if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $key)) {
+                throw new \InvalidArgumentException(
+                    "Invalid pivot column name: '{$key}'. Column names must contain only alphanumeric characters and underscores."
+                );
+            }
+
+            // Values must be scalar or null (no objects, arrays, or resources)
+            if ($value !== null && !is_scalar($value)) {
+                throw new \InvalidArgumentException(
+                    "Pivot data values must be scalar or null. Got " . gettype($value) . " for column '{$key}'"
+                );
+            }
+        }
     }
 
     /**
@@ -1210,6 +1301,11 @@ class BelongsToMany extends Relation
         // Performance: Cache parent key once (avoid repeated attribute access)
         $parentKeyValue = $this->parent->getAttribute($this->parentKey);
 
+        // Validate parent key
+        if ($parentKeyValue === null) {
+            throw new \RuntimeException('Cannot attach: parent model does not have a primary key');
+        }
+
         // Performance: Cache timestamp once if timestamps enabled (avoid repeated now() calls)
         $timestamp = $this->withTimestamps ? now()->toDateTimeString() : null;
 
@@ -1225,11 +1321,21 @@ class BelongsToMany extends Relation
                 // OR numeric key with array value: [0 => ['id' => 1, 'created_at' => ...]]
                 $relatedId = $key;
                 $pivotData = $value;
+
+                // Validate pivot data structure
+                $this->validatePivotData($pivotData);
             } else {
                 // Simple array: [1, 2, 3] - numeric key, non-array value
                 // OR string key with non-array value (shouldn't happen, but handle it)
                 $relatedId = $value;
                 $pivotData = [];
+            }
+
+            // Validate related ID
+            if (!is_int($relatedId) && !is_string($relatedId)) {
+                throw new \InvalidArgumentException(
+                    'Related model ID must be an integer or string. Got: ' . gettype($relatedId)
+                );
             }
 
             // Build data array efficiently
@@ -2409,7 +2515,7 @@ class BelongsToMany extends Relation
      * });
      * ```
      */
-    public function chunkById(int $count, callable $callback, string $column = null, string $alias = null): bool
+    public function chunkById(int $count, callable $callback, ?string $column = null, ?string $alias = null): bool
     {
         $column = $column ?: $this->relatedKey;
         $alias = $alias ?: $column;
@@ -2886,8 +2992,37 @@ class BelongsToMany extends Relation
         }
 
         // Cache miss or expired - fetch from database
-        $columns = $connection->select("SHOW COLUMNS FROM `{$tableName}`");
-        $columnNames = array_column($columns, 'Field');
+        // Use parameterized query to prevent SQL injection
+        // Escape table name to prevent injection - only allow valid identifier characters
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $tableName)) {
+            throw new \InvalidArgumentException(
+                "Invalid table name: '{$tableName}'. Table names must contain only alphanumeric characters and underscores."
+            );
+        }
+
+        // Use database-agnostic approach to get column information
+        $driver = $connection->getDriverName();
+        $columns = match ($driver) {
+            'mysql' => $connection->select(
+                "SELECT COLUMN_NAME as `Field` FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? AND TABLE_SCHEMA = DATABASE()",
+                [$tableName]
+            ),
+            'pgsql' => $connection->select(
+                "SELECT column_name as \"Field\" FROM information_schema.columns WHERE table_name = ?",
+                [$tableName]
+            ),
+            'sqlite' => $connection->select("PRAGMA table_info(`{$tableName}`)"),
+            default => $connection->select(
+                "SELECT COLUMN_NAME as `Field` FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?",
+                [$tableName]
+            ),
+        };
+
+        // Extract column names based on driver
+        $columnNames = match ($driver) {
+            'sqlite' => array_column($columns, 'name'),
+            default => array_column($columns, 'Field'),
+        };
 
         // Store in cache
         self::$schemaCache[$cacheKey] = [

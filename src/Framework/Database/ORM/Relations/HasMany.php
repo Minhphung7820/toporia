@@ -383,6 +383,90 @@ class HasMany extends Relation
     // =========================================================================
 
     /**
+     * Get parent key or throw exception if not available.
+     *
+     * @return mixed Parent key value
+     * @throws \RuntimeException If parent key is null
+     */
+    protected function getParentKeyOrFail(): mixed
+    {
+        $parentKey = $this->parent->getAttribute($this->localKey);
+
+        if ($parentKey === null) {
+            throw new \RuntimeException('Cannot perform operation: parent model does not have a key');
+        }
+
+        return $parentKey;
+    }
+
+    /**
+     * Prepare models for bulk insert by adding foreign key.
+     *
+     * @param array<int, array<string, mixed>> $models Array of model attributes
+     * @param mixed $parentKey Parent key value
+     * @return array<int, array<string, mixed>> Prepared models with foreign key
+     */
+    protected function prepareModelsForBulkInsert(array $models, mixed $parentKey): array
+    {
+        return array_map(function ($attributes) use ($parentKey) {
+            $attributes[$this->foreignKey] = $parentKey;
+            return $attributes;
+        }, $models);
+    }
+
+    /**
+     * Execute bulk insert and return inserted IDs.
+     *
+     * @param array<int, array<string, mixed>> $models Prepared models to insert
+     * @return array<int> Array of inserted IDs
+     */
+    protected function executeBulkInsert(array $models): array
+    {
+        $connection = $this->query->getConnection();
+        $table = $this->relatedClass::getTableName();
+
+        // Use transaction for atomicity
+        $connection->beginTransaction();
+
+        try {
+            $insertedIds = [];
+
+            foreach ($models as $attributes) {
+                $connection->table($table)->insert($attributes);
+                $insertedIds[] = (int) $connection->getPdo()->lastInsertId();
+            }
+
+            $connection->commit();
+            return $insertedIds;
+        } catch (\Throwable $e) {
+            $connection->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Hydrate inserted models from attributes and IDs.
+     *
+     * @param array<int, array<string, mixed>> $models Model attributes
+     * @param array<int> $insertedIds Inserted IDs
+     * @return ModelCollection Collection of hydrated models
+     */
+    protected function hydrateInsertedModels(array $models, array $insertedIds): ModelCollection
+    {
+        $primaryKey = $this->relatedClass::getPrimaryKey();
+        $hydratedModels = [];
+
+        foreach ($models as $index => $attributes) {
+            $attributes[$primaryKey] = $insertedIds[$index] ?? null;
+            $model = new $this->relatedClass($attributes);
+            $model->syncOriginal(); // Mark as persisted
+            $hydratedModels[] = $model;
+        }
+
+        return new ModelCollection($hydratedModels);
+    }
+
+    /**
      * Save multiple related models using bulk insert.
      *
      * @param array<int, array<string, mixed>> $models Array of model attributes
