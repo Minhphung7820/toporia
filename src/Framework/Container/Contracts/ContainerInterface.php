@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Container\Contracts;
 
 use Closure;
+use Psr\Container\ContainerInterface as PsrContainerInterface;
 use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException};
 
 /**
@@ -13,7 +14,20 @@ use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException
  * Contract defining the interface for ContainerInterface implementations
  * in the Dependency Injection container layer of the Toporia Framework.
  *
- * PSR-11 compliant with Laravel-style extensions for advanced DI features.
+ * Extends PSR-11 ContainerInterface for full interoperability with other
+ * PSR-11 compatible libraries and frameworks.
+ *
+ * PSR-11 compliance:
+ * - get(string $id): mixed - Returns entry from container
+ * - has(string $id): bool - Returns true if entry exists
+ *
+ * Additional features (Laravel-style):
+ * - Binding (bind, singleton, instance)
+ * - Contextual binding (when/needs/give)
+ * - Tagged bindings
+ * - Scoped bindings (request lifecycle)
+ * - Method injection (call)
+ * - Aliases
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
@@ -25,7 +39,7 @@ use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException
  *
  * @link        https://github.com/Minhphung7820/toporia
  */
-interface ContainerInterface
+interface ContainerInterface extends PsrContainerInterface
 {
     /**
      * Finds an entry of the container by its identifier and returns it.
@@ -205,4 +219,20 @@ interface ContainerInterface
      * @return bool
      */
     public function resolved(string $abstract): bool;
+
+    /**
+     * Register a resolving callback.
+     *
+     * @param string|Closure $abstract Service identifier or global callback.
+     * @param Closure|null $callback Callback to fire before resolution.
+     * @return void
+     */
+    public function resolving(string|Closure $abstract, ?Closure $callback = null): void;
+
+    /**
+     * Flush all bindings and resolved instances.
+     *
+     * @return void
+     */
+    public function flush(): void;
 }

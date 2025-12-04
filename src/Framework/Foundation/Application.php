@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Foundation;
 
+use Closure;
 use Toporia\Framework\Foundation\Contracts\ServiceProviderInterface;
 use Toporia\Framework\Container\Container;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
@@ -16,10 +17,16 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
  * container, service provider registration, and application boot process
  * following Clean Architecture principles.
  *
+ * Features:
+ * - Two-phase service provider lifecycle (register then boot)
+ * - Deferred service providers for lazy-loading
+ * - Booting/Booted lifecycle callbacks
+ * - Environment detection and configuration
+ *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
- * @version     1.0.0
+ * @version     2.0.0
  * @package     toporia/framework
  * @subpackage  Foundation
  * @since       2025-01-10
@@ -42,9 +49,34 @@ class Application
     private array $providers = [];
 
     /**
+     * @var array<string, ServiceProviderInterface> Loaded providers by class name
+     */
+    private array $loadedProviders = [];
+
+    /**
+     * @var array<string, string> Deferred services mapping (service => provider class)
+     */
+    private array $deferredServices = [];
+
+    /**
      * @var bool Whether service providers have been booted
      */
     private bool $booted = false;
+
+    /**
+     * @var array<Closure> Callbacks to run before booting
+     */
+    private array $bootingCallbacks = [];
+
+    /**
+     * @var array<Closure> Callbacks to run after booting
+     */
+    private array $bootedCallbacks = [];
+
+    /**
+     * @var array<Closure> Callbacks to run on termination
+     */
+    private array $terminatingCallbacks = [];
 
     /**
      * @param string $basePath Application base path
@@ -64,29 +96,146 @@ class Application
 
         // Register core services
         $this->registerCoreServices();
+
+        // Setup deferred service resolution
+        $this->setupDeferredServiceResolution();
+    }
+
+    /**
+     * Setup automatic resolution of deferred services.
+     *
+     * Registers a global resolving callback that loads deferred providers
+     * when their services are requested.
+     *
+     * @return void
+     */
+    private function setupDeferredServiceResolution(): void
+    {
+        // Deferred providers are loaded on-demand via loadDeferredProviderIfNeeded()
+        // which is called in make() and makeWith() methods
     }
 
     /**
      * Register a service provider.
      *
+     * Deferred providers are stored for lazy-loading instead of being registered immediately.
+     *
      * @param string|ServiceProviderInterface $provider Provider class name or instance
-     * @return self
+     * @param bool $force Force registration even if already registered
+     * @return ServiceProviderInterface The registered provider
      */
-    public function register(string|ServiceProviderInterface $provider): self
+    public function register(string|ServiceProviderInterface $provider, bool $force = false): ServiceProviderInterface
     {
+        $providerClass = is_string($provider) ? $provider : $provider::class;
+
+        // Check if already registered
+        if (isset($this->loadedProviders[$providerClass]) && !$force) {
+            return $this->loadedProviders[$providerClass];
+        }
+
+        // Instantiate if string
         if (is_string($provider)) {
             $provider = new $provider();
         }
 
+        // Handle deferred providers
+        if ($provider->isDeferred() && !$this->booted) {
+            $this->registerDeferredProvider($provider);
+            return $provider;
+        }
+
+        // Register immediately
         $provider->register($this->container);
-        $this->providers[] = $provider;
+        $this->markAsRegistered($provider);
 
         // If already booted, boot this provider immediately
         if ($this->booted) {
-            $provider->boot($this->container);
+            $this->bootProvider($provider);
         }
 
-        return $this;
+        return $provider;
+    }
+
+    /**
+     * Register a deferred provider for lazy-loading.
+     *
+     * @param ServiceProviderInterface $provider
+     * @return void
+     */
+    private function registerDeferredProvider(ServiceProviderInterface $provider): void
+    {
+        $providerClass = $provider::class;
+
+        // Map each provided service to this provider
+        foreach ($provider->provides() as $service) {
+            $this->deferredServices[$service] = $providerClass;
+        }
+
+        // Store the provider instance for later
+        $this->loadedProviders[$providerClass] = $provider;
+    }
+
+    /**
+     * Load a deferred provider by service name.
+     *
+     * @param string $service Service identifier
+     * @return void
+     */
+    public function loadDeferredProvider(string $service): void
+    {
+        if (!isset($this->deferredServices[$service])) {
+            return;
+        }
+
+        $providerClass = $this->deferredServices[$service];
+
+        // Already fully registered?
+        if (isset($this->providers[$providerClass])) {
+            return;
+        }
+
+        $provider = $this->loadedProviders[$providerClass] ?? new $providerClass();
+
+        // Register the provider
+        $provider->register($this->container);
+
+        // Remove from deferred list
+        foreach ($provider->provides() as $providedService) {
+            unset($this->deferredServices[$providedService]);
+        }
+
+        // Mark as registered
+        $this->providers[] = $provider;
+
+        // Boot if application is already booted
+        if ($this->booted) {
+            $this->bootProvider($provider);
+        }
+    }
+
+    /**
+     * Load all deferred providers for a given service.
+     *
+     * @param string $service
+     * @return void
+     */
+    public function loadDeferredProviderIfNeeded(string $service): void
+    {
+        if (isset($this->deferredServices[$service])) {
+            $this->loadDeferredProvider($service);
+        }
+    }
+
+    /**
+     * Mark a provider as registered.
+     *
+     * @param ServiceProviderInterface $provider
+     * @return void
+     */
+    private function markAsRegistered(ServiceProviderInterface $provider): void
+    {
+        $this->providers[] = $provider;
+        $this->loadedProviders[$provider::class] = $provider;
     }
 
     /**
@@ -115,13 +264,128 @@ class Application
             return $this;
         }
 
+        // Fire booting callbacks
+        $this->fireAppCallbacks($this->bootingCallbacks);
+
+        // Boot each provider
         foreach ($this->providers as $provider) {
-            $provider->boot($this->container);
+            $this->bootProvider($provider);
         }
 
         $this->booted = true;
 
+        // Fire booted callbacks
+        $this->fireAppCallbacks($this->bootedCallbacks);
+
         return $this;
+    }
+
+    /**
+     * Boot a single service provider.
+     *
+     * @param ServiceProviderInterface $provider
+     * @return void
+     */
+    private function bootProvider(ServiceProviderInterface $provider): void
+    {
+        $provider->boot($this->container);
+    }
+
+    /**
+     * Register a callback to run before booting.
+     *
+     * @param Closure $callback
+     * @return self
+     */
+    public function booting(Closure $callback): self
+    {
+        $this->bootingCallbacks[] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * Register a callback to run after booting.
+     *
+     * @param Closure $callback
+     * @return self
+     */
+    public function booted(Closure $callback): self
+    {
+        $this->bootedCallbacks[] = $callback;
+
+        // If already booted, fire immediately
+        if ($this->booted) {
+            $callback($this);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Fire application callbacks.
+     *
+     * @param array<Closure> $callbacks
+     * @return void
+     */
+    private function fireAppCallbacks(array $callbacks): void
+    {
+        foreach ($callbacks as $callback) {
+            $callback($this);
+        }
+    }
+
+    /**
+     * Get deferred services and their providers.
+     *
+     * @return array<string, string>
+     */
+    public function getDeferredServices(): array
+    {
+        return $this->deferredServices;
+    }
+
+    /**
+     * Set deferred services (useful for caching).
+     *
+     * @param array<string, string> $services
+     * @return void
+     */
+    public function setDeferredServices(array $services): void
+    {
+        $this->deferredServices = $services;
+    }
+
+    /**
+     * Determine if a service is deferred.
+     *
+     * @param string $service
+     * @return bool
+     */
+    public function isDeferredService(string $service): bool
+    {
+        return isset($this->deferredServices[$service]);
+    }
+
+    /**
+     * Get all registered providers.
+     *
+     * @return array<ServiceProviderInterface>
+     */
+    public function getProviders(): array
+    {
+        return $this->providers;
+    }
+
+    /**
+     * Get a provider instance by class name.
+     *
+     * @param string $providerClass
+     * @return ServiceProviderInterface|null
+     */
+    public function getProvider(string $providerClass): ?ServiceProviderInterface
+    {
+        return $this->loadedProviders[$providerClass] ?? null;
     }
 
     /**
@@ -153,17 +417,6 @@ class Application
     public function path(string $path = ''): string
     {
         return $this->basePath . ($path ? DIRECTORY_SEPARATOR . $path : '');
-    }
-
-    /**
-     * Resolve a service from the container.
-     *
-     * @param string $id
-     * @return mixed
-     */
-    public function make(string $id): mixed
-    {
-        return $this->container->get($id);
     }
 
     /**
@@ -465,13 +718,78 @@ class Application
     /**
      * Register a terminating callback with the application.
      *
-     * @param callable $callback
-     * @return $this
+     * @param Closure $callback
+     * @return self
      */
-    public function terminating(callable $callback): self
+    public function terminating(Closure $callback): self
     {
-        // Store terminating callbacks for later execution
-        // This would be implemented when needed
+        $this->terminatingCallbacks[] = $callback;
+
         return $this;
+    }
+
+    /**
+     * Terminate the application.
+     *
+     * @return void
+     */
+    public function terminate(): void
+    {
+        foreach ($this->terminatingCallbacks as $callback) {
+            $callback($this);
+        }
+    }
+
+    /**
+     * Resolve a service, loading deferred provider if needed.
+     *
+     * @param string $abstract
+     * @param array $parameters
+     * @return mixed
+     */
+    public function makeWith(string $abstract, array $parameters = []): mixed
+    {
+        // Load deferred provider if this service is deferred
+        $this->loadDeferredProviderIfNeeded($abstract);
+
+        return $this->container->make($abstract, $parameters);
+    }
+
+    /**
+     * Resolve a service, loading deferred provider if needed.
+     *
+     * Override make to support deferred providers.
+     *
+     * @param string $id
+     * @return mixed
+     */
+    public function make(string $id): mixed
+    {
+        // Load deferred provider if this service is deferred
+        $this->loadDeferredProviderIfNeeded($id);
+
+        return $this->container->get($id);
+    }
+
+    /**
+     * Determine if a provider has been loaded.
+     *
+     * @param string $provider Provider class name
+     * @return bool
+     */
+    public function providerIsLoaded(string $provider): bool
+    {
+        return isset($this->loadedProviders[$provider]);
+    }
+
+    /**
+     * Get the registered service provider instances if any exist.
+     *
+     * @param string $provider Provider class name
+     * @return array
+     */
+    public function getLoadedProviders(): array
+    {
+        return $this->loadedProviders;
     }
 }

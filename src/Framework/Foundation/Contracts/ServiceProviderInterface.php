@@ -14,10 +14,12 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
  * implementations in the Application foundation and bootstrapping layer of
  * the Toporia Framework.
  *
+ * Supports deferred providers for lazy-loading services to improve boot performance.
+ *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
- * @version     1.0.0
+ * @version     2.0.0
  * @package     toporia/framework
  * @subpackage  Foundation\Contracts
  * @since       2025-01-10
@@ -50,4 +52,24 @@ interface ServiceProviderInterface
      * @return void
      */
     public function boot(ContainerInterface $container): void;
+
+    /**
+     * Get the services provided by this provider.
+     *
+     * Used for deferred providers to determine which services this provider offers.
+     * Return an empty array if not a deferred provider.
+     *
+     * @return array<string> List of service identifiers
+     */
+    public function provides(): array;
+
+    /**
+     * Determine if the provider is deferred.
+     *
+     * Deferred providers are not registered until one of their services is requested.
+     * This improves application boot performance.
+     *
+     * @return bool
+     */
+    public function isDeferred(): bool;
 }
