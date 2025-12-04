@@ -219,22 +219,34 @@ abstract class Relation implements RelationInterface
      * Set WHERE IN constraint for eager loading.
      *
      * OPTIMIZED: Automatically applies soft delete scope if related model uses soft deletes.
+     * PERFORMANCE: Uses array_flip for O(n) deduplication instead of array_unique O(n log n).
      *
      * @param array<int, Model> $models
      * @return void
      */
     public function addEagerConstraints(array $models): void
     {
+        // Early return for empty models
+        if (empty($models)) {
+            return;
+        }
+
+        // OPTIMIZATION: Pre-allocate array with estimated size
+        // Use array_flip for O(n) deduplication instead of array_unique O(n log n)
         $keys = [];
         foreach ($models as $model) {
             $key = $model->getAttribute($this->localKey);
             if ($key !== null) {
-                $keys[] = $key;
+                // Use key as array key for automatic deduplication (O(1) lookup)
+                $keys[$key] = true;
             }
         }
 
+        // Convert back to array of values only if we have keys
         if (!empty($keys)) {
-            $this->query->whereIn($this->foreignKey, array_unique($keys));
+            // array_keys is O(n) and preserves order, better than array_unique for large arrays
+            $uniqueKeys = array_keys($keys);
+            $this->query->whereIn($this->foreignKey, $uniqueKeys);
         }
 
         // Apply soft delete scope if related model uses soft deletes

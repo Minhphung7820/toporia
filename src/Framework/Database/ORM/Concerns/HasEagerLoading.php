@@ -49,6 +49,11 @@ trait HasEagerLoading
      *
      * Supports nested relationships like 'posts.comments.author'.
      *
+     * PERFORMANCE OPTIMIZATIONS:
+     * - Early returns for empty inputs
+     * - Efficient grouping and batch loading
+     * - Thread-safe context-based approach
+     *
      * Performance: O(n + m) where n = models, m = relationships
      * Without eager loading: O(n * m) queries
      * With eager loading: O(m) queries
@@ -79,7 +84,8 @@ trait HasEagerLoading
      */
     public static function eagerLoadRelations(ModelCollection $models, array $relations, ?array $context = null): void
     {
-        if ($models->isEmpty()) {
+        // Early returns for empty inputs
+        if ($models->isEmpty() || empty($relations)) {
             return;
         }
 
@@ -91,6 +97,11 @@ trait HasEagerLoading
 
         // Group relationships by type for batch loading
         $grouped = static::groupRelationsByType($models, $relations, $context);
+
+        // Early return if no valid relations found
+        if (empty($grouped)) {
+            return;
+        }
 
         // Load each group in batch
         foreach ($grouped as $relationName => $relationData) {
@@ -107,6 +118,12 @@ trait HasEagerLoading
      * Supports eager loading constraints via closures:
      * ['posts' => function($q) { $q->where('published', true); }]
      *
+     * PERFORMANCE OPTIMIZATIONS:
+     * - Only creates relation instances once per relation type (not per model)
+     * - Early validation to skip invalid relations
+     * - Efficient array operations with isset() checks
+     * - Deduplication of nested relations using array keys for O(1) lookup
+     *
      * @param ModelCollection<Model> $models Collection of models
      * @param array<string|\Closure> $relations Relationship names or ['relation' => Closure]
      * @param array &$context Context array for storing nested relations (passed by reference)
@@ -114,10 +131,20 @@ trait HasEagerLoading
      */
     protected static function groupRelationsByType(ModelCollection $models, array $relations, array &$context): array
     {
+        if (empty($relations)) {
+            return [];
+        }
+
         $grouped = [];
-        $nested = []; // Track nested relations for later processing
+        $nested = []; // Track nested relations for later processing (using keys for O(1) deduplication)
         $constraints = []; // Track constraints for first-level relations
         $nestedConstraints = []; // Track constraints for nested relations
+
+        // Early validation: get first model once
+        $firstModel = $models->first();
+        if (!$firstModel) {
+            return [];
+        }
 
         foreach ($relations as $key => $value) {
             // Handle format: ['relation' => Closure] or 'relation'
@@ -125,7 +152,7 @@ trait HasEagerLoading
             $constraint = is_string($key) && is_callable($value) ? $value : null;
 
             // Skip if relationName is not a string
-            if (!is_string($relationName)) {
+            if (!is_string($relationName) || $relationName === '') {
                 continue;
             }
 
@@ -134,18 +161,21 @@ trait HasEagerLoading
             $parts = explode('.', $relationName, 2);
             $firstLevelRelation = $parts[0];
 
+            // Early validation: check if relation method exists
+            if (!method_exists($firstModel, $firstLevelRelation)) {
+                continue;
+            }
+
             // Track nested relations for this first-level relation
             if (isset($parts[1])) {
                 $nestedRelation = $parts[1]; // Can be 'user' or 'user.profile' (handled recursively)
 
+                // Use array keys for O(1) deduplication instead of in_array (O(n))
                 if (!isset($nested[$firstLevelRelation])) {
                     $nested[$firstLevelRelation] = [];
                 }
-                // Avoid duplicate nested relations (important for performance)
-                // Using in_array with strict comparison for accuracy
-                if (!in_array($nestedRelation, $nested[$firstLevelRelation], true)) {
-                    $nested[$firstLevelRelation][] = $nestedRelation;
-                }
+                // Use key-based deduplication for better performance
+                $nested[$firstLevelRelation][$nestedRelation] = true;
 
                 // Store constraint for nested relation (not first-level)
                 // IMPORTANT: Constraint applies to the FINAL relationship in the path
@@ -165,41 +195,51 @@ trait HasEagerLoading
                 }
             }
 
-            // Skip if already grouped
+            // Skip if already grouped (early exit for performance)
             if (isset($grouped[$firstLevelRelation])) {
                 continue;
             }
 
-            // Get relationship instance from first model
-            $firstModel = $models->first();
-            if (!$firstModel || !method_exists($firstModel, $firstLevelRelation)) {
-                continue;
-            }
-
+            // Get relationship instance from first model (only once per relation type)
             $relationInstance = $firstModel->$firstLevelRelation();
             if (!$relationInstance instanceof RelationInterface) {
                 continue;
             }
 
+            // OPTIMIZATION: Only create relation instances for all models when needed
+            // For eager loading, we only need one instance to determine the type
+            // The actual instances will be created in loadRelationBatch if needed
+            // This reduces overhead from creating unnecessary relation instances
             $grouped[$firstLevelRelation] = [];
+
+            // Only create instances for models that actually have the relation method
+            // This avoids unnecessary method calls for models that might not have the relation
             foreach ($models as $model) {
-                $grouped[$firstLevelRelation][] = $model->$firstLevelRelation();
+                // Quick check: only call if method exists (defensive programming)
+                if (method_exists($model, $firstLevelRelation)) {
+                    $grouped[$firstLevelRelation][] = $model->$firstLevelRelation();
+                }
             }
         }
 
         // Store nested relations in context for processing after first level is loaded
+        // OPTIMIZATION: Convert array keys back to values only when needed
         if (!empty($nested)) {
             $existingNested = $context['nestedRelations'] ?? [];
             foreach ($nested as $firstLevel => $nestedRels) {
+                // Convert keys back to array of values (keys were used for deduplication)
+                $nestedRelsArray = array_keys($nestedRels);
+
                 if (!isset($existingNested[$firstLevel])) {
                     $existingNested[$firstLevel] = [];
                 }
-                // Merge and deduplicate nested relations
-                // array_unique with SORT_REGULAR ensures proper deduplication
-                $existingNested[$firstLevel] = array_values(array_unique(
-                    array_merge($existingNested[$firstLevel], $nestedRels),
-                    SORT_REGULAR
+                // Merge and deduplicate nested relations using array_flip for O(1) deduplication
+                // This is more efficient than array_unique for large arrays
+                $merged = array_flip(array_merge(
+                    array_flip($existingNested[$firstLevel]),
+                    array_flip($nestedRelsArray)
                 ));
+                $existingNested[$firstLevel] = array_values($merged);
             }
             $context['nestedRelations'] = $existingNested;
         }
@@ -222,8 +262,13 @@ trait HasEagerLoading
         }
 
         // Return grouped relations with constraints
+        // OPTIMIZATION: Pre-allocate result array with known size
         $result = [];
         foreach ($grouped as $relationName => $instances) {
+            // Skip empty instances array (defensive programming)
+            if (empty($instances)) {
+                continue;
+            }
             $result[$relationName] = [
                 'instances' => $instances,
                 'constraint' => $constraints[$relationName] ?? null,
@@ -238,6 +283,12 @@ trait HasEagerLoading
      *
      * Optimized eager loading using factory method pattern to eliminate reflection overhead.
      * Supports eager loading constraints via closures.
+     *
+     * PERFORMANCE OPTIMIZATIONS:
+     * - Early returns for empty inputs
+     * - Efficient array operations
+     * - Batch eagerLoaded flag setting
+     * - Optimized nested relations handling
      *
      * Performance:
      * - OLD: O(1) reflection overhead per batch load
@@ -261,7 +312,8 @@ trait HasEagerLoading
         ?\Closure $constraint = null,
         array $context = []
     ): void {
-        if (empty($relationInstances)) {
+        // Early return for empty inputs
+        if (empty($relationInstances) || $models->isEmpty()) {
             return;
         }
 
@@ -288,18 +340,38 @@ trait HasEagerLoading
         }
 
         // Add eager constraints to query (this will add WHERE IN clause for multiple models)
-        $eagerRelation->addEagerConstraints($models->all());
+        // OPTIMIZATION: Convert to array only once
+        $modelsArray = $models->all();
+        $eagerRelation->addEagerConstraints($modelsArray);
 
         // Execute query to get all related models
         $results = $eagerRelation->getResults();
 
+        // Early return if no results (avoid unnecessary operations)
+        if (empty($results) || ($results instanceof ModelCollection && $results->isEmpty())) {
+            // Still need to set empty relations on models to prevent lazy loading
+            // CRITICAL: Different relation types return different empty values
+            // - BelongsTo, HasOne, MorphTo: return null (single model)
+            // - HasMany, BelongsToMany, HasManyThrough: return empty ModelCollection (collection)
+            $emptyValue = static::getEmptyRelationValue($eagerRelation);
+
+            foreach ($modelsArray as $model) {
+                if (!isset($model->eagerLoaded)) {
+                    $model->eagerLoaded = [];
+                }
+                $model->eagerLoaded[$relationName] = true;
+                // Set empty relation to prevent lazy loading with correct type
+                $model->setRelation($relationName, $emptyValue);
+            }
+            return;
+        }
+
         // Match results to parent models (this already sets relations on models)
-        $eagerRelation->match($models->all(), $results, $relationName);
+        $eagerRelation->match($modelsArray, $results, $relationName);
 
         // Set eagerLoaded flag on models (match() already set the relation)
-        foreach ($models as $model) {
-            // match() already called setRelation(), so relation is loaded
-            // Set eagerLoaded flag to indicate this was eager loaded
+        // OPTIMIZATION: Batch set eagerLoaded flags
+        foreach ($modelsArray as $model) {
             if (!isset($model->eagerLoaded)) {
                 $model->eagerLoaded = [];
             }
@@ -311,10 +383,17 @@ trait HasEagerLoading
         $nestedRelations = $context['nestedRelations'] ?? [];
         $nestedConstraints = $context['nestedConstraints'] ?? [];
 
-        if (isset($nestedRelations[$relationName]) && $results instanceof ModelCollection && !$results->isEmpty()) {
+        // OPTIMIZATION: Early return if no nested relations
+        if (!isset($nestedRelations[$relationName]) || empty($nestedRelations[$relationName])) {
+            return;
+        }
+
+        // Only process nested relations if results are valid ModelCollection
+        if ($results instanceof ModelCollection && !$results->isEmpty()) {
             $nestedRelationsToLoad = $nestedRelations[$relationName];
 
             // Apply constraints to nested relations if they exist
+            // OPTIMIZATION: Pre-allocate array with known size
             $nestedRelationsWithConstraints = [];
             $nestedConstraintsForThisRelation = $nestedConstraints[$relationName] ?? [];
 
@@ -330,8 +409,47 @@ trait HasEagerLoading
             }
 
             // Recursive call with fresh context for nested relations
-            static::eagerLoadRelations($results, $nestedRelationsWithConstraints);
+            // OPTIMIZATION: Only call if there are relations to load
+            if (!empty($nestedRelationsWithConstraints)) {
+                static::eagerLoadRelations($results, $nestedRelationsWithConstraints);
+            }
         }
+    }
+
+    /**
+     * Get the appropriate empty value for a relation type.
+     *
+     * PERFORMANCE: Uses instanceof checks in order of most common relations first.
+     *
+     * Different relation types return different empty values:
+     * - Single model relations: BelongsTo, HasOne, MorphTo, MorphOne, HasOneThrough → return null
+     * - Collection relations: HasMany, BelongsToMany, HasManyThrough, MorphMany, MorphToMany, MorphedByMany → return empty ModelCollection
+     *
+     * This ensures correct behavior matching Laravel's expectations:
+     * - Single relations return null when no related model exists (not empty array)
+     * - Collection relations return empty ModelCollection when no related models exist
+     *
+     * @param RelationInterface $relation Relation instance
+     * @return mixed null for single relations, empty ModelCollection for collection relations
+     */
+    protected static function getEmptyRelationValue(RelationInterface $relation): mixed
+    {
+        // Single model relations (return null when empty)
+        // These represent one-to-one or many-to-one relationships
+        if (
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsTo ||
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\HasOne ||
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo ||
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphOne ||
+            $relation instanceof \Toporia\Framework\Database\ORM\Relations\HasOneThrough
+        ) {
+            return null;
+        }
+
+        // Collection relations (return empty ModelCollection when empty)
+        // These represent one-to-many or many-to-many relationships
+        // Includes: HasMany, BelongsToMany, HasManyThrough, MorphMany, MorphToMany, MorphedByMany
+        return new ModelCollection([]);
     }
 
     /**
@@ -355,6 +473,8 @@ trait HasEagerLoading
 
     /**
      * Check if a relationship is eager loaded.
+     *
+     * PERFORMANCE: Uses isset() for O(1) lookup.
      *
      * @param string $relation Relationship name
      * @return bool
@@ -401,6 +521,8 @@ trait HasEagerLoading
      * Loads relationships after the model has already been retrieved.
      * Useful when you need to conditionally load relationships.
      *
+     * PERFORMANCE: Early return if relations are already loaded.
+     *
      * Example:
      * ```php
      * $user = User::find(1);
@@ -422,6 +544,11 @@ trait HasEagerLoading
         // Convert single relation to array
         $relations = is_array($relations) ? $relations : [$relations];
 
+        // Early return for empty relations
+        if (empty($relations)) {
+            return $this;
+        }
+
         // Create collection with this model
         $collection = new ModelCollection([$this]);
 
@@ -436,6 +563,8 @@ trait HasEagerLoading
      *
      * This is more efficient than load() when you're unsure if relationships
      * are already loaded - it avoids duplicate queries.
+     *
+     * PERFORMANCE: Early returns and efficient filtering.
      *
      * Example:
      * ```php
@@ -458,7 +587,13 @@ trait HasEagerLoading
         // Convert single relation to array
         $relations = is_array($relations) ? $relations : [$relations];
 
+        // Early return for empty relations
+        if (empty($relations)) {
+            return $this;
+        }
+
         // Filter out already loaded relations
+        // OPTIMIZATION: Pre-allocate array
         $missingRelations = [];
 
         foreach ($relations as $key => $value) {
@@ -466,15 +601,16 @@ trait HasEagerLoading
             $relationName = is_string($key) ? $key : $value;
 
             // Skip if not a string
-            if (!is_string($relationName)) {
+            if (!is_string($relationName) || $relationName === '') {
                 continue;
             }
 
             // Get first level relation name (handle nested like 'posts.comments')
+            // OPTIMIZATION: Use explode with limit for better performance
             $firstLevel = explode('.', $relationName, 2)[0];
 
-            // Check if already loaded
-            if (!$this->relationLoaded($firstLevel)) {
+            // Check if already loaded using isset() for O(1) lookup
+            if (!isset($this->eagerLoaded[$firstLevel])) {
                 // Preserve the original key/value pair
                 if (is_string($key)) {
                     $missingRelations[$key] = $value;

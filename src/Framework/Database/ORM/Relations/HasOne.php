@@ -334,17 +334,31 @@ class HasOne extends Relation
     /**
      * {@inheritdoc}
      */
+    /**
+     * {@inheritdoc}
+     *
+     * PERFORMANCE: Optimized dictionary building and null handling for single model relations.
+     * Single relations (HasOne) return null when empty, not empty array.
+     */
     public function match(array $models, mixed $results, string $relationName): array
     {
-        if (!$results instanceof ModelCollection) {
+        // Early return: set null for all models if no results (single relation behavior)
+        if (!$results instanceof ModelCollection || $results->isEmpty()) {
+            foreach ($models as $model) {
+                $model->setRelation($relationName, null);
+            }
             return $models;
         }
 
+        // OPTIMIZATION: Build dictionary once and reuse
         $dictionary = $this->buildDictionary($results);
 
+        // OPTIMIZATION: Batch set relations with efficient lookup
         foreach ($models as $model) {
             $localValue = $model->getAttribute($this->localKey);
-            $model->setRelation($relationName, $dictionary[$localValue] ?? null);
+            // Use isset() for O(1) lookup instead of ?? operator with array access
+            $relatedModel = isset($dictionary[$localValue]) ? $dictionary[$localValue] : null;
+            $model->setRelation($relationName, $relatedModel);
         }
 
         return $models;

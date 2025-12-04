@@ -108,10 +108,9 @@ final class ProductController extends BaseController
         $optimizedQuery = ProductModel::query()
             ->with([
                 'categories',
-                'reviews' => function ($q) {
-                    return $q->where('helpful_count', '<', 20);
+                'reviews.user' => function ($q) {
+                    return $q->where('id', '=', 12324);
                 },
-                'reviews.user'
             ])
             ->optimizeForLargeResults()
             ->orderBy('id', 'ASC') // Cursor column must be ordered

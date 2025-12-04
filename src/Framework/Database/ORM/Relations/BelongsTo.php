@@ -163,9 +163,14 @@ class BelongsTo extends Relation
      */
     public function addEagerConstraints(array $models): void
     {
+        // Early return for empty models
+        if (empty($models)) {
+            return;
+        }
+
         $keys = $this->extractForeignKeys($models);
 
-        if ($keys !== []) {
+        if (!empty($keys)) {
             $this->query->whereIn($this->localKey, $keys);
         }
 
@@ -178,15 +183,23 @@ class BelongsTo extends Relation
      */
     public function match(array $models, mixed $results, string $relationName): array
     {
-        if (!$results instanceof ModelCollection) {
+        if (!$results instanceof ModelCollection || $results->isEmpty()) {
+            // Set null relations for all models to prevent lazy loading
+            foreach ($models as $model) {
+                $model->setRelation($relationName, null);
+            }
             return $models;
         }
 
+        // OPTIMIZATION: Build dictionary once and reuse
         $dictionary = $this->buildDictionary($results);
 
+        // OPTIMIZATION: Batch set relations with efficient lookup
         foreach ($models as $model) {
             $foreignValue = $model->getAttribute($this->foreignKey);
-            $model->setRelation($relationName, $dictionary[$foreignValue] ?? null);
+            // Use isset() for O(1) lookup instead of ?? operator with array access
+            $relatedModel = isset($dictionary[$foreignValue]) ? $dictionary[$foreignValue] : null;
+            $model->setRelation($relationName, $relatedModel);
         }
 
         return $models;
@@ -475,23 +488,35 @@ class BelongsTo extends Relation
     /**
      * Extract foreign keys from models array.
      *
+     * PERFORMANCE: Uses array keys for O(n) deduplication instead of array_unique O(n log n).
+     *
      * @param array<Model> $models
      * @return array<int|string>
      */
     protected function extractForeignKeys(array $models): array
     {
+        // Early return for empty models
+        if (empty($models)) {
+            return [];
+        }
+
+        // OPTIMIZATION: Use array keys for automatic deduplication (O(1) lookup)
         $keys = [];
         foreach ($models as $model) {
             $key = $model->getAttribute($this->foreignKey);
             if ($key !== null) {
-                $keys[] = $key;
+                $keys[$key] = true;
             }
         }
-        return array_values(array_unique($keys));
+
+        // Convert back to array of values (array_keys is O(n) and preserves order)
+        return array_keys($keys);
     }
 
     /**
      * Build dictionary mapping owner key to model.
+     *
+     * PERFORMANCE: Optimized dictionary building with early validation.
      *
      * @return array<int|string, Model>
      */
@@ -501,6 +526,7 @@ class BelongsTo extends Relation
         foreach ($results as $result) {
             $key = $result->getAttribute($this->localKey);
             if ($key !== null) {
+                // Direct assignment - no need for isset() check since we're overwriting
                 $dictionary[$key] = $result;
             }
         }

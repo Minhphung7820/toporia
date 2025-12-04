@@ -373,20 +373,33 @@ class MorphMany extends Relation
     /**
      * {@inheritdoc}
      */
+    /**
+     * {@inheritdoc}
+     *
+     * PERFORMANCE: Optimized dictionary building for collection relations.
+     * Collection relations (MorphMany) return empty ModelCollection when empty.
+     */
     public function match(array $models, mixed $results, string $relationName): array
     {
-        if (!$results instanceof ModelCollection) {
+        // Early return: set empty collections for all models if no results (collection relation behavior)
+        if (!$results instanceof ModelCollection || $results->isEmpty()) {
+            foreach ($models as $model) {
+                $model->setRelation($relationName, new ModelCollection([]));
+            }
             return $models;
         }
 
+        // OPTIMIZATION: Build dictionary once and reuse
         $dictionary = $this->buildDictionary($results);
 
+        // OPTIMIZATION: Batch set relations with efficient lookup
         foreach ($models as $model) {
             $type = get_class($model);
             $id = $model->getAttribute($this->localKey);
             $key = "{$type}:{$id}";
 
-            $related = $dictionary[$key] ?? [];
+            // Use isset() for O(1) lookup instead of ?? operator with array access
+            $related = isset($dictionary[$key]) ? $dictionary[$key] : [];
             $model->setRelation($relationName, new ModelCollection($related));
         }
 

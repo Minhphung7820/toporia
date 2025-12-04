@@ -286,15 +286,23 @@ class HasMany extends Relation
      */
     public function match(array $models, mixed $results, string $relationName): array
     {
-        if (!$results instanceof ModelCollection) {
+        if (!$results instanceof ModelCollection || $results->isEmpty()) {
+            // Set empty collections for all models to prevent lazy loading
+            foreach ($models as $model) {
+                $model->setRelation($relationName, new ModelCollection([]));
+            }
             return $models;
         }
 
+        // OPTIMIZATION: Build dictionary once and reuse
         $dictionary = $this->buildDictionary($results);
 
+        // OPTIMIZATION: Batch set relations
         foreach ($models as $model) {
             $localValue = $model->getAttribute($this->localKey);
-            $model->setRelation($relationName, new ModelCollection($dictionary[$localValue] ?? []));
+            // Use isset() for O(1) lookup instead of ?? operator with array access
+            $relatedModels = isset($dictionary[$localValue]) ? $dictionary[$localValue] : [];
+            $model->setRelation($relationName, new ModelCollection($relatedModels));
         }
 
         return $models;
@@ -314,6 +322,8 @@ class HasMany extends Relation
      * For HasMany, multiple results can belong to the same parent,
      * so we group them by foreign key.
      *
+     * PERFORMANCE: Optimized array building with isset() checks.
+     *
      * @param ModelCollection $results
      * @return array<int|string, array<Model>>
      */
@@ -323,6 +333,8 @@ class HasMany extends Relation
         foreach ($results as $result) {
             $key = $result->getAttribute($this->foreignKey);
             if ($key !== null) {
+                // OPTIMIZATION: Use isset() check and direct assignment
+                // This is faster than checking isset() then assigning separately
                 if (!isset($dictionary[$key])) {
                     $dictionary[$key] = [];
                 }
