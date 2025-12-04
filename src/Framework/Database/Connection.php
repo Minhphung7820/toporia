@@ -50,6 +50,16 @@ class Connection implements ConnectionInterface
     private ?GrammarInterface $grammar = null;
 
     /**
+     * @var int Transaction nesting level (for savepoint support).
+     */
+    private int $transactionLevel = 0;
+
+    /**
+     * @var array<string> Stack of savepoint names for nested transactions.
+     */
+    private array $savepointStack = [];
+
+    /**
      * @param array $config Connection configuration.
      *        Required keys: driver, host, database, username, password
      *        Optional keys: port, charset, options
@@ -216,44 +226,193 @@ class Connection implements ConnectionInterface
     }
 
     /**
-     * {@inheritdoc}
+     * Begin a transaction with nested transaction (savepoint) support.
+     *
+     * For the first level, uses standard PDO beginTransaction().
+     * For nested levels, creates a savepoint instead.
+     *
+     * @return bool True on success
+     * @throws PDOException On connection error
+     *
+     * @example
+     * ```php
+     * $conn->beginTransaction();           // Level 1: START TRANSACTION
+     * $conn->beginTransaction();           // Level 2: SAVEPOINT trans_2
+     * $conn->rollback();                   // ROLLBACK TO SAVEPOINT trans_2
+     * $conn->commit();                     // COMMIT
+     * ```
      */
     public function beginTransaction(): bool
     {
-        try {
-            return $this->getPdo()->beginTransaction();
-        } catch (PDOException $e) {
-            // If connection was lost, reconnect and retry
-            if ($this->isConnectionLost($e)) {
-                $this->reconnect();
+        $this->transactionLevel++;
+
+        // First level: start actual transaction
+        if ($this->transactionLevel === 1) {
+            try {
                 return $this->getPdo()->beginTransaction();
+            } catch (PDOException $e) {
+                $this->transactionLevel--;
+                if ($this->isConnectionLost($e)) {
+                    $this->reconnect();
+                    $this->transactionLevel++;
+                    return $this->getPdo()->beginTransaction();
+                }
+                throw $e;
             }
-            throw $e;
         }
+
+        // Nested level: create savepoint
+        $savepointName = 'trans_' . $this->transactionLevel;
+        $this->savepointStack[] = $savepointName;
+        $this->createSavepoint($savepointName);
+
+        return true;
     }
 
     /**
-     * {@inheritdoc}
+     * Commit a transaction or release a savepoint.
+     *
+     * For nested transactions (level > 1), releases the savepoint.
+     * For the outermost transaction (level 1), commits the transaction.
+     *
+     * @return bool True on success
      */
     public function commit(): bool
     {
+        if ($this->transactionLevel === 0) {
+            return false;
+        }
+
+        // Nested level: release savepoint
+        if ($this->transactionLevel > 1) {
+            $savepointName = array_pop($this->savepointStack);
+            if ($savepointName !== null) {
+                $this->releaseSavepoint($savepointName);
+            }
+            $this->transactionLevel--;
+            return true;
+        }
+
+        // Outermost level: commit transaction
+        $this->transactionLevel = 0;
+        $this->savepointStack = [];
         return $this->getPdo()->commit();
     }
 
     /**
-     * {@inheritdoc}
+     * Rollback a transaction or rollback to a savepoint.
+     *
+     * For nested transactions (level > 1), rolls back to the savepoint.
+     * For the outermost transaction (level 1), rolls back the entire transaction.
+     *
+     * @return bool True on success
      */
     public function rollback(): bool
     {
+        if ($this->transactionLevel === 0) {
+            return false;
+        }
+
+        // Nested level: rollback to savepoint
+        if ($this->transactionLevel > 1) {
+            $savepointName = array_pop($this->savepointStack);
+            if ($savepointName !== null) {
+                $this->rollbackToSavepoint($savepointName);
+            }
+            $this->transactionLevel--;
+            return true;
+        }
+
+        // Outermost level: rollback transaction
+        $this->transactionLevel = 0;
+        $this->savepointStack = [];
         return $this->getPdo()->rollBack();
     }
 
     /**
-     * {@inheritdoc}
+     * Check if currently in a transaction.
+     *
+     * @return bool True if in transaction
      */
     public function inTransaction(): bool
     {
-        return $this->getPdo()->inTransaction();
+        return $this->transactionLevel > 0 || $this->getPdo()->inTransaction();
+    }
+
+    /**
+     * Get the current transaction nesting level.
+     *
+     * @return int Transaction level (0 = no transaction)
+     */
+    public function getTransactionLevel(): int
+    {
+        return $this->transactionLevel;
+    }
+
+    /**
+     * Create a named savepoint.
+     *
+     * Savepoints allow partial rollback within a transaction.
+     * Compatible with MySQL, PostgreSQL, SQLite.
+     *
+     * @param string $name Savepoint name (must be valid SQL identifier)
+     * @return void
+     * @throws QueryException On SQL error
+     *
+     * @example
+     * ```php
+     * $conn->beginTransaction();
+     * // Do some work...
+     * $conn->createSavepoint('before_risky_operation');
+     * try {
+     *     // Risky operation...
+     * } catch (Exception $e) {
+     *     $conn->rollbackToSavepoint('before_risky_operation');
+     * }
+     * $conn->commit();
+     * ```
+     */
+    public function createSavepoint(string $name): void
+    {
+        $this->getPdo()->exec("SAVEPOINT {$name}");
+    }
+
+    /**
+     * Release (delete) a savepoint.
+     *
+     * Releases the named savepoint, making it no longer available for rollback.
+     * This is optional - savepoints are automatically released on commit.
+     *
+     * Note: SQLite does not support RELEASE SAVEPOINT, so we skip it silently.
+     *
+     * @param string $name Savepoint name
+     * @return void
+     */
+    public function releaseSavepoint(string $name): void
+    {
+        $driver = $this->getDriverName();
+
+        // SQLite doesn't support RELEASE SAVEPOINT
+        if ($driver === 'sqlite') {
+            return;
+        }
+
+        $this->getPdo()->exec("RELEASE SAVEPOINT {$name}");
+    }
+
+    /**
+     * Rollback to a savepoint.
+     *
+     * Undoes all changes made after the savepoint was created.
+     * The savepoint remains valid and can be rolled back to again.
+     *
+     * @param string $name Savepoint name
+     * @return void
+     * @throws QueryException On SQL error (e.g., savepoint doesn't exist)
+     */
+    public function rollbackToSavepoint(string $name): void
+    {
+        $this->getPdo()->exec("ROLLBACK TO SAVEPOINT {$name}");
     }
 
     /**

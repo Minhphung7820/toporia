@@ -186,6 +186,97 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
+     * Escape an identifier (column name, table name) for safe SQL use.
+     *
+     * CRITICAL SECURITY: Prevents SQL injection via column/table names.
+     * Uses backticks for MySQL, double quotes for PostgreSQL/SQLite.
+     *
+     * Handles:
+     * - Simple names: 'column' -> `column`
+     * - Qualified names: 'table.column' -> `table`.`column`
+     * - Already quoted: `column` -> `column` (no double escaping)
+     * - Expressions: DB::raw() expressions pass through unchanged
+     *
+     * @param string $identifier Column or table name
+     * @return string Safely escaped identifier
+     *
+     * @example
+     * ```php
+     * $this->escapeIdentifier('user_name');     // `user_name`
+     * $this->escapeIdentifier('users.name');    // `users`.`name`
+     * $this->escapeIdentifier('id); DROP--');   // `id); DROP--` (safe!)
+     * ```
+     */
+    protected function escapeIdentifier(string $identifier): string
+    {
+        // Skip if already contains backticks/quotes (already escaped) or is a raw expression
+        if (str_contains($identifier, '`') || str_contains($identifier, '"')) {
+            return $identifier;
+        }
+
+        // Skip special cases: *, expressions with parentheses, AS aliases
+        if ($identifier === '*' ||
+            str_contains($identifier, '(') ||
+            stripos($identifier, ' as ') !== false ||
+            str_contains($identifier, ' AS ')) {
+            return $identifier;
+        }
+
+        $driver = $this->connection->getDriverName();
+        $quote = match ($driver) {
+            'mysql' => '`',
+            'pgsql', 'sqlite' => '"',
+            default => '`',
+        };
+
+        // Handle qualified names (table.column)
+        if (str_contains($identifier, '.')) {
+            $parts = explode('.', $identifier);
+            return implode('.', array_map(
+                fn($part) => $part === '*' ? '*' : $quote . str_replace($quote, $quote . $quote, $part) . $quote,
+                $parts
+            ));
+        }
+
+        // Escape the quote character within the identifier (double it)
+        return $quote . str_replace($quote, $quote . $quote, $identifier) . $quote;
+    }
+
+    /**
+     * Escape multiple identifiers.
+     *
+     * @param array<string> $identifiers Column or table names
+     * @return array<string> Escaped identifiers
+     */
+    protected function escapeIdentifiers(array $identifiers): array
+    {
+        return array_map(fn($id) => $this->escapeIdentifier($id), $identifiers);
+    }
+
+    /**
+     * Validate and normalize ORDER BY direction.
+     *
+     * SECURITY: Prevents SQL injection via direction parameter.
+     * Only allows 'ASC' or 'DESC'.
+     *
+     * @param string $direction Direction string
+     * @return string Normalized direction ('ASC' or 'DESC')
+     * @throws \InvalidArgumentException If direction is invalid
+     */
+    protected function validateOrderDirection(string $direction): string
+    {
+        $normalized = strtoupper(trim($direction));
+
+        if (!in_array($normalized, ['ASC', 'DESC'], true)) {
+            throw new \InvalidArgumentException(
+                sprintf('Invalid ORDER BY direction: "%s". Must be ASC or DESC.', $direction)
+            );
+        }
+
+        return $normalized;
+    }
+
+    /**
      * Set the working table for the query.
      */
     public function table(string $table): self
@@ -635,18 +726,113 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
-     * Append an ORDER BY clause.
+     * Add a WHERE clause comparing two columns.
      *
-     * @param string $direction 'ASC' or 'DESC' (case-insensitive)
+     * This is essential for queries comparing columns against each other,
+     * not against literal values.
+     *
+     * @param string|Expression $first First column name or expression
+     * @param string $operator Comparison operator (=, <, >, <=, >=, <>, !=)
+     * @param string|Expression|null $second Second column name or expression (defaults to $operator if null)
+     * @param string $boolean Boolean operator (AND/OR)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Find users where updated_at > created_at
+     * $query->whereColumn('updated_at', '>', 'created_at');
+     *
+     * // Short syntax (operator defaults to =)
+     * $query->whereColumn('first_name', 'last_name');
+     *
+     * // With table prefixes
+     * $query->whereColumn('posts.user_id', '=', 'users.id');
+     *
+     * // Multiple column comparisons using array
+     * $query->whereColumn([
+     *     ['first_name', '=', 'last_name'],
+     *     ['updated_at', '>', 'created_at'],
+     * ]);
+     * ```
      */
+    public function whereColumn(
+        string|Expression|array $first,
+        ?string $operator = null,
+        string|Expression|null $second = null,
+        string $boolean = 'AND'
+    ): self {
+        // Handle array of column comparisons
+        if (is_array($first)) {
+            foreach ($first as $comparison) {
+                if (count($comparison) === 2) {
+                    $this->whereColumn($comparison[0], '=', $comparison[1], $boolean);
+                } elseif (count($comparison) >= 3) {
+                    $this->whereColumn($comparison[0], $comparison[1], $comparison[2], $boolean);
+                }
+            }
+            return $this;
+        }
+
+        // Handle short syntax: whereColumn('col1', 'col2') -> whereColumn('col1', '=', 'col2')
+        if ($second === null) {
+            $second = $operator;
+            $operator = '=';
+        }
+
+        // Validate operator
+        $validOperators = ['=', '<', '>', '<=', '>=', '<>', '!=', 'LIKE', 'NOT LIKE'];
+        $normalizedOperator = strtoupper($operator ?? '=');
+        if (!in_array($normalizedOperator, $validOperators, true)) {
+            throw new \InvalidArgumentException(
+                sprintf('Invalid whereColumn operator: "%s"', $operator)
+            );
+        }
+
+        $this->wheres[] = [
+            'type' => 'Column',
+            'first' => $first instanceof Expression ? (string) $first : $first,
+            'operator' => $normalizedOperator,
+            'second' => $second instanceof Expression ? (string) $second : $second,
+            'boolean' => strtoupper($boolean),
+        ];
+
+        $this->invalidateCache();
+
+        return $this;
+    }
+
+    /**
+     * Add an OR WHERE clause comparing two columns.
+     *
+     * @param string|Expression|array $first First column name or expression
+     * @param string|null $operator Comparison operator
+     * @param string|Expression|null $second Second column name
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $query->where('status', 'active')
+     *       ->orWhereColumn('updated_at', '>', 'created_at');
+     * ```
+     */
+    public function orWhereColumn(
+        string|Expression|array $first,
+        ?string $operator = null,
+        string|Expression|null $second = null
+    ): self {
+        return $this->whereColumn($first, $operator, $second, 'OR');
+    }
+
     /**
      * Add an ORDER BY clause.
      *
      * Accepts column names or Expression objects from DB::raw().
+     * SECURITY: Direction is validated to prevent SQL injection.
      *
      * @param string|Expression $column Column name or raw SQL expression
      * @param string $direction Sort direction (ASC or DESC)
      * @return $this
+     * @throws \InvalidArgumentException If direction is not ASC or DESC
      *
      * @example
      * ```php
@@ -660,9 +846,13 @@ class QueryBuilder implements QueryBuilderInterface
      */
     public function orderBy(string|Expression $column, string $direction = 'ASC'): self
     {
+        // Validate direction to prevent SQL injection
+        $validatedDirection = $this->validateOrderDirection($direction);
+
         $this->orders[] = [
             'column' => $column instanceof Expression ? (string) $column : $column,
-            'direction' => strtoupper($direction)
+            'direction' => $validatedDirection,
+            'isExpression' => $column instanceof Expression,
         ];
         $this->invalidateCache();
         return $this;
@@ -1410,6 +1600,168 @@ class QueryBuilder implements QueryBuilderInterface
     public function find(int|string $id, string $column = 'id'): mixed
     {
         return $this->where($column, $id)->first();
+    }
+
+    /**
+     * Find multiple rows by primary key values.
+     *
+     * @param array<int|string> $ids Array of primary key values
+     * @param string $column Primary key column (default: 'id')
+     * @return RowCollection Collection of matching rows
+     *
+     * @example
+     * ```php
+     * $users = DB::table('users')->findMany([1, 2, 3]);
+     * // SELECT * FROM users WHERE id IN (1, 2, 3)
+     * ```
+     */
+    public function findMany(array $ids, string $column = 'id'): RowCollection
+    {
+        if (empty($ids)) {
+            return new RowCollection([]);
+        }
+
+        return $this->whereIn($column, $ids)->get();
+    }
+
+    /**
+     * Get the first row or return a default value.
+     *
+     * Useful when you want a fallback instead of null.
+     *
+     * @param mixed $default Default value or callable that returns default
+     * @return mixed First row or default value
+     *
+     * @example
+     * ```php
+     * // With default value
+     * $user = DB::table('users')->where('id', 999)->firstOr(['name' => 'Guest']);
+     *
+     * // With callback
+     * $user = DB::table('users')->where('id', 999)->firstOr(function() {
+     *     return ['name' => 'New User', 'role' => 'guest'];
+     * });
+     * ```
+     */
+    public function firstOr(mixed $default = null): mixed
+    {
+        $result = $this->first();
+
+        if ($result !== null) {
+            return $result;
+        }
+
+        return is_callable($default) ? $default() : $default;
+    }
+
+    /**
+     * Get the first row or throw an exception.
+     *
+     * Use this when you expect the row to exist and want to fail fast if it doesn't.
+     *
+     * @return array<string,mixed> First row
+     * @throws \RuntimeException If no rows found
+     *
+     * @example
+     * ```php
+     * try {
+     *     $user = DB::table('users')->where('id', 1)->firstOrFail();
+     * } catch (\RuntimeException $e) {
+     *     // Handle not found
+     * }
+     * ```
+     */
+    public function firstOrFail(): array
+    {
+        $result = $this->first();
+
+        if ($result === null) {
+            throw new \RuntimeException(
+                sprintf('No query results for table [%s].', $this->table ?? 'unknown')
+            );
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get the only row matching the query or throw an exception.
+     *
+     * This method is strict: it throws if there are zero OR more than one results.
+     * Use when you expect EXACTLY one match.
+     *
+     * @return array<string,mixed> The single matching row
+     * @throws \RuntimeException If no rows or more than one row found
+     *
+     * @example
+     * ```php
+     * // Expect exactly one admin user
+     * $admin = DB::table('users')->where('role', 'admin')->sole();
+     *
+     * // Throws if:
+     * // - No admins exist (no matching records)
+     * // - Multiple admins exist (more than one record)
+     * ```
+     */
+    public function sole(): array
+    {
+        $this->limit(2); // Only fetch 2 to detect "more than one"
+
+        $collection = $this->get();
+        $count = $collection->count();
+
+        if ($count === 0) {
+            throw new \RuntimeException(
+                sprintf('No query results for table [%s].', $this->table ?? 'unknown')
+            );
+        }
+
+        if ($count > 1) {
+            throw new \RuntimeException(
+                sprintf('Multiple records found for table [%s] where only one was expected.', $this->table ?? 'unknown')
+            );
+        }
+
+        $first = $collection->first();
+        return is_array($first) ? $first : [];
+    }
+
+    /**
+     * Get the sole matching row or return a default value.
+     *
+     * Unlike sole(), this doesn't throw on zero results.
+     * Still throws if more than one result is found.
+     *
+     * @param mixed $default Default value if no rows found
+     * @return mixed The single row or default
+     * @throws \RuntimeException If more than one row found
+     *
+     * @example
+     * ```php
+     * $config = DB::table('settings')
+     *     ->where('key', 'app_name')
+     *     ->soleOr(['value' => 'My App']);
+     * ```
+     */
+    public function soleOr(mixed $default = null): mixed
+    {
+        $this->limit(2);
+
+        $collection = $this->get();
+        $count = $collection->count();
+
+        if ($count === 0) {
+            return is_callable($default) ? $default() : $default;
+        }
+
+        if ($count > 1) {
+            throw new \RuntimeException(
+                sprintf('Multiple records found for table [%s] where only one was expected.', $this->table ?? 'unknown')
+            );
+        }
+
+        $first = $collection->first();
+        return is_array($first) ? $first : $default;
     }
 
     /**
@@ -2448,7 +2800,7 @@ class QueryBuilder implements QueryBuilderInterface
                 'DayBasic'        => sprintf(' %s DAY(%s) %s ?', $boolean, $where['column'], $where['operator']),
                 'YearBasic'       => sprintf(' %s YEAR(%s) %s ?', $boolean, $where['column'], $where['operator']),
                 'TimeBasic'       => sprintf(' %s TIME(%s) %s ?', $boolean, $where['column'], $where['operator']),
-                'Column'          => sprintf(' %s %s %s %s', $boolean, $where['first'], $where['operator'], $where['second']),
+                'Column'          => $this->compileColumnWhere($where, $boolean),
                 'Exists'          => $this->compileExistsWhere($where, $boolean),
                 'NotExists'       => $this->compileNotExistsWhere($where, $boolean),
                 'InSub'           => $this->compileInSubWhere($where, $boolean),
@@ -2496,6 +2848,24 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         return sprintf(' %s (%s)', $boolean, $nestedWheres);
+    }
+
+    /**
+     * Compile a WHERE COLUMN comparison clause.
+     *
+     * SECURITY: Both column names are escaped to prevent SQL injection.
+     *
+     * @param array  $where   WHERE clause data with 'first', 'operator', 'second' keys
+     * @param string $boolean Boolean operator (AND/OR/WHERE)
+     * @return string Compiled SQL: " AND `first` = `second`"
+     */
+    private function compileColumnWhere(array $where, string $boolean): string
+    {
+        // Escape both column names for security
+        $first = $this->escapeIdentifier($where['first']);
+        $second = $this->escapeIdentifier($where['second']);
+
+        return sprintf(' %s %s %s %s', $boolean, $first, $where['operator'], $second);
     }
 
     /**
@@ -2640,6 +3010,8 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Compile a WHERE FULLTEXT clause.
      *
+     * SECURITY: Column names are escaped to prevent SQL injection.
+     *
      * @param array  $where   WHERE clause data
      * @param string $boolean Boolean operator
      * @return string
@@ -2648,17 +3020,26 @@ class QueryBuilder implements QueryBuilderInterface
     {
         $driver = $this->connection->getDriverName();
         $columns = $where['columns'];
-        $columnsStr = implode(', ', $columns);
+
+        // SECURITY: Escape column names to prevent SQL injection
+        $escapedColumns = $this->escapeIdentifiers($columns);
+        $columnsStr = implode(', ', $escapedColumns);
 
         return match ($driver) {
             'mysql' => sprintf(' %s MATCH(%s) AGAINST(? IN NATURAL LANGUAGE MODE)', $boolean, $columnsStr),
-            'pgsql' => sprintf(' %s to_tsvector(\'english\', %s) @@ to_tsquery(\'english\', ?)', $boolean, implode(" || ' ' || ", $columns)),
+            'pgsql' => sprintf(
+                ' %s to_tsvector(\'english\', %s) @@ to_tsquery(\'english\', ?)',
+                $boolean,
+                implode(" || ' ' || ", $escapedColumns)
+            ),
             default => sprintf(' %s MATCH(%s) AGAINST(? IN NATURAL LANGUAGE MODE)', $boolean, $columnsStr),
         };
     }
 
     /**
      * Compile ORDER BY clauses.
+     *
+     * SECURITY: Column names are escaped, directions are pre-validated in orderBy().
      */
     private function compileOrders(): string
     {
@@ -2667,7 +3048,14 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         $orders = array_map(
-            fn($order) => "{$order['column']} {$order['direction']}",
+            function ($order) {
+                // If it's a raw expression (DB::raw), use as-is
+                if (!empty($order['isExpression'])) {
+                    return "{$order['column']} {$order['direction']}";
+                }
+                // Otherwise escape the column name for security
+                return $this->escapeIdentifier($order['column']) . ' ' . $order['direction'];
+            },
             $this->orders
         );
 

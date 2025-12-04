@@ -150,34 +150,34 @@ trait SoftDeletes
      * Restore a soft-deleted model instance.
      *
      * Removes deleted_at timestamp to restore the record.
+     * Uses atomic UPDATE with WHERE condition to prevent race conditions.
+     *
+     * SECURITY: Atomic update prevents TOCTOU (Time-of-Check-Time-of-Use) race condition.
+     * The check and update happen in a single SQL statement.
      *
      * Performance: O(1) - Single UPDATE query
      *
-     * @return bool
+     * @return bool True if record was restored, false if already restored or not found
      */
     public function restore(): bool
     {
-        if (!$this->trashed()) {
-            return false;
-        }
-
-        // Use withTrashed() to update soft deleted record
-        // Regular save() uses query() which excludes soft deleted records
+        // Atomic update: only update if record is actually soft-deleted
+        // This prevents race condition where another process might have already restored it
         $deletedAt = null;
-        $this->setAttribute(static::$deletedAtColumn, $deletedAt);
 
-        // Update directly using withTrashed() to bypass soft delete scope
         $updated = static::withTrashed()
             ->where(static::getPrimaryKey(), $this->getKey())
+            ->whereNotNull(static::$deletedAtColumn) // Atomic check: only if still deleted
             ->update([static::$deletedAtColumn => $deletedAt]);
 
         if ($updated > 0) {
-            // Sync attributes after successful update
+            // Sync local model state after successful restore
             $this->setAttribute(static::$deletedAtColumn, $deletedAt);
             $this->syncOriginal();
             return true;
         }
 
+        // Either record doesn't exist or was already restored by another process
         return false;
     }
 
