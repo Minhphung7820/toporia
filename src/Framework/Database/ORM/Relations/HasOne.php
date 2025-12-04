@@ -23,6 +23,18 @@ use Toporia\Framework\Database\Query\QueryBuilder;
  */
 class HasOne extends Relation
 {
+    /** @var array|bool|null Default model attributes or boolean/null for withDefault() */
+    protected array|bool|null $withDefault = null;
+
+    /** @var bool Whether this is a one-of-many relationship */
+    protected bool $isOneOfMany = false;
+
+    /** @var string|null Column used for ofMany comparison */
+    protected ?string $oneOfManyColumn = null;
+
+    /** @var string ofMany aggregate function (MAX or MIN) */
+    protected string $oneOfManyAggregate = 'MAX';
+
     /**
      * @param QueryBuilder $query Query builder for related model
      * @param Model $parent Parent model instance
@@ -81,7 +93,7 @@ class HasOne extends Relation
     public function getResults(): ?Model
     {
         if (!$this->hasValidParentKey()) {
-            return null;
+            return $this->getDefaultFor($this->parent);
         }
 
         // Ensure table is set before executing query
@@ -94,7 +106,229 @@ class HasOne extends Relation
             }
         }
 
-        return $this->query->first();
+        $result = $this->query->first();
+
+        return $result ?? $this->getDefaultFor($this->parent);
+    }
+
+    /**
+     * Get the default value for the relationship.
+     *
+     * @param Model $parent Parent model
+     * @return Model|null Default model or null
+     */
+    protected function getDefaultFor(Model $parent): ?Model
+    {
+        if ($this->withDefault === null || $this->withDefault === false) {
+            return null;
+        }
+
+        $instance = new $this->relatedClass();
+
+        // Set the foreign key to link to parent
+        $instance->setAttribute($this->foreignKey, $parent->getAttribute($this->localKey));
+
+        if (is_array($this->withDefault)) {
+            foreach ($this->withDefault as $key => $value) {
+                // Support callable values
+                $instance->setAttribute($key, is_callable($value) ? $value($parent) : $value);
+            }
+        } elseif (is_callable($this->withDefault)) {
+            ($this->withDefault)($instance, $parent);
+        }
+
+        return $instance;
+    }
+
+    /**
+     * Return a default model if the relationship returns null.
+     *
+     * This is useful when you want to avoid null checks in your code.
+     * The default model will be a new (unsaved) instance of the related model.
+     *
+     * @param array|bool|callable $callback Default attributes, true for empty model, or callback
+     * @return $this
+     *
+     * @example
+     * // Return empty model
+     * public function profile(): HasOne
+     * {
+     *     return $this->hasOne(Profile::class)->withDefault();
+     * }
+     *
+     * // With default attributes
+     * public function profile(): HasOne
+     * {
+     *     return $this->hasOne(Profile::class)->withDefault([
+     *         'bio' => 'No bio yet'
+     *     ]);
+     * }
+     *
+     * // With callback
+     * public function profile(): HasOne
+     * {
+     *     return $this->hasOne(Profile::class)->withDefault(function ($profile, $user) {
+     *         $profile->bio = 'New profile for ' . $user->name;
+     *     });
+     * }
+     */
+    public function withDefault(array|bool|callable $callback = true): static
+    {
+        $this->withDefault = is_bool($callback) ? $callback : $callback;
+
+        return $this;
+    }
+
+    // =========================================================================
+    // OF MANY PATTERN (HasOneOfMany)
+    // =========================================================================
+
+    /**
+     * Indicate that the relationship is one of many.
+     *
+     * This pattern allows defining a HasOne relationship that selects a single
+     * record from what would normally be a HasMany relationship, based on
+     * aggregate functions (MAX, MIN).
+     *
+     * @param string|array $column Column(s) for aggregate, or ['column' => 'aggregate']
+     * @param string|null $aggregate Aggregate function ('max', 'min')
+     * @return $this
+     *
+     * @example
+     * // Get the latest order for each user (by id)
+     * public function latestOrder(): HasOne
+     * {
+     *     return $this->hasOne(Order::class)->ofMany();
+     * }
+     *
+     * // Get the oldest order (by created_at)
+     * public function oldestOrder(): HasOne
+     * {
+     *     return $this->hasOne(Order::class)->ofMany('created_at', 'min');
+     * }
+     *
+     * // Get the highest priced order
+     * public function mostExpensiveOrder(): HasOne
+     * {
+     *     return $this->hasOne(Order::class)->ofMany('total_amount', 'max');
+     * }
+     *
+     * // Multiple columns (uses subquery)
+     * public function latestCompletedOrder(): HasOne
+     * {
+     *     return $this->hasOne(Order::class)->ofMany([
+     *         'completed_at' => 'max',
+     *         'id' => 'max'
+     *     ]);
+     * }
+     */
+    public function ofMany(string|array $column = 'id', string|null $aggregate = 'max'): static
+    {
+        $this->isOneOfMany = true;
+
+        if (is_array($column)) {
+            // Multiple columns: use first column's aggregate
+            $firstKey = array_key_first($column);
+            $this->oneOfManyColumn = $firstKey;
+            $this->oneOfManyAggregate = strtoupper($column[$firstKey]);
+        } else {
+            $this->oneOfManyColumn = $column;
+            $this->oneOfManyAggregate = strtoupper($aggregate ?? 'MAX');
+        }
+
+        // Add the ofMany constraint to the query
+        $this->addOneOfManyConstraint();
+
+        return $this;
+    }
+
+    /**
+     * Get the latest related model (based on primary key).
+     *
+     * Shorthand for ofMany('id', 'max').
+     *
+     * @param string|null $column Column to use for latest (default: primary key)
+     * @return $this
+     *
+     * @example
+     * public function latestOrder(): HasOne
+     * {
+     *     return $this->hasOne(Order::class)->latestOfMany();
+     * }
+     *
+     * // Or by a specific column
+     * public function latestOrder(): HasOne
+     * {
+     *     return $this->hasOne(Order::class)->latestOfMany('created_at');
+     * }
+     */
+    public function latestOfMany(?string $column = null): static
+    {
+        $column = $column ?? $this->relatedClass::getPrimaryKey();
+        return $this->ofMany($column, 'max');
+    }
+
+    /**
+     * Get the oldest related model (based on primary key).
+     *
+     * Shorthand for ofMany('id', 'min').
+     *
+     * @param string|null $column Column to use for oldest (default: primary key)
+     * @return $this
+     *
+     * @example
+     * public function firstOrder(): HasOne
+     * {
+     *     return $this->hasOne(Order::class)->oldestOfMany();
+     * }
+     *
+     * // Or by a specific column
+     * public function firstOrder(): HasOne
+     * {
+     *     return $this->hasOne(Order::class)->oldestOfMany('created_at');
+     * }
+     */
+    public function oldestOfMany(?string $column = null): static
+    {
+        $column = $column ?? $this->relatedClass::getPrimaryKey();
+        return $this->ofMany($column, 'min');
+    }
+
+    /**
+     * Add the one-of-many subquery constraint.
+     *
+     * Uses a correlated subquery approach:
+     * SELECT * FROM orders WHERE user_id = ? AND id = (SELECT MAX(id) FROM orders WHERE user_id = ?)
+     */
+    protected function addOneOfManyConstraint(): void
+    {
+        if (!$this->isOneOfMany || $this->oneOfManyColumn === null) {
+            return;
+        }
+
+        $relatedTable = $this->relatedClass::getTableName();
+        $grammar = $this->query->getConnection()->getGrammar();
+        $wrappedForeignKey = $grammar->wrapColumn($this->foreignKey);
+        $wrappedColumn = $grammar->wrapColumn($this->oneOfManyColumn);
+        $wrappedTable = $grammar->wrapTable($relatedTable);
+        $wrappedLocalKey = $grammar->wrapColumn($this->localKey);
+
+        // Build subquery: (SELECT MAX/MIN(column) FROM table WHERE foreign_key = parent.local_key)
+        $parentTable = $this->parent::getTableName();
+        $wrappedParentTable = $grammar->wrapTable($parentTable);
+
+        $subquery = "(SELECT {$this->oneOfManyAggregate}({$wrappedColumn}) FROM {$wrappedTable} WHERE {$wrappedForeignKey} = {$wrappedParentTable}.{$wrappedLocalKey})";
+
+        // Add constraint: column = (SELECT MAX/MIN(column) ...)
+        $this->query->whereRaw("{$wrappedTable}.{$wrappedColumn} = {$subquery}");
+    }
+
+    /**
+     * Check if this is a one-of-many relationship.
+     */
+    public function isOneOfMany(): bool
+    {
+        return $this->isOneOfMany;
     }
 
     /**

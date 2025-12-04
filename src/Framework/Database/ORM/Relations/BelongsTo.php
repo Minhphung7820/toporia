@@ -29,6 +29,9 @@ class BelongsTo extends Relation
     /** @var string|null Cached relation name */
     private ?string $relationNameCache = null;
 
+    /** @var array|bool|null Default model attributes or boolean/null for withDefault() */
+    protected array|bool|null $withDefault = null;
+
     public function __construct(
         QueryBuilder $query,
         Model $parent,
@@ -121,10 +124,38 @@ class BelongsTo extends Relation
 
         // Single model query - return single Model or null
         if (!$this->hasValidForeignKey()) {
+            return $this->getDefaultFor($this->parent);
+        }
+
+        $result = $this->query->first();
+
+        return $result ?? $this->getDefaultFor($this->parent);
+    }
+
+    /**
+     * Get the default value for the relationship.
+     *
+     * @param Model $parent Parent model
+     * @return Model|null Default model or null
+     */
+    protected function getDefaultFor(Model $parent): ?Model
+    {
+        if ($this->withDefault === null || $this->withDefault === false) {
             return null;
         }
 
-        return $this->query->first();
+        $instance = new $this->relatedClass();
+
+        if (is_array($this->withDefault)) {
+            foreach ($this->withDefault as $key => $value) {
+                // Support callable values
+                $instance->setAttribute($key, is_callable($value) ? $value($parent) : $value);
+            }
+        } elseif (is_callable($this->withDefault)) {
+            ($this->withDefault)($instance, $parent);
+        }
+
+        return $instance;
     }
 
     /**
@@ -222,6 +253,45 @@ class BelongsTo extends Relation
     // =========================================================================
     // ASSOCIATION METHODS
     // =========================================================================
+
+    /**
+     * Return a default model if the relationship returns null.
+     *
+     * This is useful when you want to avoid null checks in your code.
+     * The default model will be a new (unsaved) instance of the related model.
+     *
+     * @param array|bool|callable $callback Default attributes, true for empty model, or callback
+     * @return $this
+     *
+     * @example
+     * // Return empty model
+     * public function author(): BelongsTo
+     * {
+     *     return $this->belongsTo(User::class)->withDefault();
+     * }
+     *
+     * // With default attributes
+     * public function author(): BelongsTo
+     * {
+     *     return $this->belongsTo(User::class)->withDefault([
+     *         'name' => 'Anonymous'
+     *     ]);
+     * }
+     *
+     * // With callback
+     * public function author(): BelongsTo
+     * {
+     *     return $this->belongsTo(User::class)->withDefault(function ($user, $post) {
+     *         $user->name = 'Guest Author for ' . $post->title;
+     *     });
+     * }
+     */
+    public function withDefault(array|bool|callable $callback = true): static
+    {
+        $this->withDefault = is_bool($callback) ? $callback : $callback;
+
+        return $this;
+    }
 
     /**
      * Associate the parent model with the given model.

@@ -392,4 +392,261 @@ trait HasEagerLoading
 
         return $this;
     }
+
+    /**
+     * Lazy eager load relationships only if they haven't been loaded yet.
+     *
+     * This is more efficient than load() when you're unsure if relationships
+     * are already loaded - it avoids duplicate queries.
+     *
+     * Example:
+     * ```php
+     * $user = User::with('posts')->find(1); // posts already loaded
+     * $user->loadMissing('posts'); // Does nothing - posts already loaded
+     * $user->loadMissing('comments'); // Loads comments
+     *
+     * // Also supports constraints
+     * $user->loadMissing(['posts' => fn($q) => $q->where('published', true)]);
+     *
+     * // Multiple relations
+     * $user->loadMissing(['posts', 'comments', 'profile']);
+     * ```
+     *
+     * @param string|array<string|\Closure> $relations Relationship names or ['relation' => Closure]
+     * @return $this
+     */
+    public function loadMissing(string|array $relations): static
+    {
+        // Convert single relation to array
+        $relations = is_array($relations) ? $relations : [$relations];
+
+        // Filter out already loaded relations
+        $missingRelations = [];
+
+        foreach ($relations as $key => $value) {
+            // Handle format: ['relation' => Closure] or 'relation'
+            $relationName = is_string($key) ? $key : $value;
+
+            // Skip if not a string
+            if (!is_string($relationName)) {
+                continue;
+            }
+
+            // Get first level relation name (handle nested like 'posts.comments')
+            $firstLevel = explode('.', $relationName, 2)[0];
+
+            // Check if already loaded
+            if (!$this->relationLoaded($firstLevel)) {
+                // Preserve the original key/value pair
+                if (is_string($key)) {
+                    $missingRelations[$key] = $value;
+                } else {
+                    $missingRelations[] = $value;
+                }
+            }
+        }
+
+        // Only load if there are missing relations
+        if (!empty($missingRelations)) {
+            $this->load($missingRelations);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Lazy eager load a count of related models only if not already loaded.
+     *
+     * Example:
+     * ```php
+     * $user->loadMissingCount('posts');
+     * // $user->posts_count is now available
+     * ```
+     *
+     * @param string|array<string|\Closure> $relations Relationship names
+     * @return $this
+     */
+    public function loadMissingCount(string|array $relations): static
+    {
+        // Convert single relation to array
+        $relations = is_array($relations) ? $relations : [$relations];
+
+        // Filter out already loaded counts
+        $missingRelations = [];
+
+        foreach ($relations as $key => $value) {
+            $relationName = is_string($key) ? $key : $value;
+
+            if (!is_string($relationName)) {
+                continue;
+            }
+
+            $countAttribute = $relationName . '_count';
+
+            // Check if count already loaded (exists as attribute)
+            if (!isset($this->attributes[$countAttribute])) {
+                if (is_string($key)) {
+                    $missingRelations[$key] = $value;
+                } else {
+                    $missingRelations[] = $value;
+                }
+            }
+        }
+
+        // Only load if there are missing counts
+        if (!empty($missingRelations)) {
+            $this->loadCount($missingRelations);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Lazy eager load count of related models.
+     *
+     * Example:
+     * ```php
+     * $user = User::find(1);
+     * $user->loadCount('posts');
+     * // $user->posts_count is now available
+     *
+     * // With constraints
+     * $user->loadCount(['posts' => fn($q) => $q->where('published', true)]);
+     * ```
+     *
+     * @param string|array<string|\Closure> $relations Relationship names
+     * @return $this
+     */
+    public function loadCount(string|array $relations): static
+    {
+        // Convert single relation to array
+        $relations = is_array($relations) ? $relations : [$relations];
+
+        foreach ($relations as $key => $value) {
+            $relationName = is_string($key) ? $key : $value;
+            $constraint = is_string($key) && is_callable($value) ? $value : null;
+
+            if (!is_string($relationName) || !method_exists($this, $relationName)) {
+                continue;
+            }
+
+            // Get relationship instance
+            $relationInstance = $this->$relationName();
+
+            if (!$relationInstance instanceof RelationInterface) {
+                continue;
+            }
+
+            // Get query and apply constraints
+            $query = $relationInstance->getQuery();
+
+            if ($constraint !== null) {
+                $constraint($query);
+            }
+
+            // Get count
+            $count = $query->count();
+
+            // Set count as attribute
+            $countAttribute = $relationName . '_count';
+            $this->setAttribute($countAttribute, $count);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Load aggregate values for relationships.
+     *
+     * Example:
+     * ```php
+     * $user->loadSum('posts', 'views');
+     * // $user->posts_sum_views is now available
+     *
+     * $user->loadAvg('reviews', 'rating');
+     * // $user->reviews_avg_rating is now available
+     * ```
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to aggregate
+     * @param string $function Aggregate function (sum, avg, min, max)
+     * @return $this
+     */
+    public function loadAggregate(string $relation, string $column, string $function = 'sum'): static
+    {
+        if (!method_exists($this, $relation)) {
+            return $this;
+        }
+
+        $relationInstance = $this->$relation();
+
+        if (!$relationInstance instanceof RelationInterface) {
+            return $this;
+        }
+
+        $query = $relationInstance->getQuery();
+
+        $value = match (strtolower($function)) {
+            'sum' => $query->sum($column),
+            'avg' => $query->avg($column),
+            'min' => $query->min($column),
+            'max' => $query->max($column),
+            'count' => $query->count($column),
+            default => null,
+        };
+
+        // Set aggregate as attribute
+        $attributeName = "{$relation}_{$function}_{$column}";
+        $this->setAttribute($attributeName, $value);
+
+        return $this;
+    }
+
+    /**
+     * Load sum aggregate for a relationship.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to sum
+     * @return $this
+     */
+    public function loadSum(string $relation, string $column): static
+    {
+        return $this->loadAggregate($relation, $column, 'sum');
+    }
+
+    /**
+     * Load average aggregate for a relationship.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to average
+     * @return $this
+     */
+    public function loadAvg(string $relation, string $column): static
+    {
+        return $this->loadAggregate($relation, $column, 'avg');
+    }
+
+    /**
+     * Load minimum aggregate for a relationship.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to get minimum
+     * @return $this
+     */
+    public function loadMin(string $relation, string $column): static
+    {
+        return $this->loadAggregate($relation, $column, 'min');
+    }
+
+    /**
+     * Load maximum aggregate for a relationship.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to get maximum
+     * @return $this
+     */
+    public function loadMax(string $relation, string $column): static
+    {
+        return $this->loadAggregate($relation, $column, 'max');
+    }
 }

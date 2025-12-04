@@ -515,6 +515,84 @@ class ModelQueryBuilder extends QueryBuilder
     // =========================================================================
 
     /**
+     * Filter models that have at least one related model.
+     *
+     * This is a shorthand for whereHas() with default parameters.
+     * Uses EXISTS subquery for optimal performance.
+     *
+     * @param string $relation Relationship method name
+     * @param string $operator Comparison operator (>=, >, =, etc.)
+     * @param int $count Minimum count (default: 1)
+     * @return $this
+     *
+     * @example
+     * // Products that have at least one review
+     * ProductModel::has('reviews')->get();
+     *
+     * // Products with at least 5 reviews
+     * ProductModel::has('reviews', '>=', 5)->get();
+     *
+     * // Products with exactly 3 reviews
+     * ProductModel::has('reviews', '=', 3)->get();
+     */
+    public function has(string $relation, string $operator = '>=', int $count = 1): self
+    {
+        return $this->whereHas($relation, null, $operator, $count);
+    }
+
+    /**
+     * OR filter models that have at least one related model.
+     *
+     * This is a shorthand for orWhereHas() with default parameters.
+     *
+     * @param string $relation Relationship method name
+     * @param string $operator Comparison operator (>=, >, =, etc.)
+     * @param int $count Minimum count (default: 1)
+     * @return $this
+     *
+     * @example
+     * // Products that have reviews OR have been featured
+     * ProductModel::has('reviews')->orHas('features')->get();
+     */
+    public function orHas(string $relation, string $operator = '>=', int $count = 1): self
+    {
+        return $this->orWhereHas($relation, null, $operator, $count);
+    }
+
+    /**
+     * Filter models that don't have any related models.
+     *
+     * This is a shorthand for whereDoesntHave() with default parameters.
+     * Uses NOT EXISTS subquery for optimal performance.
+     *
+     * @param string $relation Relationship method name
+     * @return $this
+     *
+     * @example
+     * // Products that have no reviews
+     * ProductModel::doesntHave('reviews')->get();
+     */
+    public function doesntHave(string $relation): self
+    {
+        return $this->whereDoesntHave($relation);
+    }
+
+    /**
+     * OR filter models that don't have any related models.
+     *
+     * @param string $relation Relationship method name
+     * @return $this
+     *
+     * @example
+     * // Products without reviews OR without images
+     * ProductModel::doesntHave('reviews')->orDoesntHave('images')->get();
+     */
+    public function orDoesntHave(string $relation): self
+    {
+        return $this->orWhereDoesntHave($relation);
+    }
+
+    /**
      * Filter models that have a related model matching the given constraints.
      *
      * Optimized implementation:
@@ -663,6 +741,48 @@ class ModelQueryBuilder extends QueryBuilder
 
         // For simple existence check, use optimized OR EXISTS
         return $this->orWhereHasExists($relation, $callback);
+    }
+
+    /**
+     * Add whereHas constraint AND eager load the relationship.
+     *
+     * This combines whereHas() and with() in a single call, which is more efficient
+     * than calling them separately because the constraint is applied consistently
+     * to both the filtering and the eager loading.
+     *
+     * This is particularly useful when you want to:
+     * 1. Filter parent models based on relationship conditions
+     * 2. Eager load only the related models that match those conditions
+     *
+     * @param string $relation Relationship method name
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @return $this
+     *
+     * @example
+     * // Get users who have published posts, and eager load only their published posts
+     * User::withWhereHas('posts', fn($q) => $q->where('published', true))->get();
+     *
+     * // Without withWhereHas, you would need:
+     * User::whereHas('posts', fn($q) => $q->where('published', true))
+     *     ->with(['posts' => fn($q) => $q->where('published', true)])
+     *     ->get();
+     *
+     * // Get products with approved reviews, load only approved reviews
+     * Product::withWhereHas('reviews', fn($q) => $q->where('approved', true))->get();
+     */
+    public function withWhereHas(string $relation, ?callable $callback = null): self
+    {
+        // Apply whereHas constraint to filter parent models
+        $this->whereHas($relation, $callback);
+
+        // Also eager load with the same constraint
+        if ($callback !== null) {
+            $this->with([$relation => $callback]);
+        } else {
+            $this->with($relation);
+        }
+
+        return $this;
     }
 
     /**
