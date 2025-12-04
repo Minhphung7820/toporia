@@ -106,7 +106,12 @@ final class ProductController extends BaseController
         $path = $request->path();
         $baseUrl = $request->root(); // Get base URL (http://localhost:8000)
         $optimizedQuery = ProductModel::query()
-            ->with('categories')
+            ->with([
+                'categories',
+                'reviews' => function ($q) {
+                    return $q->where('helpful_count', '>', 20);
+                }
+            ])
             ->optimizeForLargeResults()
             ->orderBy('id', 'ASC') // Cursor column must be ordered
             ->cursorPaginate($perPage, ['cursor' => $cursor], ['path' => $path, 'baseUrl' => $baseUrl]);

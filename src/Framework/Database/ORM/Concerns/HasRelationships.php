@@ -779,7 +779,12 @@ trait HasRelationships
         $normalized = [];
 
         // Special case: with('childrens', function($q) { ... })
-        if (count($relations) === 2 && is_string($relations[0]) && is_callable($relations[1])) {
+        // Only check this if we have exactly 2 elements and both are accessible by numeric keys
+        if (
+            count($relations) === 2 &&
+            isset($relations[0]) && isset($relations[1]) &&
+            is_string($relations[0]) && is_callable($relations[1])
+        ) {
             return [$relations[0] => $relations[1]];
         }
 
