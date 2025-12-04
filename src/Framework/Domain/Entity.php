@@ -5,46 +5,73 @@ declare(strict_types=1);
 namespace Toporia\Framework\Domain;
 
 use Toporia\Framework\Domain\Contracts\EntityInterface;
+use Toporia\Framework\Domain\Contracts\ValueObjectInterface;
 
 /**
  * Abstract Class Entity
  *
- * Abstract base class for Entity implementations in the Domain layer
- * providing common functionality and contracts.
+ * Base class for Entities in Domain-Driven Design.
+ * Entities are identified by their unique identity, not their attributes.
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
- * @copyright   Copyright (c) 2025 Toporia Framework
- * @license     MIT
- * @version     1.0.0
- * @package     toporia/framework
- * @subpackage  Domain
- * @since       2025-01-10
+ * Usage with typed properties (recommended):
+ * ```php
+ * final class Order extends Entity
+ * {
+ *     public function __construct(
+ *         private ?int $id,
+ *         private CustomerId $customerId,
+ *         private OrderStatus $status,
+ *         private \DateTimeImmutable $createdAt
+ *     ) {}
  *
- * @link        https://github.com/Minhphung7820/toporia
+ *     public function getId(): ?int
+ *     {
+ *         return $this->id;
+ *     }
+ *
+ *     public function confirm(): void
+ *     {
+ *         if (!$this->status->canTransitionTo(OrderStatus::Confirmed)) {
+ *             throw new \DomainException('Cannot confirm order');
+ *         }
+ *         $this->status = OrderStatus::Confirmed;
+ *     }
+ * }
+ * ```
+ *
+ * @package Toporia\Framework\Domain
  */
 abstract class Entity implements EntityInterface
 {
     /**
-     * @var array<string, mixed> Entity attributes.
+     * {@inheritdoc}
      */
-    protected array $attributes = [];
+    abstract public function getId(): int|string|null;
 
     /**
      * {@inheritdoc}
      */
-    abstract public function getId(): mixed;
+    public function isPersisted(): bool
+    {
+        return $this->getId() !== null;
+    }
 
     /**
      * {@inheritdoc}
      */
     public function equals(EntityInterface $other): bool
     {
-        // Entities are equal if they are of the same class and have the same ID
+        // Different types are never equal
         if (!($other instanceof static)) {
             return false;
         }
 
-        return $this->getId() === $other->getId() && $this->getId() !== null;
+        // Unpersisted entities are never equal (even to themselves in this context)
+        if (!$this->isPersisted() || !$other->isPersisted()) {
+            return false;
+        }
+
+        return $this->getId() === $other->getId();
     }
 
     /**
@@ -52,62 +79,61 @@ abstract class Entity implements EntityInterface
      */
     public function toArray(): array
     {
-        return $this->attributes;
+        $array = [];
+        $reflection = new \ReflectionClass($this);
+
+        foreach ($reflection->getProperties() as $property) {
+            if ($property->isStatic()) {
+                continue;
+            }
+
+            if (!$property->isInitialized($this)) {
+                continue;
+            }
+
+            $value = $property->getValue($this);
+            $array[$property->getName()] = $this->serializeValue($value);
+        }
+
+        return $array;
     }
 
     /**
-     * Get an attribute value.
+     * Serialize a value for array output.
      *
-     * @param string $key Attribute key.
-     * @return mixed
+     * @param mixed $value Value to serialize.
+     * @return mixed Serialized value.
      */
-    protected function getAttribute(string $key): mixed
+    private function serializeValue(mixed $value): mixed
     {
-        return $this->attributes[$key] ?? null;
-    }
+        if ($value instanceof ValueObjectInterface) {
+            return $value->toArray();
+        }
 
-    /**
-     * Set an attribute value.
-     *
-     * @param string $key Attribute key.
-     * @param mixed $value Attribute value.
-     * @return void
-     */
-    protected function setAttribute(string $key, mixed $value): void
-    {
-        $this->attributes[$key] = $value;
-    }
+        if ($value instanceof EntityInterface) {
+            return $value->toArray();
+        }
 
-    /**
-     * Check if attribute exists.
-     *
-     * @param string $key Attribute key.
-     * @return bool
-     */
-    protected function hasAttribute(string $key): bool
-    {
-        return isset($this->attributes[$key]);
-    }
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
 
-    /**
-     * Magic getter for attributes.
-     *
-     * @param string $key Attribute key.
-     * @return mixed
-     */
-    public function __get(string $key): mixed
-    {
-        return $this->getAttribute($key);
-    }
+        if ($value instanceof \BackedEnum) {
+            return $value->value;
+        }
 
-    /**
-     * Magic isset for attributes.
-     *
-     * @param string $key Attribute key.
-     * @return bool
-     */
-    public function __isset(string $key): bool
-    {
-        return $this->hasAttribute($key);
+        if ($value instanceof \UnitEnum) {
+            return $value->name;
+        }
+
+        if (is_array($value)) {
+            return array_map(fn($v) => $this->serializeValue($v), $value);
+        }
+
+        if (is_object($value) && method_exists($value, 'toArray')) {
+            return $value->toArray();
+        }
+
+        return $value;
     }
 }

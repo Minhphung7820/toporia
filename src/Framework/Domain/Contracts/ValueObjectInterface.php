@@ -4,46 +4,54 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Domain\Contracts;
 
-
 /**
  * Interface ValueObjectInterface
  *
- * Contract defining the interface for ValueObjectInterface implementations
- * in the Domain layer of the Toporia Framework.
+ * Contract for immutable Value Objects in Domain-Driven Design.
+ * Value Objects are identified by their attribute values, not identity.
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
- * @copyright   Copyright (c) 2025 Toporia Framework
- * @license     MIT
- * @version     1.0.0
- * @package     toporia/framework
- * @subpackage  Domain\Contracts
- * @since       2025-01-10
+ * Key characteristics:
+ * - Immutability: Once created, cannot be changed
+ * - Equality by value: Two VOs with same attributes are equal
+ * - Self-validation: Always in valid state
+ * - Side-effect free: Methods don't modify state
  *
- * @link        https://github.com/Minhphung7820/toporia
+ * @package Toporia\Framework\Domain\Contracts
  */
 interface ValueObjectInterface
 {
     /**
-     * Check if this value object equals another.
+     * Check equality with another value object.
      *
-     * Value objects are equal if all their attributes are equal.
+     * Two value objects are equal if they are of the same type
+     * and all their attributes have equal values.
      *
-     * @param ValueObjectInterface $other Another value object.
-     * @return bool
+     * @param ValueObjectInterface $other Value object to compare.
+     * @return bool True if equal.
      */
     public function equals(ValueObjectInterface $other): bool;
 
     /**
-     * Get string representation of the value object.
+     * Get hash code for use in hash-based collections.
      *
-     * @return string
+     * Objects that are equal MUST have the same hash code.
+     * Used for efficient lookups in sets and map keys.
+     *
+     * @return string Hash code string.
+     */
+    public function hashCode(): string;
+
+    /**
+     * Get string representation.
+     *
+     * @return string Human-readable string representation.
      */
     public function __toString(): string;
 
     /**
-     * Get the value object as an array.
+     * Convert to array representation.
      *
-     * @return array<string, mixed>
+     * @return array<string, mixed> Associative array of attributes.
      */
     public function toArray(): array;
 }

@@ -4,44 +4,51 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Domain\Contracts;
 
-
 /**
  * Interface EntityInterface
  *
- * Contract defining the interface for EntityInterface implementations in
- * the Domain layer of the Toporia Framework.
+ * Contract for Entities in Domain-Driven Design.
+ * Entities are identified by their unique identity, not their attributes.
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
- * @copyright   Copyright (c) 2025 Toporia Framework
- * @license     MIT
- * @version     1.0.0
- * @package     toporia/framework
- * @subpackage  Domain\Contracts
- * @since       2025-01-10
+ * Key characteristics:
+ * - Identity: Has a unique identifier that persists through state changes
+ * - Equality by identity: Two entities with same ID are the same entity
+ * - Lifecycle: Can change state over time while maintaining identity
+ * - Encapsulation: Protects invariants through behavior methods
  *
- * @link        https://github.com/Minhphung7820/toporia
+ * @package Toporia\Framework\Domain\Contracts
  */
 interface EntityInterface
 {
     /**
      * Get the entity's unique identifier.
      *
-     * @return mixed Entity ID (int, string, UUID, etc.)
+     * @return int|string|null Entity ID. Null only for new unpersisted entities.
      */
-    public function getId(): mixed;
+    public function getId(): int|string|null;
+
+    /**
+     * Check if this entity has been persisted.
+     *
+     * @return bool True if entity has an ID.
+     */
+    public function isPersisted(): bool;
 
     /**
      * Check if this entity is the same as another.
      *
-     * @param EntityInterface $other Another entity.
-     * @return bool
+     * Entities are equal if they have the same type and ID.
+     * Two new entities (without ID) are never equal.
+     *
+     * @param EntityInterface $other Entity to compare.
+     * @return bool True if same entity.
      */
     public function equals(EntityInterface $other): bool;
 
     /**
-     * Get the entity as an array.
+     * Convert entity to array representation.
      *
-     * @return array<string, mixed>
+     * @return array<string, mixed> Entity attributes.
      */
     public function toArray(): array;
 }
