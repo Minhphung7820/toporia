@@ -166,6 +166,16 @@ abstract class Relation implements RelationInterface
     }
 
     /**
+     * Get the parent model instance.
+     *
+     * @return Model Parent model instance
+     */
+    public function getParent(): Model
+    {
+        return $this->parent;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function getForeignKey(): string
@@ -325,8 +335,10 @@ abstract class Relation implements RelationInterface
         // Check if query has skipGlobalScopes flag (from withTrashed())
         // If ModelQueryBuilder with skipGlobalScopes = true, don't apply SoftDeletes scope
         // Use public method to avoid reflection overhead (O(1) instead of O(n) reflection calls)
-        if ($query instanceof \Toporia\Framework\Database\ORM\ModelQueryBuilder
-            && $query->isSkippingGlobalScopes()) {
+        if (
+            $query instanceof \Toporia\Framework\Database\ORM\ModelQueryBuilder
+            && $query->isSkippingGlobalScopes()
+        ) {
             return; // Skip applying SoftDeletes scope when withTrashed() is used
         }
 

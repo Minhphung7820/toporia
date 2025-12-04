@@ -27,6 +27,9 @@ class BelongsToMany extends Relation
     /** @var array<string> Additional pivot columns to select */
     protected array $pivotColumns = [];
 
+    /** @var bool Whether to include all pivot columns (lazy loaded) */
+    protected bool $withPivotAll = false;
+
     /** @var bool Whether to include timestamps in pivot table */
     protected bool $withTimestamps = false;
 
@@ -93,26 +96,15 @@ class BelongsToMany extends Relation
     {
         // Handle wildcard '*' to select all pivot columns
         if (in_array('*', $columns, true)) {
-            // Get all columns from pivot table (with caching for performance)
-            $connection = $this->query->getConnection();
-            $allColumns = $this->getCachedTableColumns($this->pivotTable, $connection);
+            // Lazy load: Mark that we need all columns, but don't fetch them yet
+            // This avoids SHOW COLUMNS query when relation is only used for whereHas/exists checks
+            $this->withPivotAll = true;
 
-            // Exclude foreign and related pivot keys (they're always selected separately)
-            $excludeColumns = [$this->foreignPivotKey, $this->relatedPivotKey];
-
-            // Exclude timestamps if withTimestamps() will be called separately
-            // But include them if they're already in pivotColumns (user explicitly wants them)
-            if (!$this->withTimestamps) {
-                $excludeColumns[] = 'created_at';
-                $excludeColumns[] = 'updated_at';
-            }
-
-            // Filter out excluded columns
-            $pivotColumns = array_diff($allColumns ?? [], $excludeColumns);
-
-            // Merge with existing pivot columns and remove '*'
+            // Remove '*' from columns array
             $columns = array_filter($columns, fn($col) => $col !== '*');
-            $this->pivotColumns = array_values(array_unique([...$this->pivotColumns, ...$pivotColumns, ...$columns]));
+
+            // Merge with existing pivot columns
+            $this->pivotColumns = array_values(array_unique([...$this->pivotColumns, ...$columns]));
         } else {
             // Normal case: just add specified columns
             // Deduplicate columns to avoid duplicate alias in SQL queries
@@ -354,6 +346,11 @@ class BelongsToMany extends Relation
         // Only select pivot keys if we need to include pivot object or for matching in eager loading
         // Pivot keys are always needed for matching, but we only create pivot object when withPivot/withTimestamps is used
         if ($this->shouldIncludePivot()) {
+            // Lazy load pivot columns only when withPivot('*') was used
+            if ($this->withPivotAll) {
+                $this->ensurePivotColumnsLoaded();
+            }
+
             // Use selectRaw for pivot columns to avoid wrapping issues with aliases
             // This ensures pivot columns are selected with correct aliases (not wrapped as single string)
             $this->query->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
@@ -388,7 +385,43 @@ class BelongsToMany extends Relation
      */
     protected function shouldIncludePivot(): bool
     {
-        return !empty($this->pivotColumns) || $this->withTimestamps;
+        return !empty($this->pivotColumns) || $this->withPivotAll || $this->withTimestamps;
+    }
+
+    /**
+     * Lazy load all pivot columns when actually needed (not during whereHas/exists).
+     *
+     * IMPORTANT: This method ONLY executes SHOW COLUMNS when:
+     * 1. withPivot('*') was called (withPivotAll = true)
+     * 2. AND pivot columns haven't been loaded yet (empty pivotColumns)
+     *
+     * When using withPivot('field1', 'field2'), this method is never called,
+     * so SHOW COLUMNS is never executed.
+     *
+     * This avoids unnecessary SHOW COLUMNS queries.
+     */
+    protected function ensurePivotColumnsLoaded(): void
+    {
+        // Only load columns if withPivot('*') was used AND columns not loaded yet
+        if ($this->withPivotAll && empty($this->pivotColumns)) {
+            // Get all columns from pivot table (with caching for performance)
+            $connection = $this->query->getConnection();
+            $allColumns = $this->getCachedTableColumns($this->pivotTable, $connection);
+
+            // Exclude foreign and related pivot keys (they're always selected separately)
+            $excludeColumns = [$this->foreignPivotKey, $this->relatedPivotKey];
+
+            // Exclude timestamps if withTimestamps() will be called separately
+            // But include them if they're already in pivotColumns (user explicitly wants them)
+            if (!$this->withTimestamps) {
+                $excludeColumns[] = 'created_at';
+                $excludeColumns[] = 'updated_at';
+            }
+
+            // Filter out excluded columns
+            $pivotColumns = array_diff($allColumns ?? [], $excludeColumns);
+            $this->pivotColumns = array_values($pivotColumns);
+        }
     }
 
     /**
@@ -622,6 +655,11 @@ class BelongsToMany extends Relation
                 $baseQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
                 // Include additional pivot columns if needed
                 if ($this->shouldIncludePivot()) {
+                    // Lazy load pivot columns only when withPivot('*') was used
+                    if ($this->withPivotAll) {
+                        $this->ensurePivotColumnsLoaded();
+                    }
+
                     foreach ($this->pivotColumns as $column) {
                         if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
                             $baseQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
@@ -890,6 +928,11 @@ class BelongsToMany extends Relation
             // Only build pivot data if we should include pivot object
             $pivotData = null;
             if ($this->shouldIncludePivot()) {
+                // Lazy load pivot columns only when withPivot('*') was used
+                if ($this->withPivotAll) {
+                    $this->ensurePivotColumnsLoaded();
+                }
+
                 // Build pivot data from all pivot_* attributes
                 $pivotData = [
                     $this->foreignPivotKey => $pivotForeignKey,
@@ -2077,6 +2120,7 @@ class BelongsToMany extends Relation
 
         // Preserve all pivot settings from original relation
         $instance->pivotColumns = $this->pivotColumns;
+        $instance->withPivotAll = $this->withPivotAll;
         $instance->withTimestamps = $this->withTimestamps;
         $instance->pivotAccessor = $this->pivotAccessor;
         $instance->pivotWheres = $this->pivotWheres;
@@ -2103,6 +2147,11 @@ class BelongsToMany extends Relation
         // Only select pivot keys if we need to include pivot object or for matching in eager loading
         // Pivot keys are always needed for matching, but we only create pivot object when withPivot/withTimestamps is used
         if ($this->shouldIncludePivot()) {
+            // Lazy load pivot columns only when withPivot('*') was used
+            if ($this->withPivotAll) {
+                $this->ensurePivotColumnsLoaded();
+            }
+
             // Always select foreignPivotKey and relatedPivotKey from pivot table
             $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
             $cleanQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");

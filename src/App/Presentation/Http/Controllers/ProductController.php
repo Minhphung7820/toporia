@@ -101,19 +101,25 @@ final class ProductController extends BaseController
         // Option 3: Performance testing with query hints
         // Cursor-based pagination (high-performance for large datasets)
         // O(1) performance regardless of dataset size
-        $perPage = (int) ($request->get('per_page', 15));
+        $perPage = (int) ($request->get('per_page', 150));
         $cursor = $request->get('cursor'); // Get cursor from query parameter
         $path = $request->path();
         $baseUrl = $request->root(); // Get base URL (http://localhost:8000)
+        // Example 1: Filter products that have allTags with name = 'abs'
         $optimizedQuery = ProductModel::query()
             ->with([
                 'categories',
-                'reviews.users' => function ($q) {
+                'reviews.user' => function ($q) {
                     return $q->where('role', '=', 'users');
                 },
+                'allTags' // Eager load allTags for the filtered products
             ])
+            ->where('id', '>', 40000)
+            ->whereHas('allTags', function ($q) {
+                $q->where('tags.id', 17);
+            })
             ->optimizeForLargeResults()
-            ->orderBy('id', 'ASC') // Cursor column must be ordered
+            ->orderBy('id', 'DESC') // Cursor column must be ordered
             ->cursorPaginate($perPage, ['cursor' => $cursor], ['path' => $path, 'baseUrl' => $baseUrl]);
         $queries = $this->formatQueryLogs(DB::getQueryLog());
         $singleProduct = [

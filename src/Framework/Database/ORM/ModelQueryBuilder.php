@@ -1240,7 +1240,9 @@ class ModelQueryBuilder extends QueryBuilder
                 "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
                 "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
         } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany) {
-            // Similar logic for MorphToMany
+            // Optimized MorphToMany query matching Laravel's structure
+            // Laravel starts from related table (tags) and joins pivot (taggables)
+            // This is more efficient when filtering by related table columns
             $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
             $morphType = $this->getRelationProperty($relation, 'morphType');
             $morphId = $this->getRelationProperty($relation, 'foreignKey');
@@ -1250,12 +1252,17 @@ class ModelQueryBuilder extends QueryBuilder
 
             // Get related table and morph class
             $relatedTable = $relationQuery->getTable();
-            $morphClass = get_class($relation->getParent());
+            $morphClass = $this->getMorphClassFromRelation($relation);
 
-            $subquerySql = "SELECT COUNT(*) FROM {$pivotTable} " .
-                "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
-                "WHERE {$pivotTable}.{$morphId} = {$parentTable}.{$parentKey} " .
-                "AND {$pivotTable}.{$morphType} = '{$morphClass}'";
+            // Laravel's structure: SELECT COUNT(*) FROM tags INNER JOIN taggables ON tags.id = taggables.tag_id
+            // WHERE products.id = taggables.taggable_id AND taggables.taggable_type = ?
+            // This is more efficient when filtering by tags because it can use tags table index first
+            // Quote morph class value for safe SQL injection prevention
+            $quotedMorphClass = $this->quoteValue($morphClass);
+            $subquerySql = "SELECT COUNT(*) FROM {$relatedTable} " .
+                "INNER JOIN {$pivotTable} ON {$relatedTable}.{$relatedKey} = {$pivotTable}.{$relatedPivotKey} " .
+                "WHERE {$parentTable}.{$parentKey} = {$pivotTable}.{$morphId} " .
+                "AND {$pivotTable}.{$morphType} = {$quotedMorphClass}";
         }
 
         return $subquerySql;
@@ -1274,6 +1281,27 @@ class ModelQueryBuilder extends QueryBuilder
     private function getRelationProperty(object $relation, string $property): mixed
     {
         return (new \ReflectionProperty($relation, $property))->getValue($relation);
+    }
+
+    /**
+     * Get morph class from a polymorphic relation using reflection.
+     *
+     * This is internal framework code that needs to access protected methods
+     * of relation classes for query building.
+     *
+     * @param object $relation MorphToMany or MorphedByMany relation instance
+     * @return string Morph class name
+     */
+    private function getMorphClassFromRelation(object $relation): string
+    {
+        if (method_exists($relation, 'getMorphClass')) {
+            $reflection = new \ReflectionMethod($relation, 'getMorphClass');
+            $reflection->setAccessible(true);
+            return $reflection->invoke($relation);
+        }
+
+        // Fallback to get_class if getMorphClass doesn't exist
+        return get_class($relation->getParent());
     }
 
     /**
@@ -1378,7 +1406,9 @@ class ModelQueryBuilder extends QueryBuilder
                 "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
                 "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
         } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany) {
-            // Similar logic for MorphToMany
+            // Optimized MorphToMany query matching Laravel's structure
+            // Laravel starts from related table (tags) and joins pivot (taggables)
+            // This is more efficient when filtering by related table columns
             $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
             $morphType = $this->getRelationProperty($relation, 'morphType');
             $morphId = $this->getRelationProperty($relation, 'foreignKey');
@@ -1388,12 +1418,17 @@ class ModelQueryBuilder extends QueryBuilder
 
             // Get related table and morph class
             $relatedTable = $relationQuery->getTable();
-            $morphClass = get_class($relation->getParent());
+            $morphClass = $this->getMorphClassFromRelation($relation);
 
-            $subquerySql = "SELECT 1 FROM {$pivotTable} " .
-                "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
-                "WHERE {$pivotTable}.{$morphId} = {$parentTable}.{$parentKey} " .
-                "AND {$pivotTable}.{$morphType} = '{$morphClass}'";
+            // Laravel's structure: SELECT * FROM tags INNER JOIN taggables ON tags.id = taggables.tag_id
+            // WHERE products.id = taggables.taggable_id AND taggables.taggable_type = ? AND tags.id = ?
+            // This is more efficient when filtering by tags because it can use tags table index first
+            // Quote morph class value for safe SQL injection prevention
+            $quotedMorphClass = $this->quoteValue($morphClass);
+            $subquerySql = "SELECT 1 FROM {$relatedTable} " .
+                "INNER JOIN {$pivotTable} ON {$relatedTable}.{$relatedKey} = {$pivotTable}.{$relatedPivotKey} " .
+                "WHERE {$parentTable}.{$parentKey} = {$pivotTable}.{$morphId} " .
+                "AND {$pivotTable}.{$morphType} = {$quotedMorphClass}";
         }
 
         // Add relation constraints
