@@ -73,6 +73,29 @@ Route::post('/products/test-sync-operations', [ProductController::class, 'testSy
 Route::get('/products/test-performance', [ProductController::class, 'testPerformance']);
 Route::get('/products/test-pivot-validation', [ProductController::class, 'testPivotValidation']);
 
+// =========================================================================
+// POLYMORPHIC RELATIONSHIPS TESTING ROUTES
+// =========================================================================
+
+// Test individual polymorphic relationship types
+Route::get('/polymorphic/test-morph-one', [ProductController::class, 'testMorphOne']);
+Route::get('/polymorphic/test-morph-many', [ProductController::class, 'testMorphMany']);
+Route::get('/polymorphic/test-morph-to', [ProductController::class, 'testMorphTo']);
+Route::get('/polymorphic/test-morph-to-many', [ProductController::class, 'testMorphToMany']);
+
+// Test all polymorphic relationships together
+Route::get('/polymorphic/test-all', [ProductController::class, 'testAllPolymorphic']);
+
+// CRUD operations for polymorphic models
+Route::post('/polymorphic/posts', [ProductController::class, 'createPost']);
+Route::post('/polymorphic/videos', [ProductController::class, 'createVideo']);
+Route::post('/polymorphic/comments', [ProductController::class, 'createComment']);
+
+// Utility endpoints
+Route::get('/polymorphic/available-ids', [ProductController::class, 'getAvailableIds']);
+Route::get('/polymorphic/sample-data', [ProductController::class, 'getSampleData']);
+Route::post('/polymorphic/seed-data', [ProductController::class, 'seedPolymorphicData']);
+
 // 404 Handler - Global handler for unmatched routes
 // This will be called automatically when no route matches the request
 Route::fallback(function () {

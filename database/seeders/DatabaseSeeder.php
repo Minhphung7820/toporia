@@ -43,6 +43,9 @@ final class DatabaseSeeder extends Seeder
 
         // Then seed other data
         // $this->call(ProductSeeder::class);
+
+        // Seed polymorphic relationships (posts, videos, comments, images)
+        // $this->call(PolymorphicRelationshipsSeeder::class);
     }
 
     /**

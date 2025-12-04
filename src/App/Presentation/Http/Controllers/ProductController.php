@@ -11,6 +11,10 @@ use App\Infrastructure\Persistence\Models\ReviewModel;
 use App\Infrastructure\Persistence\Models\UserModel;
 use App\Infrastructure\Persistence\Models\TagModel;
 use App\Infrastructure\Persistence\Models\OrderItemModel;
+use App\Infrastructure\Persistence\Models\PostModel;
+use App\Infrastructure\Persistence\Models\VideoModel;
+use App\Infrastructure\Persistence\Models\CommentModel;
+use App\Infrastructure\Persistence\Models\ImageModel;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Contracts\JsonResponseInterface;
 use Toporia\Framework\Support\Accessors\DB;
@@ -1733,5 +1737,819 @@ final class ProductController extends BaseController
             'data' => $tag->toArray(),
             'queries' => $queries,
         ]);
+    }
+
+    // =========================================================================
+    // POLYMORPHIC RELATIONSHIPS TESTING ENDPOINTS
+    // =========================================================================
+
+    /**
+     * Test MorphOne relationship (Post/Video has one Image).
+     *
+     * GET /api/polymorphic/test-morph-one?type=post&id=1
+     * GET /api/polymorphic/test-morph-one?type=video&id=1
+     *
+     * Parameters:
+     * - type: 'post' or 'video' (required)
+     * - id: ID of post or video (required, must exist in database)
+     *
+     * Example with real data:
+     * 1. First get available IDs: GET /api/polymorphic/available-ids
+     * 2. Use a real post ID: GET /api/polymorphic/test-morph-one?type=post&id={real_post_id}
+     * 3. Use a real video ID: GET /api/polymorphic/test-morph-one?type=video&id={real_video_id}
+     *
+     * Full example:
+     * GET /api/polymorphic/test-morph-one?type=post&id=1
+     * GET /api/polymorphic/test-morph-one?type=video&id=1
+     */
+    public function testMorphOne(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $type = $request->get('type', 'post'); // post or video
+        $id = (int) $request->get('id', 1);
+
+        $results = [];
+
+        if ($type === 'post') {
+            $post = PostModel::with('image')->find($id);
+            if ($post) {
+                $results['post'] = $post->toArray();
+                $results['image'] = $post->image ? $post->image->toArray() : null;
+            } else {
+                $results['error'] = 'Post not found';
+            }
+        } elseif ($type === 'video') {
+            $video = VideoModel::with('image')->find($id);
+            if ($video) {
+                $results['video'] = $video->toArray();
+                $results['image'] = $video->image ? $video->image->toArray() : null;
+            } else {
+                $results['error'] = 'Video not found';
+            }
+        }
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'MorphOne relationship test',
+            'data' => $results,
+            'queries' => $queries,
+        ]);
+    }
+
+    /**
+     * Test MorphMany relationship (Post/Video has many Comments).
+     *
+     * GET /api/polymorphic/test-morph-many?type=post&id=1
+     * GET /api/polymorphic/test-morph-many?type=video&id=1
+     *
+     * Parameters:
+     * - type: 'post' or 'video' (required)
+     * - id: ID of post or video (required, must exist in database)
+     *
+     * Example with real data:
+     * 1. First get available IDs: GET /api/polymorphic/available-ids
+     * 2. Use a real post ID: GET /api/polymorphic/test-morph-many?type=post&id={real_post_id}
+     * 3. Use a real video ID: GET /api/polymorphic/test-morph-many?type=video&id={real_video_id}
+     *
+     * Full example:
+     * GET /api/polymorphic/test-morph-many?type=post&id=1
+     * GET /api/polymorphic/test-morph-many?type=video&id=1
+     */
+    public function testMorphMany(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $type = $request->get('type', 'post');
+        $id = (int) $request->get('id', 1);
+
+        $results = [];
+
+        if ($type === 'post') {
+            $post = PostModel::with(['comments' => function ($q) {
+                $q->where('is_approved', true)->orderBy('created_at', 'DESC');
+            }])->find($id);
+            if ($post) {
+                $results['post'] = $post->toArray();
+                $results['comments'] = $post->comments->toArray();
+                $results['comments_count'] = $post->comments->count();
+            } else {
+                $results['error'] = 'Post not found';
+            }
+        } elseif ($type === 'video') {
+            $video = VideoModel::with(['comments' => function ($q) {
+                $q->where('is_approved', true)->orderBy('created_at', 'DESC');
+            }])->find($id);
+            if ($video) {
+                $results['video'] = $video->toArray();
+                $results['comments'] = $video->comments->toArray();
+                $results['comments_count'] = $video->comments->count();
+            } else {
+                $results['error'] = 'Video not found';
+            }
+        }
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'MorphMany relationship test',
+            'data' => $results,
+            'queries' => $queries,
+        ]);
+    }
+
+    /**
+     * Test MorphTo relationship (Comment belongs to Post/Video).
+     *
+     * GET /api/polymorphic/test-morph-to?comment_id=1
+     *
+     * Parameters:
+     * - comment_id: ID of comment (required, must exist in database)
+     *
+     * Example with real data:
+     * 1. First get available IDs: GET /api/polymorphic/available-ids
+     * 2. Use a real comment ID: GET /api/polymorphic/test-morph-to?comment_id={real_comment_id}
+     *
+     * Full example:
+     * GET /api/polymorphic/test-morph-to?comment_id=1
+     */
+    public function testMorphTo(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $commentId = (int) $request->get('comment_id', 1);
+
+        $comment = CommentModel::with('commentable')->find($commentId);
+
+        $results = [];
+        if ($comment) {
+            $results['comment'] = $comment->toArray();
+            $results['commentable'] = $comment->commentable ? $comment->commentable->toArray() : null;
+            $results['commentable_type'] = $comment->commentable_type;
+            $results['commentable_class'] = $comment->commentable ? get_class($comment->commentable) : null;
+        } else {
+            $results['error'] = 'Comment not found';
+        }
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'MorphTo relationship test',
+            'data' => $results,
+            'queries' => $queries,
+        ]);
+    }
+
+    /**
+     * Test MorphToMany relationship (Post/Video has many Tags).
+     *
+     * GET /api/polymorphic/test-morph-to-many?type=post&id=1
+     * GET /api/polymorphic/test-morph-to-many?type=video&id=1
+     *
+     * Parameters:
+     * - type: 'post' or 'video' (required)
+     * - id: ID of post or video (required, must exist in database)
+     *
+     * Example with real data:
+     * 1. First get available IDs: GET /api/polymorphic/available-ids
+     * 2. Use a real post ID: GET /api/polymorphic/test-morph-to-many?type=post&id={real_post_id}
+     * 3. Use a real video ID: GET /api/polymorphic/test-morph-to-many?type=video&id={real_video_id}
+     *
+     * Full example:
+     * GET /api/polymorphic/test-morph-to-many?type=post&id=1
+     * GET /api/polymorphic/test-morph-to-many?type=video&id=1
+     */
+    public function testMorphToMany(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $type = $request->get('type', 'post');
+        $id = (int) $request->get('id', 1);
+
+        $results = [];
+
+        if ($type === 'post') {
+            $post = PostModel::with('tags')->find($id);
+            if ($post) {
+                $results['post'] = $post->toArray();
+                $results['tags'] = $post->tags->map(function ($tag) {
+                    $data = $tag->toArray();
+                    if ($tag->pivot) {
+                        $data['pivot'] = $tag->pivot->toArray();
+                    }
+                    return $data;
+                })->toArray();
+                $results['tags_count'] = $post->tags->count();
+            } else {
+                $results['error'] = 'Post not found';
+            }
+        } elseif ($type === 'video') {
+            $video = VideoModel::with('tags')->find($id);
+            if ($video) {
+                $results['video'] = $video->toArray();
+                $results['tags'] = $video->tags->map(function ($tag) {
+                    $data = $tag->toArray();
+                    if ($tag->pivot) {
+                        $data['pivot'] = $tag->pivot->toArray();
+                    }
+                    return $data;
+                })->toArray();
+                $results['tags_count'] = $video->tags->count();
+            } else {
+                $results['error'] = 'Video not found';
+            }
+        }
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'MorphToMany relationship test',
+            'data' => $results,
+            'queries' => $queries,
+        ]);
+    }
+
+    /**
+     * Create a Post with polymorphic relationships.
+     *
+     * POST /api/polymorphic/posts
+     *
+     * Body (JSON):
+     * {
+     *   "title": "Post Title",
+     *   "slug": "post-title" (optional, auto-generated from title),
+     *   "content": "Post content",
+     *   "views": 0 (optional, default: 0),
+     *   "is_published": true (optional, default: true),
+     *   "tag_ids": [1, 2, 3] (optional, must be valid tag IDs from database),
+     *   "image": {
+     *     "url": "https://example.com/image.jpg",
+     *     "alt_text": "Post image" (optional),
+     *     "width": 800 (optional, default: 0),
+     *     "height": 600 (optional, default: 0),
+     *     "size": 102400 (optional, default: 0)
+     *   } (optional)
+     * }
+     *
+     * Example with real tag IDs:
+     * 1. First get available tag IDs: GET /api/polymorphic/available-ids
+     * 2. Use real tag IDs in request:
+     * POST /api/polymorphic/posts
+     * {
+     *   "title": "My First Post",
+     *   "content": "This is my first post content",
+     *   "tag_ids": [1, 2, 3],
+     *   "image": {
+     *     "url": "https://picsum.photos/800/600",
+     *     "alt_text": "Featured image",
+     *     "width": 800,
+     *     "height": 600,
+     *     "size": 102400
+     *   }
+     * }
+     */
+    public function createPost(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $data = $request->json();
+
+        $result = DB::transaction(function () use ($data) {
+            // Create post
+            $post = PostModel::create([
+                'title' => $data['title'] ?? 'Test Post',
+                'slug' => $data['slug'] ?? strtolower(str_replace(' ', '-', $data['title'] ?? 'test-post')),
+                'content' => $data['content'] ?? null,
+                'views' => $data['views'] ?? 0,
+                'is_published' => $data['is_published'] ?? true,
+            ]);
+
+            // Create image (MorphOne)
+            if (isset($data['image']) && is_array($data['image'])) {
+                $post->image()->create([
+                    'url' => $data['image']['url'] ?? 'https://example.com/default.jpg',
+                    'alt_text' => $data['image']['alt_text'] ?? null,
+                    'width' => $data['image']['width'] ?? 0,
+                    'height' => $data['image']['height'] ?? 0,
+                    'size' => $data['image']['size'] ?? 0,
+                ]);
+            }
+
+            // Attach tags (MorphToMany)
+            if (isset($data['tag_ids']) && is_array($data['tag_ids'])) {
+                $validTagIds = TagModel::whereIn('id', $data['tag_ids'])
+                    ->get()
+                    ->pluck('id')
+                    ->values()
+                    ->all();
+                if (!empty($validTagIds)) {
+                    $post->tags()->attach($validTagIds);
+                }
+            }
+
+            // Load relationships
+            $post->load(['image', 'tags']);
+
+            return $post;
+        });
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Post created successfully',
+            'data' => $result->toArray(),
+            'queries' => $queries,
+        ], 201);
+    }
+
+    /**
+     * Create a Video with polymorphic relationships.
+     *
+     * POST /api/polymorphic/videos
+     *
+     * Body (JSON):
+     * {
+     *   "title": "Video Title",
+     *   "slug": "video-title" (optional, auto-generated from title),
+     *   "description": "Video description" (optional),
+     *   "video_url": "https://example.com/video.mp4" (optional),
+     *   "duration": 3600 (optional, default: 0, in seconds),
+     *   "views": 0 (optional, default: 0),
+     *   "is_published": true (optional, default: true),
+     *   "tag_ids": [1, 2, 3] (optional, must be valid tag IDs from database),
+     *   "image": {
+     *     "url": "https://example.com/thumbnail.jpg",
+     *     "alt_text": "Video thumbnail" (optional),
+     *     "width": 1280 (optional, default: 0),
+     *     "height": 720 (optional, default: 0),
+     *     "size": 204800 (optional, default: 0)
+     *   } (optional)
+     * }
+     *
+     * Example with real tag IDs:
+     * 1. First get available tag IDs: GET /api/polymorphic/available-ids
+     * 2. Use real tag IDs in request:
+     * POST /api/polymorphic/videos
+     * {
+     *   "title": "My First Video",
+     *   "description": "This is my first video description",
+     *   "video_url": "https://example.com/video.mp4",
+     *   "duration": 3600,
+     *   "tag_ids": [1, 2, 3],
+     *   "image": {
+     *     "url": "https://picsum.photos/1280/720",
+     *     "alt_text": "Video thumbnail",
+     *     "width": 1280,
+     *     "height": 720,
+     *     "size": 204800
+     *   }
+     * }
+     */
+    public function createVideo(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $data = $request->json();
+
+        $result = DB::transaction(function () use ($data) {
+            // Create video
+            $video = VideoModel::create([
+                'title' => $data['title'] ?? 'Test Video',
+                'slug' => $data['slug'] ?? strtolower(str_replace(' ', '-', $data['title'] ?? 'test-video')),
+                'description' => $data['description'] ?? null,
+                'video_url' => $data['video_url'] ?? null,
+                'duration' => $data['duration'] ?? 0,
+                'views' => $data['views'] ?? 0,
+                'is_published' => $data['is_published'] ?? true,
+            ]);
+
+            // Create image (MorphOne)
+            if (isset($data['image']) && is_array($data['image'])) {
+                $video->image()->create([
+                    'url' => $data['image']['url'] ?? 'https://example.com/default.jpg',
+                    'alt_text' => $data['image']['alt_text'] ?? null,
+                    'width' => $data['image']['width'] ?? 0,
+                    'height' => $data['image']['height'] ?? 0,
+                    'size' => $data['image']['size'] ?? 0,
+                ]);
+            }
+
+            // Attach tags (MorphToMany)
+            if (isset($data['tag_ids']) && is_array($data['tag_ids'])) {
+                $validTagIds = TagModel::whereIn('id', $data['tag_ids'])
+                    ->get()
+                    ->pluck('id')
+                    ->values()
+                    ->all();
+                if (!empty($validTagIds)) {
+                    $video->tags()->attach($validTagIds);
+                }
+            }
+
+            // Load relationships
+            $video->load(['image', 'tags']);
+
+            return $video;
+        });
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Video created successfully',
+            'data' => $result->toArray(),
+            'queries' => $queries,
+        ], 201);
+    }
+
+    /**
+     * Create a Comment for Post or Video.
+     *
+     * POST /api/polymorphic/comments
+     *
+     * Body (JSON):
+     * {
+     *   "commentable_type": "post" (required, must be "post" or "video"),
+     *   "commentable_id": 1 (required, must be valid post/video ID from database),
+     *   "content": "Comment content" (required),
+     *   "user_id": 1 (optional, must be valid user ID if provided),
+     *   "is_approved": true (optional, default: false)
+     * }
+     *
+     * Example with real data:
+     * 1. First get available IDs: GET /api/polymorphic/available-ids
+     * 2. Use real post ID:
+     * POST /api/polymorphic/comments
+     * {
+     *   "commentable_type": "post",
+     *   "commentable_id": 1,
+     *   "content": "This is a great post!",
+     *   "is_approved": true
+     * }
+     *
+     * 3. Use real video ID:
+     * POST /api/polymorphic/comments
+     * {
+     *   "commentable_type": "video",
+     *   "commentable_id": 1,
+     *   "content": "Awesome video!",
+     *   "is_approved": true
+     * }
+     */
+    public function createComment(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $data = $request->json();
+
+        // Map type to model class
+        $typeMap = [
+            'post' => PostModel::class,
+            'video' => VideoModel::class,
+        ];
+
+        $commentableType = $data['commentable_type'] ?? 'post';
+        $commentableId = (int) ($data['commentable_id'] ?? 1);
+
+        if (!isset($typeMap[$commentableType])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid commentable_type. Use: post or video',
+            ], 400);
+        }
+
+        // Verify commentable exists
+        $modelClass = $typeMap[$commentableType];
+        $commentable = $modelClass::find($commentableId);
+        if (!$commentable) {
+            return response()->json([
+                'success' => false,
+                'message' => ucfirst($commentableType) . ' not found',
+            ], 404);
+        }
+
+        $result = DB::transaction(function () use ($data, $modelClass, $commentableId) {
+            $comment = CommentModel::create([
+                'commentable_type' => $modelClass,
+                'commentable_id' => $commentableId,
+                'content' => $data['content'] ?? 'Test comment',
+                'user_id' => $data['user_id'] ?? null,
+                'is_approved' => $data['is_approved'] ?? false,
+            ]);
+
+            // Load relationship
+            $comment->load('commentable');
+
+            return $comment;
+        });
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Comment created successfully',
+            'data' => $result->toArray(),
+            'queries' => $queries,
+        ], 201);
+    }
+
+    /**
+     * Test all polymorphic relationships together.
+     *
+     * GET /api/polymorphic/test-all?post_id=1&video_id=1&comment_id=1
+     *
+     * Parameters (all optional, but recommended to use real IDs):
+     * - post_id: ID of post (optional, must exist in database if provided)
+     * - video_id: ID of video (optional, must exist in database if provided)
+     * - comment_id: ID of comment (optional, must exist in database if provided)
+     *
+     * Example with real data:
+     * 1. First get available IDs: GET /api/polymorphic/available-ids
+     * 2. Use real IDs:
+     * GET /api/polymorphic/test-all?post_id={real_post_id}&video_id={real_video_id}&comment_id={real_comment_id}
+     *
+     * Full example:
+     * GET /api/polymorphic/test-all?post_id=1&video_id=1&comment_id=1
+     */
+    public function testAllPolymorphic(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $postId = (int) $request->get('post_id', 1);
+        $videoId = (int) $request->get('video_id', 1);
+        $commentId = (int) $request->get('comment_id', 1);
+
+        $results = [];
+
+        // Test MorphOne - Post has one Image
+        $post = PostModel::with('image')->find($postId);
+        if ($post) {
+            $results['post_with_image'] = [
+                'post' => $post->toArray(),
+                'image' => $post->image ? $post->image->toArray() : null,
+            ];
+        }
+
+        // Test MorphOne - Video has one Image
+        $video = VideoModel::with('image')->find($videoId);
+        if ($video) {
+            $results['video_with_image'] = [
+                'video' => $video->toArray(),
+                'image' => $video->image ? $video->image->toArray() : null,
+            ];
+        }
+
+        // Test MorphMany - Post has many Comments
+        if ($post) {
+            $results['post_with_comments'] = [
+                'post' => $post->toArray(),
+                'comments' => $post->comments->toArray(),
+                'comments_count' => $post->comments->count(),
+            ];
+        }
+
+        // Test MorphMany - Video has many Comments
+        if ($video) {
+            $results['video_with_comments'] = [
+                'video' => $video->toArray(),
+                'comments' => $video->comments->toArray(),
+                'comments_count' => $video->comments->count(),
+            ];
+        }
+
+        // Test MorphTo - Comment belongs to Post/Video
+        $comment = CommentModel::with('commentable')->find($commentId);
+        if ($comment) {
+            $results['comment_with_commentable'] = [
+                'comment' => $comment->toArray(),
+                'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
+                'commentable_type' => $comment->commentable_type,
+            ];
+        }
+
+        // Test MorphToMany - Post has many Tags
+        if ($post) {
+            $post->load('tags');
+            $results['post_with_tags'] = [
+                'post' => $post->toArray(),
+                'tags' => $post->tags->map(function ($tag) {
+                    $data = $tag->toArray();
+                    if ($tag->pivot) {
+                        $data['pivot'] = $tag->pivot->toArray();
+                    }
+                    return $data;
+                })->toArray(),
+                'tags_count' => $post->tags->count(),
+            ];
+        }
+
+        // Test MorphToMany - Video has many Tags
+        if ($video) {
+            $video->load('tags');
+            $results['video_with_tags'] = [
+                'video' => $video->toArray(),
+                'tags' => $video->tags->map(function ($tag) {
+                    $data = $tag->toArray();
+                    if ($tag->pivot) {
+                        $data['pivot'] = $tag->pivot->toArray();
+                    }
+                    return $data;
+                })->toArray(),
+                'tags_count' => $video->tags->count(),
+            ];
+        }
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'All polymorphic relationships test',
+            'data' => $results,
+            'queries' => $queries,
+        ]);
+    }
+
+    /**
+     * Get available IDs for testing polymorphic relationships.
+     *
+     * GET /api/polymorphic/available-ids
+     *
+     * Returns actual IDs from database that can be used for testing.
+     */
+    public function getAvailableIds(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $results = [
+            'posts' => PostModel::pluck('id')->take(10)->all(),
+            'videos' => VideoModel::pluck('id')->take(10)->all(),
+            'comments' => CommentModel::pluck('id')->take(10)->all(),
+            'images' => ImageModel::pluck('id')->take(10)->all(),
+            'tags' => TagModel::pluck('id')->take(20)->all(),
+            'sample_post_id' => PostModel::first()?->id,
+            'sample_video_id' => VideoModel::first()?->id,
+            'sample_comment_id' => CommentModel::first()?->id,
+            'sample_tag_ids' => TagModel::take(5)->pluck('id')->all(),
+        ];
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Available IDs for testing',
+            'data' => $results,
+            'queries' => $queries,
+        ]);
+    }
+
+    /**
+     * Get sample data for testing polymorphic relationships.
+     *
+     * GET /api/polymorphic/sample-data
+     */
+    public function getSampleData(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $results = [
+            'posts' => PostModel::with(['image', 'comments', 'tags'])->limit(5)->get()->toArray(),
+            'videos' => VideoModel::with(['image', 'comments', 'tags'])->limit(5)->get()->toArray(),
+            'comments' => CommentModel::with('commentable')->limit(10)->get()->toArray(),
+            'images' => ImageModel::with('imageable')->limit(10)->get()->toArray(),
+        ];
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sample data for polymorphic relationships',
+            'data' => $results,
+            'queries' => $queries,
+        ]);
+    }
+
+    /**
+     * Seed sample data for testing polymorphic relationships.
+     *
+     * POST /api/polymorphic/seed-data
+     */
+    public function seedPolymorphicData(Request $request): JsonResponseInterface
+    {
+        DB::enableQueryLog();
+
+        $results = DB::transaction(function () {
+            $created = [];
+
+            // Create sample posts
+            $posts = [];
+            for ($i = 1; $i <= 5; $i++) {
+                $post = PostModel::create([
+                    'title' => "Sample Post {$i}",
+                    'slug' => "sample-post-{$i}",
+                    'content' => "This is the content for post {$i}",
+                    'views' => rand(10, 1000),
+                    'is_published' => true,
+                ]);
+
+                // Create image for post (MorphOne)
+                $post->image()->create([
+                    'url' => "https://example.com/post-{$i}.jpg",
+                    'alt_text' => "Image for post {$i}",
+                    'width' => 800,
+                    'height' => 600,
+                    'size' => 102400,
+                ]);
+
+                // Attach tags (MorphToMany)
+                $tagIds = TagModel::inRandomOrder()->limit(rand(2, 4))->pluck('id')->all();
+                if (!empty($tagIds)) {
+                    $post->tags()->attach($tagIds);
+                }
+
+                $posts[] = $post;
+            }
+            $created['posts'] = count($posts);
+
+            // Create sample videos
+            $videos = [];
+            for ($i = 1; $i <= 5; $i++) {
+                $video = VideoModel::create([
+                    'title' => "Sample Video {$i}",
+                    'slug' => "sample-video-{$i}",
+                    'description' => "This is the description for video {$i}",
+                    'video_url' => "https://example.com/video-{$i}.mp4",
+                    'duration' => rand(60, 3600), // 1 minute to 1 hour
+                    'views' => rand(50, 5000),
+                    'is_published' => true,
+                ]);
+
+                // Create image for video (MorphOne)
+                $video->image()->create([
+                    'url' => "https://example.com/video-thumb-{$i}.jpg",
+                    'alt_text' => "Thumbnail for video {$i}",
+                    'width' => 1280,
+                    'height' => 720,
+                    'size' => 204800,
+                ]);
+
+                // Attach tags (MorphToMany)
+                $tagIds = TagModel::inRandomOrder()->limit(rand(2, 4))->pluck('id')->all();
+                if (!empty($tagIds)) {
+                    $video->tags()->attach($tagIds);
+                }
+
+                $videos[] = $video;
+            }
+            $created['videos'] = count($videos);
+
+            // Create sample comments for posts
+            $comments = [];
+            foreach ($posts as $post) {
+                for ($j = 1; $j <= rand(2, 5); $j++) {
+                    $comment = CommentModel::create([
+                        'commentable_type' => PostModel::class,
+                        'commentable_id' => $post->id,
+                        'content' => "Comment {$j} on post {$post->id}",
+                        'user_id' => null,
+                        'is_approved' => rand(0, 1) === 1,
+                    ]);
+                    $comments[] = $comment;
+                }
+            }
+            $created['post_comments'] = count($comments);
+
+            // Create sample comments for videos
+            $videoComments = [];
+            foreach ($videos as $video) {
+                for ($j = 1; $j <= rand(2, 5); $j++) {
+                    $comment = CommentModel::create([
+                        'commentable_type' => VideoModel::class,
+                        'commentable_id' => $video->id,
+                        'content' => "Comment {$j} on video {$video->id}",
+                        'user_id' => null,
+                        'is_approved' => rand(0, 1) === 1,
+                    ]);
+                    $videoComments[] = $comment;
+                }
+            }
+            $created['video_comments'] = count($videoComments);
+
+            return $created;
+        });
+
+        $queries = $this->formatQueryLogs(DB::getQueryLog());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sample data seeded successfully',
+            'data' => $results,
+            'queries' => $queries,
+        ], 201);
     }
 }
