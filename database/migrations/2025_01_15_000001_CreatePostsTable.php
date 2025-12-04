@@ -36,3 +36,4 @@ class CreatePostsTable extends Migration
         $this->schema->dropIfExists('posts');
     }
 }
+

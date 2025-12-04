@@ -307,3 +307,4 @@ $users = UserModel::query()
 
 Framework đã được tích hợp hoàn chỉnh giữa Collection, ORM và Query Builder. Tất cả các methods của Collection đều có sẵn và hoạt động chính xác với kết quả truy vấn, tương tự như Laravel. Hiệu năng cao, clean code, và độ chính xác tuyệt đối đã được đảm bảo.
 
+
