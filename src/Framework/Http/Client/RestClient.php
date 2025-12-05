@@ -31,6 +31,23 @@ final class RestClient implements HttpClientInterface
     private int $retrySleep = 100;
     private ?string $contentType = null;
     private ?string $accept = null;
+    private bool $verifySsl = true;
+    private bool $ssrfProtection = true;
+
+    /**
+     * Private/internal IP ranges for SSRF protection.
+     * SECURITY: Block requests to internal networks to prevent SSRF attacks.
+     */
+    private const PRIVATE_IP_RANGES = [
+        '127.0.0.0/8',      // Loopback
+        '10.0.0.0/8',       // Private Class A
+        '172.16.0.0/12',    // Private Class B
+        '192.168.0.0/16',   // Private Class C
+        '169.254.0.0/16',   // Link-local (includes AWS metadata)
+        '0.0.0.0/8',        // "This" network
+        '224.0.0.0/4',      // Multicast
+        '240.0.0.0/4',      // Reserved
+    ];
 
     /**
      * {@inheritdoc}
@@ -220,6 +237,9 @@ final class RestClient implements HttpClientInterface
         // Build full URL
         $fullUrl = $this->buildUrl($url);
 
+        // SECURITY: Validate URL to prevent SSRF attacks
+        $this->validateUrl($fullUrl);
+
         // Initialize cURL
         $ch = curl_init();
 
@@ -240,6 +260,10 @@ final class RestClient implements HttpClientInterface
 
         // Follow redirects
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+
+        // SECURITY: SSL/TLS verification
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $this->verifySsl);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $this->verifySsl ? 2 : 0);
 
         // Build headers
         $requestHeaders = $this->buildHeaders($headers);
@@ -371,5 +395,131 @@ final class RestClient implements HttpClientInterface
         }
 
         return $headers;
+    }
+
+    /**
+     * Validate URL to prevent SSRF attacks.
+     *
+     * SECURITY: Blocks requests to internal networks, localhost, and cloud metadata endpoints.
+     *
+     * @param string $url URL to validate
+     * @throws HttpClientException If URL is blocked
+     */
+    private function validateUrl(string $url): void
+    {
+        if (!$this->ssrfProtection) {
+            return;
+        }
+
+        $parsed = parse_url($url);
+
+        if ($parsed === false) {
+            throw new HttpClientException('Invalid URL format');
+        }
+
+        // Only allow http and https schemes
+        $scheme = strtolower($parsed['scheme'] ?? '');
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            throw new HttpClientException("Invalid URL scheme: {$scheme}. Only http and https are allowed.");
+        }
+
+        $host = $parsed['host'] ?? '';
+        if (empty($host)) {
+            throw new HttpClientException('URL must contain a host');
+        }
+
+        // Block localhost and common internal hostnames
+        $blockedHosts = ['localhost', '127.0.0.1', '::1', '0.0.0.0', 'metadata', 'metadata.google.internal'];
+        if (in_array(strtolower($host), $blockedHosts, true)) {
+            throw new HttpClientException("SSRF Protection: Blocked request to internal host: {$host}");
+        }
+
+        // Resolve hostname to IP
+        $ip = gethostbyname($host);
+
+        // If resolution failed, gethostbyname returns the hostname
+        if ($ip === $host && !filter_var($host, FILTER_VALIDATE_IP)) {
+            throw new HttpClientException("Cannot resolve hostname: {$host}");
+        }
+
+        // Check if IP is in private ranges
+        if ($this->isPrivateIp($ip)) {
+            throw new HttpClientException("SSRF Protection: Blocked request to private IP: {$ip}");
+        }
+    }
+
+    /**
+     * Check if IP address is in private/internal ranges.
+     *
+     * @param string $ip IP address
+     * @return bool True if private
+     */
+    private function isPrivateIp(string $ip): bool
+    {
+        // Handle IPv6 loopback
+        if ($ip === '::1') {
+            return true;
+        }
+
+        // Check against private ranges
+        foreach (self::PRIVATE_IP_RANGES as $range) {
+            if ($this->ipInCidr($ip, $range)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if IP is within CIDR range.
+     *
+     * @param string $ip IP address
+     * @param string $cidr CIDR notation (e.g., 192.168.0.0/16)
+     * @return bool True if IP is in range
+     */
+    private function ipInCidr(string $ip, string $cidr): bool
+    {
+        [$range, $netmask] = explode('/', $cidr, 2);
+
+        $ipLong = ip2long($ip);
+        $rangeLong = ip2long($range);
+
+        if ($ipLong === false || $rangeLong === false) {
+            return false;
+        }
+
+        $maskLong = ~((1 << (32 - (int)$netmask)) - 1);
+
+        return ($ipLong & $maskLong) === ($rangeLong & $maskLong);
+    }
+
+    /**
+     * Disable SSL verification (NOT RECOMMENDED for production).
+     *
+     * SECURITY WARNING: Only use this for development/testing with self-signed certificates.
+     *
+     * @return self
+     */
+    public function withoutVerifying(): self
+    {
+        $clone = clone $this;
+        $clone->verifySsl = false;
+        return $clone;
+    }
+
+    /**
+     * Disable SSRF protection (NOT RECOMMENDED).
+     *
+     * SECURITY WARNING: Only use this when you need to access internal services
+     * and you trust the URL source completely.
+     *
+     * @return self
+     */
+    public function withoutSsrfProtection(): self
+    {
+        $clone = clone $this;
+        $clone->ssrfProtection = false;
+        return $clone;
     }
 }

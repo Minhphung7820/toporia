@@ -230,8 +230,9 @@ final class SesTransport extends AbstractTransport
         }
 
         // SECURITY: Disable external entity loading to prevent XXE attacks
+        // Note: LIBXML_NONET blocks network access, we removed LIBXML_NOENT which enables entity expansion
         $previousValue = libxml_disable_entity_loader(true);
-        $xml = simplexml_load_string($response, 'SimpleXMLElement', LIBXML_NOENT | LIBXML_NONET);
+        $xml = simplexml_load_string($response, 'SimpleXMLElement', LIBXML_NONET);
         libxml_disable_entity_loader($previousValue);
 
         if ($xml === false) {

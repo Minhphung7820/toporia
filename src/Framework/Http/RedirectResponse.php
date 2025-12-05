@@ -63,10 +63,57 @@ final class RedirectResponse extends Response implements RedirectResponseInterfa
      */
     public function setTargetUrl(string $url): static
     {
+        // SECURITY: Validate URL to prevent open redirect attacks
+        $this->validateRedirectUrl($url);
+
         $this->targetUrl = $url;
         $this->header('Location', $url);
 
         return $this;
+    }
+
+    /**
+     * Validate redirect URL to prevent open redirect attacks.
+     *
+     * SECURITY: Prevents redirects to:
+     * - JavaScript URLs (XSS)
+     * - Data URLs
+     * - Protocol-relative URLs that could redirect to external sites
+     * - External domains (unless explicitly allowed)
+     *
+     * @param string $url URL to validate
+     * @throws \InvalidArgumentException If URL is invalid or dangerous
+     */
+    private function validateRedirectUrl(string $url): void
+    {
+        // Block dangerous protocols (XSS via javascript:, data:, vbscript:)
+        if (preg_match('/^(javascript|data|vbscript):/i', $url)) {
+            throw new \InvalidArgumentException('Invalid redirect URL: dangerous protocol detected');
+        }
+
+        // Block protocol-relative URLs (//evil.com could redirect externally)
+        if (str_starts_with($url, '//')) {
+            throw new \InvalidArgumentException('Invalid redirect URL: protocol-relative URLs are not allowed');
+        }
+
+        // Allow relative URLs (starting with / or not starting with a scheme)
+        if (str_starts_with($url, '/') && !str_starts_with($url, '//')) {
+            return; // Safe relative URL
+        }
+
+        // For absolute URLs, validate the scheme
+        $parsed = parse_url($url);
+        if ($parsed === false) {
+            throw new \InvalidArgumentException('Invalid redirect URL: malformed URL');
+        }
+
+        // If there's a scheme, it must be http or https
+        if (isset($parsed['scheme'])) {
+            $scheme = strtolower($parsed['scheme']);
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                throw new \InvalidArgumentException("Invalid redirect URL: only http and https schemes are allowed");
+            }
+        }
     }
 
     /**
