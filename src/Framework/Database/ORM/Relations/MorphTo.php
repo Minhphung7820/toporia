@@ -32,6 +32,9 @@ class MorphTo extends Relation
     /** @var string|null Cached relation name */
     private ?string $relationNameCache = null;
 
+    /** @var array<string, callable> Constraints for each morph type */
+    protected array $typeConstraints = [];
+
     /**
      * @param QueryBuilder $query Query builder (will be replaced dynamically)
      * @param Model $parent Child model instance (Comment)
@@ -119,9 +122,16 @@ class MorphTo extends Relation
             return null;
         }
 
-        return $modelClass::query()
-            ->where($this->localKey, $id)
-            ->first();
+        $query = $modelClass::query()
+            ->where($this->localKey, $id);
+
+        // Apply constraint for this morph type if set
+        $constraint = $this->getConstraintForType($modelClass);
+        if ($constraint !== null && is_callable($constraint)) {
+            $constraint($query);
+        }
+
+        return $query->first();
     }
 
     /**
@@ -199,6 +209,13 @@ class MorphTo extends Relation
 
             // Apply SoftDeletes scope automatically (respects withTrashed() via ModelQueryBuilder)
             $query = $modelClass::whereIn('id', array_unique($ids));
+
+            // Apply constraint for this morph type if set
+            $constraint = $this->getConstraintForType($modelClass);
+            if ($constraint !== null && is_callable($constraint)) {
+                $constraint($query);
+            }
+
             $related = $query->get();
 
             foreach ($related as $model) {
@@ -232,6 +249,9 @@ class MorphTo extends Relation
         );
 
         $instance->setMorphMap($this->morphMap);
+
+        // Copy type constraints for eager loading
+        $instance->typeConstraints = $this->typeConstraints;
 
         // Use freshQuery directly instead of creating another new query
         // freshQuery already has the table set from loadRelationBatch
@@ -272,6 +292,44 @@ class MorphTo extends Relation
     public function getAvailableTypes(): array
     {
         return array_keys($this->morphMap);
+    }
+
+    /**
+     * Set constraints for each morph type.
+     *
+     * Allows applying different query constraints to different morph types
+     * when eager loading polymorphic relationships.
+     *
+     * @param array<string, callable> $constraints Array mapping model class names to constraint callables
+     * @return $this
+     *
+     * @example
+     * ```php
+     * $morphTo->constrain([
+     *     PostModel::class => function ($query) {
+     *         $query->where('is_published', true);
+     *     },
+     *     VideoModel::class => function ($query) {
+     *         $query->where('duration', '>', 60);
+     *     },
+     * ]);
+     * ```
+     */
+    public function constrain(array $constraints): static
+    {
+        $this->typeConstraints = $constraints;
+        return $this;
+    }
+
+    /**
+     * Get constraints for a specific morph type.
+     *
+     * @param string $type Model class name
+     * @return callable|null Constraint callable or null if not set
+     */
+    protected function getConstraintForType(string $type): ?callable
+    {
+        return $this->typeConstraints[$type] ?? null;
     }
 
     // =========================================================================

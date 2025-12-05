@@ -15,6 +15,7 @@ use App\Infrastructure\Persistence\Models\PostModel;
 use App\Infrastructure\Persistence\Models\VideoModel;
 use App\Infrastructure\Persistence\Models\CommentModel;
 use App\Infrastructure\Persistence\Models\ImageModel;
+use Toporia\Framework\Database\ORM\Relations\MorphTo;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Contracts\JsonResponseInterface;
 use Toporia\Framework\Support\Accessors\DB;
@@ -1965,15 +1966,27 @@ final class ProductController extends BaseController
                 }
             })
                 ->with([
-                    'image.imageable' => function ($q) use ($publishedOnly, $minViews) {
-                        // Nested: image -> imageable (Post/Video)
-                        if ($publishedOnly) {
-                            $q->where('is_published', true);
-                        }
-                        if ($minViews > 0) {
-                            $q->where('views', '>=', $minViews);
-                        }
+                    'image.imageable' => function (MorphTo $morphTo) use ($publishedOnly, $minViews) {
+                        $morphTo->constrain([
+                            PostModel::class => function ($query) use ($publishedOnly, $minViews) {
+                                if ($publishedOnly) {
+                                    $query->where('is_published', true);
+                                }
+                                if ($minViews > 0) {
+                                    $query->where('views', '>=', $minViews);
+                                }
+                            },
+                            VideoModel::class => function ($query) use ($publishedOnly, $minViews) {
+                                if ($publishedOnly) {
+                                    $query->where('is_published', true);
+                                }
+                                if ($minViews > 0) {
+                                    $query->where('views', '>=', $minViews);
+                                }
+                            },
+                        ]);
                     },
+
                     'image' => function ($q) {
                         $q->orderBy('size', 'DESC');
                     }
@@ -1993,166 +2006,166 @@ final class ProductController extends BaseController
                 ];
             })->all();
 
-            // Test 6: Deep nested - Post with image, image has imageable, and imageable has relationships
-            // Use whereHas with whereHasMorph to properly handle polymorphic relationship
-            $postsWithDeepNested = PostModel::whereHas('image', function ($q) use ($publishedOnly, $minViews) {
-                // Filter images that have an imageable (Post) with the specified conditions using whereHasMorph
-                $q->whereHasMorph('imageable', [PostModel::class], function ($subQ) use ($publishedOnly, $minViews) {
-                    if ($publishedOnly) {
-                        $subQ->where('is_published', true);
-                    }
-                    if ($minViews > 0) {
-                        $subQ->where('views', '>=', $minViews);
-                    }
-                });
-            })
-                ->with([
-                    // Load imageable and its nested relationships
-                    // Note: 'image.imageable.image' creates a circular reference:
-                    // Post -> Image -> Imageable (Post) -> Image
-                    // The constraint applies to the final 'image' in the path
-                    'image.imageable.image' => function ($q) {
-                        // Deep nested: Post -> Image -> Imageable (Post) -> Image
-                        // Constraint applies to imageable's image, ordered by size DESC
-                        $q->orderBy('size', 'DESC');
-                    },
-                    'image.imageable.comments' => function ($q) {
-                        // Deep nested: Post -> Image -> Imageable (Post) -> Comments
-                        $q->where('is_approved', true)
-                            ->orderBy('created_at', 'DESC')
-                            ->limit(3);
-                    },
-                    'image.imageable.tags' => function ($q) {
-                        // Deep nested: Post -> Image -> Imageable (Post) -> Tags
-                        $q->where('is_active', true)
-                            ->orderBy('name', 'ASC');
-                    }
-                ])
-                ->limit(3)
-                ->get();
-            $results['deep_nested_relationships'] = $postsWithDeepNested->map(function ($p) {
-                $imageable = $p->image && $p->image->imageable ? $p->image->imageable : null;
-                return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'image' => $p->image ? [
-                        'image' => $p->image->toArray(),
-                        'imageable' => $imageable ? [
-                            'imageable' => $imageable->toArray(),
-                            'nested_image' => $imageable->image ? $imageable->image->toArray() : null,
-                            'nested_comments' => $imageable->comments ? $imageable->comments->toArray() : [],
-                            'nested_tags' => $imageable->tags ? $imageable->tags->map(function ($tag) {
-                                $data = $tag->toArray();
-                                if ($tag->pivot) {
-                                    $data['pivot'] = $tag->pivot->toArray();
-                                }
-                                return $data;
-                            })->all() : [],
-                        ] : null,
-                    ] : null,
-                ];
-            })->all();
+            // // Test 6: Deep nested - Post with image, image has imageable, and imageable has relationships
+            // // Use whereHas with whereHasMorph to properly handle polymorphic relationship
+            // $postsWithDeepNested = PostModel::whereHas('image', function ($q) use ($publishedOnly, $minViews) {
+            //     // Filter images that have an imageable (Post) with the specified conditions using whereHasMorph
+            //     $q->whereHasMorph('imageable', [PostModel::class], function ($subQ) use ($publishedOnly, $minViews) {
+            //         if ($publishedOnly) {
+            //             $subQ->where('is_published', true);
+            //         }
+            //         if ($minViews > 0) {
+            //             $subQ->where('views', '>=', $minViews);
+            //         }
+            //     });
+            // })
+            //     ->with([
+            //         // Load imageable and its nested relationships
+            //         // Note: 'image.imageable.image' creates a circular reference:
+            //         // Post -> Image -> Imageable (Post) -> Image
+            //         // The constraint applies to the final 'image' in the path
+            //         'image.imageable.image' => function ($q) {
+            //             // Deep nested: Post -> Image -> Imageable (Post) -> Image
+            //             // Constraint applies to imageable's image, ordered by size DESC
+            //             $q->orderBy('size', 'DESC');
+            //         },
+            //         'image.imageable.comments' => function ($q) {
+            //             // Deep nested: Post -> Image -> Imageable (Post) -> Comments
+            //             $q->where('is_approved', true)
+            //                 ->orderBy('created_at', 'DESC')
+            //                 ->limit(3);
+            //         },
+            //         'image.imageable.tags' => function ($q) {
+            //             // Deep nested: Post -> Image -> Imageable (Post) -> Tags
+            //             $q->where('is_active', true)
+            //                 ->orderBy('name', 'ASC');
+            //         }
+            //     ])
+            //     ->limit(3)
+            //     ->get();
+            // $results['deep_nested_relationships'] = $postsWithDeepNested->map(function ($p) {
+            //     $imageable = $p->image && $p->image->imageable ? $p->image->imageable : null;
+            //     return [
+            //         'id' => $p->id,
+            //         'title' => $p->title,
+            //         'image' => $p->image ? [
+            //             'image' => $p->image->toArray(),
+            //             'imageable' => $imageable ? [
+            //                 'imageable' => $imageable->toArray(),
+            //                 'nested_image' => $imageable->image ? $imageable->image->toArray() : null,
+            //                 'nested_comments' => $imageable->comments ? $imageable->comments->toArray() : [],
+            //                 'nested_tags' => $imageable->tags ? $imageable->tags->map(function ($tag) {
+            //                     $data = $tag->toArray();
+            //                     if ($tag->pivot) {
+            //                         $data['pivot'] = $tag->pivot->toArray();
+            //                     }
+            //                     return $data;
+            //                 })->all() : [],
+            //             ] : null,
+            //         ] : null,
+            //     ];
+            // })->all();
 
-            // Test 5: Nested relationship - Video with image and image has imageable (nested MorphTo)
-            $videosWithNestedImage = VideoModel::whereHas('image', function ($q) use ($minWidth, $minHeight) {
-                if ($minWidth > 0) {
-                    $q->where('width', '>=', $minWidth);
-                }
-                if ($minHeight > 0) {
-                    $q->where('height', '>=', $minHeight);
-                }
-            })
-                ->with([
-                    'image.imageable' => function ($q) use ($publishedOnly, $minViews) {
-                        // Nested: image -> imageable (Post/Video)
-                        if ($publishedOnly) {
-                            $q->where('is_published', true);
-                        }
-                        if ($minViews > 0) {
-                            $q->where('views', '>=', $minViews);
-                        }
-                    },
-                    'image' => function ($q) {
-                        $q->orderBy('size', 'DESC');
-                    }
-                ])
-                ->where('is_published', true)
-                ->where('duration', '>', 0)
-                ->limit(5)
-                ->get();
-            $results['nested_image_imageable'] = $videosWithNestedImage->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'image' => $v->image ? [
-                        'image' => $v->image->toArray(),
-                        'imageable' => $v->image->imageable ? $v->image->imageable->toArray() : null,
-                        'imageable_type' => $v->image->imageable_type ?? null,
-                    ] : null,
-                ];
-            })->all();
+            // // Test 5: Nested relationship - Video with image and image has imageable (nested MorphTo)
+            // $videosWithNestedImage = VideoModel::whereHas('image', function ($q) use ($minWidth, $minHeight) {
+            //     if ($minWidth > 0) {
+            //         $q->where('width', '>=', $minWidth);
+            //     }
+            //     if ($minHeight > 0) {
+            //         $q->where('height', '>=', $minHeight);
+            //     }
+            // })
+            //     ->with([
+            //         'image.imageable' => function ($q) use ($publishedOnly, $minViews) {
+            //             // Nested: image -> imageable (Post/Video)
+            //             if ($publishedOnly) {
+            //                 $q->where('is_published', true);
+            //             }
+            //             if ($minViews > 0) {
+            //                 $q->where('views', '>=', $minViews);
+            //             }
+            //         },
+            //         'image' => function ($q) {
+            //             $q->orderBy('size', 'DESC');
+            //         }
+            //     ])
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 0)
+            //     ->limit(5)
+            //     ->get();
+            // $results['nested_image_imageable'] = $videosWithNestedImage->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'image' => $v->image ? [
+            //             'image' => $v->image->toArray(),
+            //             'imageable' => $v->image->imageable ? $v->image->imageable->toArray() : null,
+            //             'imageable_type' => $v->image->imageable_type ?? null,
+            //         ] : null,
+            //     ];
+            // })->all();
 
-            // Test 6: Deep nested - Video with image, image has imageable, and imageable has relationships
-            // Use whereHas with whereHasMorph to properly handle polymorphic relationship
-            $videosWithDeepNested = VideoModel::whereHas('image', function ($q) use ($publishedOnly, $minViews) {
-                // Filter images that have an imageable (Video) with the specified conditions using whereHasMorph
-                $q->whereHasMorph('imageable', [VideoModel::class], function ($subQ) use ($publishedOnly, $minViews) {
-                    if ($publishedOnly) {
-                        $subQ->where('is_published', true);
-                    }
-                    if ($minViews > 0) {
-                        $subQ->where('views', '>=', $minViews);
-                    }
-                });
-            })
-                ->with([
-                    // Load imageable and its nested relationships
-                    // Note: 'image.imageable.image' creates a circular reference:
-                    // Video -> Image -> Imageable (Video) -> Image
-                    // The constraint applies to the final 'image' in the path
-                    'image.imageable.image' => function ($q) {
-                        // Deep nested: Video -> Image -> Imageable (Video) -> Image
-                        // Constraint applies to imageable's image, ordered by size DESC
-                        $q->orderBy('size', 'DESC');
-                    },
-                    'image.imageable.comments' => function ($q) {
-                        // Deep nested: Video -> Image -> Imageable (Video) -> Comments
-                        $q->where('is_approved', true)
-                            ->orderBy('created_at', 'DESC')
-                            ->limit(3);
-                    },
-                    'image.imageable.tags' => function ($q) {
-                        // Deep nested: Video -> Image -> Imageable (Video) -> Tags
-                        $q->where('is_active', true)
-                            ->orderBy('name', 'ASC');
-                    }
-                ])
-                ->where('duration', '>', 60)
-                ->limit(3)
-                ->get();
-            $results['deep_nested_relationships'] = $videosWithDeepNested->map(function ($v) {
-                $imageable = $v->image && $v->image->imageable ? $v->image->imageable : null;
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'duration' => $v->duration,
-                    'image' => $v->image ? [
-                        'image' => $v->image->toArray(),
-                        'imageable' => $imageable ? [
-                            'imageable' => $imageable->toArray(),
-                            'nested_image' => $imageable->image ? $imageable->image->toArray() : null,
-                            'nested_comments' => $imageable->comments ? $imageable->comments->toArray() : [],
-                            'nested_tags' => $imageable->tags ? $imageable->tags->map(function ($tag) {
-                                $data = $tag->toArray();
-                                if ($tag->pivot) {
-                                    $data['pivot'] = $tag->pivot->toArray();
-                                }
-                                return $data;
-                            })->all() : [],
-                        ] : null,
-                    ] : null,
-                ];
-            })->all();
+            // // Test 6: Deep nested - Video with image, image has imageable, and imageable has relationships
+            // // Use whereHas with whereHasMorph to properly handle polymorphic relationship
+            // $videosWithDeepNested = VideoModel::whereHas('image', function ($q) use ($publishedOnly, $minViews) {
+            //     // Filter images that have an imageable (Video) with the specified conditions using whereHasMorph
+            //     $q->whereHasMorph('imageable', [VideoModel::class], function ($subQ) use ($publishedOnly, $minViews) {
+            //         if ($publishedOnly) {
+            //             $subQ->where('is_published', true);
+            //         }
+            //         if ($minViews > 0) {
+            //             $subQ->where('views', '>=', $minViews);
+            //         }
+            //     });
+            // })
+            //     ->with([
+            //         // Load imageable and its nested relationships
+            //         // Note: 'image.imageable.image' creates a circular reference:
+            //         // Video -> Image -> Imageable (Video) -> Image
+            //         // The constraint applies to the final 'image' in the path
+            //         'image.imageable.image' => function ($q) {
+            //             // Deep nested: Video -> Image -> Imageable (Video) -> Image
+            //             // Constraint applies to imageable's image, ordered by size DESC
+            //             $q->orderBy('size', 'DESC');
+            //         },
+            //         'image.imageable.comments' => function ($q) {
+            //             // Deep nested: Video -> Image -> Imageable (Video) -> Comments
+            //             $q->where('is_approved', true)
+            //                 ->orderBy('created_at', 'DESC')
+            //                 ->limit(3);
+            //         },
+            //         'image.imageable.tags' => function ($q) {
+            //             // Deep nested: Video -> Image -> Imageable (Video) -> Tags
+            //             $q->where('is_active', true)
+            //                 ->orderBy('name', 'ASC');
+            //         }
+            //     ])
+            //     ->where('duration', '>', 60)
+            //     ->limit(3)
+            //     ->get();
+            // $results['deep_nested_relationships'] = $videosWithDeepNested->map(function ($v) {
+            //     $imageable = $v->image && $v->image->imageable ? $v->image->imageable : null;
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'duration' => $v->duration,
+            //         'image' => $v->image ? [
+            //             'image' => $v->image->toArray(),
+            //             'imageable' => $imageable ? [
+            //                 'imageable' => $imageable->toArray(),
+            //                 'nested_image' => $imageable->image ? $imageable->image->toArray() : null,
+            //                 'nested_comments' => $imageable->comments ? $imageable->comments->toArray() : [],
+            //                 'nested_tags' => $imageable->tags ? $imageable->tags->map(function ($tag) {
+            //                     $data = $tag->toArray();
+            //                     if ($tag->pivot) {
+            //                         $data['pivot'] = $tag->pivot->toArray();
+            //                     }
+            //                     return $data;
+            //                 })->all() : [],
+            //             ] : null,
+            //         ] : null,
+            //     ];
+            // })->all();
         }
 
         $queries = $this->formatQueryLogs(DB::getQueryLog());

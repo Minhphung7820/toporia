@@ -356,9 +356,15 @@ trait HasEagerLoading
         // This eliminates reflection overhead and follows Open/Closed principle
         $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
 
-        // Apply constraint if provided (e.g., ->where('published', true))
+        // Apply constraint if provided
+        // For MorphTo relations, pass the relation instance to allow constrain() method
+        // For other relations, pass the query builder
         if ($constraint !== null) {
-            $constraint($eagerRelation->getQuery());
+            if ($eagerRelation instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+                $constraint($eagerRelation);
+            } else {
+                $constraint($eagerRelation->getQuery());
+            }
         }
 
         // Add eager constraints to query (this will add WHERE IN clause for multiple models)
