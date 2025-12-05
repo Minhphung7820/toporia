@@ -229,8 +229,11 @@ final class SesTransport extends AbstractTransport
             throw TransportException::connectionFailed('ses', $host);
         }
 
-        // Parse XML response
-        $xml = simplexml_load_string($response);
+        // SECURITY: Disable external entity loading to prevent XXE attacks
+        $previousValue = libxml_disable_entity_loader(true);
+        $xml = simplexml_load_string($response, 'SimpleXMLElement', LIBXML_NOENT | LIBXML_NONET);
+        libxml_disable_entity_loader($previousValue);
+
         if ($xml === false) {
             throw new TransportException('Invalid XML response', 'ses', ['response' => $response]);
         }

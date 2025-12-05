@@ -203,9 +203,55 @@ class Response implements ResponseInterface
      */
     public function redirect(string $url, int $status = 302): void
     {
+        // SECURITY: Validate redirect URL to prevent open redirects
+        $this->validateRedirectUrl($url);
+
         $this->setStatus($status);
         $this->header('Location', $url);
         $this->send('');
+    }
+
+    /**
+     * Validate redirect URL to prevent open redirect attacks.
+     *
+     * SECURITY: Prevents:
+     * - javascript: and data: URLs (XSS)
+     * - Protocol-relative URLs (//evil.com)
+     * - External domain redirects
+     *
+     * @param string $url URL to validate
+     * @throws \InvalidArgumentException If URL is not safe
+     */
+    private function validateRedirectUrl(string $url): void
+    {
+        // Reject dangerous protocols
+        if (preg_match('/^(javascript|data|vbscript):/i', $url)) {
+            throw new \InvalidArgumentException('Invalid redirect URL: dangerous protocol');
+        }
+
+        // Reject protocol-relative URLs (//evil.com)
+        if (str_starts_with($url, '//')) {
+            throw new \InvalidArgumentException('Invalid redirect URL: protocol-relative URLs not allowed');
+        }
+
+        // Allow relative paths
+        if (str_starts_with($url, '/') && !str_starts_with($url, '//')) {
+            return;
+        }
+
+        // For absolute URLs, verify same origin
+        if (filter_var($url, FILTER_VALIDATE_URL)) {
+            $parsed = parse_url($url);
+            $currentHost = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+
+            // Strip port from current host for comparison
+            $currentHost = preg_replace('/:\d+$/', '', $currentHost);
+            $urlHost = $parsed['host'] ?? '';
+
+            if (strcasecmp($urlHost, $currentHost) !== 0) {
+                throw new \InvalidArgumentException('Invalid redirect URL: cross-origin redirects not allowed');
+            }
+        }
     }
 
     /**

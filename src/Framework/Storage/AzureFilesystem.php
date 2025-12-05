@@ -410,7 +410,10 @@ final class AzureFilesystem implements CloudFilesystemInterface
                 break;
             }
 
-            $xml = simplexml_load_string($response['body']);
+            // SECURITY: Disable external entity loading to prevent XXE attacks
+            $previousValue = libxml_disable_entity_loader(true);
+            $xml = simplexml_load_string($response['body'], 'SimpleXMLElement', LIBXML_NOENT | LIBXML_NONET);
+            libxml_disable_entity_loader($previousValue);
 
             if ($type === 'file' && isset($xml->Blobs->Blob)) {
                 foreach ($xml->Blobs->Blob as $blob) {

@@ -86,8 +86,8 @@ final class RedisCache implements CacheInterface
         // Raw integers from increment() are stored without serialization for performance
         if (is_numeric($value) && is_string($value)) {
             // This might be a raw integer string from increment operations
-            // Check if it's actually serialized by trying unserialize
-            $unserialized = @unserialize($value);
+            // SECURITY: Check if it's actually serialized by trying unserialize with restriction
+            $unserialized = @unserialize($value, ['allowed_classes' => false]);
             if ($unserialized !== false) {
                 // It was serialized after all
                 return $unserialized;
@@ -183,7 +183,8 @@ final class RedisCache implements CacheInterface
 
             // CRITICAL: Handle unserialize errors gracefully
             try {
-                $unserialized = @unserialize($value);
+                // SECURITY: Restrict unserialize to prevent PHP Object Injection
+                $unserialized = @unserialize($value, ['allowed_classes' => false]);
 
                 if ($unserialized === false && $value !== serialize(false)) {
                     // Corrupted data - delete and use default

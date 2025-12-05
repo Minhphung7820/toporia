@@ -207,7 +207,7 @@ final class TokenRepository implements TokenRepositoryInterface
      */
     private function generateJwtToken(string $clientId, ?string $userId, array $scopes, int $expiresAt): string
     {
-        $secret = $_ENV['APP_KEY'] ?? 'default-secret-key';
+        $secret = $this->getJwtSecret();
         $header = base64_encode(json_encode(['typ' => 'JWT', 'alg' => 'HS256']));
         $payload = base64_encode(json_encode([
             'client_id' => $clientId,
@@ -239,8 +239,13 @@ final class TokenRepository implements TokenRepositoryInterface
         [$headerEncoded, $payloadEncoded, $signatureEncoded] = $parts;
 
         // Verify signature
-        $secret = $_ENV['APP_KEY'] ?? 'default-secret-key';
-        $signature = base64_decode(str_replace(['-', '_'], ['+', '/'], $signatureEncoded));
+        $secret = $this->getJwtSecret();
+        $signature = base64_decode(str_replace(['-', '_'], ['+', '/'], $signatureEncoded), true);
+
+        // SECURITY: Validate decoded signature
+        if ($signature === false || strlen($signature) !== 32) {
+            return null;
+        }
         $expectedSignature = hash_hmac('sha256', "{$headerEncoded}.{$payloadEncoded}", $secret, true);
 
         if (!hash_equals($expectedSignature, $signature)) {
@@ -270,5 +275,30 @@ final class TokenRepository implements TokenRepositoryInterface
     private function hashToken(string $token): string
     {
         return hash('sha256', $token);
+    }
+
+    /**
+     * Get the JWT signing secret.
+     *
+     * SECURITY: Validates that APP_KEY is properly configured.
+     * Throws exception if no valid key is found to prevent insecure operation.
+     *
+     * @return string Secret key
+     * @throws \RuntimeException If APP_KEY is not configured properly
+     */
+    private function getJwtSecret(): string
+    {
+        $secret = $_ENV['APP_KEY']
+            ?? (function_exists('env') ? env('APP_KEY') : null)
+            ?? getenv('APP_KEY');
+
+        if (!$secret || strlen($secret) < 32) {
+            throw new \RuntimeException(
+                'APP_KEY must be at least 32 characters long and set in environment. ' .
+                'Run: php artisan key:generate'
+            );
+        }
+
+        return $secret;
     }
 }
