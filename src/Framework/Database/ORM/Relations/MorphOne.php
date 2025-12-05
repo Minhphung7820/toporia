@@ -115,18 +115,19 @@ class MorphOne extends Relation
     protected function copyWhereClausesRecursive(QueryBuilder $targetQuery, array $wheres): void
     {
         foreach ($wheres as $where) {
-            match ($where['type'] ?? '') {
+            $type = strtolower($where['type'] ?? '');
+            match ($type) {
                 'basic' => $targetQuery->where(
                     $where['column'],
                     $where['operator'] ?? '=',
                     $where['value'] ?? null,
                     $where['boolean'] ?? 'AND'
                 ),
-                'Null' => $targetQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
-                'NotNull' => $targetQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
-                'In' => $targetQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                'NotIn' => $targetQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                'Raw' => $targetQuery->whereRaw(
+                'null' => $targetQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'notnull' => $targetQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'in' => $targetQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'notin' => $targetQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'raw' => $targetQuery->whereRaw(
                     $where['sql'] ?? '',
                     $where['bindings'] ?? [],
                     $where['boolean'] ?? 'AND'
@@ -218,19 +219,28 @@ class MorphOne extends Relation
      */
     public function getResults(): mixed
     {
-        // Check if this is eager loading (has WHERE IN or nested WHERE with morph type)
+        // Check if this is eager loading (has WHERE IN, nested WHERE, or simple WHERE with morph type)
         // During eager loading, parent is a dummy model that doesn't exist,
         // but we still need to execute the query with eager constraints
         $wheres = $this->query->getWheres();
         $hasEagerConstraints = false;
         foreach ($wheres as $where) {
-            // Check for WHERE IN (from addEagerConstraints)
+            // Check for WHERE IN (from addEagerConstraints - multiple models same type)
             if (strtolower($where['type'] ?? '') === 'in') {
                 $hasEagerConstraints = true;
                 break;
             }
-            // Check for nested WHERE with morph type pattern (from addEagerConstraints)
+            // Check for nested WHERE with morph type pattern (from addEagerConstraints - multiple types)
             if (strtolower($where['type'] ?? '') === 'nested') {
+                $hasEagerConstraints = true;
+                break;
+            }
+            // Check for simple WHERE with morphType (from addEagerConstraints - single model optimization)
+            // This is the new optimization case where we use simple WHERE instead of nested WHERE
+            if (
+                strtolower($where['type'] ?? '') === 'basic' &&
+                ($where['column'] ?? '') === $this->morphType
+            ) {
                 $hasEagerConstraints = true;
                 break;
             }
@@ -311,6 +321,10 @@ class MorphOne extends Relation
      */
     public function addEagerConstraints(array $models): void
     {
+        if (empty($models)) {
+            return;
+        }
+
         $types = [];
         foreach ($models as $model) {
             // Use getMorphClass() if available, otherwise use get_class()
@@ -320,23 +334,44 @@ class MorphOne extends Relation
             $types[$type][] = $model->getAttribute($this->localKey);
         }
 
-        $this->query->where(function ($q) use ($types) {
-            $first = true;
-            foreach ($types as $type => $ids) {
-                if ($first) {
-                    $q->where(function ($subQ) use ($type, $ids) {
-                        $subQ->where($this->morphType, $type)
-                            ->whereIn($this->foreignKey, $ids);
-                    });
-                    $first = false;
-                } else {
-                    $q->orWhere(function ($subQ) use ($type, $ids) {
-                        $subQ->where($this->morphType, $type)
-                            ->whereIn($this->foreignKey, $ids);
-                    });
-                }
+        // OPTIMIZATION: If only one type with one ID, use simple WHERE (no nested clause)
+        // This fixes performance issue where nested WHERE with whereIn() was not compiled correctly
+        if (count($types) === 1) {
+            $type = array_key_first($types);
+            $ids = $types[$type];
+
+            if (count($ids) === 1) {
+                // Single model case - use simple WHERE (no nested clause)
+                // This ensures: WHERE imageable_type = ? AND imageable_id = ?
+                $this->query->where($this->morphType, $type)
+                    ->where($this->foreignKey, $ids[0]);
+            } else {
+                // Multiple models of same type - use WHERE IN
+                // This ensures: WHERE imageable_type = ? AND imageable_id IN (?, ?, ...)
+                $this->query->where($this->morphType, $type)
+                    ->whereIn($this->foreignKey, $ids);
             }
-        });
+        } else {
+            // Multiple types - use nested WHERE with OR
+            // This ensures: WHERE ((imageable_type = ? AND imageable_id IN (?)) OR (imageable_type = ? AND imageable_id IN (?)))
+            $this->query->where(function ($q) use ($types) {
+                $first = true;
+                foreach ($types as $type => $ids) {
+                    if ($first) {
+                        $q->where(function ($subQ) use ($type, $ids) {
+                            $subQ->where($this->morphType, $type)
+                                ->whereIn($this->foreignKey, $ids);
+                        });
+                        $first = false;
+                    } else {
+                        $q->orWhere(function ($subQ) use ($type, $ids) {
+                            $subQ->where($this->morphType, $type)
+                                ->whereIn($this->foreignKey, $ids);
+                        });
+                    }
+                }
+            });
+        }
 
         // Apply soft delete scope if related model uses soft deletes
         $this->applySoftDeleteScope($this->query, $this->relatedClass);
