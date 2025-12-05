@@ -6,6 +6,7 @@ namespace Toporia\Framework\Auth\Tokens;
 
 use Toporia\Framework\Auth\Contracts\PersonalAccessTokenInterface;
 use Toporia\Framework\Database\ORM\Model;
+use Toporia\Framework\Database\ORM\Relations\MorphTo;
 
 
 /**
@@ -174,22 +175,41 @@ class PersonalAccessToken extends Model implements PersonalAccessTokenInterface
     }
 
     /**
-     * Get the token's owner (user/model).
+     * Get the token's owner (user/model) using polymorphic relationship.
      *
-     * Performance: Lazy loaded when accessed
+     * This method returns the actual model instance (User, Admin, etc.)
+     * that owns this token, using the morphTo relationship.
      *
-     * @return mixed Token owner
+     * Performance: Lazy loaded when accessed, use with() for eager loading
+     *
+     * @return Model|null Token owner model instance
      */
-    public function getTokenable(): mixed
+    public function getTokenable(): ?Model
     {
-        // In a full implementation, this would use polymorphic relationship
-        // For now, we'll return a simple structure
-        // TODO: Implement polymorphic relationship when ORM supports it
+        return $this->tokenable()->getResults()->first();
+    }
 
-        return [
-            'type' => $this->tokenable_type,
-            'id' => $this->tokenable_id,
-        ];
+    /**
+     * Define the polymorphic relationship to the token's owner.
+     *
+     * This allows tokens to belong to any model (User, Admin, ApiClient, etc.)
+     * The tokenable_type column stores the model class name.
+     * The tokenable_id column stores the model's primary key.
+     *
+     * Usage:
+     * ```php
+     * // Get the user who owns this token
+     * $user = $token->tokenable;
+     *
+     * // Eager load tokenable with tokens
+     * $tokens = PersonalAccessToken::with('tokenable')->get();
+     * ```
+     *
+     * @return MorphTo
+     */
+    public function tokenable(): MorphTo
+    {
+        return $this->morphTo('tokenable', 'tokenable_type', 'tokenable_id');
     }
 
     /**

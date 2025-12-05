@@ -132,9 +132,8 @@ abstract class AbstractJsonKafkaConsumer extends AbstractKafkaConsumer implement
                 'event' => $message->getEvent(),
             ]);
 
-            // Re-throw to trigger DLQ (if implemented)
-            // For now, continue processing
-            // TODO: Implement DLQ support
+            // Send to Dead Letter Queue if configured
+            $this->sendToDeadLetterQueue($message, $e);
         }
     }
 
@@ -152,5 +151,97 @@ abstract class AbstractJsonKafkaConsumer extends AbstractKafkaConsumer implement
         // The actual consume() method in KafkaBroker handles the loop
         // We monitor processed count in processMessage()
         $broker->consume($timeout, 1);
+    }
+
+    /**
+     * Send failed message to Dead Letter Queue.
+     *
+     * Override getDeadLetterTopic() to enable DLQ support.
+     * Messages sent to DLQ include original payload plus error metadata.
+     *
+     * @param MessageInterface $message Original message that failed
+     * @param \Throwable $exception Exception that caused the failure
+     * @return void
+     */
+    protected function sendToDeadLetterQueue(MessageInterface $message, \Throwable $exception): void
+    {
+        $dlqTopic = $this->getDeadLetterTopic();
+
+        // Skip if DLQ not configured
+        if ($dlqTopic === null) {
+            return;
+        }
+
+        try {
+            $broker = $this->getBroker();
+
+            // Create DLQ message with error metadata
+            $messageData = $message->getData();
+            $dlqPayload = [
+                'original_message' => [
+                    'id' => $message->getId(),
+                    'channel' => $message->getChannel(),
+                    'event' => $message->getEvent(),
+                    'data' => $messageData,
+                ],
+                'error' => [
+                    'message' => $exception->getMessage(),
+                    'class' => get_class($exception),
+                    'code' => $exception->getCode(),
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                    'trace' => $exception->getTraceAsString(),
+                ],
+                'metadata' => [
+                    'original_topic' => $this->getTopic(),
+                    'consumer_class' => static::class,
+                    'failed_at' => now()->toDateTimeString(),
+                    'retry_count' => (is_array($messageData) ? ($messageData['_retry_count'] ?? 0) : 0) + 1,
+                ],
+            ];
+
+            $dlqMessage = new Message(
+                type: 'event',
+                channel: $dlqTopic,
+                event: 'message.failed',
+                data: $dlqPayload
+            );
+
+            $broker->publish($dlqTopic, $dlqMessage);
+
+            $this->writeln(sprintf(
+                '<comment>Message %s sent to DLQ topic: %s</comment>',
+                $message->getId(),
+                $dlqTopic
+            ));
+        } catch (\Throwable $e) {
+            // Log DLQ failure but don't throw
+            error_log(sprintf(
+                'Failed to send message to DLQ: %s (original error: %s)',
+                $e->getMessage(),
+                $exception->getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Get the Dead Letter Queue topic name.
+     *
+     * Override this method to enable DLQ support.
+     * Return null to disable DLQ (default).
+     *
+     * Example:
+     * ```php
+     * protected function getDeadLetterTopic(): ?string
+     * {
+     *     return $this->getTopic() . '.dlq';
+     * }
+     * ```
+     *
+     * @return string|null DLQ topic name or null to disable
+     */
+    protected function getDeadLetterTopic(): ?string
+    {
+        return null;
     }
 }

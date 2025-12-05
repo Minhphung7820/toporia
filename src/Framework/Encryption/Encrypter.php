@@ -301,7 +301,9 @@ class Encrypter implements EncrypterInterface
             throw new DecryptException('The MAC is invalid.');
         }
 
-        return $unserialize ? unserialize($decrypted) : $decrypted;
+        // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
+        // Only allow scalar values by default for encrypted data
+        return $unserialize ? unserialize($decrypted, ['allowed_classes' => false]) : $decrypted;
     }
 
     /**

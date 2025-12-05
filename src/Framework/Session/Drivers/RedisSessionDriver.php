@@ -58,7 +58,8 @@ final class RedisSessionDriver implements SessionStoreInterface
         $payload = $this->redis->get($key);
 
         if ($payload !== false) {
-            $this->data = unserialize($payload) ?: [];
+            // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
+            $this->data = unserialize($payload, ['allowed_classes' => false]) ?: [];
         } else {
             $this->data = [];
         }

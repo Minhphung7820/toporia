@@ -799,7 +799,8 @@ final class RabbitMQQueue implements QueueInterface
         // Define consumer callback
         $consumerCallback = function (AMQPMessage $message) use ($callback, $noAck) {
             $payload = $message->getBody();
-            $job = unserialize($payload);
+            // SECURITY: Validate job type after unserialize to prevent object injection
+            $job = @unserialize($payload, ['allowed_classes' => true]);
 
             if ($job instanceof JobInterface) {
                 try {

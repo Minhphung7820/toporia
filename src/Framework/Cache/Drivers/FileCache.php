@@ -35,9 +35,15 @@ final class FileCache implements CacheInterface
 {
     private string $directory;
 
-    public function __construct(string $directory = '/tmp/cache')
+    /**
+     * Create a new FileCache instance.
+     *
+     * @param string|null $directory Cache directory path. If null, uses system temp directory.
+     */
+    public function __construct(?string $directory = null)
     {
-        $this->directory = rtrim($directory, '/');
+        // Use system temp directory as fallback instead of hardcoded /tmp
+        $this->directory = rtrim($directory ?? sys_get_temp_dir() . '/toporia_cache', '/');
         $this->ensureDirectoryExists();
     }
 
@@ -49,7 +55,8 @@ final class FileCache implements CacheInterface
             return $default;
         }
 
-        $data = unserialize(file_get_contents($file));
+        // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
+        $data = unserialize(file_get_contents($file), ['allowed_classes' => false]);
 
         // Check if expired
         if ($data['expires_at'] !== null && $data['expires_at'] < now()->getTimestamp()) {
@@ -202,7 +209,8 @@ final class FileCache implements CacheInterface
 
         // Check if file exists and is not expired
         if (file_exists($file)) {
-            $data = @unserialize(file_get_contents($file));
+            // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
+            $data = @unserialize(file_get_contents($file), ['allowed_classes' => false]);
             if ($data !== false) {
                 // If no expiration or not expired, key exists
                 if ($data['expires_at'] === null || $data['expires_at'] >= now()->getTimestamp()) {

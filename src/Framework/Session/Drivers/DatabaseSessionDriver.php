@@ -257,7 +257,8 @@ final class DatabaseSessionDriver implements SessionStoreInterface
             return;
         }
 
-        $this->data = unserialize($result['payload']) ?: [];
+        // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
+        $this->data = unserialize($result['payload'], ['allowed_classes' => false]) ?: [];
         $this->exists = true;
     }
 

@@ -283,9 +283,10 @@ final class ForkProcess implements ProcessInterface
         unset($this->pipes[$this->pid]);
 
         // Deserialize output
+        // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
         if ($serialized !== false && $serialized !== '') {
             try {
-                $this->output = unserialize($serialized);
+                $this->output = unserialize($serialized, ['allowed_classes' => false]);
             } catch (\Throwable $e) {
                 $this->output = null;
                 error_log("Failed to deserialize process output: " . $e->getMessage());

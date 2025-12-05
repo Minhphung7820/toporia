@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Notification\Jobs;
 
 use Toporia\Framework\Notification\Contracts\{NotifiableInterface, NotificationInterface};
+use Toporia\Framework\Notification\Events\NotificationFailed;
 use Toporia\Framework\Queue\Job;
 
 /**
@@ -60,6 +61,8 @@ final class SendNotificationJob extends Job
     /**
      * Handle job failure.
      *
+     * Logs the error and dispatches NotificationFailed event for each channel.
+     *
      * @param \Throwable $exception
      * @return void
      */
@@ -71,7 +74,32 @@ final class SendNotificationJob extends Job
             $exception->getMessage()
         ));
 
-        // TODO: Dispatch NotificationFailed event
+        // Dispatch NotificationFailed event
+        try {
+            $notifiable = $this->reconstructNotifiable();
+            $channels = $this->notification->via($notifiable);
+
+            // Dispatch event for each channel that failed
+            foreach ($channels as $channel) {
+                $event = new NotificationFailed(
+                    notifiable: $notifiable,
+                    notification: $this->notification,
+                    channel: $channel,
+                    exception: $exception
+                );
+
+                // Try to dispatch via event dispatcher if available
+                if (function_exists('app') && app()->has('events')) {
+                    app('events')->dispatch($event);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Log but don't throw - we're already in error handling
+            error_log(sprintf(
+                "Failed to dispatch NotificationFailed event: %s",
+                $e->getMessage()
+            ));
+        }
     }
 
     /**

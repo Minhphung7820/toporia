@@ -236,7 +236,8 @@ final class FileSessionDriver implements SessionStoreInterface
             return [];
         }
 
-        $data = unserialize($content);
+        // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
+        $data = unserialize($content, ['allowed_classes' => false]);
         if (!is_array($data) || !isset($data['data'], $data['expires_at'])) {
             return [];
         }

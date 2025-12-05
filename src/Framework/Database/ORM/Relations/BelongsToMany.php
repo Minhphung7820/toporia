@@ -829,17 +829,47 @@ class BelongsToMany extends Relation
             }
         }
 
-        // TEMPORARILY DISABLED: Need to validate pivot table structure first
-        // TODO: Re-enable after implementing proper column existence validation
-        // The issue is that we're trying to select pivot columns that may not exist
-        // or have different names than expected
-        return false;
+        // Validate pivot table structure
+        // Only use optimized matching if we can verify the pivot columns exist
+        try {
+            return $this->validatePivotTableStructure();
+        } catch (\Throwable $e) {
+            // If validation fails, fall back to standard matching
+            return false;
+        }
+    }
 
-        // Future implementation should validate:
-        // 1. Pivot table exists
-        // 2. Foreign key column exists
-        // 3. Related key column exists
-        // 4. No naming conflicts with selected columns
+    /**
+     * Validate that the pivot table has the required columns.
+     *
+     * This ensures:
+     * 1. Pivot table exists
+     * 2. Foreign key column exists
+     * 3. Related key column exists
+     *
+     * @return bool True if structure is valid
+     */
+    protected function validatePivotTableStructure(): bool
+    {
+        // Skip validation if we don't have a connection yet
+        $connection = $this->query->getConnection();
+        if ($connection === null) {
+            return false;
+        }
+
+        // Get cached table columns (uses schema cache with 5-minute TTL)
+        $columns = $this->getCachedTableColumns($this->pivotTable, $connection);
+
+        // If we couldn't get columns, table might not exist
+        if (empty($columns)) {
+            return false;
+        }
+
+        // Check required columns exist
+        $hasForegnKey = in_array($this->foreignPivotKey, $columns, true);
+        $hasRelatedKey = in_array($this->relatedPivotKey, $columns, true);
+
+        return $hasForegnKey && $hasRelatedKey;
     }
 
     /**
