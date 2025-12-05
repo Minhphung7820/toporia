@@ -152,10 +152,15 @@ final class DatabaseQueue implements QueueInterface
 
             $this->connection->commit();
 
-            // Unserialize with type safety to prevent object injection attacks
-            // Only allow Job classes to be unserialized
+            // Unserialize with strict whitelist to prevent PHP Object Injection attacks
+            // Only allow specific Job classes - this is critical for security
             $job = @unserialize($record['payload'], [
-                'allowed_classes' => true // Allow all classes but validate after
+                'allowed_classes' => [
+                    \Toporia\Framework\Queue\Job::class,
+                    \Toporia\Framework\Queue\Contracts\JobInterface::class,
+                    \Toporia\Framework\Notification\Jobs\SendNotificationJob::class,
+                    // Add other trusted Job classes here
+                ]
             ]);
 
             // Validate that unserialized object is a valid job

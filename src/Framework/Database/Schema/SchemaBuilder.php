@@ -143,21 +143,56 @@ class SchemaBuilder
     {
         $driver = $this->connection->getDriverName();
         $tableName = $this->quoteIdentifier($table, $driver);
-        $columnName = $this->quoteIdentifier($column, $driver);
 
-        $sql = match ($driver) {
-            'mysql' => "SHOW COLUMNS FROM {$tableName} LIKE {$columnName}",
-            'pgsql' => "SELECT column_name FROM information_schema.columns WHERE table_name = '{$table}' AND column_name = '{$column}'",
-            'sqlite' => "PRAGMA table_info({$tableName})",
+        // SECURITY: Use parameterized queries to prevent SQL injection
+        return match ($driver) {
+            'mysql' => $this->hasColumnMysql($tableName, $column),
+            'pgsql' => $this->hasColumnPgsql($table, $column),
+            'sqlite' => $this->hasColumnSqlite($tableName, $column),
             default => throw new \RuntimeException("Unsupported driver: {$driver}")
         };
+    }
 
-        $result = $this->connection->selectOne($sql);
+    /**
+     * Check if column exists in MySQL table.
+     */
+    private function hasColumnMysql(string $tableName, string $column): bool
+    {
+        $sql = "SHOW COLUMNS FROM {$tableName} WHERE Field = ?";
+        $result = $this->connection->selectOne($sql, [$column]);
         return $result !== null;
     }
 
     /**
+     * Check if column exists in PostgreSQL table.
+     */
+    private function hasColumnPgsql(string $table, string $column): bool
+    {
+        $sql = "SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?";
+        $result = $this->connection->selectOne($sql, [$table, $column]);
+        return $result !== null;
+    }
+
+    /**
+     * Check if column exists in SQLite table.
+     */
+    private function hasColumnSqlite(string $tableName, string $column): bool
+    {
+        $sql = "PRAGMA table_info({$tableName})";
+        $results = $this->connection->select($sql);
+
+        foreach ($results as $row) {
+            if (($row['name'] ?? $row->name ?? null) === $column) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Check if table exists.
+     *
+     * SECURITY: Uses parameterized queries to prevent SQL injection.
      *
      * @param string $table Table name.
      * @return bool
@@ -166,15 +201,42 @@ class SchemaBuilder
     {
         $driver = $this->connection->getDriverName();
 
-        $sql = match ($driver) {
-            'mysql' => "SHOW TABLES LIKE '{$table}'",
-            'pgsql' => "SELECT to_regclass('{$table}')",
-            'sqlite' => "SELECT name FROM sqlite_master WHERE type='table' AND name='{$table}'",
+        // SECURITY: Use parameterized queries to prevent SQL injection
+        return match ($driver) {
+            'mysql' => $this->hasTableMysql($table),
+            'pgsql' => $this->hasTablePgsql($table),
+            'sqlite' => $this->hasTableSqlite($table),
             default => throw new \RuntimeException("Unsupported driver: {$driver}")
         };
+    }
 
-        $result = $this->connection->selectOne($sql);
+    /**
+     * Check if table exists in MySQL.
+     */
+    private function hasTableMysql(string $table): bool
+    {
+        $sql = "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?";
+        $result = $this->connection->selectOne($sql, [$table]);
+        return $result !== null;
+    }
 
+    /**
+     * Check if table exists in PostgreSQL.
+     */
+    private function hasTablePgsql(string $table): bool
+    {
+        $sql = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = ?";
+        $result = $this->connection->selectOne($sql, [$table]);
+        return $result !== null;
+    }
+
+    /**
+     * Check if table exists in SQLite.
+     */
+    private function hasTableSqlite(string $table): bool
+    {
+        $sql = "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?";
+        $result = $this->connection->selectOne($sql, [$table]);
         return $result !== null;
     }
 

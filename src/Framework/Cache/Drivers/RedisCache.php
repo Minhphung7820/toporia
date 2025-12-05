@@ -111,7 +111,8 @@ final class RedisCache implements CacheInterface
                 // But don't delete yet, try unserialize first
             }
 
-            $unserialized = @unserialize($value, ['allowed_classes' => true]);
+            // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
+            $unserialized = @unserialize($value, ['allowed_classes' => false]);
 
             // @unserialize returns false if data cannot be unserialized
             // But false is also a valid value, so check if original was serialized false

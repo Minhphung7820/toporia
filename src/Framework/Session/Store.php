@@ -28,17 +28,35 @@ final class Store implements SessionStoreInterface
     private string $id;
     private string $name;
 
+    /**
+     * Session cookie configuration.
+     * SECURITY: Secure defaults for session cookies.
+     */
+    private array $cookieConfig;
+
     public function __construct(
         private SessionStoreInterface $driver,
-        string $name = 'PHPSESSID'
+        string $name = 'PHPSESSID',
+        array $cookieConfig = []
     ) {
         $this->name = $name;
         $this->id = $this->driver->getId();
+
+        // SECURITY: Merge with secure defaults
+        $this->cookieConfig = array_merge([
+            'lifetime' => 0,           // Session cookie (expires when browser closes)
+            'path' => '/',             // Available across entire domain
+            'domain' => '',            // Current domain only
+            'secure' => true,          // HTTPS only (set to false for development)
+            'httponly' => true,        // No JavaScript access (XSS protection)
+            'samesite' => 'Lax',       // CSRF protection (Strict, Lax, or None)
+        ], $cookieConfig);
     }
 
     /**
      * Start the session.
      *
+     * SECURITY: Configures secure session cookie parameters before starting.
      * Performance: O(1) - Direct driver call
      *
      * @return bool True on success
@@ -49,12 +67,56 @@ final class Store implements SessionStoreInterface
             return true;
         }
 
+        // SECURITY: Set secure cookie parameters before starting session
+        $this->configureSecureCookie();
+
         $this->started = $this->driver->start();
         if ($this->started) {
             $this->id = $this->driver->getId();
         }
 
         return $this->started;
+    }
+
+    /**
+     * Configure secure session cookie parameters.
+     *
+     * SECURITY: Sets HttpOnly, Secure, SameSite attributes to prevent:
+     * - XSS attacks (HttpOnly)
+     * - Session hijacking over HTTP (Secure)
+     * - CSRF attacks (SameSite)
+     *
+     * @return void
+     */
+    private function configureSecureCookie(): void
+    {
+        // Only configure if session not already started
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            return;
+        }
+
+        // Set session name
+        session_name($this->name);
+
+        // PHP 7.3+ supports SameSite in session_set_cookie_params
+        session_set_cookie_params([
+            'lifetime' => $this->cookieConfig['lifetime'],
+            'path' => $this->cookieConfig['path'],
+            'domain' => $this->cookieConfig['domain'],
+            'secure' => $this->cookieConfig['secure'],
+            'httponly' => $this->cookieConfig['httponly'],
+            'samesite' => $this->cookieConfig['samesite'],
+        ]);
+    }
+
+    /**
+     * Get session cookie configuration.
+     *
+     * @return array Cookie configuration
+     */
+    public function getCookieConfig(): array
+    {
+        return $this->cookieConfig;
     }
 
     /**

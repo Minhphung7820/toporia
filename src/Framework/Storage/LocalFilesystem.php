@@ -24,10 +24,31 @@ use Toporia\Framework\Storage\Contracts\FilesystemInterface;
  */
 final class LocalFilesystem implements FilesystemInterface
 {
+    /**
+     * Signing key for temporary URLs.
+     * SECURITY: Should be set from config/environment, not hardcoded.
+     */
+    private readonly string $signingKey;
+
     public function __construct(
         private readonly string $root,
-        private readonly string $baseUrl = ''
+        private readonly string $baseUrl = '',
+        ?string $signingKey = null
     ) {
+        // SECURITY: Use provided key or get from config/environment
+        // Never use hardcoded secrets in production
+        $key = $signingKey
+            ?? (function_exists('config') ? config('app.key', '') : '')
+            ?? (getenv('APP_KEY') ?: '');
+
+        if (empty($key)) {
+            // Generate a random key for this instance if none provided
+            // This is secure but means URLs won't persist across restarts
+            $key = bin2hex(random_bytes(32));
+        }
+
+        $this->signingKey = $key;
+
         // Ensure root directory exists
         if (!is_dir($this->root)) {
             mkdir($this->root, 0755, true);
@@ -286,11 +307,40 @@ final class LocalFilesystem implements FilesystemInterface
 
     public function temporaryUrl(string $path, int $expiration): string
     {
-        // For local filesystem, generate signed URL using HMAC
+        // SECURITY: Generate cryptographically secure signed URL
+        // Include disk identifier to prevent cross-disk URL reuse
         $expires = now()->getTimestamp() + $expiration;
-        $signature = hash_hmac('sha256', $path . $expires, 'app-secret');
 
-        return $this->url($path) . '?expires=' . $expires . '&signature=' . $signature;
+        // Create payload that includes disk identifier and path
+        $payload = sprintf('local:%s:%d', $path, $expires);
+        $signature = hash_hmac('sha256', $payload, $this->signingKey);
+
+        return $this->url($path) . '?expires=' . $expires . '&signature=' . urlencode($signature);
+    }
+
+    /**
+     * Verify a temporary URL signature.
+     *
+     * SECURITY: Validates that the URL was signed by this instance.
+     *
+     * @param string $path File path
+     * @param int $expires Expiration timestamp
+     * @param string $signature URL signature
+     * @return bool True if signature is valid and not expired
+     */
+    public function verifyTemporaryUrl(string $path, int $expires, string $signature): bool
+    {
+        // Check if URL has expired
+        if ($expires < now()->getTimestamp()) {
+            return false;
+        }
+
+        // Recreate the expected signature
+        $payload = sprintf('local:%s:%d', $path, $expires);
+        $expectedSignature = hash_hmac('sha256', $payload, $this->signingKey);
+
+        // Use timing-safe comparison to prevent timing attacks
+        return hash_equals($expectedSignature, $signature);
     }
 
     /**
@@ -313,14 +363,63 @@ final class LocalFilesystem implements FilesystemInterface
     }
 
     /**
-     * Get full filesystem path.
+     * Get full filesystem path with path traversal protection.
+     *
+     * SECURITY: Prevents directory traversal attacks using realpath() verification.
+     * Input like "../../etc/passwd" will be rejected.
      *
      * @param string $path Relative path
      * @return string Absolute path
+     * @throws \InvalidArgumentException If path traversal is detected
      */
     private function getFullPath(string $path): string
     {
-        return $this->root . DIRECTORY_SEPARATOR . ltrim($path, '/\\');
+        // Normalize path separators and remove leading slashes
+        $normalizedPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, ltrim($path, '/\\'));
+
+        // Build the full path
+        $fullPath = $this->root . DIRECTORY_SEPARATOR . $normalizedPath;
+
+        // CRITICAL: Use realpath to resolve symlinks and .. sequences
+        // For new files/dirs that don't exist yet, check parent directory
+        $realPath = realpath($fullPath);
+
+        if ($realPath === false) {
+            // File doesn't exist - check parent directory
+            $parentDir = dirname($fullPath);
+            $realParent = realpath($parentDir);
+
+            if ($realParent === false) {
+                // Parent doesn't exist - verify the path doesn't escape root
+                // by checking for .. after normalization
+                if (str_contains($normalizedPath, '..')) {
+                    throw new \InvalidArgumentException(
+                        'Path traversal detected: ' . $path
+                    );
+                }
+                return $fullPath;
+            }
+
+            // Verify parent is within root
+            $realRoot = realpath($this->root);
+            if ($realRoot === false || !str_starts_with($realParent, $realRoot)) {
+                throw new \InvalidArgumentException(
+                    'Path traversal detected: ' . $path
+                );
+            }
+
+            return $realParent . DIRECTORY_SEPARATOR . basename($fullPath);
+        }
+
+        // Verify resolved path is within root directory
+        $realRoot = realpath($this->root);
+        if ($realRoot === false || !str_starts_with($realPath, $realRoot)) {
+            throw new \InvalidArgumentException(
+                'Path traversal detected: ' . $path
+            );
+        }
+
+        return $realPath;
     }
 
     /**

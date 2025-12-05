@@ -25,9 +25,29 @@ final class AddSecurityHeaders extends AbstractMiddleware
 {
     private array $config;
 
+    /**
+     * CSP nonce for inline scripts/styles.
+     * SECURITY: Use this nonce in script/style tags: <script nonce="...">
+     */
+    private string $nonce;
+
     public function __construct(array $config = [])
     {
         $this->config = array_merge($this->getDefaultConfig(), $config);
+        // Generate cryptographically secure nonce for this request
+        $this->nonce = base64_encode(random_bytes(16));
+    }
+
+    /**
+     * Get the CSP nonce for this request.
+     *
+     * Use this in Blade templates: <script nonce="{{ csp_nonce() }}">
+     *
+     * @return string Base64-encoded nonce
+     */
+    public function getNonce(): string
+    {
+        return $this->nonce;
     }
 
     protected function after(Request $request, Response $response, mixed $result): void
@@ -60,8 +80,10 @@ final class AddSecurityHeaders extends AbstractMiddleware
         }
 
         // Content-Security-Policy
+        // SECURITY: Replace {nonce} placeholder with actual nonce
         if ($this->config['csp']) {
-            $response->header('Content-Security-Policy', $this->config['csp']);
+            $csp = str_replace('{nonce}', $this->nonce, $this->config['csp']);
+            $response->header('Content-Security-Policy', $csp);
         }
 
         // Referrer-Policy
@@ -90,7 +112,10 @@ final class AddSecurityHeaders extends AbstractMiddleware
             'hsts_max_age' => 31536000, // 1 year
             'hsts_include_subdomains' => false,
             'hsts_preload' => false,
-            'csp' => "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';",
+            // SECURITY: Use nonce-based CSP instead of unsafe-inline
+            // The {nonce} placeholder will be replaced with actual nonce value
+            // Usage in templates: <script nonce="{{ csp_nonce() }}">
+            'csp' => "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';",
             'referrer_policy' => 'strict-origin-when-cross-origin',
             'permissions_policy' => 'geolocation=(), microphone=(), camera=()',
         ];
