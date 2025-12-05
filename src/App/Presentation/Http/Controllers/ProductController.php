@@ -1994,20 +1994,26 @@ final class ProductController extends BaseController
             })->all();
 
             // Test 6: Deep nested - Post with image, image has imageable, and imageable has relationships
-            $postsWithDeepNested = PostModel::whereHas('image.imageable', function ($q) use ($publishedOnly, $minViews) {
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
+            // Use whereHas with whereHasMorph to properly handle polymorphic relationship
+            $postsWithDeepNested = PostModel::whereHas('image', function ($q) use ($publishedOnly, $minViews) {
+                // Filter images that have an imageable (Post) with the specified conditions using whereHasMorph
+                $q->whereHasMorph('imageable', [PostModel::class], function ($subQ) use ($publishedOnly, $minViews) {
+                    if ($publishedOnly) {
+                        $subQ->where('is_published', true);
+                    }
+                    if ($minViews > 0) {
+                        $subQ->where('views', '>=', $minViews);
+                    }
+                });
             })
                 ->with([
-                    'image.imageable' => function ($q) {
-                        // Load imageable with its own relationships
-                    },
+                    // Load imageable and its nested relationships
+                    // Note: 'image.imageable.image' creates a circular reference:
+                    // Post -> Image -> Imageable (Post) -> Image
+                    // The constraint applies to the final 'image' in the path
                     'image.imageable.image' => function ($q) {
                         // Deep nested: Post -> Image -> Imageable (Post) -> Image
+                        // Constraint applies to imageable's image, ordered by size DESC
                         $q->orderBy('size', 'DESC');
                     },
                     'image.imageable.comments' => function ($q) {
@@ -2046,7 +2052,7 @@ final class ProductController extends BaseController
                     ] : null,
                 ];
             })->all();
-        } elseif ($type === 'video') {
+
             // Test 5: Nested relationship - Video with image and image has imageable (nested MorphTo)
             $videosWithNestedImage = VideoModel::whereHas('image', function ($q) use ($minWidth, $minHeight) {
                 if ($minWidth > 0) {
@@ -2087,20 +2093,26 @@ final class ProductController extends BaseController
             })->all();
 
             // Test 6: Deep nested - Video with image, image has imageable, and imageable has relationships
-            $videosWithDeepNested = VideoModel::whereHas('image.imageable', function ($q) use ($publishedOnly, $minViews) {
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
+            // Use whereHas with whereHasMorph to properly handle polymorphic relationship
+            $videosWithDeepNested = VideoModel::whereHas('image', function ($q) use ($publishedOnly, $minViews) {
+                // Filter images that have an imageable (Video) with the specified conditions using whereHasMorph
+                $q->whereHasMorph('imageable', [VideoModel::class], function ($subQ) use ($publishedOnly, $minViews) {
+                    if ($publishedOnly) {
+                        $subQ->where('is_published', true);
+                    }
+                    if ($minViews > 0) {
+                        $subQ->where('views', '>=', $minViews);
+                    }
+                });
             })
                 ->with([
-                    'image.imageable' => function ($q) {
-                        // Load imageable with its own relationships
-                    },
+                    // Load imageable and its nested relationships
+                    // Note: 'image.imageable.image' creates a circular reference:
+                    // Video -> Image -> Imageable (Video) -> Image
+                    // The constraint applies to the final 'image' in the path
                     'image.imageable.image' => function ($q) {
                         // Deep nested: Video -> Image -> Imageable (Video) -> Image
+                        // Constraint applies to imageable's image, ordered by size DESC
                         $q->orderBy('size', 'DESC');
                     },
                     'image.imageable.comments' => function ($q) {
