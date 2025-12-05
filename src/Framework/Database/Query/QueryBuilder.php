@@ -2509,6 +2509,197 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
+     * Determine if no rows exist for the current query.
+     *
+     * Inverse of exists(). Returns true if no matching rows found.
+     *
+     * Performance: Uses the same optimized EXISTS pattern as exists().
+     *
+     * @return bool True if no rows match the query
+     *
+     * @example
+     * if ($query->where('email', $email)->doesntExist()) {
+     *     // Email is available
+     * }
+     */
+    public function doesntExist(): bool
+    {
+        return !$this->exists();
+    }
+
+    /**
+     * Get a single column's value from the first result.
+     *
+     * Retrieves only the specified column value, not the entire row.
+     * More efficient than first() when you only need one field.
+     *
+     * Performance: Uses SELECT $column ... LIMIT 1 (minimal data transfer)
+     *
+     * @param string $column Column name to retrieve
+     * @return mixed The column value, or null if no row found
+     *
+     * @example
+     * // Get user's name by ID
+     * $name = DB::table('users')->where('id', 1)->value('name');
+     *
+     * // Get latest order total
+     * $total = Order::query()->latest()->value('total');
+     */
+    public function value(string $column): mixed
+    {
+        $result = $this->select($column)->first();
+
+        if ($result === null) {
+            return null;
+        }
+
+        // Handle both array (QueryBuilder) and object (Model) results
+        if (is_array($result)) {
+            return $result[$column] ?? null;
+        }
+
+        return $result->$column ?? $result->getAttribute($column) ?? null;
+    }
+
+    /**
+     * Remove all existing orders and optionally set new order.
+     *
+     * Useful for removing default order or completely replacing order clauses.
+     *
+     * @param string|null $column Optional new column to order by
+     * @param string $direction Order direction (ASC/DESC)
+     * @return $this
+     *
+     * @example
+     * // Remove all ordering
+     * $query->reorder();
+     *
+     * // Replace all ordering with new order
+     * $query->reorder('created_at', 'DESC');
+     *
+     * // Remove default scope ordering and apply new
+     * User::query()->reorder('name', 'ASC')->get();
+     */
+    public function reorder(?string $column = null, string $direction = 'ASC'): self
+    {
+        // Clear all existing orders
+        $this->orders = [];
+
+        // Invalidate SQL cache
+        $this->cachedSql = null;
+
+        // Apply new order if column provided
+        if ($column !== null) {
+            return $this->orderBy($column, $direction);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Order by column in descending order.
+     *
+     * Shortcut for orderBy($column, 'DESC').
+     *
+     * @param string $column Column to order by
+     * @return $this
+     *
+     * @example
+     * $query->orderByDesc('created_at')->get();
+     */
+    public function orderByDesc(string $column): self
+    {
+        return $this->orderBy($column, 'DESC');
+    }
+
+    /**
+     * Get the SQL query with bindings substituted.
+     *
+     * Useful for debugging - shows the actual SQL that would be executed.
+     * WARNING: The output is for debugging only, do NOT execute directly
+     * as it may be vulnerable to SQL injection.
+     *
+     * @return string SQL with values substituted
+     *
+     * @example
+     * $sql = User::where('id', 1)->toRawSql();
+     * // "SELECT * FROM users WHERE id = 1"
+     */
+    public function toRawSql(): string
+    {
+        $sql = $this->toSql();
+        $bindings = $this->getBindings();
+
+        // Replace each ? placeholder with the actual value
+        foreach ($bindings as $binding) {
+            if (is_string($binding)) {
+                // Escape single quotes and wrap in quotes
+                $value = "'" . str_replace("'", "''", $binding) . "'";
+            } elseif (is_bool($binding)) {
+                $value = $binding ? '1' : '0';
+            } elseif (is_null($binding)) {
+                $value = 'NULL';
+            } elseif (is_int($binding) || is_float($binding)) {
+                $value = (string) $binding;
+            } else {
+                $value = "'" . str_replace("'", "''", (string) $binding) . "'";
+            }
+
+            // Replace first occurrence of ?
+            $pos = strpos($sql, '?');
+            if ($pos !== false) {
+                $sql = substr_replace($sql, $value, $pos, 1);
+            }
+        }
+
+        return $sql;
+    }
+
+    /**
+     * Dump the current SQL and bindings for debugging.
+     *
+     * Outputs the query information and continues execution.
+     *
+     * @return $this
+     *
+     * @example
+     * User::where('active', true)->dump()->get();
+     */
+    public function dump(): self
+    {
+        $data = [
+            'sql' => $this->toSql(),
+            'bindings' => $this->getBindings(),
+            'raw_sql' => $this->toRawSql(),
+        ];
+
+        if (function_exists('dump')) {
+            dump($data);
+        } else {
+            var_dump($data);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Dump the current SQL and bindings, then die.
+     *
+     * Outputs the query information and stops execution.
+     * Useful for quick debugging.
+     *
+     * @return never
+     *
+     * @example
+     * User::where('active', true)->dd();
+     */
+    public function dd(): never
+    {
+        $this->dump();
+        exit(1);
+    }
+
+    /**
      * Compile the SELECT statement into raw SQL.
      *
      * Performance optimization: Caches compiled SQL to avoid recompilation
