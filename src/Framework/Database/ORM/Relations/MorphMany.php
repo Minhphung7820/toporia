@@ -197,6 +197,19 @@ class MorphMany extends Relation
                 // Build window function query for morph relationships
                 $table = $this->getRelatedTable();
                 $grammar = $this->query->getConnection()->getGrammar();
+
+                // Check if database supports window functions
+                // MySQL 8.0+, PostgreSQL, SQLite 3.25+ support window functions
+                // For older databases, fall back to standard query (less efficient but compatible)
+                if (!$grammar->supportsFeature('window_functions')) {
+                    // Fallback: Execute query without per-parent limit optimization
+                    $rows = $this->query->get();
+                    if ($rows->isEmpty()) {
+                        return new ModelCollection([]);
+                    }
+                    return $this->relatedClass::hydrate($rows->toArray());
+                }
+
                 $wrappedMorphType = $grammar->wrapColumn($this->morphType);
                 $wrappedForeignKey = $grammar->wrapColumn($this->foreignKey);
 

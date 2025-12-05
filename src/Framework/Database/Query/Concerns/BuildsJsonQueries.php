@@ -303,13 +303,20 @@ trait BuildsJsonQueries
     /**
      * Select JSON value with optional casting.
      *
+     * Multi-database support:
+     * - MySQL: JSON_UNQUOTE(JSON_EXTRACT(column, '$.path'))
+     * - PostgreSQL: column->>'path'
+     * - SQLite: json_extract(column, '$.path')
+     *
      * Example:
      * ```php
      * $query->selectJson('settings->theme', 'theme');
-     * // SELECT JSON_UNQUOTE(JSON_EXTRACT(settings, '$.theme')) AS theme
+     * // MySQL: SELECT JSON_UNQUOTE(JSON_EXTRACT(settings, '$.theme')) AS theme
+     * // PostgreSQL: SELECT settings->>'theme' AS "theme"
      *
      * $query->selectJson('data->count', 'count', 'integer');
-     * // SELECT CAST(JSON_EXTRACT(data, '$.count') AS SIGNED) AS count
+     * // MySQL: SELECT CAST(JSON_EXTRACT(data, '$.count') AS SIGNED) AS count
+     * // PostgreSQL: SELECT (data->>'count')::INTEGER AS "count"
      * ```
      *
      * @param string $column JSON column with path
@@ -321,18 +328,9 @@ trait BuildsJsonQueries
     {
         [$columnName, $path] = $this->parseJsonPath($column);
 
-        $jsonPath = '$.' . str_replace('->', '.', $path ?? '');
-
-        $expression = match ($cast) {
-            'integer', 'int' => "CAST(JSON_EXTRACT({$columnName}, '{$jsonPath}') AS SIGNED)",
-            'float', 'decimal' => "CAST(JSON_EXTRACT({$columnName}, '{$jsonPath}') AS DECIMAL(65, 30))",
-            'boolean', 'bool' => "CAST(JSON_EXTRACT({$columnName}, '{$jsonPath}') AS UNSIGNED)",
-            default => "JSON_UNQUOTE(JSON_EXTRACT({$columnName}, '{$jsonPath}'))",
-        };
-
-        if ($alias !== null) {
-            $expression .= " AS {$alias}";
-        }
+        // Use Grammar for multi-database JSON select compilation
+        $grammar = $this->connection->getGrammar();
+        $expression = $grammar->compileJsonSelect($columnName, $path ?? '', $cast, $alias);
 
         $this->columns[] = new Expression($expression);
 
@@ -342,9 +340,16 @@ trait BuildsJsonQueries
     /**
      * Order by JSON value.
      *
+     * Multi-database support:
+     * - MySQL: JSON_EXTRACT(column, '$.path')
+     * - PostgreSQL: column->'path'
+     * - SQLite: json_extract(column, '$.path')
+     *
      * Example:
      * ```php
      * $query->orderByJson('settings->priority', 'desc');
+     * // MySQL: ORDER BY JSON_EXTRACT(settings, '$.priority') DESC
+     * // PostgreSQL: ORDER BY settings->>'priority' DESC
      * ```
      *
      * @param string $column JSON column with path
@@ -356,17 +361,13 @@ trait BuildsJsonQueries
     {
         [$columnName, $path] = $this->parseJsonPath($column);
 
-        $jsonPath = '$.' . str_replace('->', '.', $path ?? '');
-
-        $expression = match ($cast) {
-            'integer', 'int' => "CAST(JSON_EXTRACT({$columnName}, '{$jsonPath}') AS SIGNED)",
-            'float', 'decimal' => "CAST(JSON_EXTRACT({$columnName}, '{$jsonPath}') AS DECIMAL(65, 30))",
-            default => "JSON_EXTRACT({$columnName}, '{$jsonPath}')",
-        };
+        // Use Grammar for multi-database JSON order compilation
+        $grammar = $this->connection->getGrammar();
+        $orderSql = $grammar->compileJsonOrder($columnName, $path ?? '', $direction, $cast);
 
         $this->orders[] = [
             'type' => 'raw',
-            'sql' => "{$expression} " . strtoupper($direction),
+            'sql' => $orderSql,
         ];
 
         $this->invalidateCache();

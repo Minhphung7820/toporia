@@ -568,6 +568,19 @@ class BelongsToMany extends Relation
             if ($limit !== null && $limit > 0) {
                 $relatedTable = $this->getRelatedTableName();
                 $grammar = $this->query->getConnection()->getGrammar();
+
+                // Check if database supports window functions
+                // MySQL 8.0+, PostgreSQL, SQLite 3.25+ support window functions
+                // For older databases, fall back to standard query (less efficient but compatible)
+                if (!$grammar->supportsFeature('window_functions')) {
+                    // Fallback: Execute query without per-parent limit optimization
+                    $rows = $this->query->get();
+                    if ($rows->isEmpty()) {
+                        return new ModelCollection([]);
+                    }
+                    return $this->hydrateWithPivot($rows->toArray());
+                }
+
                 $wrappedPivotForeignKey = $grammar->wrapColumn("{$this->pivotTable}.{$this->foreignPivotKey}");
 
                 // Build ORDER BY clause for window function

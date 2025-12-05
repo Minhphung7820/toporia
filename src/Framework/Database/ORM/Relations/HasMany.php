@@ -113,13 +113,27 @@ class HasMany extends Relation
             // Use window function when limit is present (even without explicit orderBy)
             // Also works with offset/skip for pagination
             if ($limit !== null && $limit > 0) {
+                // Get Grammar for safe column wrapping and feature detection
+                $grammar = $this->query->getConnection()->getGrammar();
+
+                // Check if database supports window functions
+                // MySQL 8.0+, PostgreSQL, SQLite 3.25+ support window functions
+                // For older databases, fall back to multiple queries (less efficient but compatible)
+                if (!$grammar->supportsFeature('window_functions')) {
+                    // Fallback: Execute query without per-parent limit optimization
+                    // This may return more rows than expected but maintains compatibility
+                    $rows = $this->query->get();
+                    if ($rows->isEmpty()) {
+                        return new ModelCollection([]);
+                    }
+                    return $this->relatedClass::hydrate($rows->toArray());
+                }
+
                 // Build window function query like Laravel
                 // SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY foreignKey ORDER BY ...) AS toporia_row FROM table WHERE ...) AS toporia_table WHERE toporia_row <= limit
                 $foreignKey = $this->foreignKey;
                 $table = $this->query->getTable();
 
-                // Get Grammar for safe column wrapping
-                $grammar = $this->query->getConnection()->getGrammar();
                 $wrappedForeignKey = $grammar->wrapColumn($foreignKey);
 
                 // Build ORDER BY clause for window function

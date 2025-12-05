@@ -151,4 +151,26 @@ interface GrammarInterface
      * @return bool True if supported
      */
     public function supportsFeature(string $feature): bool;
+
+    /**
+     * Compile UNION clauses.
+     *
+     * UNION syntax is standard across MySQL, PostgreSQL, and SQLite:
+     * - UNION: Removes duplicate rows
+     * - UNION ALL: Keeps all rows including duplicates
+     *
+     * @param array<int, array{query: QueryBuilder, all: bool}> $unions Union queries
+     * @return string Compiled UNION SQL
+     */
+    public function compileUnions(array $unions): string;
+
+    /**
+     * Compile the random order function for this database.
+     *
+     * - MySQL/MariaDB: RAND()
+     * - PostgreSQL/SQLite: RANDOM()
+     *
+     * @return string The database-specific random function
+     */
+    public function compileRandomOrderFunction(): string;
 }

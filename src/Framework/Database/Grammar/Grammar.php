@@ -290,6 +290,15 @@ abstract class Grammar implements GrammarInterface
             'NotExists' => $this->compileNotExistsWhere($where),
             'InSub' => $this->compileWhereInSub($where), // Backward compatibility
             'NotInSub' => $this->compileWhereNotInSub($where), // Backward compatibility
+            // JSON WHERE types - multi-database support
+            'Json' => $this->compileJsonWhere($where),
+            'JsonContainsKey' => $this->compileJsonContainsKeyWhere($where),
+            'JsonDoesntContainKey' => $this->compileJsonDoesntContainKeyWhere($where),
+            'JsonOverlaps' => $this->compileJsonOverlapsWhere($where),
+            'JsonType' => $this->compileJsonTypeWhere($where),
+            'JsonDepth' => $this->compileJsonDepthWhere($where),
+            'JsonValid' => $this->compileJsonValidWhere($where),
+            'JsonSearch' => $this->compileJsonSearchWhere($where),
             default => throw new \InvalidArgumentException("Unknown WHERE type: {$type}"),
         };
     }
@@ -778,5 +787,284 @@ abstract class Grammar implements GrammarInterface
         }
 
         return $column;
+    }
+
+    // =========================================================================
+    // JSON WHERE COMPILATION METHODS
+    // Multi-database support: Override in subclasses for database-specific syntax
+    // Default implementations use MySQL syntax
+    // =========================================================================
+
+    /**
+     * Compile JSON WHERE clause (whereJson).
+     *
+     * MySQL: JSON_UNQUOTE(JSON_EXTRACT(column, '$.path')) operator ?
+     * PostgreSQL: column->>'path' operator ? (override)
+     * SQLite: json_extract(column, '$.path') operator ? (override)
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileJsonWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $path = '$.' . str_replace('->', '.', $where['path'] ?? '');
+        $operator = $where['operator'];
+
+        return "JSON_UNQUOTE(JSON_EXTRACT({$column}, '{$path}')) {$operator} ?";
+    }
+
+    /**
+     * Compile JSON contains key WHERE clause (whereJsonContainsKey).
+     *
+     * MySQL: JSON_CONTAINS_PATH(column, 'one', '$.key')
+     * PostgreSQL: column ? 'key' (override)
+     * SQLite: json_type(column, '$.key') IS NOT NULL (override)
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileJsonContainsKeyWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $key = $where['key'];
+        // Convert dot notation to JSON path
+        $path = '$.' . str_replace('.', '.', $key);
+
+        return "JSON_CONTAINS_PATH({$column}, 'one', '{$path}')";
+    }
+
+    /**
+     * Compile JSON doesn't contain key WHERE clause.
+     *
+     * MySQL: NOT JSON_CONTAINS_PATH(column, 'one', '$.key')
+     * PostgreSQL: NOT (column ? 'key') (override)
+     * SQLite: json_type(column, '$.key') IS NULL (override)
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileJsonDoesntContainKeyWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $key = $where['key'];
+        $path = '$.' . str_replace('.', '.', $key);
+
+        return "NOT JSON_CONTAINS_PATH({$column}, 'one', '{$path}')";
+    }
+
+    /**
+     * Compile JSON overlaps WHERE clause (whereJsonOverlaps).
+     *
+     * MySQL 8.0+: JSON_OVERLAPS(column, ?)
+     * PostgreSQL: column ?| array[...] (override)
+     * SQLite: Custom implementation via json_each (override)
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileJsonOverlapsWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+
+        // MySQL 8.0+ supports JSON_OVERLAPS
+        return "JSON_OVERLAPS({$column}, ?)";
+    }
+
+    /**
+     * Compile JSON type WHERE clause (whereJsonType).
+     *
+     * MySQL: JSON_TYPE(JSON_EXTRACT(column, '$.path')) = 'TYPE'
+     * PostgreSQL: jsonb_typeof(column->'path') = 'type' (override)
+     * SQLite: json_type(column, '$.path') = 'type' (override)
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileJsonTypeWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $path = '$.' . str_replace('->', '.', $where['path'] ?? '');
+        $jsonType = strtoupper($where['jsonType']);
+
+        return "JSON_TYPE(JSON_EXTRACT({$column}, '{$path}')) = '{$jsonType}'";
+    }
+
+    /**
+     * Compile JSON depth WHERE clause (whereJsonDepth).
+     *
+     * MySQL: JSON_DEPTH(column) operator ?
+     * PostgreSQL: Not directly supported - returns 0 (override with custom logic)
+     * SQLite: Not supported - returns 1 = 1 fallback (override)
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileJsonDepthWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+
+        return "JSON_DEPTH({$column}) {$operator} ?";
+    }
+
+    /**
+     * Compile JSON valid WHERE clause (whereJsonValid).
+     *
+     * MySQL: JSON_VALID(column)
+     * PostgreSQL: column IS NOT NULL AND column::text ~ '^[{\[]' (override)
+     * SQLite: json_valid(column) (override)
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileJsonValidWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $valid = $where['valid'] ?? true;
+
+        if ($valid) {
+            return "JSON_VALID({$column})";
+        }
+
+        return "NOT JSON_VALID({$column})";
+    }
+
+    /**
+     * Compile JSON search WHERE clause (whereJsonSearch).
+     *
+     * MySQL: JSON_SEARCH(column, 'one'/'all', ?) IS NOT NULL
+     * PostgreSQL: column::text LIKE '%value%' (override - no direct equivalent)
+     * SQLite: instr(column, ?) > 0 (override - no direct equivalent)
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileJsonSearchWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $oneOrAll = $where['oneOrAll'];
+
+        return "JSON_SEARCH({$column}, '{$oneOrAll}', ?) IS NOT NULL";
+    }
+
+    // =========================================================================
+    // JSON SELECT/ORDER COMPILATION
+    // Multi-database support for JSON value selection and ordering
+    // =========================================================================
+
+    /**
+     * Compile JSON select expression.
+     *
+     * MySQL: JSON_UNQUOTE(JSON_EXTRACT(column, '$.path'))
+     * PostgreSQL: column->>'path'
+     * SQLite: json_extract(column, '$.path')
+     *
+     * @param string $column Column name
+     * @param string $path JSON path (dot notation)
+     * @param string|null $cast Cast type (integer, float, string, boolean)
+     * @param string|null $alias Column alias
+     * @return string SQL expression
+     */
+    public function compileJsonSelect(string $column, string $path, ?string $cast = null, ?string $alias = null): string
+    {
+        $wrappedColumn = $this->wrapColumn($column);
+        $jsonPath = '$.' . str_replace('->', '.', $path);
+
+        $expression = match ($cast) {
+            'integer', 'int' => "CAST(JSON_EXTRACT({$wrappedColumn}, '{$jsonPath}') AS SIGNED)",
+            'float', 'decimal' => "CAST(JSON_EXTRACT({$wrappedColumn}, '{$jsonPath}') AS DECIMAL(65, 30))",
+            'boolean', 'bool' => "CAST(JSON_EXTRACT({$wrappedColumn}, '{$jsonPath}') AS UNSIGNED)",
+            default => "JSON_UNQUOTE(JSON_EXTRACT({$wrappedColumn}, '{$jsonPath}'))",
+        };
+
+        if ($alias !== null) {
+            $expression .= " AS {$alias}";
+        }
+
+        return $expression;
+    }
+
+    /**
+     * Compile JSON order expression.
+     *
+     * MySQL: JSON_EXTRACT(column, '$.path')
+     * PostgreSQL: column->'path'
+     * SQLite: json_extract(column, '$.path')
+     *
+     * @param string $column Column name
+     * @param string $path JSON path (dot notation)
+     * @param string $direction Sort direction (asc/desc)
+     * @param string|null $cast Cast type for proper sorting
+     * @return string SQL expression with direction
+     */
+    public function compileJsonOrder(string $column, string $path, string $direction = 'ASC', ?string $cast = null): string
+    {
+        $wrappedColumn = $this->wrapColumn($column);
+        $jsonPath = '$.' . str_replace('->', '.', $path);
+
+        $expression = match ($cast) {
+            'integer', 'int' => "CAST(JSON_EXTRACT({$wrappedColumn}, '{$jsonPath}') AS SIGNED)",
+            'float', 'decimal' => "CAST(JSON_EXTRACT({$wrappedColumn}, '{$jsonPath}') AS DECIMAL(65, 30))",
+            default => "JSON_EXTRACT({$wrappedColumn}, '{$jsonPath}')",
+        };
+
+        return "{$expression} " . strtoupper($direction);
+    }
+
+    // =========================================================================
+    // UNION COMPILATION
+    // =========================================================================
+
+    /**
+     * Compile UNION clauses.
+     *
+     * UNION syntax is standard across MySQL, PostgreSQL, and SQLite:
+     * - UNION: Removes duplicate rows
+     * - UNION ALL: Keeps all rows including duplicates
+     *
+     * Performance: O(N) where N = number of unions
+     *
+     * @param array<int, array{query: QueryBuilder, all: bool}> $unions
+     * @return string
+     */
+    public function compileUnions(array $unions): string
+    {
+        if (empty($unions)) {
+            return '';
+        }
+
+        $sql = '';
+
+        foreach ($unions as $union) {
+            /** @var QueryBuilder $query */
+            $query = $union['query'];
+            $keyword = $union['all'] ? 'UNION ALL' : 'UNION';
+
+            // Get the union query's SQL through its own grammar
+            $unionSql = $query->getConnection()->getGrammar()->compileSelect($query);
+
+            $sql .= " {$keyword} {$unionSql}";
+        }
+
+        return $sql;
+    }
+
+    // =========================================================================
+    // DATABASE-SPECIFIC FUNCTIONS
+    // =========================================================================
+
+    /**
+     * Compile the random order function for this database.
+     *
+     * Override in subclasses for database-specific random functions.
+     * Default uses RAND() which works for MySQL/MariaDB.
+     *
+     * @return string The database-specific random function
+     */
+    public function compileRandomOrderFunction(): string
+    {
+        // Default: MySQL/MariaDB syntax
+        return 'RAND()';
     }
 }

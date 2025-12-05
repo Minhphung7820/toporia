@@ -1489,10 +1489,14 @@ class QueryBuilder implements QueryBuilderInterface
      */
     public function inRandomOrder(): self
     {
-        // Use RAND() which works for MySQL, MariaDB
-        // For PostgreSQL/SQLite, use RANDOM() manually: orderBy('RANDOM()')
+        // Get database-specific random function from Grammar
+        // - MySQL/MariaDB: RAND()
+        // - PostgreSQL/SQLite: RANDOM()
+        // - MongoDB: Uses $sample aggregation (handled separately)
+        $randomFunction = $this->connection->getGrammar()->compileRandomOrderFunction();
+
         $this->orders[] = [
-            'column' => 'RAND()',
+            'column' => $randomFunction,
             'direction' => '' // No direction for RANDOM()
         ];
 
@@ -2733,8 +2737,10 @@ class QueryBuilder implements QueryBuilderInterface
         $grammar = $this->connection->getGrammar();
         $compiledSql = $grammar->compileSelect($this);
 
-        // Add unions and lock clauses (not yet in Grammar)
-        $compiledSql .= $this->compileUnions();
+        // Add unions via Grammar (multi-database support)
+        $compiledSql .= $grammar->compileUnions($this->unions);
+
+        // Add lock clause (not in Grammar - database-specific)
         $compiledSql .= $this->compileLock();
 
         // Prepend CTEs if present

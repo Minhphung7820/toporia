@@ -253,4 +253,291 @@ class SQLiteGrammar extends Grammar
     {
         return 'VACUUM';
     }
+
+    // =========================================================================
+    // DATE/TIME FUNCTIONS - SQLite-specific syntax using strftime()
+    // =========================================================================
+
+    /**
+     * Compile DATE() WHERE clause.
+     *
+     * SQLite: DATE(column) works the same as MySQL.
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileDateBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "DATE({$column}) {$operator} ?";
+    }
+
+    /**
+     * Compile MONTH() WHERE clause.
+     *
+     * SQLite uses strftime('%m', column) instead of MONTH(column).
+     * CAST to INTEGER to match numeric comparison (removes leading zero).
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileMonthBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "CAST(strftime('%m', {$column}) AS INTEGER) {$operator} ?";
+    }
+
+    /**
+     * Compile DAY() WHERE clause.
+     *
+     * SQLite uses strftime('%d', column) instead of DAY(column).
+     * CAST to INTEGER to match numeric comparison (removes leading zero).
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileDayBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "CAST(strftime('%d', {$column}) AS INTEGER) {$operator} ?";
+    }
+
+    /**
+     * Compile YEAR() WHERE clause.
+     *
+     * SQLite uses strftime('%Y', column) instead of YEAR(column).
+     * CAST to INTEGER for numeric comparison.
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileYearBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "CAST(strftime('%Y', {$column}) AS INTEGER) {$operator} ?";
+    }
+
+    /**
+     * Compile TIME() WHERE clause.
+     *
+     * SQLite: TIME(column) works the same as MySQL.
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileTimeBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "TIME({$column}) {$operator} ?";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite uses RANDOM() instead of RAND().
+     */
+    public function compileRandomOrderFunction(): string
+    {
+        return 'RANDOM()';
+    }
+
+    // =========================================================================
+    // JSON WHERE COMPILATION - SQLite-specific syntax (JSON1 extension)
+    // SQLite uses json_extract(), json_type(), etc.
+    // Requires SQLite 3.38+ for full JSON support
+    // =========================================================================
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: json_extract(column, '$.path') operator ?
+     * Uses json_extract() for value extraction.
+     */
+    protected function compileJsonWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $path = '$.' . str_replace('->', '.', $where['path'] ?? '');
+        $operator = $where['operator'];
+
+        return "json_extract({$column}, '{$path}') {$operator} ?";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: json_type(column, '$.key') IS NOT NULL
+     * Uses json_type() to check if a key exists.
+     */
+    protected function compileJsonContainsKeyWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $key = $where['key'];
+        $path = '$.' . str_replace('.', '.', $key);
+
+        return "json_type({$column}, '{$path}') IS NOT NULL";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: json_type(column, '$.key') IS NULL
+     */
+    protected function compileJsonDoesntContainKeyWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $key = $where['key'];
+        $path = '$.' . str_replace('.', '.', $key);
+
+        return "json_type({$column}, '{$path}') IS NULL";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: Uses json_each() to check array overlap.
+     * This is a subquery approach since SQLite doesn't have direct overlap function.
+     */
+    protected function compileJsonOverlapsWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+
+        // SQLite doesn't have JSON_OVERLAPS, use EXISTS with json_each
+        // The binding will be the JSON array to check against
+        return "EXISTS (SELECT 1 FROM json_each({$column}) AS a, json_each(?) AS b WHERE a.value = b.value)";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: json_type(column, '$.path') = 'type'
+     * SQLite type names: null, true, false, integer, real, text, array, object
+     */
+    protected function compileJsonTypeWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $path = '$.' . str_replace('->', '.', $where['path'] ?? '');
+        $jsonType = strtolower($where['jsonType']);
+
+        // Map MySQL/general type names to SQLite
+        $typeMap = [
+            'object' => 'object',
+            'array' => 'array',
+            'string' => 'text',
+            'number' => 'integer', // Could also be 'real'
+            'integer' => 'integer',
+            'double' => 'real',
+            'boolean' => 'true', // SQLite returns 'true' or 'false', not 'boolean'
+            'null' => 'null',
+        ];
+
+        $sqliteType = $typeMap[$jsonType] ?? $jsonType;
+
+        // For boolean, we need to check both 'true' and 'false'
+        if ($jsonType === 'boolean') {
+            return "(json_type({$column}, '{$path}') IN ('true', 'false'))";
+        }
+
+        // For number, check both integer and real
+        if ($jsonType === 'number') {
+            return "(json_type({$column}, '{$path}') IN ('integer', 'real'))";
+        }
+
+        return "json_type({$column}, '{$path}') = '{$sqliteType}'";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite doesn't have JSON_DEPTH function.
+     * Return always true as fallback.
+     */
+    protected function compileJsonDepthWhere(array $where): string
+    {
+        // SQLite doesn't have a built-in JSON_DEPTH function
+        // Return always true (feature not supported)
+        return '1 = 1';
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: json_valid(column) (SQLite 3.38+)
+     */
+    protected function compileJsonValidWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $valid = $where['valid'] ?? true;
+
+        if ($valid) {
+            return "json_valid({$column})";
+        }
+
+        return "NOT json_valid({$column})";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: Use instr() for text search since no JSON_SEARCH equivalent.
+     */
+    protected function compileJsonSearchWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+
+        // SQLite doesn't have JSON_SEARCH, use text search
+        return "instr({$column}, ?) > 0";
+    }
+
+    // =========================================================================
+    // JSON SELECT/ORDER COMPILATION - SQLite-specific syntax (JSON1 extension)
+    // =========================================================================
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: Uses json_extract() for value extraction.
+     * Casting uses CAST AS INTEGER/REAL (no SIGNED/UNSIGNED in SQLite).
+     */
+    public function compileJsonSelect(string $column, string $path, ?string $cast = null, ?string $alias = null): string
+    {
+        $wrappedColumn = $this->wrapColumn($column);
+        $jsonPath = '$.' . str_replace('->', '.', $path);
+
+        $expression = match ($cast) {
+            'integer', 'int' => "CAST(json_extract({$wrappedColumn}, '{$jsonPath}') AS INTEGER)",
+            'float', 'decimal' => "CAST(json_extract({$wrappedColumn}, '{$jsonPath}') AS REAL)",
+            'boolean', 'bool' => "CAST(json_extract({$wrappedColumn}, '{$jsonPath}') AS INTEGER)",
+            default => "json_extract({$wrappedColumn}, '{$jsonPath}')",
+        };
+
+        if ($alias !== null) {
+            $expression .= " AS \"{$alias}\"";
+        }
+
+        return $expression;
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * SQLite: Uses json_extract() for ordering by JSON values.
+     */
+    public function compileJsonOrder(string $column, string $path, string $direction = 'ASC', ?string $cast = null): string
+    {
+        $wrappedColumn = $this->wrapColumn($column);
+        $jsonPath = '$.' . str_replace('->', '.', $path);
+
+        $expression = match ($cast) {
+            'integer', 'int' => "CAST(json_extract({$wrappedColumn}, '{$jsonPath}') AS INTEGER)",
+            'float', 'decimal' => "CAST(json_extract({$wrappedColumn}, '{$jsonPath}') AS REAL)",
+            default => "json_extract({$wrappedColumn}, '{$jsonPath}')",
+        };
+
+        return "{$expression} " . strtoupper($direction);
+    }
 }

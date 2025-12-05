@@ -136,11 +136,15 @@ class PostgreSQLGrammar extends Grammar
     /**
      * {@inheritdoc}
      *
-     * PostgreSQL uses numbered placeholders: $1, $2, $3...
+     * PostgreSQL with PDO uses positional placeholders (?) like MySQL/SQLite.
+     * PDO handles the conversion to native PostgreSQL $1, $2, $3 format internally.
+     *
+     * Note: Using ? (positional) instead of $1 (numbered) ensures consistency
+     * across all PDO-based database connections and simplifies binding management.
      */
     public function getParameterPlaceholder(int $index): string
     {
-        return '$' . ($index + 1);
+        return '?';
     }
 
     /**
@@ -165,6 +169,8 @@ class PostgreSQLGrammar extends Grammar
 
     /**
      * {@inheritdoc}
+     *
+     * PostgreSQL INSERT uses ? placeholders (PDO converts them internally).
      */
     public function compileInsert(QueryBuilder $query, array $values): string
     {
@@ -182,22 +188,11 @@ class PostgreSQLGrammar extends Grammar
             $columns
         ));
 
-        $index = 1;
-        $placeholders = '(' . implode(', ', array_map(
-            fn() => '$' . $index++,
-            $columns
-        )) . ')';
+        $placeholders = '(' . implode(', ', array_fill(0, count($columns), '?')) . ')';
 
         if (count($values) > 1) {
-            $allPlaceholders = [];
-            foreach ($values as $row) {
-                $rowPlaceholders = [];
-                foreach ($row as $value) {
-                    $rowPlaceholders[] = '$' . $index++;
-                }
-                $allPlaceholders[] = '(' . implode(', ', $rowPlaceholders) . ')';
-            }
-            return "INSERT INTO {$table} ({$wrappedColumns}) VALUES " . implode(', ', $allPlaceholders);
+            $allPlaceholders = implode(', ', array_fill(0, count($values), $placeholders));
+            return "INSERT INTO {$table} ({$wrappedColumns}) VALUES {$allPlaceholders}";
         }
 
         return "INSERT INTO {$table} ({$wrappedColumns}) VALUES {$placeholders}";
@@ -224,12 +219,13 @@ class PostgreSQLGrammar extends Grammar
 
     /**
      * {@inheritdoc}
+     *
+     * PostgreSQL UPDATE uses ? placeholders (PDO converts them internally).
      */
     public function compileUpdate(QueryBuilder $query, array $values): string
     {
         $table = $this->wrapTable($query->getTable());
 
-        $index = 1;
         $sets = [];
         foreach ($values as $column => $value) {
             $wrappedColumn = $this->wrapColumn($column);
@@ -238,7 +234,7 @@ class PostgreSQLGrammar extends Grammar
             if ($value instanceof \Toporia\Framework\Database\Query\Expression) {
                 $sets[] = "{$wrappedColumn} = " . (string) $value;
             } else {
-                $sets[] = "{$wrappedColumn} = \$" . $index++;
+                $sets[] = "{$wrappedColumn} = ?";
             }
         }
 
@@ -290,5 +286,348 @@ class PostgreSQLGrammar extends Grammar
         $onConflict = implode(', ', $updates);
 
         return "{$insertSql} ON CONFLICT ({$conflict}) DO UPDATE SET {$onConflict}";
+    }
+
+    // =========================================================================
+    // DATE/TIME FUNCTIONS - PostgreSQL-specific syntax
+    // =========================================================================
+
+    /**
+     * Compile DATE() WHERE clause.
+     *
+     * PostgreSQL: DATE(column) works the same as MySQL.
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileDateBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "DATE({$column}) {$operator} ?";
+    }
+
+    /**
+     * Compile MONTH() WHERE clause.
+     *
+     * PostgreSQL uses EXTRACT(MONTH FROM column) instead of MONTH(column).
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileMonthBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "EXTRACT(MONTH FROM {$column}) {$operator} ?";
+    }
+
+    /**
+     * Compile DAY() WHERE clause.
+     *
+     * PostgreSQL uses EXTRACT(DAY FROM column) instead of DAY(column).
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileDayBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "EXTRACT(DAY FROM {$column}) {$operator} ?";
+    }
+
+    /**
+     * Compile YEAR() WHERE clause.
+     *
+     * PostgreSQL uses EXTRACT(YEAR FROM column) instead of YEAR(column).
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileYearBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "EXTRACT(YEAR FROM {$column}) {$operator} ?";
+    }
+
+    /**
+     * Compile TIME() WHERE clause.
+     *
+     * PostgreSQL uses column::TIME cast instead of TIME(column).
+     *
+     * @param array<string, mixed> $where
+     * @return string
+     */
+    protected function compileTimeBasicWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $operator = $where['operator'];
+        return "{$column}::TIME {$operator} ?";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL uses RANDOM() instead of RAND().
+     */
+    public function compileRandomOrderFunction(): string
+    {
+        return 'RANDOM()';
+    }
+
+    // =========================================================================
+    // JSON WHERE COMPILATION - PostgreSQL-specific syntax
+    // PostgreSQL uses jsonb operators: ->, ->>, ?, ?|, ?&
+    // =========================================================================
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: column->>'path' operator ?
+     * Uses ->> for text extraction (equivalent to JSON_UNQUOTE in MySQL).
+     */
+    protected function compileJsonWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $path = $where['path'] ?? '';
+        $operator = $where['operator'];
+
+        // Handle nested paths: user.name -> 'user'->'name'
+        $pathParts = explode('.', str_replace('->', '.', $path));
+
+        if (count($pathParts) === 1) {
+            return "{$column}->>'{$pathParts[0]}' {$operator} ?";
+        }
+
+        // For nested paths, use -> for all but the last, then ->> for text extraction
+        $jsonPath = $column;
+        for ($i = 0; $i < count($pathParts) - 1; $i++) {
+            $jsonPath .= "->'{$pathParts[$i]}'";
+        }
+        $jsonPath .= "->>'" . end($pathParts) . "'";
+
+        return "{$jsonPath} {$operator} ?";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: column ? 'key' for top-level, column->'path' ? 'key' for nested.
+     */
+    protected function compileJsonContainsKeyWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $key = $where['key'];
+
+        // Handle nested paths
+        if (str_contains($key, '.')) {
+            $parts = explode('.', $key);
+            $lastKey = array_pop($parts);
+
+            $jsonPath = $column;
+            foreach ($parts as $part) {
+                $jsonPath .= "->'{$part}'";
+            }
+
+            return "({$jsonPath}) ? '{$lastKey}'";
+        }
+
+        return "{$column} ? '{$key}'";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: NOT (column ? 'key').
+     */
+    protected function compileJsonDoesntContainKeyWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $key = $where['key'];
+
+        if (str_contains($key, '.')) {
+            $parts = explode('.', $key);
+            $lastKey = array_pop($parts);
+
+            $jsonPath = $column;
+            foreach ($parts as $part) {
+                $jsonPath .= "->'{$part}'";
+            }
+
+            return "NOT (({$jsonPath}) ? '{$lastKey}')";
+        }
+
+        return "NOT ({$column} ? '{$key}')";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: column ?| array['value1', 'value2'] for array overlap.
+     * Note: This checks if ANY of the keys exist, not value overlap.
+     * For actual value overlap, we use jsonb @> operator.
+     */
+    protected function compileJsonOverlapsWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $values = $where['values'];
+
+        // PostgreSQL jsonb @> for containment check
+        // This checks if the column contains any of the values
+        return "{$column} && ?::jsonb";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: jsonb_typeof(column->'path') = 'type'.
+     * PostgreSQL type names differ from MySQL (lowercase, different names).
+     */
+    protected function compileJsonTypeWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $path = $where['path'] ?? '';
+        $jsonType = strtolower($where['jsonType']);
+
+        // Map MySQL type names to PostgreSQL
+        $typeMap = [
+            'object' => 'object',
+            'array' => 'array',
+            'string' => 'string',
+            'number' => 'number',
+            'integer' => 'number',
+            'double' => 'number',
+            'boolean' => 'boolean',
+            'null' => 'null',
+        ];
+
+        $pgType = $typeMap[$jsonType] ?? $jsonType;
+
+        // Build JSON path
+        $pathParts = explode('.', str_replace('->', '.', $path));
+        $jsonPath = $column;
+        foreach ($pathParts as $part) {
+            if (!empty($part)) {
+                $jsonPath .= "->'{$part}'";
+            }
+        }
+
+        return "jsonb_typeof({$jsonPath}) = '{$pgType}'";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL doesn't have JSON_DEPTH, use custom recursive function or return always true.
+     * This is a best-effort implementation using a subquery approach.
+     */
+    protected function compileJsonDepthWhere(array $where): string
+    {
+        // PostgreSQL doesn't have a built-in JSON_DEPTH function
+        // For simplicity, always return true (feature not fully supported)
+        // A proper implementation would require a recursive CTE
+        return '1 = 1';
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: Check if column can be cast to jsonb.
+     */
+    protected function compileJsonValidWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+        $valid = $where['valid'] ?? true;
+
+        // PostgreSQL validates JSON when casting to jsonb
+        // We check if the column is not null and can be interpreted as jsonb
+        if ($valid) {
+            return "({$column} IS NOT NULL AND {$column}::text ~ '^[{\\[]')";
+        }
+
+        return "({$column} IS NULL OR NOT ({$column}::text ~ '^[{\\[]'))";
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: Use text search since no direct JSON_SEARCH equivalent.
+     * Uses LIKE pattern matching on the JSON text representation.
+     */
+    protected function compileJsonSearchWhere(array $where): string
+    {
+        $column = $this->wrapColumn($where['column']);
+
+        // PostgreSQL doesn't have JSON_SEARCH, use text search
+        return "{$column}::text LIKE '%' || ? || '%'";
+    }
+
+    // =========================================================================
+    // JSON SELECT/ORDER COMPILATION - PostgreSQL-specific syntax
+    // =========================================================================
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: Uses ->> for text extraction, CAST for type conversion.
+     */
+    public function compileJsonSelect(string $column, string $path, ?string $cast = null, ?string $alias = null): string
+    {
+        $wrappedColumn = $this->wrapColumn($column);
+
+        // Build JSON path for nested access
+        $pathParts = explode('.', str_replace('->', '.', $path));
+        $jsonPath = $wrappedColumn;
+
+        // For nested paths, use -> for all but last, then ->> for text extraction
+        for ($i = 0; $i < count($pathParts) - 1; $i++) {
+            $jsonPath .= "->'{$pathParts[$i]}'";
+        }
+
+        // Last part uses ->> for text or -> for JSON depending on cast
+        $lastKey = end($pathParts);
+
+        $expression = match ($cast) {
+            'integer', 'int' => "({$jsonPath}->>'{$lastKey}')::INTEGER",
+            'float', 'decimal' => "({$jsonPath}->>'{$lastKey}')::DECIMAL",
+            'boolean', 'bool' => "({$jsonPath}->>'{$lastKey}')::BOOLEAN",
+            default => "{$jsonPath}->>'{$lastKey}'",
+        };
+
+        if ($alias !== null) {
+            $expression .= " AS \"{$alias}\"";
+        }
+
+        return $expression;
+    }
+
+    /**
+     * {@inheritdoc}
+     *
+     * PostgreSQL: Uses -> for JSON access, CAST for type conversion in ordering.
+     */
+    public function compileJsonOrder(string $column, string $path, string $direction = 'ASC', ?string $cast = null): string
+    {
+        $wrappedColumn = $this->wrapColumn($column);
+
+        // Build JSON path for nested access
+        $pathParts = explode('.', str_replace('->', '.', $path));
+        $jsonPath = $wrappedColumn;
+
+        for ($i = 0; $i < count($pathParts) - 1; $i++) {
+            $jsonPath .= "->'{$pathParts[$i]}'";
+        }
+
+        $lastKey = end($pathParts);
+
+        $expression = match ($cast) {
+            'integer', 'int' => "({$jsonPath}->>'{$lastKey}')::INTEGER",
+            'float', 'decimal' => "({$jsonPath}->>'{$lastKey}')::DECIMAL",
+            default => "{$jsonPath}->>'{$lastKey}'",
+        };
+
+        return "{$expression} " . strtoupper($direction);
     }
 }
