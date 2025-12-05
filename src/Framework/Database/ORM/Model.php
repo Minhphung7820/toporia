@@ -1564,7 +1564,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      *
      * @return bool False if event was cancelled
      */
-    private function fireEvent(string $event): bool
+    protected function fireEvent(string $event): bool
     {
         // Boot observers if not already booted
         static::bootObservers();

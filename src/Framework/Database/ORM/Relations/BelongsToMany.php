@@ -2194,17 +2194,43 @@ class BelongsToMany extends Relation
     /**
      * Create a new pivot model instance.
      *
-     * @param array $attributes Pivot attributes
+     * Creates a Pivot model instance with full ORM capabilities.
+     * If a custom pivot class is specified via using(), it will be instantiated instead.
+     *
+     * The pivot model has access to:
+     * - Accessors/Mutators
+     * - Custom methods
+     * - Relationships from pivot
+     * - Event hooks (creating, created, updating, updated, deleting, deleted)
+     * - Save/update/delete operations
+     *
+     * @param array<string, mixed> $attributes Pivot attributes
      * @param bool $exists Whether the pivot exists in database
      * @return Pivot Pivot model instance
      */
     public function newPivot(array $attributes = [], bool $exists = false): Pivot
     {
-        if ($this->pivotClass !== null) {
-            return new ($this->pivotClass)($attributes, $this->pivotTable, $exists);
+        $pivotClass = $this->pivotClass ?? Pivot::class;
+
+        // Use fromRawAttributes for proper Model initialization
+        // This ensures accessors/mutators work correctly
+        $pivot = $pivotClass::fromRawAttributes(
+            $this->parent,
+            $attributes,
+            $this->pivotTable,
+            $exists
+        );
+
+        // Set the foreign and related keys for proper save/delete operations
+        $pivot->setForeignKey($this->foreignPivotKey);
+        $pivot->setRelatedKey($this->relatedPivotKey);
+
+        // Enable timestamps if configured
+        if ($this->withTimestamps) {
+            $pivot->withTimestamps();
         }
 
-        return new Pivot($attributes, $this->pivotTable, $exists);
+        return $pivot;
     }
 
     /**

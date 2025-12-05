@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM\Relations;
 
-use Toporia\Framework\Database\ORM\{Model, ModelCollection};
+use Toporia\Framework\Database\ORM\{Model, ModelCollection, MorphPivot, Pivot};
 use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
 use Toporia\Framework\Support\Str;
 
@@ -768,17 +768,62 @@ class MorphToMany extends Relation
     /**
      * Create a new pivot model instance.
      *
-     * @param array $attributes Pivot attributes
+     * Creates a MorphPivot model instance with full ORM capabilities.
+     * If a custom pivot class is specified via using(), it will be instantiated instead.
+     *
+     * The pivot model has access to:
+     * - Accessors/Mutators
+     * - Custom methods
+     * - Relationships from pivot
+     * - Event hooks (creating, created, updating, updated, deleting, deleted)
+     * - Save/update/delete operations
+     * - Morph type information for polymorphic relationships
+     *
+     * @param array<string, mixed> $attributes Pivot attributes
      * @param bool $exists Whether the pivot exists in database
-     * @return \Toporia\Framework\Database\ORM\Pivot Pivot model instance
+     * @return Pivot Pivot model instance (MorphPivot or custom class)
      */
-    protected function newPivot(array $attributes = [], bool $exists = false): \Toporia\Framework\Database\ORM\Pivot
+    protected function newPivot(array $attributes = [], bool $exists = false): Pivot
     {
-        if ($this->pivotClass !== null) {
-            return new ($this->pivotClass)($attributes, $this->pivotTable, $exists);
+        // Determine the pivot class to use
+        // Priority: custom class via using() > MorphPivot (default for polymorphic)
+        $pivotClass = $this->pivotClass ?? MorphPivot::class;
+
+        // Check if the class is a MorphPivot or subclass
+        $isMorphPivot = is_a($pivotClass, MorphPivot::class, true);
+
+        if ($isMorphPivot) {
+            // Use fromMorphAttributes for MorphPivot instances
+            /** @var MorphPivot $pivot */
+            $pivot = $pivotClass::fromMorphAttributes(
+                $this->parent,
+                $attributes,
+                $this->pivotTable,
+                $exists,
+                $this->morphType,
+                $this->getMorphClass()
+            );
+        } else {
+            // Use fromRawAttributes for regular Pivot instances
+            /** @var Pivot $pivot */
+            $pivot = $pivotClass::fromRawAttributes(
+                $this->parent,
+                $attributes,
+                $this->pivotTable,
+                $exists
+            );
         }
 
-        return new \Toporia\Framework\Database\ORM\Pivot($attributes, $this->pivotTable, $exists);
+        // Set the foreign and related keys for proper save/delete operations
+        $pivot->setForeignKey($this->foreignKey);
+        $pivot->setRelatedKey($this->relatedPivotKey);
+
+        // Enable timestamps if configured
+        if ($this->withTimestamps) {
+            $pivot->withTimestamps();
+        }
+
+        return $pivot;
     }
 
     /**
