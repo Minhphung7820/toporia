@@ -199,14 +199,55 @@ abstract class BaseExporter implements ExportInterface
         // Export to temp file
         $this->export($data, $tempFile, $options);
 
+        // SECURITY: Sanitize filename to prevent header injection
+        // Remove any characters that could be used for HTTP header injection
+        $safeFilename = $this->sanitizeFilename($filename);
+
         // Stream to browser
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
         header('Content-Length: ' . filesize($tempFile));
 
         readfile($tempFile);
         unlink($tempFile);
         exit;
+    }
+
+    /**
+     * Sanitize filename to prevent header injection attacks.
+     *
+     * SECURITY: This prevents HTTP header injection via filename parameter.
+     * Characters like \r\n can be used to inject additional headers.
+     *
+     * @param string $filename Raw filename
+     * @return string Sanitized filename
+     */
+    protected function sanitizeFilename(string $filename): string
+    {
+        // Remove any characters that could be used for header injection
+        // Including: newlines, carriage returns, null bytes, and control characters
+        $sanitized = preg_replace('/[\r\n\x00-\x1f\x7f]/', '', $filename);
+
+        // Remove directory traversal attempts
+        $sanitized = basename($sanitized);
+
+        // Remove or replace characters problematic in Content-Disposition
+        // Quotes and backslashes need special handling
+        $sanitized = str_replace(['"', '\\'], ['', ''], $sanitized);
+
+        // Ensure filename is not empty
+        if (empty($sanitized)) {
+            $sanitized = 'export.xlsx';
+        }
+
+        // Limit filename length to prevent buffer overflow
+        if (strlen($sanitized) > 255) {
+            $ext = pathinfo($sanitized, PATHINFO_EXTENSION);
+            $name = pathinfo($sanitized, PATHINFO_FILENAME);
+            $sanitized = substr($name, 0, 250 - strlen($ext)) . '.' . $ext;
+        }
+
+        return $sanitized;
     }
 
     /**

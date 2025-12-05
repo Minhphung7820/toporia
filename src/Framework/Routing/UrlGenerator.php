@@ -61,7 +61,22 @@ final class UrlGenerator implements UrlGeneratorInterface
         private Request $request,
         string $secretKey = ''
     ) {
-        $this->secretKey = $secretKey ?: ($_ENV['APP_KEY'] ?? 'default-secret-key');
+        // SECURITY: Require valid secret key for signed URLs - no fallback allowed
+        if ($secretKey) {
+            $this->secretKey = $secretKey;
+        } else {
+            $key = $_ENV['APP_KEY']
+                ?? (function_exists('env') ? env('APP_KEY') : null)
+                ?? getenv('APP_KEY');
+
+            if (!$key || strlen($key) < 32) {
+                throw new \RuntimeException(
+                    'APP_KEY environment variable must be set with at least 32 characters for secure URL signing. ' .
+                    'Generate one with: php -r "echo bin2hex(random_bytes(32));"'
+                );
+            }
+            $this->secretKey = $key;
+        }
         $this->initializeFromRequest();
     }
 

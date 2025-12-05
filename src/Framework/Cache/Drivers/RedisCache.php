@@ -239,34 +239,68 @@ final class RedisCache implements CacheInterface
         $existing = $this->redis->get($prefixedKey);
 
         if ($existing === false) {
-            // Key doesn't exist - set integer value directly (not serialized)
-            $this->redis->set($prefixedKey, $value);
-            return $value;
+            // Key doesn't exist - use SETNX for atomic operation to prevent race condition
+            // SETNX returns true if key was set, false if already exists
+            $wasSet = $this->redis->setnx($prefixedKey, $value);
+            if ($wasSet) {
+                return $value;
+            }
+            // Another process set the key between GET and SETNX - retry with INCRBY
+            $result = $this->redis->incrBy($prefixedKey, $value);
+            return $result !== false ? (int)$result : false;
         }
 
         // Check if value is serialized or raw integer
         // Serialized integers look like "i:1;" or "s:1:"1""
         // Raw integers from Redis INCRBY are just integers
         if (is_numeric($existing)) {
-            // Value is already an integer - use INCRBY directly
+            // Value is already an integer - use INCRBY directly (atomic operation)
             $result = $this->redis->incrBy($prefixedKey, $value);
             return $result !== false ? (int)$result : false;
         }
 
-        // Value is serialized - unserialize, increment, serialize back
+        // Value is serialized - use WATCH/MULTI/EXEC for atomic read-modify-write
+        // This prevents race conditions when converting from serialized to raw integer
         try {
-            $unserialized = @unserialize($existing);
+            // SECURITY: Restrict unserialize to prevent PHP Object Injection
+            $unserialized = @unserialize($existing, ['allowed_classes' => false]);
 
             if (is_numeric($unserialized)) {
                 $newValue = (int)$unserialized + $value;
-                // Store as raw integer for future INCRBY operations
+
+                // Use optimistic locking with WATCH to detect concurrent modifications
+                $this->redis->watch($prefixedKey);
+
+                // Check if value changed since we read it
+                $currentValue = $this->redis->get($prefixedKey);
+                if ($currentValue !== $existing) {
+                    // Value changed - abort and retry
+                    $this->redis->unwatch();
+                    return $this->increment($key, $value);
+                }
+
+                // Execute atomic transaction
+                $this->redis->multi();
                 $this->redis->set($prefixedKey, $newValue);
+                $result = $this->redis->exec();
+
+                if ($result === false) {
+                    // Transaction failed due to concurrent modification - retry
+                    return $this->increment($key, $value);
+                }
+
                 return $newValue;
             }
 
             // Not a numeric value - cannot increment
             return false;
         } catch (\Throwable $e) {
+            // Ensure WATCH is cleared on error
+            try {
+                $this->redis->unwatch();
+            } catch (\Throwable) {
+                // Ignore unwatch errors
+            }
             // Corrupted data - cannot increment
             return false;
         }
@@ -307,9 +341,24 @@ final class RedisCache implements CacheInterface
         $prefixedKey = $this->prefixKey($key);
         $value = $this->redis->get($prefixedKey);
 
-        if ($value !== false) {
+        if ($value !== false && $value !== null) {
             $this->redis->del($prefixedKey);
-            return unserialize($value);
+
+            // SECURITY: Restrict unserialize to prevent PHP Object Injection
+            // Handle raw integers from increment() operations
+            if (is_numeric($value) && is_string($value)) {
+                $unserialized = @unserialize($value, ['allowed_classes' => false]);
+                if ($unserialized !== false) {
+                    return $unserialized;
+                }
+                return (int)$value;
+            }
+
+            $unserialized = @unserialize($value, ['allowed_classes' => false]);
+            if ($unserialized === false && $value !== serialize(false) && $value !== 'b:0;') {
+                return $default;
+            }
+            return $unserialized;
         }
 
         return $default;
