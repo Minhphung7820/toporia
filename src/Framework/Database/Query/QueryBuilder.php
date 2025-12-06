@@ -327,6 +327,163 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
+     * Add columns to the existing select clause.
+     *
+     * Unlike select() which replaces all columns, addSelect() appends to existing columns.
+     * If no columns have been selected yet, it will preserve the default '*' behavior
+     * by first selecting all columns from the table.
+     *
+     * Performance: O(n) where n = number of columns being added
+     *
+     * @param string|array<int, string|Expression>|Expression $columns Column names or Expression objects
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Add columns to existing selection
+     * $query->select('id', 'name')->addSelect('email');
+     * // SELECT id, name, email FROM ...
+     *
+     * // Add multiple columns
+     * $query->select('id')->addSelect(['name', 'email', 'created_at']);
+     * // SELECT id, name, email, created_at FROM ...
+     *
+     * // Add to default '*' selection - automatically expands to table.*
+     * $query->addSelect('custom_column');
+     * // SELECT users.*, custom_column FROM users ...
+     *
+     * // Add with Expression
+     * $query->select('id')->addSelect(DB::raw('COUNT(*) as total'));
+     * // SELECT id, COUNT(*) as total FROM ...
+     * ```
+     */
+    public function addSelect(string|array|Expression $columns): self
+    {
+        // Normalize to array
+        if ($columns instanceof Expression) {
+            $columnsArray = [$columns];
+        } else {
+            $columnsArray = is_array($columns) ? $columns : func_get_args();
+        }
+
+        // If current columns is default ['*'], replace with table.* to preserve all columns
+        // This ensures addSelect adds to all columns, not replaces them
+        if ($this->columns === ['*'] && $this->table !== null) {
+            $this->columns = [$this->table . '.*'];
+        }
+
+        // Append new columns
+        foreach ($columnsArray as $column) {
+            $this->columns[] = $column;
+        }
+
+        $this->invalidateCache();
+        return $this;
+    }
+
+    /**
+     * Add a raw SELECT expression to existing columns.
+     *
+     * Unlike selectRaw() which can be called multiple times but starts fresh with select(),
+     * addSelectRaw() explicitly preserves existing columns and appends the raw expression.
+     *
+     * Performance: O(1) - Single array push operation
+     *
+     * @param string $expression Raw SQL expression (e.g., "COUNT(*) AS count")
+     * @param array<mixed> $bindings Optional bindings for the expression
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Add raw expression to existing selection
+     * $query->select('id', 'name')
+     *       ->addSelectRaw('(SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) as orders_count');
+     * // SELECT id, name, (SELECT COUNT(*) FROM orders WHERE orders.user_id = users.id) as orders_count FROM users
+     *
+     * // With bindings
+     * $query->select('*')
+     *       ->addSelectRaw('price * ? as discounted_price', [0.9]);
+     * // SELECT *, price * 0.9 as discounted_price FROM ...
+     *
+     * // Multiple raw expressions
+     * $query->select('id')
+     *       ->addSelectRaw('UPPER(name) as upper_name')
+     *       ->addSelectRaw('LOWER(email) as lower_email');
+     * // SELECT id, UPPER(name) as upper_name, LOWER(email) as lower_email FROM ...
+     * ```
+     */
+    public function addSelectRaw(string $expression, array $bindings = []): self
+    {
+        // If current columns is default ['*'], replace with table.* to preserve all columns
+        if ($this->columns === ['*'] && $this->table !== null) {
+            $this->columns = [$this->table . '.*'];
+        }
+
+        // Append raw expression
+        $this->columns[] = new Expression($expression);
+
+        // Add bindings
+        foreach ($bindings as $binding) {
+            $this->bindings[] = $binding;
+        }
+
+        $this->invalidateCache();
+        return $this;
+    }
+
+    /**
+     * Add a subselect to the query.
+     *
+     * Convenient method for adding correlated subqueries as select columns.
+     *
+     * Performance: O(1) - Delegates to addSelectRaw
+     *
+     * @param string|\Closure|self $query Subquery as string, closure, or QueryBuilder instance
+     * @param string $alias Column alias for the subquery result
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // With closure
+     * $query->select('id', 'name')
+     *       ->addSelectSub(function($q) {
+     *           $q->from('orders')
+     *             ->selectRaw('COUNT(*)')
+     *             ->whereRaw('orders.user_id = users.id');
+     *       }, 'orders_count');
+     *
+     * // With QueryBuilder instance
+     * $subQuery = DB::table('orders')
+     *     ->selectRaw('SUM(total)')
+     *     ->whereRaw('orders.user_id = users.id');
+     * $query->select('id')->addSelectSub($subQuery, 'total_spent');
+     *
+     * // With raw SQL string
+     * $query->addSelectSub('SELECT MAX(created_at) FROM logins WHERE logins.user_id = users.id', 'last_login');
+     * ```
+     */
+    public function addSelectSub(string|\Closure|self $query, string $alias): self
+    {
+        // Handle closure
+        if ($query instanceof \Closure) {
+            $subQuery = new self($this->connection);
+            $query($subQuery);
+            $query = $subQuery;
+        }
+
+        // Handle QueryBuilder instance
+        if ($query instanceof self) {
+            $sql = $query->toSql();
+            $bindings = $query->getBindings();
+
+            return $this->addSelectRaw("({$sql}) AS {$alias}", $bindings);
+        }
+
+        // Handle raw SQL string
+        return $this->addSelectRaw("({$query}) AS {$alias}");
+    }
+
+    /**
      * Get the table name for this query.
      *
      * @return string|null
