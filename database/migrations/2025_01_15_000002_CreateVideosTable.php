@@ -40,3 +40,4 @@ class CreateVideosTable extends Migration
 }
 
 
+

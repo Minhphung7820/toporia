@@ -1868,93 +1868,93 @@ final class ProductController extends BaseController
             })->all();
         } elseif ($type === 'video') {
             // Test 1: Basic with() simple
-            $videoBasic = VideoModel::with('image')->find($id);
-            $results['basic_with'] = $videoBasic ? [
-                'video' => $videoBasic->toArray(),
-                'image' => $videoBasic->image ? $videoBasic->image->toArray() : null,
-            ] : ['error' => 'Video not found'];
+            // $videoBasic = VideoModel::with('image')->find($id);
+            // $results['basic_with'] = $videoBasic ? [
+            //     'video' => $videoBasic->toArray(),
+            //     'image' => $videoBasic->image ? $videoBasic->image->toArray() : null,
+            // ] : ['error' => 'Video not found'];
 
-            // Test 2: Complex with() callback - multiple conditions
-            $videoComplex = VideoModel::with(['image' => function ($q) use ($minWidth, $minHeight, $minSize, $hasAltText, $urlContains) {
-                if ($minWidth > 0) {
-                    $q->where('width', '>=', $minWidth);
-                }
-                if ($minHeight > 0) {
-                    $q->where('height', '>=', $minHeight);
-                }
-                if ($minSize > 0) {
-                    $q->where('size', '>=', $minSize);
-                }
-                if ($hasAltText) {
-                    $q->whereNotNull('alt_text')->where('alt_text', '!=', '');
-                }
-                if (!empty($urlContains)) {
-                    $q->where('url', 'like', '%' . $urlContains . '%');
-                }
-                $q->orderBy('size', 'DESC');
-            }])->find($id);
-            $results['complex_with_callback'] = $videoComplex ? [
-                'video' => $videoComplex->toArray(),
-                'image' => $videoComplex->image ? $videoComplex->image->toArray() : null,
-            ] : ['error' => 'Video not found'];
+            // // Test 2: Complex with() callback - multiple conditions
+            // $videoComplex = VideoModel::with(['image' => function ($q) use ($minWidth, $minHeight, $minSize, $hasAltText, $urlContains) {
+            //     if ($minWidth > 0) {
+            //         $q->where('width', '>=', $minWidth);
+            //     }
+            //     if ($minHeight > 0) {
+            //         $q->where('height', '>=', $minHeight);
+            //     }
+            //     if ($minSize > 0) {
+            //         $q->where('size', '>=', $minSize);
+            //     }
+            //     if ($hasAltText) {
+            //         $q->whereNotNull('alt_text')->where('alt_text', '!=', '');
+            //     }
+            //     if (!empty($urlContains)) {
+            //         $q->where('url', 'like', '%' . $urlContains . '%');
+            //     }
+            //     $q->orderBy('size', 'DESC');
+            // }])->find($id);
+            // $results['complex_with_callback'] = $videoComplex ? [
+            //     'video' => $videoComplex->toArray(),
+            //     'image' => $videoComplex->image ? $videoComplex->image->toArray() : null,
+            // ] : ['error' => 'Video not found'];
 
-            // Test 3: whereHas with complex conditions
-            $videosWithImage = VideoModel::whereHas('image', function ($q) use ($minWidth, $minHeight, $hasAltText) {
-                if ($minWidth > 0) {
-                    $q->where('width', '>=', $minWidth);
-                }
-                if ($minHeight > 0) {
-                    $q->where('height', '>=', $minHeight);
-                }
-                if ($hasAltText) {
-                    $q->whereNotNull('alt_text');
-                }
-                $q->where('size', '>', 0);
-            })
-                ->where('is_published', true)
-                ->where('duration', '>', 0)
-                ->with(['image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
-                }])
-                ->limit(5)
-                ->get();
-            $results['where_has_complex'] = $videosWithImage->map(function ($v) {
-                return [
-                    'video' => $v->toArray(),
-                    'image' => $v->image ? $v->image->toArray() : null,
-                ];
-            })->all();
+            // // Test 3: whereHas with complex conditions
+            // $videosWithImage = VideoModel::whereHas('image', function ($q) use ($minWidth, $minHeight, $hasAltText) {
+            //     if ($minWidth > 0) {
+            //         $q->where('width', '>=', $minWidth);
+            //     }
+            //     if ($minHeight > 0) {
+            //         $q->where('height', '>=', $minHeight);
+            //     }
+            //     if ($hasAltText) {
+            //         $q->whereNotNull('alt_text');
+            //     }
+            //     $q->where('size', '>', 0);
+            // })
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 0)
+            //     ->with(['image' => function ($q) {
+            //         $q->orderBy('size', 'DESC');
+            //     }])
+            //     ->limit(5)
+            //     ->get();
+            // $results['where_has_complex'] = $videosWithImage->map(function ($v) {
+            //     return [
+            //         'video' => $v->toArray(),
+            //         'image' => $v->image ? $v->image->toArray() : null,
+            //     ];
+            // })->all();
 
-            // Test 4: Nested whereHas with multiple conditions
-            $videosWithLargeImages = VideoModel::whereHas('image', function ($q) {
-                $q->where('width', '>=', 1280)
-                    ->where('height', '>=', 720)
-                    ->where(function ($subQ) {
-                        $subQ->where('size', '>=', 200000)
-                            ->orWhere('url', 'like', '%thumbnail%');
-                    });
-            })
-                ->where(function ($q) {
-                    $q->where('views', '>', 500)
-                        ->orWhere('is_published', true);
-                })
-                ->where('duration', '>', 60)
-                ->with(['image' => function ($q) {
-                    $q->select('id', 'imageable_type', 'imageable_id', 'url', 'width', 'height', 'size', 'alt_text')
-                        ->orderBy('size', 'DESC');
-                }])
-                ->orderBy('views', 'DESC')
-                ->limit(10)
-                ->get();
-            $results['nested_where_has'] = $videosWithLargeImages->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'views' => $v->views,
-                    'duration' => $v->duration,
-                    'image' => $v->image ? $v->image->toArray() : null,
-                ];
-            })->all();
+            // // Test 4: Nested whereHas with multiple conditions
+            // $videosWithLargeImages = VideoModel::whereHas('image', function ($q) {
+            //     $q->where('width', '>=', 1280)
+            //         ->where('height', '>=', 720)
+            //         ->where(function ($subQ) {
+            //             $subQ->where('size', '>=', 200000)
+            //                 ->orWhere('url', 'like', '%thumbnail%');
+            //         });
+            // })
+            //     ->where(function ($q) {
+            //         $q->where('views', '>', 500)
+            //             ->orWhere('is_published', true);
+            //     })
+            //     ->where('duration', '>', 60)
+            //     ->with(['image' => function ($q) {
+            //         $q->select('id', 'imageable_type', 'imageable_id', 'url', 'width', 'height', 'size', 'alt_text')
+            //             ->orderBy('size', 'DESC');
+            //     }])
+            //     ->orderBy('views', 'DESC')
+            //     ->limit(10)
+            //     ->get();
+            // $results['nested_where_has'] = $videosWithLargeImages->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'views' => $v->views,
+            //         'duration' => $v->duration,
+            //         'image' => $v->image ? $v->image->toArray() : null,
+            //     ];
+            // })->all();
 
             // Test 5: Nested relationship - Post with image and image has imageable (nested MorphTo)
             $postsWithNestedImage = PostModel::whereHas('image', function ($q) use ($minWidth, $minHeight) {
@@ -1994,6 +1994,18 @@ final class ProductController extends BaseController
                 ->where('is_published', true)
                 ->limit(5)
                 ->get();
+            
+            // Force eager loading to execute by accessing relationships
+            // This ensures all eager loading queries are executed and logged
+            foreach ($postsWithNestedImage as $p) {
+                // Access image relationship to trigger eager loading query
+                $p->image;
+                // Access imageable relationship to trigger nested eager loading query
+                if ($p->image) {
+                    $p->image->imageable;
+                }
+            }
+            
             $results['nested_image_imageable'] = $postsWithNestedImage->map(function ($p) {
                 return [
                     'id' => $p->id,
