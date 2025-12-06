@@ -1280,6 +1280,654 @@ class ModelQueryBuilder extends QueryBuilder
         return $this;
     }
 
+    // =========================================================================
+    // ADVANCED RELATIONSHIP QUERY METHODS (Laravel 8+ compatible)
+    // =========================================================================
+
+    /**
+     * Filter models where a relationship column matches a given value.
+     *
+     * This is a shorthand for whereHas() that makes simple column comparisons cleaner.
+     * Uses EXISTS subquery for optimal performance.
+     *
+     * @param string $relation Relationship method name
+     * @param string $column Column on the related model
+     * @param mixed $operator Operator or value (if 2 args, this is value with '=' operator)
+     * @param mixed $value Value to compare (optional if operator is the value)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Instead of: User::whereHas('posts', fn($q) => $q->where('published', true))->get()
+     * User::whereRelation('posts', 'published', true)->get();
+     *
+     * // With operator
+     * User::whereRelation('posts', 'views', '>=', 100)->get();
+     *
+     * // Nested relations supported
+     * User::whereRelation('posts.comments', 'approved', true)->get();
+     * ```
+     */
+    public function whereRelation(string $relation, string $column, mixed $operator = null, mixed $value = null): self
+    {
+        // Handle 2-argument version: whereRelation('posts', 'published', true)
+        if ($value === null && $operator !== null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        // Handle nested relations
+        if (str_contains($relation, '.')) {
+            return $this->whereHasNested($relation, function ($query) use ($column, $operator, $value) {
+                $query->where($column, $operator, $value);
+            });
+        }
+
+        return $this->whereHas($relation, function ($query) use ($column, $operator, $value) {
+            $query->where($column, $operator, $value);
+        });
+    }
+
+    /**
+     * OR filter models where a relationship column matches a given value.
+     *
+     * @param string $relation Relationship method name
+     * @param string $column Column on the related model
+     * @param mixed $operator Operator or value
+     * @param mixed $value Value to compare
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Users with published posts OR approved comments
+     * User::whereRelation('posts', 'published', true)
+     *     ->orWhereRelation('comments', 'approved', true)
+     *     ->get();
+     * ```
+     */
+    public function orWhereRelation(string $relation, string $column, mixed $operator = null, mixed $value = null): self
+    {
+        // Handle 2-argument version
+        if ($value === null && $operator !== null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        return $this->orWhereHas($relation, function ($query) use ($column, $operator, $value) {
+            $query->where($column, $operator, $value);
+        });
+    }
+
+    /**
+     * Filter models where a morph relationship column matches a given value.
+     *
+     * Shorthand for whereHasMorph() with simple column comparison.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array $types Morph type class name(s)
+     * @param string $column Column on the related model
+     * @param mixed $operator Operator or value
+     * @param mixed $value Value to compare
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Images where the imageable (Post/Video) is published
+     * Image::whereMorphRelation('imageable', [Post::class, Video::class], 'published', true)->get();
+     *
+     * // Comments on posts with high views
+     * Comment::whereMorphRelation('commentable', Post::class, 'views', '>=', 1000)->get();
+     * ```
+     */
+    public function whereMorphRelation(string $relation, string|array $types, string $column, mixed $operator = null, mixed $value = null): self
+    {
+        // Handle 2-argument version
+        if ($value === null && $operator !== null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        return $this->whereHasMorph($relation, $types, function ($query) use ($column, $operator, $value) {
+            $query->where($column, $operator, $value);
+        });
+    }
+
+    /**
+     * OR filter models where a morph relationship column matches a given value.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array $types Morph type class name(s)
+     * @param string $column Column on the related model
+     * @param mixed $operator Operator or value
+     * @param mixed $value Value to compare
+     * @return $this
+     */
+    public function orWhereMorphRelation(string $relation, string|array $types, string $column, mixed $operator = null, mixed $value = null): self
+    {
+        // Handle 2-argument version
+        if ($value === null && $operator !== null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        return $this->orWhereHasMorph($relation, $types, function ($query) use ($column, $operator, $value) {
+            $query->where($column, $operator, $value);
+        });
+    }
+
+    /**
+     * Filter models that belong to a specific model instance.
+     *
+     * This method provides a clean syntax for filtering by a BelongsTo relationship.
+     * Automatically determines the foreign key from the relationship definition.
+     *
+     * @param string $relation BelongsTo relationship method name
+     * @param \Toporia\Framework\Database\ORM\Model|int|string|array $related Related model instance(s), ID(s)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Get posts belonging to a specific user
+     * $user = User::find(1);
+     * Post::whereBelongsTo($user)->get();
+     *
+     * // With explicit relation name
+     * Post::whereBelongsTo($user, 'author')->get();
+     *
+     * // Multiple models
+     * Post::whereBelongsTo([$user1, $user2])->get();
+     *
+     * // By ID
+     * Post::whereBelongsTo(1, 'user')->get();
+     * ```
+     */
+    public function whereBelongsTo(Model|int|string|array $related, ?string $relation = null): self
+    {
+        // If related is a model, extract the relation name from class if not provided
+        if ($related instanceof Model) {
+            $relation ??= $this->guessBelongsToRelation($related);
+            return $this->whereBelongsToModel($related, $relation);
+        }
+
+        // If array of models
+        if (is_array($related) && !empty($related) && $related[0] instanceof Model) {
+            $relation ??= $this->guessBelongsToRelation($related[0]);
+            return $this->whereBelongsToModels($related, $relation);
+        }
+
+        // ID or array of IDs - relation is required
+        if ($relation === null) {
+            throw new \InvalidArgumentException(
+                'Relation name is required when filtering by ID(s). Use whereBelongsTo($id, "relationName")'
+            );
+        }
+
+        $ids = is_array($related) ? $related : [$related];
+        return $this->whereBelongsToIds($ids, $relation);
+    }
+
+    /**
+     * OR version of whereBelongsTo.
+     *
+     * @param \Toporia\Framework\Database\ORM\Model|int|string|array $related Related model instance(s), ID(s)
+     * @param string|null $relation Relationship method name
+     * @return $this
+     */
+    public function orWhereBelongsTo(Model|int|string|array $related, ?string $relation = null): self
+    {
+        return $this->orWhere(function ($query) use ($related, $relation) {
+            $query->whereBelongsTo($related, $relation);
+        });
+    }
+
+    /**
+     * Filter models that don't belong to a specific model instance.
+     *
+     * @param \Toporia\Framework\Database\ORM\Model|int|string|array $related Related model instance(s), ID(s)
+     * @param string|null $relation Relationship method name
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Posts NOT belonging to a specific user
+     * $user = User::find(1);
+     * Post::whereDoesntBelongTo($user)->get();
+     * ```
+     */
+    public function whereDoesntBelongTo(Model|int|string|array $related, ?string $relation = null): self
+    {
+        // If related is a model
+        if ($related instanceof Model) {
+            $relation ??= $this->guessBelongsToRelation($related);
+            $model = new $this->modelClass([]);
+            $relationInstance = $model->$relation();
+
+            if (!$relationInstance instanceof BelongsTo) {
+                throw new \InvalidArgumentException("Relationship '{$relation}' must be a BelongsTo relationship");
+            }
+
+            $foreignKey = $relationInstance->getForeignKeyName();
+            $ownerKey = $this->getRelationProperty($relationInstance, 'ownerKey') ?? $related->getPrimaryKey();
+
+            return $this->where($foreignKey, '!=', $related->getAttribute($ownerKey));
+        }
+
+        // Array of models or IDs
+        if ($relation === null && !($related instanceof Model)) {
+            throw new \InvalidArgumentException(
+                'Relation name is required when filtering by ID(s)'
+            );
+        }
+
+        if (is_array($related) && !empty($related) && $related[0] instanceof Model) {
+            $relation ??= $this->guessBelongsToRelation($related[0]);
+            $model = new $this->modelClass([]);
+            $relationInstance = $model->$relation();
+
+            if (!$relationInstance instanceof BelongsTo) {
+                throw new \InvalidArgumentException("Relationship '{$relation}' must be a BelongsTo relationship");
+            }
+
+            $foreignKey = $relationInstance->getForeignKeyName();
+            $ownerKey = $this->getRelationProperty($relationInstance, 'ownerKey') ?? $related[0]->getPrimaryKey();
+
+            $ids = array_map(fn($m) => $m->getAttribute($ownerKey), $related);
+            return $this->whereNotIn($foreignKey, $ids);
+        }
+
+        // By ID(s)
+        $model = new $this->modelClass([]);
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof BelongsTo) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' must be a BelongsTo relationship");
+        }
+
+        $foreignKey = $relationInstance->getForeignKeyName();
+        $ids = is_array($related) ? $related : [$related];
+
+        return $this->whereNotIn($foreignKey, $ids);
+    }
+
+    /**
+     * Filter models that have a nested relationship with constraints.
+     *
+     * Supports deep nesting like 'posts.comments.author' with a single callback
+     * applied to the deepest relation.
+     *
+     * Performance: Builds nested EXISTS subqueries for optimal execution.
+     *
+     * @param string $relation Dot-notated relationship path
+     * @param callable|null $callback Callback applied to the deepest relation
+     * @param string $operator Comparison operator
+     * @param int $count Minimum count
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Users with posts that have approved comments
+     * User::whereHasNested('posts.comments', fn($q) => $q->where('approved', true))->get();
+     *
+     * // Categories with products that have high-rated reviews
+     * Category::whereHasNested('products.reviews', fn($q) => $q->where('rating', '>=', 4))->get();
+     *
+     * // Deep nesting: Users -> Posts -> Comments -> Author -> Profile
+     * User::whereHasNested('posts.comments.author.profile', fn($q) => $q->where('verified', true))->get();
+     * ```
+     */
+    public function whereHasNested(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): self
+    {
+        // If no dot, use regular whereHas
+        if (!str_contains($relation, '.')) {
+            return $this->whereHas($relation, $callback, $operator, $count);
+        }
+
+        $relations = explode('.', $relation);
+        $firstRelation = array_shift($relations);
+        $remainingPath = implode('.', $relations);
+
+        // Build nested callback
+        return $this->whereHas($firstRelation, function ($query) use ($remainingPath, $callback, $operator, $count) {
+            if (str_contains($remainingPath, '.')) {
+                // Still more nesting - recurse
+                $query->whereHasNested($remainingPath, $callback, $operator, $count);
+            } else {
+                // Final relation
+                $query->whereHas($remainingPath, $callback, $operator, $count);
+            }
+        });
+    }
+
+    /**
+     * OR version of whereHasNested.
+     *
+     * @param string $relation Dot-notated relationship path
+     * @param callable|null $callback Callback applied to the deepest relation
+     * @param string $operator Comparison operator
+     * @param int $count Minimum count
+     * @return $this
+     */
+    public function orWhereHasNested(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): self
+    {
+        if (!str_contains($relation, '.')) {
+            return $this->orWhereHas($relation, $callback, $operator, $count);
+        }
+
+        $relations = explode('.', $relation);
+        $firstRelation = array_shift($relations);
+        $remainingPath = implode('.', $relations);
+
+        return $this->orWhereHas($firstRelation, function ($query) use ($remainingPath, $callback, $operator, $count) {
+            if (str_contains($remainingPath, '.')) {
+                $query->whereHasNested($remainingPath, $callback, $operator, $count);
+            } else {
+                $query->whereHas($remainingPath, $callback, $operator, $count);
+            }
+        });
+    }
+
+    /**
+     * Add a subselect to check if a relationship exists (returns boolean column).
+     *
+     * Unlike withCount(), this returns a boolean (1/0) instead of count.
+     * Useful for conditional logic in application code.
+     *
+     * @param string|array $relations Relationship name(s)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Get users with exists flag for profile
+     * $users = User::withExists('profile')->get();
+     * // Access: $user->profile_exists (true/false)
+     *
+     * // Multiple relations
+     * $users = User::withExists(['profile', 'posts'])->get();
+     * // Access: $user->profile_exists, $user->posts_exists
+     *
+     * // With alias
+     * $users = User::withExists(['profile as has_profile'])->get();
+     * // Access: $user->has_profile
+     * ```
+     */
+    public function withExists(string|array $relations): self
+    {
+        $relations = is_array($relations) ? $relations : [$relations];
+
+        foreach ($relations as $key => $value) {
+            // Handle alias: 'relation as alias'
+            $relation = is_string($key) ? $key : $value;
+            $alias = null;
+
+            if (str_contains($relation, ' as ')) {
+                [$relation, $alias] = array_map('trim', explode(' as ', $relation, 2));
+            }
+
+            $alias ??= $relation . '_exists';
+
+            // Build EXISTS subquery
+            $this->addExistsSelect($relation, $alias);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Add EXISTS subselect for a relation.
+     *
+     * @param string $relation Relationship name
+     * @param string $alias Column alias
+     * @return void
+     */
+    protected function addExistsSelect(string $relation, string $alias): void
+    {
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof RelationInterface) {
+            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
+        }
+
+        $relationQuery = $relationInstance->getQuery();
+
+        // Build EXISTS subquery
+        $existsResult = $this->buildExistsSubquery($relationInstance, $table, $relationQuery);
+        $existsSql = $existsResult['sql'];
+
+        // Wrap in CASE WHEN for boolean result
+        $selectSql = "CASE WHEN EXISTS ({$existsSql}) THEN 1 ELSE 0 END AS {$alias}";
+
+        $this->selectRaw($selectSql, $existsResult['bindings']);
+    }
+
+    /**
+     * Shorthand for whereHas with null check (relation exists and column is null).
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to check for null
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Users with posts that have no published_at date
+     * User::whereRelationNull('posts', 'published_at')->get();
+     * ```
+     */
+    public function whereRelationNull(string $relation, string $column): self
+    {
+        return $this->whereHas($relation, function ($query) use ($column) {
+            $query->whereNull($column);
+        });
+    }
+
+    /**
+     * Shorthand for whereHas with not null check.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to check for not null
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Users with posts that are published (have published_at)
+     * User::whereRelationNotNull('posts', 'published_at')->get();
+     * ```
+     */
+    public function whereRelationNotNull(string $relation, string $column): self
+    {
+        return $this->whereHas($relation, function ($query) use ($column) {
+            $query->whereNotNull($column);
+        });
+    }
+
+    /**
+     * Shorthand for whereHas with IN check.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to check
+     * @param array $values Values to check against
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Users with posts in specific categories
+     * User::whereRelationIn('posts', 'category_id', [1, 2, 3])->get();
+     * ```
+     */
+    public function whereRelationIn(string $relation, string $column, array $values): self
+    {
+        return $this->whereHas($relation, function ($query) use ($column, $values) {
+            $query->whereIn($column, $values);
+        });
+    }
+
+    /**
+     * Shorthand for whereHas with NOT IN check.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to check
+     * @param array $values Values to exclude
+     * @return $this
+     */
+    public function whereRelationNotIn(string $relation, string $column, array $values): self
+    {
+        return $this->whereHas($relation, function ($query) use ($column, $values) {
+            $query->whereNotIn($column, $values);
+        });
+    }
+
+    /**
+     * Shorthand for whereHas with BETWEEN check.
+     *
+     * @param string $relation Relationship name
+     * @param string $column Column to check
+     * @param mixed $min Minimum value
+     * @param mixed $max Maximum value
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Users with orders between $100 and $500
+     * User::whereRelationBetween('orders', 'total', 100, 500)->get();
+     * ```
+     */
+    public function whereRelationBetween(string $relation, string $column, mixed $min, mixed $max): self
+    {
+        return $this->whereHas($relation, function ($query) use ($column, $min, $max) {
+            $query->whereBetween($column, [$min, $max]);
+        });
+    }
+
+    // =========================================================================
+    // HELPER METHODS FOR ADVANCED QUERIES
+    // =========================================================================
+
+    /**
+     * Guess the BelongsTo relation name from a related model.
+     *
+     * @param \Toporia\Framework\Database\ORM\Model $related
+     * @return string
+     */
+    protected function guessBelongsToRelation(Model $related): string
+    {
+        // Get class name without namespace and convert to camelCase
+        $class = get_class($related);
+
+        // Extract base name from fully qualified class name
+        $baseName = substr(strrchr($class, '\\'), 1);
+        if ($baseName === false) {
+            $baseName = $class;
+        }
+
+        // Remove 'Model' suffix if present
+        if (str_ends_with($baseName, 'Model')) {
+            $baseName = substr($baseName, 0, -5);
+        }
+
+        return lcfirst($baseName);
+    }
+
+    /**
+     * Filter by a single model using BelongsTo relation.
+     *
+     * @param \Toporia\Framework\Database\ORM\Model $related
+     * @param string $relation
+     * @return $this
+     */
+    protected function whereBelongsToModel(Model $related, string $relation): self
+    {
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof BelongsTo) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' must be a BelongsTo relationship");
+        }
+
+        $foreignKey = $relationInstance->getForeignKeyName();
+        $ownerKey = $this->getRelationProperty($relationInstance, 'ownerKey') ?? $related->getPrimaryKey();
+
+        return $this->where($foreignKey, $related->getAttribute($ownerKey));
+    }
+
+    /**
+     * Filter by multiple models using BelongsTo relation.
+     *
+     * @param array<\Toporia\Framework\Database\ORM\Model> $models
+     * @param string $relation
+     * @return $this
+     */
+    protected function whereBelongsToModels(array $models, string $relation): self
+    {
+        if (empty($models)) {
+            return $this->whereRaw('1 = 0'); // Return no results
+        }
+
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof BelongsTo) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' must be a BelongsTo relationship");
+        }
+
+        $foreignKey = $relationInstance->getForeignKeyName();
+        $ownerKey = $this->getRelationProperty($relationInstance, 'ownerKey') ?? $models[0]->getPrimaryKey();
+
+        $ids = array_map(fn($m) => $m->getAttribute($ownerKey), $models);
+
+        return $this->whereIn($foreignKey, $ids);
+    }
+
+    /**
+     * Filter by IDs using BelongsTo relation.
+     *
+     * @param array $ids
+     * @param string $relation
+     * @return $this
+     */
+    protected function whereBelongsToIds(array $ids, string $relation): self
+    {
+        if (empty($ids)) {
+            return $this->whereRaw('1 = 0');
+        }
+
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        if (!$relationInstance instanceof BelongsTo) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' must be a BelongsTo relationship");
+        }
+
+        $foreignKey = $relationInstance->getForeignKeyName();
+
+        return count($ids) === 1
+            ? $this->where($foreignKey, $ids[0])
+            : $this->whereIn($foreignKey, $ids);
+    }
+
     /**
      * OR version of optimized whereHas using EXISTS.
      *
