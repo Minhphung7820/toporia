@@ -35,8 +35,8 @@ class MorphTo extends Relation
     /** @var string Morph type column name */
     protected string $morphType;
 
-    /** @var array<string, class-string<Model>> Type to class mapping */
-    protected array $morphMap = [];
+    /** @var array<string, class-string<Model>> Instance-level type to class mapping (different from static morphMap in Relation) */
+    protected array $instanceMorphMap = [];
 
     /** @var string|null Cached relation name */
     private ?string $relationNameCache = null;
@@ -740,7 +740,7 @@ class MorphTo extends Relation
         );
 
         // Copy configuration
-        $instance->setMorphMap($this->morphMap);
+        $instance->setMorphMap($this->instanceMorphMap);
         $instance->morphableConstraints = $this->morphableConstraints;
         $instance->morphableEagerLoads = $this->morphableEagerLoads;
         $instance->nestedEagerLoads = $this->nestedEagerLoads;
@@ -769,8 +769,8 @@ class MorphTo extends Relation
     protected function getModelClass(string $type): string
     {
         // 1. Check instance-level morph map first (highest priority)
-        if (isset($this->morphMap[$type])) {
-            return $this->morphMap[$type];
+        if (isset($this->instanceMorphMap[$type])) {
+            return $this->instanceMorphMap[$type];
         }
 
         // 2. Check global morph map
@@ -815,7 +815,7 @@ class MorphTo extends Relation
      */
     public function setMorphMap(array $map): static
     {
-        $this->morphMap = $map;
+        $this->instanceMorphMap = $map;
         return $this;
     }
 
@@ -824,7 +824,7 @@ class MorphTo extends Relation
      */
     public function getMorphMap(): array
     {
-        return $this->morphMap;
+        return $this->instanceMorphMap;
     }
 
     /**
@@ -832,7 +832,7 @@ class MorphTo extends Relation
      */
     public function getAvailableTypes(): array
     {
-        return array_keys($this->morphMap);
+        return array_keys($this->instanceMorphMap);
     }
 
     // =========================================================================
@@ -865,8 +865,8 @@ class MorphTo extends Relation
     {
         $modelClass = get_class($model);
 
-        // Check if there's a reverse mapping in morphMap (value => key)
-        foreach ($this->morphMap as $type => $class) {
+        // Check if there's a reverse mapping in instanceMorphMap (value => key)
+        foreach ($this->instanceMorphMap as $type => $class) {
             if ($class === $modelClass) {
                 return $type;
             }
@@ -1059,7 +1059,7 @@ class MorphTo extends Relation
         }
 
         return $currentType === $type ||
-            (isset($this->morphMap[$type]) && $this->morphMap[$type] === $currentType);
+            (isset($this->instanceMorphMap[$type]) && $this->instanceMorphMap[$type] === $currentType);
     }
 
     /**

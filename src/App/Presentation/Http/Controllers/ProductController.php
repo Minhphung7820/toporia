@@ -1957,7 +1957,7 @@ final class ProductController extends BaseController
             // })->all();
 
             // Test 5: Nested relationship - Post with image and image has imageable (nested MorphTo)
-            $postsWithNestedImage = PostModel::whereHas('image', function ($q) use ($minWidth, $minHeight) {
+            $postsWithNestedImage = VideoModel::whereHas('image', function ($q) use ($minWidth, $minHeight) {
                 if ($minWidth > 0) {
                     $q->where('width', '>=', $minWidth);
                 }
@@ -1994,18 +1994,8 @@ final class ProductController extends BaseController
                 ->where('is_published', true)
                 ->limit(5)
                 ->get();
-            
-            // Force eager loading to execute by accessing relationships
-            // This ensures all eager loading queries are executed and logged
-            foreach ($postsWithNestedImage as $p) {
-                // Access image relationship to trigger eager loading query
-                $p->image;
-                // Access imageable relationship to trigger nested eager loading query
-                if ($p->image) {
-                    $p->image->imageable;
-                }
-            }
-            
+
+
             $results['nested_image_imageable'] = $postsWithNestedImage->map(function ($p) {
                 return [
                     'id' => $p->id,
