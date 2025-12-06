@@ -1999,17 +1999,7 @@ final class ProductController extends BaseController
                 ->get();
 
 
-            $results['nested_image_imageable'] = $postsWithNestedImage->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'image' => $p->image ? [
-                        'image' => $p->image->toArray(),
-                        'imageable' => $p->image->imageable ? $p->image->imageable->toArray() : null,
-                        'imageable_type' => $p->image->imageable_type ?? null,
-                    ] : null,
-                ];
-            })->all();
+            $results['nested_image_imageable'] = $postsWithNestedImage->all();
 
             // // Test 6: Deep nested - Post with image, image has imageable, and imageable has relationships
             // // Use whereHas with whereHasMorph to properly handle polymorphic relationship
