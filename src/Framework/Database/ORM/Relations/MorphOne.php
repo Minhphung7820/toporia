@@ -196,22 +196,33 @@ class MorphOne extends Relation
     }
 
     /**
-     * Get morph class name for parent.
+     * Get morph class name/alias for parent.
      *
-     * Returns the full namespace class name (e.g., "App\Models\Product").
-     * Models can override getMorphClass() method to provide a custom morph class string.
+     * Resolution order (first match wins):
+     * 1. Model's getMorphClass() method if defined
+     * 2. Global morph map alias (if registered via Relation::morphMap())
+     * 3. Full namespace class name (e.g., "App\Models\Product")
      *
-     * @return string Full namespace class name
+     * Using morph map aliases is recommended for:
+     * - Shorter database storage
+     * - Decoupling class names from stored data
+     * - Easier refactoring (rename class without data migration)
+     *
+     * @return string Morph alias or full namespace class name
      */
     protected function getMorphClass(): string
     {
-        // Allow parent model to override getMorphClass() method
+        // 1. Allow parent model to override getMorphClass() method
         if (method_exists($this->parent, 'getMorphClass')) {
             return $this->parent->getMorphClass();
         }
 
-        // Default: return full namespace class name
-        return get_class($this->parent);
+        // 2. Check global morph map for alias
+        $className = get_class($this->parent);
+        $alias = Relation::getMorphAlias($className);
+
+        // 3. Return alias if found, otherwise return full class name
+        return $alias;
     }
 
     /**

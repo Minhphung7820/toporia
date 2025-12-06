@@ -388,16 +388,13 @@ trait HasEagerLoading
                 $nestedRelationsToLoad = $nestedRelations[$relationName];
                 $nestedConstraintsForThisRelation = $nestedConstraints[$relationName] ?? [];
 
-                // Build nested eager loads with constraints
-                $nestedEagerLoads = [];
-                foreach ($nestedRelationsToLoad as $nestedRelation) {
-                    if (isset($nestedConstraintsForThisRelation[$nestedRelation])) {
-                        $nestedEagerLoads[$nestedRelation] = $nestedConstraintsForThisRelation[$nestedRelation];
-                    } else {
-                        // No constraint - add as simple relation
-                        $nestedEagerLoads[] = $nestedRelation;
-                    }
-                }
+                // Build nested eager loads with proper constraint merging for deep nesting
+                // Example: ['comments' => fn(), 'comments.author', 'comments.author.profile']
+                // Should merge into: ['comments' => fn() with nested 'author.profile']
+                $nestedEagerLoads = static::buildMergedNestedEagerLoads(
+                    $nestedRelationsToLoad,
+                    $nestedConstraintsForThisRelation
+                );
 
                 // Set nested eager loads on MorphTo - these will be applied to ALL morph types
                 $eagerRelation->setNestedEagerLoads($nestedEagerLoads);
@@ -909,5 +906,153 @@ trait HasEagerLoading
     public function loadMax(string $relation, string $column): static
     {
         return $this->loadAggregate($relation, $column, 'max');
+    }
+
+    // =========================================================================
+    // NESTED EAGER LOADING HELPERS
+    // =========================================================================
+
+    /**
+     * Build merged nested eager loads with proper constraint handling for deep nesting.
+     *
+     * This method handles complex cases like:
+     * - ['comments' => fn($q) => ..., 'comments.author', 'comments.author.profile']
+     * - Should merge into proper format for ModelQueryBuilder::with() to handle
+     *
+     * The key insight is that when we have:
+     * - 'comments' with constraint
+     * - 'comments.author' without constraint
+     *
+     * We need to produce:
+     * - ['comments' => fn($q) => $q->where(...)->with('author')]
+     *
+     * However, since ModelQueryBuilder::with() already handles dot notation natively,
+     * we can pass them as-is BUT we need to ensure constraints are wrapped properly
+     * to include their nested relations.
+     *
+     * @param array $nestedRelations Array of relation paths (e.g., ['comments', 'comments.author'])
+     * @param array $constraints Array of constraints keyed by relation path
+     * @return array Properly formatted eager loads for with()
+     */
+    protected static function buildMergedNestedEagerLoads(array $nestedRelations, array $constraints): array
+    {
+        // Group relations by their first-level relation
+        // e.g., 'comments.author.profile' -> firstLevel = 'comments', rest = 'author.profile'
+        $grouped = [];
+        $simpleRelations = [];
+
+        foreach ($nestedRelations as $relation) {
+            $parts = explode('.', $relation, 2);
+            $firstLevel = $parts[0];
+
+            if (isset($parts[1])) {
+                // Has nested part
+                if (!isset($grouped[$firstLevel])) {
+                    $grouped[$firstLevel] = [
+                        'nested' => [],
+                        'constraint' => null,
+                    ];
+                }
+                $grouped[$firstLevel]['nested'][] = $parts[1];
+
+                // Check if there's a constraint for this specific path
+                if (isset($constraints[$relation])) {
+                    // Store constraint for the nested path
+                    if (!isset($grouped[$firstLevel]['nestedConstraints'])) {
+                        $grouped[$firstLevel]['nestedConstraints'] = [];
+                    }
+                    $grouped[$firstLevel]['nestedConstraints'][$parts[1]] = $constraints[$relation];
+                }
+            } else {
+                // Simple relation (no dot)
+                if (isset($constraints[$relation])) {
+                    // Has constraint - will be handled in grouped
+                    if (!isset($grouped[$firstLevel])) {
+                        $grouped[$firstLevel] = [
+                            'nested' => [],
+                            'constraint' => null,
+                        ];
+                    }
+                    $grouped[$firstLevel]['constraint'] = $constraints[$relation];
+                } else {
+                    $simpleRelations[] = $relation;
+                }
+            }
+        }
+
+        // Also check constraints for relations that might only have constraint (no nested specified)
+        foreach ($constraints as $path => $constraint) {
+            $parts = explode('.', $path, 2);
+            $firstLevel = $parts[0];
+
+            if (!isset($parts[1])) {
+                // First-level constraint
+                if (!isset($grouped[$firstLevel])) {
+                    $grouped[$firstLevel] = [
+                        'nested' => [],
+                        'constraint' => $constraint,
+                    ];
+                } elseif ($grouped[$firstLevel]['constraint'] === null) {
+                    $grouped[$firstLevel]['constraint'] = $constraint;
+                }
+            }
+        }
+
+        // Build result array
+        $result = [];
+
+        // Add simple relations (no constraints, no nesting from this level)
+        foreach ($simpleRelations as $relation) {
+            // Check if this is also in grouped (has deeper nesting)
+            if (!isset($grouped[$relation])) {
+                $result[] = $relation;
+            }
+        }
+
+        // Process grouped relations
+        foreach ($grouped as $firstLevel => $data) {
+            $constraint = $data['constraint'];
+            $nestedPaths = $data['nested'];
+            $nestedConstraints = $data['nestedConstraints'] ?? [];
+
+            if (empty($nestedPaths) && $constraint === null) {
+                // No constraint, no nesting - simple relation
+                $result[] = $firstLevel;
+            } elseif (empty($nestedPaths) && $constraint !== null) {
+                // Has constraint, no deeper nesting
+                $result[$firstLevel] = $constraint;
+            } elseif (!empty($nestedPaths)) {
+                // Has deeper nesting - need to wrap in constraint that adds nested with()
+                if ($constraint !== null) {
+                    // Wrap existing constraint to also load nested relations
+                    $originalConstraint = $constraint;
+                    $nestedToLoad = static::buildMergedNestedEagerLoads($nestedPaths, $nestedConstraints);
+
+                    $result[$firstLevel] = function ($query) use ($originalConstraint, $nestedToLoad) {
+                        // Apply original constraint
+                        $originalConstraint($query);
+                        // Add nested eager loads
+                        if (!empty($nestedToLoad)) {
+                            $query->with($nestedToLoad);
+                        }
+                    };
+                } else {
+                    // No constraint at this level, but has nested relations
+                    // Recursively build nested loads
+                    $nestedToLoad = static::buildMergedNestedEagerLoads($nestedPaths, $nestedConstraints);
+
+                    if (!empty($nestedToLoad)) {
+                        // Create wrapper constraint just to add nested with()
+                        $result[$firstLevel] = function ($query) use ($nestedToLoad) {
+                            $query->with($nestedToLoad);
+                        };
+                    } else {
+                        $result[] = $firstLevel;
+                    }
+                }
+            }
+        }
+
+        return $result;
     }
 }

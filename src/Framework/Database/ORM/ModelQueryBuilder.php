@@ -726,6 +726,7 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         // Build combined OR EXISTS clause for all morph types
+        // OPTIMIZED: Direct EXISTS without derived table wrapper for better index usage
         $this->where(function ($outerQuery) use ($validTypes, $callback, $table, $morphType, $morphId, $operator, $count) {
             $isFirst = true;
 
@@ -738,46 +739,100 @@ class ModelQueryBuilder extends QueryBuilder
                 $getPrimaryKey = [$type, 'getPrimaryKey'];
                 $relatedKey = $getPrimaryKey();
 
-                // Build the EXISTS subquery using a proper QueryBuilder
-                // This ensures full support for nested queries and all query methods
-                $subqueryBuilder = $type::query();
+                // Resolve morph type alias using global morph map
+                $morphTypeValue = \Toporia\Framework\Database\ORM\Relations\Relation::getMorphAlias($type);
 
-                // Core join condition: related.id = parent.morph_id AND parent.morph_type = 'Type'
-                $subqueryBuilder->whereRaw("{$relatedTable}.{$relatedKey} = {$table}.{$morphId}");
-
-                // Apply callback constraints if provided
-                if ($callback !== null) {
-                    $callback($subqueryBuilder, $type);
-                }
-
-                // Get the compiled subquery SQL and bindings
-                $subquerySql = $subqueryBuilder->toSql();
-                $subqueryBindings = $subqueryBuilder->getBindings();
-
-                // Add morph type binding
-                array_unshift($subqueryBindings, $type);
-
-                // Build final EXISTS clause
+                // Build final EXISTS clause directly without derived table
+                // This is more efficient and allows better index utilization
                 if ($count === 1 && $operator === '>=') {
-                    // Simple existence check - use EXISTS (faster)
-                    $existsSql = "EXISTS (SELECT 1 FROM ({$subquerySql}) AS morph_sub WHERE {$table}.{$morphType} = ?)";
+                    // Simple existence check - use direct EXISTS (optimal)
+                    // SQL: EXISTS (SELECT 1 FROM related_table WHERE related.id = parent.morph_id AND parent.morph_type = ?)
+                    $existsBindings = [$morphTypeValue];
+
+                    // Start building WHERE conditions for EXISTS
+                    $whereConditions = [
+                        "{$relatedTable}.{$relatedKey} = {$table}.{$morphId}",
+                        "{$table}.{$morphType} = ?",
+                    ];
+
+                    // Apply callback constraints if provided
+                    $callbackSql = '';
+                    $callbackBindings = [];
+                    if ($callback !== null) {
+                        $subqueryBuilder = $type::query();
+                        $callback($subqueryBuilder, $type);
+
+                        // Extract WHERE clause from callback query
+                        $callbackWheres = $subqueryBuilder->getWheres();
+                        if (!empty($callbackWheres)) {
+                            // Get SQL and bindings from the callback query
+                            $callbackQuerySql = $subqueryBuilder->toSql();
+                            $callbackBindings = $subqueryBuilder->getBindings();
+
+                            // Extract WHERE part from the full SQL
+                            if (preg_match('/WHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s+GROUP|\s*$)/is', $callbackQuerySql, $matches)) {
+                                $callbackSql = $matches[1];
+                            }
+                        }
+                    }
+
+                    // Build the complete EXISTS SQL
+                    $existsWhere = implode(' AND ', $whereConditions);
+                    if (!empty($callbackSql)) {
+                        $existsWhere .= ' AND (' . $callbackSql . ')';
+                        $existsBindings = array_merge($existsBindings, $callbackBindings);
+                    }
+
+                    $existsSql = "EXISTS (SELECT 1 FROM {$relatedTable} WHERE {$existsWhere})";
 
                     if ($isFirst) {
-                        $outerQuery->whereRaw($existsSql, $subqueryBindings);
+                        $outerQuery->whereRaw($existsSql, $existsBindings);
                         $isFirst = false;
                     } else {
-                        $outerQuery->orWhereRaw($existsSql, $subqueryBindings);
+                        $outerQuery->orWhereRaw($existsSql, $existsBindings);
                     }
                 } else {
-                    // Count-based check
-                    $countSql = "(SELECT COUNT(*) FROM ({$subquerySql}) AS morph_sub WHERE {$table}.{$morphType} = ?) {$operator} ?";
-                    $subqueryBindings[] = $count;
+                    // Count-based check - still needs subquery for COUNT
+                    $countBindings = [$morphTypeValue];
+
+                    // Build WHERE conditions
+                    $whereConditions = [
+                        "{$relatedTable}.{$relatedKey} = {$table}.{$morphId}",
+                        "{$table}.{$morphType} = ?",
+                    ];
+
+                    // Apply callback constraints if provided
+                    $callbackSql = '';
+                    $callbackBindings = [];
+                    if ($callback !== null) {
+                        $subqueryBuilder = $type::query();
+                        $callback($subqueryBuilder, $type);
+
+                        $callbackWheres = $subqueryBuilder->getWheres();
+                        if (!empty($callbackWheres)) {
+                            $callbackQuerySql = $subqueryBuilder->toSql();
+                            $callbackBindings = $subqueryBuilder->getBindings();
+
+                            if (preg_match('/WHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s+GROUP|\s*$)/is', $callbackQuerySql, $matches)) {
+                                $callbackSql = $matches[1];
+                            }
+                        }
+                    }
+
+                    $countWhere = implode(' AND ', $whereConditions);
+                    if (!empty($callbackSql)) {
+                        $countWhere .= ' AND (' . $callbackSql . ')';
+                        $countBindings = array_merge($countBindings, $callbackBindings);
+                    }
+
+                    $countBindings[] = $count;
+                    $countSql = "(SELECT COUNT(*) FROM {$relatedTable} WHERE {$countWhere}) {$operator} ?";
 
                     if ($isFirst) {
-                        $outerQuery->whereRaw($countSql, $subqueryBindings);
+                        $outerQuery->whereRaw($countSql, $countBindings);
                         $isFirst = false;
                     } else {
-                        $outerQuery->orWhereRaw($countSql, $subqueryBindings);
+                        $outerQuery->orWhereRaw($countSql, $countBindings);
                     }
                 }
             }
@@ -851,6 +906,7 @@ class ModelQueryBuilder extends QueryBuilder
         $morphId = $this->getRelationProperty($relationInstance, 'foreignKey');
 
         // Build NOT EXISTS subqueries for each morph type (AND logic)
+        // OPTIMIZED: Direct NOT EXISTS without derived table wrapper for better index usage
         foreach ($types as $type) {
             if (!class_exists($type)) {
                 continue;
@@ -864,29 +920,50 @@ class ModelQueryBuilder extends QueryBuilder
             $getPrimaryKey = [$type, 'getPrimaryKey'];
             $relatedKey = $getPrimaryKey();
 
-            // Build the NOT EXISTS subquery using a proper QueryBuilder
-            // This ensures full support for nested queries and all query methods
-            $subqueryBuilder = $type::query();
+            // Resolve morph type alias using global morph map
+            $morphTypeValue = \Toporia\Framework\Database\ORM\Relations\Relation::getMorphAlias($type);
 
-            // Core join condition
-            $subqueryBuilder->whereRaw("{$relatedTable}.{$relatedKey} = {$table}.{$morphId}");
+            // Build NOT EXISTS directly without derived table (optimal)
+            // SQL: NOT EXISTS (SELECT 1 FROM related_table WHERE related.id = parent.morph_id AND parent.morph_type = ?)
+            $notExistsBindings = [$morphTypeValue];
+
+            // Start building WHERE conditions for NOT EXISTS
+            $whereConditions = [
+                "{$relatedTable}.{$relatedKey} = {$table}.{$morphId}",
+                "{$table}.{$morphType} = ?",
+            ];
 
             // Apply callback constraints if provided
+            $callbackSql = '';
+            $callbackBindings = [];
             if ($callback !== null) {
+                $subqueryBuilder = $type::query();
                 $callback($subqueryBuilder, $type);
+
+                // Extract WHERE clause from callback query
+                $callbackWheres = $subqueryBuilder->getWheres();
+                if (!empty($callbackWheres)) {
+                    // Get SQL and bindings from the callback query
+                    $callbackQuerySql = $subqueryBuilder->toSql();
+                    $callbackBindings = $subqueryBuilder->getBindings();
+
+                    // Extract WHERE part from the full SQL
+                    if (preg_match('/WHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s+GROUP|\s*$)/is', $callbackQuerySql, $matches)) {
+                        $callbackSql = $matches[1];
+                    }
+                }
             }
 
-            // Get the compiled subquery SQL and bindings
-            $subquerySql = $subqueryBuilder->toSql();
-            $subqueryBindings = $subqueryBuilder->getBindings();
+            // Build the complete NOT EXISTS SQL
+            $notExistsWhere = implode(' AND ', $whereConditions);
+            if (!empty($callbackSql)) {
+                $notExistsWhere .= ' AND (' . $callbackSql . ')';
+                $notExistsBindings = array_merge($notExistsBindings, $callbackBindings);
+            }
 
-            // Add morph type binding
-            array_unshift($subqueryBindings, $type);
+            $notExistsSql = "NOT EXISTS (SELECT 1 FROM {$relatedTable} WHERE {$notExistsWhere})";
 
-            // Build NOT EXISTS clause
-            $notExistsSql = "NOT EXISTS (SELECT 1 FROM ({$subquerySql}) AS morph_sub WHERE {$table}.{$morphType} = ?)";
-
-            $this->whereRaw($notExistsSql, $subqueryBindings);
+            $this->whereRaw($notExistsSql, $notExistsBindings);
         }
 
         return $this;
@@ -925,6 +1002,86 @@ class ModelQueryBuilder extends QueryBuilder
     ): self {
         return $this->orWhere(function ($query) use ($relation, $types, $callback, $operator, $count) {
             $query->whereHasMorph($relation, $types, $callback, $operator, $count);
+        });
+    }
+
+    /**
+     * Filter models that do not have a polymorphic relation (simple version).
+     *
+     * Convenience wrapper for whereDoesntHaveMorph without callback.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array<string> $types Morph type class name(s)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Get comments that don't belong to posts
+     * Comment::doesntHaveMorph('commentable', Post::class)->get();
+     *
+     * // Get comments that don't belong to posts or videos
+     * Comment::doesntHaveMorph('commentable', [Post::class, Video::class])->get();
+     * ```
+     */
+    public function doesntHaveMorph(string $relation, string|array $types): self
+    {
+        return $this->whereDoesntHaveMorph($relation, $types, null);
+    }
+
+    /**
+     * OR version of doesntHaveMorph.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array<string> $types Morph type class name(s)
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Get comments that belong to posts OR don't belong to videos
+     * Comment::hasMorph('commentable', Post::class)
+     *     ->orDoesntHaveMorph('commentable', Video::class)
+     *     ->get();
+     * ```
+     */
+    public function orDoesntHaveMorph(string $relation, string|array $types): self
+    {
+        return $this->orWhereDoesntHaveMorph($relation, $types, null);
+    }
+
+    /**
+     * OR version of whereDoesntHaveMorph.
+     *
+     * Adds an OR condition for filtering models that don't have a polymorphic relation.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array<string> $types Morph type class name(s)
+     * @param callable|null $callback Optional callback to constrain the relationship query
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Get comments where:
+     * // - They belong to posts with rating >= 4
+     * // - OR they don't belong to any videos
+     * Comment::whereHasMorph('commentable', Post::class, function($query) {
+     *     $query->where('rating', '>=', 4);
+     * })->orWhereDoesntHaveMorph('commentable', Video::class)->get();
+     *
+     * // Get comments where they don't belong to published posts OR don't belong to active videos
+     * Comment::whereDoesntHaveMorph('commentable', Post::class, function($query) {
+     *     $query->where('published', true);
+     * })->orWhereDoesntHaveMorph('commentable', Video::class, function($query) {
+     *     $query->where('active', true);
+     * })->get();
+     * ```
+     */
+    public function orWhereDoesntHaveMorph(
+        string $relation,
+        string|array $types,
+        ?callable $callback = null
+    ): self {
+        return $this->orWhere(function ($query) use ($relation, $types, $callback) {
+            $query->whereDoesntHaveMorph($relation, $types, $callback);
         });
     }
 
@@ -2061,6 +2218,307 @@ class ModelQueryBuilder extends QueryBuilder
     public function withMax(string $relation, string $column, ?callable $callback = null): self
     {
         return $this->addRelationAggregateSelect($relation, $column, 'MAX', $callback);
+    }
+
+    // =========================================================================
+    // MORPH-TO AGGREGATE METHODS
+    // =========================================================================
+
+    /**
+     * Add a subselect count of a MorphTo relationship to the query.
+     *
+     * Unlike regular withCount(), this handles polymorphic inverse relationships
+     * where the related model type varies per row (stored in morph_type column).
+     *
+     * Uses CASE WHEN to build a unified count across different morph types.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array $types Morph type class name(s) to count, or '*' for all types
+     * @param callable|null $callback Optional callback to constrain each morph type query
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Count for specific types
+     * Comment::withCountMorph('commentable', [Post::class, Video::class])->get();
+     * // Access: $comment->commentable_count (returns 1 if exists, 0 if not)
+     *
+     * // With constraints per type
+     * Comment::withCountMorph('commentable', [Post::class], function($query, $type) {
+     *     if ($type === Post::class) {
+     *         $query->where('published', true);
+     *     }
+     * })->get();
+     * ```
+     */
+    public function withCountMorph(string $relation, string|array $types, ?callable $callback = null): self
+    {
+        return $this->addMorphToAggregateSelect($relation, $types, null, 'COUNT', $callback);
+    }
+
+    /**
+     * Add a subselect sum of a MorphTo relationship column to the query.
+     *
+     * Sums a column from the polymorphic parent models.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array $types Morph type class name(s)
+     * @param string $column Column to sum from the morph parent
+     * @param callable|null $callback Optional callback to constrain each morph type query
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Sum view_count from posts and videos that images belong to
+     * Image::withSumMorph('imageable', [Post::class, Video::class], 'view_count')->get();
+     * // Access: $image->imageable_sum_view_count
+     * ```
+     */
+    public function withSumMorph(string $relation, string|array $types, string $column, ?callable $callback = null): self
+    {
+        return $this->addMorphToAggregateSelect($relation, $types, $column, 'SUM', $callback);
+    }
+
+    /**
+     * Add a subselect average of a MorphTo relationship column to the query.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array $types Morph type class name(s)
+     * @param string $column Column to average from the morph parent
+     * @param callable|null $callback Optional callback to constrain each morph type query
+     * @return $this
+     */
+    public function withAvgMorph(string $relation, string|array $types, string $column, ?callable $callback = null): self
+    {
+        return $this->addMorphToAggregateSelect($relation, $types, $column, 'AVG', $callback);
+    }
+
+    /**
+     * Add a subselect minimum of a MorphTo relationship column to the query.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array $types Morph type class name(s)
+     * @param string $column Column to find minimum from the morph parent
+     * @param callable|null $callback Optional callback to constrain each morph type query
+     * @return $this
+     */
+    public function withMinMorph(string $relation, string|array $types, string $column, ?callable $callback = null): self
+    {
+        return $this->addMorphToAggregateSelect($relation, $types, $column, 'MIN', $callback);
+    }
+
+    /**
+     * Add a subselect maximum of a MorphTo relationship column to the query.
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array $types Morph type class name(s)
+     * @param string $column Column to find maximum from the morph parent
+     * @param callable|null $callback Optional callback to constrain each morph type query
+     * @return $this
+     */
+    public function withMaxMorph(string $relation, string|array $types, string $column, ?callable $callback = null): self
+    {
+        return $this->addMorphToAggregateSelect($relation, $types, $column, 'MAX', $callback);
+    }
+
+    /**
+     * Add a MorphTo aggregate subselect to the query.
+     *
+     * This handles the complexity of polymorphic inverse relationships where
+     * different rows may reference different tables.
+     *
+     * Uses CASE WHEN statements to build type-specific subqueries:
+     * CASE
+     *   WHEN morph_type = 'post' THEN (SELECT column FROM posts WHERE posts.id = table.morph_id)
+     *   WHEN morph_type = 'video' THEN (SELECT column FROM videos WHERE videos.id = table.morph_id)
+     *   ELSE NULL
+     * END
+     *
+     * @param string $relation MorphTo relationship method name
+     * @param string|array $types Morph type class name(s)
+     * @param string|null $column Column to aggregate (null for COUNT)
+     * @param string $function Aggregate function (COUNT, SUM, AVG, MIN, MAX)
+     * @param callable|null $callback Optional callback to constrain each morph type query
+     * @return $this
+     */
+    private function addMorphToAggregateSelect(
+        string $relation,
+        string|array $types,
+        ?string $column,
+        string $function,
+        ?callable $callback = null
+    ): self {
+        // Normalize types to array
+        $types = is_array($types) ? $types : [$types];
+
+        // Get table name from model
+        /** @var callable $getTableName */
+        $getTableName = [$this->modelClass, 'getTableName'];
+        $table = $getTableName();
+
+        // Create a dummy model to get the relationship
+        $model = new $this->modelClass([]);
+
+        if (!method_exists($model, $relation)) {
+            throw new \InvalidArgumentException("Relationship '{$relation}' does not exist on model {$this->modelClass}");
+        }
+
+        $relationInstance = $model->$relation();
+
+        // Must be a MorphTo relationship
+        if (!$relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+            throw new \InvalidArgumentException(
+                "Relationship '{$relation}' must be a MorphTo relationship for withCountMorph/withSumMorph"
+            );
+        }
+
+        // Get morph type and id columns
+        $morphType = $this->getRelationProperty($relationInstance, 'morphType');
+        $morphId = $this->getRelationProperty($relationInstance, 'foreignKey');
+
+        // Handle wildcard '*' - get all possible types from the database
+        if (count($types) === 1 && $types[0] === '*') {
+            $distinctTypes = $this->getConnection()->select(
+                "SELECT DISTINCT {$morphType} FROM {$table} WHERE {$morphType} IS NOT NULL"
+            );
+            $types = array_column($distinctTypes, $morphType);
+
+            if (empty($types)) {
+                // No types found, add NULL column
+                $columnAlias = $function === 'COUNT'
+                    ? "{$relation}_count"
+                    : "{$relation}_" . strtolower($function) . "_{$column}";
+
+                $columns = $this->getColumns();
+                if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+                    $this->select("{$table}.*");
+                }
+                $this->selectRaw("NULL AS {$columnAlias}");
+                return $this;
+            }
+        }
+
+        // Filter to only valid classes
+        $validTypes = array_filter($types, fn($type) => class_exists($type));
+
+        if (empty($validTypes)) {
+            // No valid types, add NULL column
+            $columnAlias = $function === 'COUNT'
+                ? "{$relation}_count"
+                : "{$relation}_" . strtolower($function) . "_{$column}";
+
+            $columns = $this->getColumns();
+            if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+                $this->select("{$table}.*");
+            }
+            $this->selectRaw("NULL AS {$columnAlias}");
+            return $this;
+        }
+
+        // Build CASE WHEN statement for each morph type
+        $caseParts = [];
+
+        foreach ($validTypes as $type) {
+            /** @var callable $getRelatedTable */
+            $getRelatedTable = [$type, 'getTableName'];
+            $relatedTable = $getRelatedTable();
+
+            /** @var callable $getPrimaryKey */
+            $getPrimaryKey = [$type, 'getPrimaryKey'];
+            $relatedKey = $getPrimaryKey();
+
+            // Resolve morph type alias using global morph map
+            $morphTypeValue = \Toporia\Framework\Database\ORM\Relations\Relation::getMorphAlias($type);
+
+            // Build the aggregate expression
+            if ($function === 'COUNT') {
+                // For COUNT, we count 1 if exists
+                $selectExpr = '1';
+            } else {
+                // For other aggregates, select the column
+                $selectExpr = "{$relatedTable}.{$column}";
+            }
+
+            // Build WHERE conditions
+            $whereConditions = [
+                "{$relatedTable}.{$relatedKey} = {$table}.{$morphId}",
+            ];
+
+            // Apply callback constraints if provided
+            $callbackSql = '';
+            if ($callback !== null) {
+                $subqueryBuilder = $type::query();
+                $callback($subqueryBuilder, $type);
+
+                // Extract WHERE clause from callback query
+                $callbackWheres = $subqueryBuilder->getWheres();
+                if (!empty($callbackWheres)) {
+                    $callbackQuerySql = $subqueryBuilder->toSql();
+                    $callbackBindings = $subqueryBuilder->getBindings();
+
+                    if (preg_match('/WHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s+GROUP|\s*$)/is', $callbackQuerySql, $matches)) {
+                        $callbackSql = $matches[1];
+
+                        // Replace placeholders with actual values
+                        foreach ($callbackBindings as $binding) {
+                            $quoted = $this->quoteValue($binding);
+                            $callbackSql = preg_replace('/\?/', $quoted, $callbackSql, 1);
+                        }
+                    }
+                }
+            }
+
+            // Apply soft delete scope if related model uses it
+            if (method_exists($type, 'usesSoftDeletes') && $type::usesSoftDeletes()) {
+                $deletedAtColumn = method_exists($type, 'getDeletedAtColumn')
+                    ? $type::getDeletedAtColumn()
+                    : 'deleted_at';
+                $whereConditions[] = "{$relatedTable}.{$deletedAtColumn} IS NULL";
+            }
+
+            // Build complete WHERE clause
+            $whereClause = implode(' AND ', $whereConditions);
+            if (!empty($callbackSql)) {
+                $whereClause .= ' AND (' . $callbackSql . ')';
+            }
+
+            // Build subquery for this type
+            $subquery = "SELECT {$selectExpr} FROM {$relatedTable} WHERE {$whereClause}";
+
+            // Quote morph type value
+            $quotedMorphType = $this->quoteValue($morphTypeValue);
+
+            // Build CASE WHEN part
+            $caseParts[] = "WHEN {$table}.{$morphType} = {$quotedMorphType} THEN ({$subquery})";
+        }
+
+        // Build complete CASE expression
+        $caseExpression = "CASE " . implode(' ', $caseParts) . " ELSE NULL END";
+
+        // Determine column alias
+        $columnAlias = $function === 'COUNT'
+            ? "{$relation}_count"
+            : "{$relation}_" . strtolower($function) . "_{$column}";
+
+        // Wrap with aggregate function if needed
+        // For MorphTo, each row has at most one parent, so COUNT returns 0 or 1
+        // For other aggregates, we just return the value directly
+        if ($function === 'COUNT') {
+            // COALESCE to return 0 instead of NULL when no match
+            $finalExpression = "COALESCE(({$caseExpression}), 0)";
+        } else {
+            $finalExpression = $caseExpression;
+        }
+
+        // Ensure we select table.* along with the subquery (only once)
+        $columns = $this->getColumns();
+        if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+            $this->select("{$table}.*");
+        }
+
+        $this->selectRaw("{$finalExpression} AS {$columnAlias}");
+
+        return $this;
     }
 
     // =========================================================================

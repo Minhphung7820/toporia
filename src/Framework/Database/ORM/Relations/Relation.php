@@ -28,6 +28,395 @@ use Toporia\Framework\Support\Str;
  */
 abstract class Relation implements RelationInterface
 {
+    // =========================================================================
+    // GLOBAL MORPH MAP
+    // =========================================================================
+
+    /**
+     * Global morph type to class name map.
+     *
+     * This allows using short aliases instead of full class names in database.
+     * Example: 'post' => App\Models\Post::class
+     *
+     * @var array<string, class-string<Model>>
+     */
+    protected static array $morphMap = [];
+
+    /**
+     * Get or set the morph map for polymorphic relationships.
+     *
+     * When called without arguments, returns the current morph map.
+     * When called with a map, sets/merges the morph map.
+     *
+     * Performance: O(1) for get, O(n) for merge where n = map size
+     *
+     * @param array<string, class-string<Model>>|null $map Morph map to set/merge
+     * @param bool $merge Whether to merge with existing map (default: true)
+     * @return array<string, class-string<Model>> Current morph map
+     *
+     * @example
+     * ```php
+     * // Set morph map (typically in ServiceProvider)
+     * Relation::morphMap([
+     *     'post' => Post::class,
+     *     'video' => Video::class,
+     *     'user' => User::class,
+     * ]);
+     *
+     * // Get morph map
+     * $map = Relation::morphMap();
+     *
+     * // Replace entire map (don't merge)
+     * Relation::morphMap(['post' => Post::class], false);
+     * ```
+     */
+    public static function morphMap(?array $map = null, bool $merge = true): array
+    {
+        if ($map === null) {
+            return static::$morphMap;
+        }
+
+        static::$morphMap = $merge
+            ? array_merge(static::$morphMap, $map)
+            : $map;
+
+        return static::$morphMap;
+    }
+
+    /**
+     * Get the model class for a given morph type.
+     *
+     * Resolves alias to class name using morph map.
+     * Returns the input if no mapping exists (assumes full class name).
+     *
+     * Performance: O(1) - Direct array lookup
+     *
+     * @param string $alias Morph type alias or class name
+     * @return string Resolved class name
+     *
+     * @example
+     * ```php
+     * // With morph map: ['post' => App\Models\Post::class]
+     * Relation::getMorphedModel('post'); // Returns 'App\Models\Post'
+     * Relation::getMorphedModel('App\Models\Post'); // Returns 'App\Models\Post'
+     * ```
+     */
+    public static function getMorphedModel(string $alias): string
+    {
+        return static::$morphMap[$alias] ?? $alias;
+    }
+
+    /**
+     * Get the morph alias for a given model class.
+     *
+     * Returns the alias if found in morph map, otherwise returns the class name.
+     *
+     * Performance: O(n) - Linear search through map values
+     *
+     * @param string|object $model Model class name or instance
+     * @return string Morph alias or class name
+     *
+     * @example
+     * ```php
+     * // With morph map: ['post' => App\Models\Post::class]
+     * Relation::getMorphAlias(Post::class); // Returns 'post'
+     * Relation::getMorphAlias($postInstance); // Returns 'post'
+     * Relation::getMorphAlias(Comment::class); // Returns 'App\Models\Comment'
+     * ```
+     */
+    public static function getMorphAlias(string|object $model): string
+    {
+        $className = is_object($model) ? get_class($model) : $model;
+
+        // Search for alias in morph map
+        $alias = array_search($className, static::$morphMap, true);
+
+        return $alias !== false ? $alias : $className;
+    }
+
+    /**
+     * Check if a morph type alias exists in the map.
+     *
+     * @param string $alias Morph type alias to check
+     * @return bool True if alias exists in morph map
+     */
+    public static function hasMorphAlias(string $alias): bool
+    {
+        return isset(static::$morphMap[$alias]);
+    }
+
+    /**
+     * Clear the global morph map.
+     *
+     * Useful for testing or resetting state.
+     *
+     * @return void
+     */
+    public static function clearMorphMap(): void
+    {
+        static::$morphMap = [];
+        static::$morphMapLoaded = false;
+    }
+
+    /**
+     * Flag to track if morph map has been loaded from config.
+     *
+     * @var bool
+     */
+    protected static bool $morphMapLoaded = false;
+
+    /**
+     * Load morph map from configuration file.
+     *
+     * This method loads morph type aliases from config/morphs.php
+     * and optionally performs auto-discovery of model classes.
+     *
+     * Should be called once during application boot (e.g., in ServiceProvider).
+     *
+     * Performance: O(n) where n = number of models (only runs once)
+     *
+     * @param string|null $configPath Custom config file path (for testing)
+     * @return array<string, class-string<Model>> Loaded morph map
+     *
+     * @example
+     * ```php
+     * // In ServiceProvider boot() method
+     * Relation::loadMorphMapFromConfig();
+     *
+     * // With custom config path (for testing)
+     * Relation::loadMorphMapFromConfig('/path/to/custom/morphs.php');
+     * ```
+     */
+    public static function loadMorphMapFromConfig(?string $configPath = null): array
+    {
+        if (static::$morphMapLoaded && $configPath === null) {
+            return static::$morphMap;
+        }
+
+        // Determine config file path
+        $configFile = $configPath ?? static::getMorphConfigPath();
+
+        if (!file_exists($configFile)) {
+            static::$morphMapLoaded = true;
+            return static::$morphMap;
+        }
+
+        // Load config
+        $config = require $configFile;
+
+        if (!is_array($config)) {
+            static::$morphMapLoaded = true;
+            return static::$morphMap;
+        }
+
+        // Load explicit morph map
+        if (isset($config['map']) && is_array($config['map'])) {
+            static::morphMap($config['map']);
+        }
+
+        // Perform auto-discovery if enabled
+        if (isset($config['auto_discover']) && $config['auto_discover'] === true) {
+            $paths = $config['discovery_paths'] ?? ['app/Models'];
+            $namespace = $config['discovery_namespace'] ?? 'App\\Models';
+
+            static::discoverMorphTypes($paths, $namespace);
+        }
+
+        static::$morphMapLoaded = true;
+        return static::$morphMap;
+    }
+
+    /**
+     * Get the default morph config file path.
+     *
+     * @return string
+     */
+    protected static function getMorphConfigPath(): string
+    {
+        // Try to use Laravel's base_path() if available
+        if (function_exists('base_path')) {
+            return base_path('config/morphs.php');
+        }
+
+        // Fallback: assume we're in vendor/toporia/framework/src/...
+        // Go up to project root
+        $dir = __DIR__;
+        while ($dir !== '/' && !file_exists($dir . '/config/morphs.php')) {
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+        }
+
+        return $dir . '/config/morphs.php';
+    }
+
+    /**
+     * Discover morph types from model classes.
+     *
+     * Scans the given directories for model classes that define
+     * a static $morphAlias property and registers them in the morph map.
+     *
+     * Performance: O(n * m) where n = number of files, m = class loading time
+     * This is only called once during application boot.
+     *
+     * @param array<string> $paths Directories to scan (relative to base path)
+     * @param string $baseNamespace Base namespace for models
+     * @return array<string, class-string<Model>> Discovered morph types
+     *
+     * @example
+     * ```php
+     * // In your model class
+     * class Post extends Model
+     * {
+     *     public static string $morphAlias = 'post';
+     * }
+     *
+     * // Auto-discovery will register: 'post' => App\Models\Post::class
+     * ```
+     */
+    public static function discoverMorphTypes(array $paths, string $baseNamespace = 'App\\Models'): array
+    {
+        $discovered = [];
+        $basePath = static::getBasePath();
+
+        foreach ($paths as $path) {
+            $fullPath = $basePath . DIRECTORY_SEPARATOR . $path;
+
+            if (!is_dir($fullPath)) {
+                continue;
+            }
+
+            // Scan directory for PHP files
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($fullPath, \RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+
+            foreach ($iterator as $file) {
+                if ($file->isFile() && $file->getExtension() === 'php') {
+                    // Calculate relative path from models directory
+                    $relativePath = str_replace(
+                        [$fullPath . DIRECTORY_SEPARATOR, '.php'],
+                        ['', ''],
+                        $file->getPathname()
+                    );
+
+                    // Convert path to class name
+                    $className = $baseNamespace . '\\' . str_replace(DIRECTORY_SEPARATOR, '\\', $relativePath);
+
+                    // Check if class exists and has morphAlias property
+                    if (!class_exists($className, true)) {
+                        continue;
+                    }
+
+                    // Check for static morphAlias property
+                    try {
+                        $reflection = new \ReflectionClass($className);
+
+                        // Only process Model subclasses
+                        if (!$reflection->isSubclassOf(Model::class)) {
+                            continue;
+                        }
+
+                        // Check for public static property
+                        if ($reflection->hasProperty('morphAlias')) {
+                            $property = $reflection->getProperty('morphAlias');
+                            if ($property->isStatic() && $property->isPublic()) {
+                                $alias = $property->getValue();
+                                if (is_string($alias) && $alias !== '') {
+                                    $discovered[$alias] = $className;
+                                }
+                            }
+                        }
+
+                        // Also check for getMorphAlias static method
+                        if ($reflection->hasMethod('getMorphAlias')) {
+                            $method = $reflection->getMethod('getMorphAlias');
+                            if ($method->isStatic() && $method->isPublic() && $method->getNumberOfRequiredParameters() === 0) {
+                                try {
+                                    $alias = $className::getMorphAlias();
+                                    // Only use if different from class name (custom alias)
+                                    if (is_string($alias) && $alias !== '' && $alias !== $className) {
+                                        $discovered[$alias] = $className;
+                                    }
+                                } catch (\Throwable $e) {
+                                    // Method threw exception, skip
+                                }
+                            }
+                        }
+                    } catch (\ReflectionException $e) {
+                        // Skip classes that can't be reflected
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Merge discovered types into morph map (explicit config takes priority)
+        if (!empty($discovered)) {
+            // Discovered types have lower priority - only add if not already set
+            foreach ($discovered as $alias => $className) {
+                if (!isset(static::$morphMap[$alias])) {
+                    static::$morphMap[$alias] = $className;
+                }
+            }
+        }
+
+        return $discovered;
+    }
+
+    /**
+     * Get the application base path.
+     *
+     * @return string
+     */
+    protected static function getBasePath(): string
+    {
+        // Try to use Laravel's base_path() if available
+        if (function_exists('base_path')) {
+            return base_path();
+        }
+
+        // Fallback: find project root by looking for composer.json
+        $dir = __DIR__;
+        while ($dir !== '/' && !file_exists($dir . '/composer.json')) {
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+        }
+
+        return $dir;
+    }
+
+    /**
+     * Reset the morph map loaded flag.
+     *
+     * Useful for testing or when config changes.
+     *
+     * @return void
+     */
+    public static function resetMorphMapLoaded(): void
+    {
+        static::$morphMapLoaded = false;
+    }
+
+    /**
+     * Check if morph map has been loaded from config.
+     *
+     * @return bool
+     */
+    public static function isMorphMapLoaded(): bool
+    {
+        return static::$morphMapLoaded;
+    }
+
+    // =========================================================================
+    // CONSTRUCTOR
+    // =========================================================================
+
     /**
      * @param QueryBuilder $query Query builder for related model
      * @param Model $parent Parent model instance

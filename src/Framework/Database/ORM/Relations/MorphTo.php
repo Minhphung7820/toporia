@@ -149,6 +149,21 @@ class MorphTo extends Relation
     }
 
     /**
+     * Flag to enable/disable UNION ALL batch loading optimization.
+     *
+     * @var bool
+     */
+    protected bool $useBatchLoading = true;
+
+    /**
+     * Minimum number of types to trigger UNION ALL batch loading.
+     * Below this threshold, individual queries are used.
+     *
+     * @var int
+     */
+    protected int $batchLoadingThreshold = 2;
+
+    /**
      * Get the results of the relationship for eager loading.
      *
      * This is the main entry point for MorphTo eager loading.
@@ -161,11 +176,265 @@ class MorphTo extends Relation
      */
     public function getEager(): ModelCollection
     {
-        foreach (array_keys($this->dictionary) as $type) {
-            $this->matchToMorphParents($type, $this->getResultsByType($type));
+        $types = array_keys($this->dictionary);
+
+        // Check if we can use UNION ALL batch loading optimization
+        if ($this->canUseBatchLoading($types)) {
+            return $this->getEagerWithUnionAll($types);
+        }
+
+        // Standard loading: one query per type
+        foreach ($types as $type) {
+            // Use extended method that supports withCount if configured
+            if ($this->hasMorphWithCounts()) {
+                $this->matchToMorphParents($type, $this->getResultsByTypeWithCount($type));
+            } else {
+                $this->matchToMorphParents($type, $this->getResultsByType($type));
+            }
         }
 
         return $this->models ?? new ModelCollection([]);
+    }
+
+    /**
+     * Check if UNION ALL batch loading can be used.
+     *
+     * Batch loading is only possible when:
+     * - useBatchLoading is enabled
+     * - Number of types >= batchLoadingThreshold
+     * - No type-specific eager loads (morphWith)
+     * - No type-specific constraints (constrain)
+     * - No morphWithCount configured
+     * - All types have same primary key column
+     *
+     * @param array<string> $types Morph types
+     * @return bool
+     */
+    protected function canUseBatchLoading(array $types): bool
+    {
+        // Check basic conditions
+        if (!$this->useBatchLoading) {
+            return false;
+        }
+
+        if (count($types) < $this->batchLoadingThreshold) {
+            return false;
+        }
+
+        // Check for type-specific configurations that prevent batching
+        if (!empty($this->morphableEagerLoads)) {
+            return false;
+        }
+
+        if (!empty($this->morphableConstraints)) {
+            return false;
+        }
+
+        if ($this->hasMorphWithCounts()) {
+            return false;
+        }
+
+        // Verify all types are valid models with same key column
+        $keyColumn = null;
+        foreach ($types as $type) {
+            $modelClass = $this->getModelClass($type);
+
+            if (!class_exists($modelClass) || !is_subclass_of($modelClass, Model::class)) {
+                return false;
+            }
+
+            $typeKeyColumn = $modelClass::getKeyName();
+
+            if ($keyColumn === null) {
+                $keyColumn = $typeKeyColumn;
+            } elseif ($keyColumn !== $typeKeyColumn) {
+                // Different primary key columns, cannot batch
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Get eager load results using UNION ALL optimization.
+     *
+     * This method combines queries for all morph types into a single UNION ALL query,
+     * reducing the number of database round-trips from N to 1.
+     *
+     * Performance benefit is most significant when:
+     * - There are many morph types (3+)
+     * - Each type has relatively few records
+     * - Network latency is high
+     *
+     * @param array<string> $types Morph types to load
+     * @return ModelCollection
+     */
+    protected function getEagerWithUnionAll(array $types): ModelCollection
+    {
+        $unionParts = [];
+        $allBindings = [];
+
+        foreach ($types as $type) {
+            $modelClass = $this->getModelClass($type);
+            $table = $modelClass::getTableName();
+            $ownerKey = $this->ownerKey ?? $modelClass::getKeyName();
+            $ids = $this->gatherKeysByType($type);
+
+            if (empty($ids)) {
+                continue;
+            }
+
+            // Resolve morph type alias
+            $morphTypeValue = Relation::getMorphAlias($modelClass);
+
+            // Build SELECT with morph type column for identification
+            $quotedMorphType = $this->quoteValue($morphTypeValue);
+            $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+
+            // Select all columns plus morph type identifier
+            $selectSql = "SELECT {$table}.*, {$quotedMorphType} AS __morph_type FROM {$table} WHERE {$table}.{$ownerKey} IN ({$placeholders})";
+
+            // Apply soft delete scope if model uses it
+            if (method_exists($modelClass, 'usesSoftDeletes') && $modelClass::usesSoftDeletes()) {
+                $deletedAtColumn = method_exists($modelClass, 'getDeletedAtColumn')
+                    ? $modelClass::getDeletedAtColumn()
+                    : 'deleted_at';
+                $selectSql .= " AND {$table}.{$deletedAtColumn} IS NULL";
+            }
+
+            $unionParts[] = "({$selectSql})";
+            $allBindings = array_merge($allBindings, $ids);
+        }
+
+        if (empty($unionParts)) {
+            return $this->models ?? new ModelCollection([]);
+        }
+
+        // Execute UNION ALL query
+        $unionSql = implode(' UNION ALL ', $unionParts);
+
+        // Get database connection from parent model's query builder
+        // Use the query builder's connection since Model::getConnection() is protected static
+        $connection = $this->query->getConnection();
+        $results = $connection->select($unionSql, $allBindings);
+
+        // Group results by morph type and hydrate
+        $resultsByType = [];
+        foreach ($results as $row) {
+            // Handle both object and array results from database
+            if (is_object($row)) {
+                $rowArray = (array) $row;
+            } else {
+                $rowArray = $row;
+            }
+
+            $morphType = $rowArray['__morph_type'] ?? null;
+            if ($morphType === null) {
+                continue;
+            }
+
+            // Remove the identifier column
+            unset($rowArray['__morph_type']);
+
+            // Convert back to object for hydration consistency
+            $resultsByType[$morphType][] = (object) $rowArray;
+        }
+
+        // Match results to parents
+        foreach ($resultsByType as $morphType => $typeResults) {
+            // Find the original type key in dictionary
+            $originalType = $this->findOriginalTypeKey($morphType);
+            if ($originalType === null) {
+                continue;
+            }
+
+            $modelClass = $this->getModelClass($originalType);
+
+            // Hydrate results into models
+            /** @var callable $hydrate */
+            $hydrate = [$modelClass, 'hydrate'];
+            $hydratedModels = $hydrate($typeResults);
+
+            // Load universal nested eager loads if any
+            if (!empty($this->nestedEagerLoads)) {
+                /** @var callable $eagerLoadRelations */
+                $eagerLoadRelations = [$modelClass, 'eagerLoadRelations'];
+                $eagerLoadRelations($hydratedModels, $this->nestedEagerLoads);
+            }
+
+            $this->matchToMorphParents($originalType, $hydratedModels);
+        }
+
+        return $this->models ?? new ModelCollection([]);
+    }
+
+    /**
+     * Find the original type key in the dictionary from a morph alias.
+     *
+     * @param string $morphAlias The morph alias (from __morph_type)
+     * @return string|null Original type key or null if not found
+     */
+    protected function findOriginalTypeKey(string $morphAlias): ?string
+    {
+        foreach (array_keys($this->dictionary) as $typeKey) {
+            $modelClass = $this->getModelClass($typeKey);
+            $alias = Relation::getMorphAlias($modelClass);
+
+            if ($alias === $morphAlias || $modelClass === $morphAlias) {
+                return $typeKey;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Quote a value for SQL.
+     *
+     * @param mixed $value Value to quote
+     * @return string Quoted value
+     */
+    protected function quoteValue(mixed $value): string
+    {
+        if ($value === null) {
+            return 'NULL';
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        // Escape single quotes
+        return "'" . str_replace("'", "''", (string) $value) . "'";
+    }
+
+    /**
+     * Enable or disable UNION ALL batch loading.
+     *
+     * @param bool $enable Whether to enable batch loading
+     * @return $this
+     */
+    public function withBatchLoading(bool $enable = true): static
+    {
+        $this->useBatchLoading = $enable;
+        return $this;
+    }
+
+    /**
+     * Set the minimum number of types to trigger batch loading.
+     *
+     * @param int $threshold Minimum number of types
+     * @return $this
+     */
+    public function setBatchLoadingThreshold(int $threshold): static
+    {
+        $this->batchLoadingThreshold = max(2, $threshold);
+        return $this;
     }
 
     /**
@@ -475,6 +744,9 @@ class MorphTo extends Relation
         $instance->morphableConstraints = $this->morphableConstraints;
         $instance->morphableEagerLoads = $this->morphableEagerLoads;
         $instance->nestedEagerLoads = $this->nestedEagerLoads;
+        $instance->morphWithCounts = $this->morphWithCounts;
+        $instance->useBatchLoading = $this->useBatchLoading;
+        $instance->batchLoadingThreshold = $this->batchLoadingThreshold;
 
         return $instance;
     }
@@ -486,12 +758,29 @@ class MorphTo extends Relation
     /**
      * Get the related model class from type.
      *
-     * @param string $type
+     * Resolution order (first match wins):
+     * 1. Instance-level morphMap (set via setMorphMap())
+     * 2. Global morph map (set via Relation::morphMap())
+     * 3. Use type as-is (assumed to be full class name)
+     *
+     * @param string $type Morph type alias or class name
      * @return class-string<Model>
      */
     protected function getModelClass(string $type): string
     {
-        return $this->morphMap[$type] ?? $type;
+        // 1. Check instance-level morph map first (highest priority)
+        if (isset($this->morphMap[$type])) {
+            return $this->morphMap[$type];
+        }
+
+        // 2. Check global morph map
+        $globalMapped = Relation::getMorphedModel($type);
+        if ($globalMapped !== $type) {
+            return $globalMapped;
+        }
+
+        // 3. Return type as-is (assumed to be full class name)
+        return $type;
     }
 
     /**
@@ -789,6 +1078,183 @@ class MorphTo extends Relation
     public function isNot(Model $model): bool
     {
         return !$this->is($model);
+    }
+
+    // =========================================================================
+    // MORPH WITH COUNT METHODS
+    // =========================================================================
+
+    /**
+     * Eager loads for counting nested relations of morph parents.
+     *
+     * Structure: [morphType => [relation => constraint, ...], ...]
+     *
+     * @var array<string, array<string, callable|null>>
+     */
+    protected array $morphWithCounts = [];
+
+    /**
+     * Set eager load counts for each morph type.
+     *
+     * Allows counting different relationships for different morph types
+     * when eager loading through MorphTo.
+     *
+     * @param array<string, string|array> $relations Array mapping model class names to relations to count
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Count different relations for each morph type
+     * Image::with(['imageable' => function (MorphTo $morphTo) {
+     *     $morphTo->morphWithCount([
+     *         Post::class => ['comments', 'likes'],
+     *         Video::class => ['views', 'comments'],
+     *     ]);
+     * }])->get();
+     *
+     * // Access counts:
+     * // $image->imageable->comments_count (if imageable is Post or Video)
+     * // $image->imageable->likes_count (if imageable is Post)
+     * // $image->imageable->views_count (if imageable is Video)
+     * ```
+     */
+    public function morphWithCount(array $relations): static
+    {
+        foreach ($relations as $type => $typeRelations) {
+            // Normalize to array
+            $typeRelations = is_string($typeRelations) ? [$typeRelations] : $typeRelations;
+
+            // Store with proper format
+            $this->morphWithCounts[$type] = [];
+            foreach ($typeRelations as $key => $value) {
+                if (is_int($key)) {
+                    // Simple relation name
+                    $this->morphWithCounts[$type][$value] = null;
+                } else {
+                    // Relation with callback
+                    $this->morphWithCounts[$type][$key] = $value;
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Get all relation results for a specific morph type (with withCount support).
+     *
+     * Creates a COMPLETELY FRESH query for the morph type.
+     * This ensures no constraints from parent queries leak in.
+     * Also applies morphWithCount if configured.
+     *
+     * @param string $type Morph type (model class name)
+     * @return ModelCollection
+     */
+    protected function getResultsByTypeWithCount(string $type): ModelCollection
+    {
+        $modelClass = $this->getModelClass($type);
+
+        // Validate model class
+        if (!class_exists($modelClass)) {
+            return new ModelCollection([]);
+        }
+
+        if (!is_subclass_of($modelClass, Model::class)) {
+            return new ModelCollection([]);
+        }
+
+        // Create FRESH query - no inheritance from parent
+        $ownerKey = $this->ownerKey ?? $modelClass::getKeyName();
+
+        // Start with a completely fresh query using static method
+        $query = $modelClass::query();
+
+        // Build combined eager loads:
+        // 1. Type-specific eager loads from morphWith() (highest priority)
+        // 2. Universal nested eager loads from dot notation (applies to all types)
+        $typeSpecificLoads = $this->morphableEagerLoads[$modelClass] ?? [];
+        $universalLoads = $this->nestedEagerLoads;
+
+        // Merge: type-specific takes priority over universal
+        $combinedEagerLoads = array_merge($universalLoads, $typeSpecificLoads);
+
+        if (!empty($combinedEagerLoads)) {
+            $query->with($combinedEagerLoads);
+        }
+
+        // Apply withCount for this morph type
+        if (isset($this->morphWithCounts[$modelClass]) && !empty($this->morphWithCounts[$modelClass])) {
+            $countRelations = [];
+            foreach ($this->morphWithCounts[$modelClass] as $relation => $callback) {
+                if ($callback === null) {
+                    $countRelations[] = $relation;
+                } else {
+                    $countRelations[$relation] = $callback;
+                }
+            }
+            $query->withCount($countRelations);
+        }
+
+        // Apply constraints for this type (from constrain())
+        $constraint = $this->morphableConstraints[$modelClass] ?? null;
+        if ($constraint !== null && is_callable($constraint)) {
+            $constraint($query);
+        }
+
+        // Get unique IDs for this type
+        $ids = $this->gatherKeysByType($type);
+
+        if (empty($ids)) {
+            return new ModelCollection([]);
+        }
+
+        // Execute query with WHERE IN
+        // Use table-qualified column to avoid ambiguity
+        $table = $modelClass::getTableName();
+        $qualifiedColumn = $table ? "{$table}.{$ownerKey}" : $ownerKey;
+
+        return $query->whereIn($qualifiedColumn, $ids)->get();
+    }
+
+    /**
+     * Get the results of the relationship for eager loading.
+     *
+     * This is the main entry point for MorphTo eager loading.
+     * It iterates through each morph type and loads results separately.
+     *
+     * IMPORTANT: This method creates FRESH queries for each type.
+     * No constraints from parent queries leak into these queries.
+     *
+     * @return ModelCollection
+     */
+    public function getEagerWithCount(): ModelCollection
+    {
+        foreach (array_keys($this->dictionary) as $type) {
+            // Use extended method that supports withCount
+            $this->matchToMorphParents($type, $this->getResultsByTypeWithCount($type));
+        }
+
+        return $this->models ?? new ModelCollection([]);
+    }
+
+    /**
+     * Check if morphWithCount is configured.
+     *
+     * @return bool
+     */
+    public function hasMorphWithCounts(): bool
+    {
+        return !empty($this->morphWithCounts);
+    }
+
+    /**
+     * Get the morph with counts configuration.
+     *
+     * @return array<string, array<string, callable|null>>
+     */
+    public function getMorphWithCounts(): array
+    {
+        return $this->morphWithCounts;
     }
 
     // =========================================================================

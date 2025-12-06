@@ -165,11 +165,19 @@ class MorphedByMany extends Relation
     }
 
     /**
-     * Get morph class name for related model.
+     * Get morph class name/alias for related model.
+     *
+     * For MorphedByMany, we need the alias of the related class (not parent),
+     * since we're looking up by the morphable type in the pivot table.
+     *
+     * @return string Morph alias or full namespace class name
      */
     protected function getMorphClass(): string
     {
-        return $this->relatedClass;
+        // Check global morph map for alias
+        $alias = Relation::getMorphAlias($this->relatedClass);
+
+        return $alias;
     }
 
     // =========================================================================
