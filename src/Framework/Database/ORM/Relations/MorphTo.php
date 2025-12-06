@@ -236,6 +236,28 @@ class MorphTo extends Relation
 
     /**
      * {@inheritdoc}
+     *
+     * IMPORTANT: MorphTo does NOT copy where constraints from the original query.
+     *
+     * Unlike other relationships (HasMany, BelongsTo, etc.), MorphTo is a polymorphic
+     * inverse relationship that loads models from DIFFERENT tables based on morph type.
+     * The constraints defined on the root model's query (e.g., whereHas conditions)
+     * should NOT be applied to the related models' queries because:
+     *
+     * 1. The columns may not exist on the related tables (e.g., 'width' column on images
+     *    table should not be applied to videos table query)
+     * 2. Each morph type should have its own constraints via constrain() method
+     * 3. This matches Laravel's behavior where MorphTo eager loading creates fresh
+     *    queries per morph type without inheriting parent constraints
+     *
+     * Example of WRONG behavior (before fix):
+     * - PostModel::whereHas('image', fn($q) => $q->where('width', '>=', 100))
+     *   ->with(['image.imageable' => fn($m) => $m->constrain([...])])
+     * - The 'width >= 100' constraint would incorrectly leak into VideoModel query
+     *
+     * Example of CORRECT behavior (after fix):
+     * - Each morph type (PostModel, VideoModel) gets a clean query
+     * - Constraints are applied only via constrain() method per morph type
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
@@ -257,8 +279,11 @@ class MorphTo extends Relation
         // freshQuery already has the table set from loadRelationBatch
         $instance->setQuery($freshQuery);
 
-        // Copy where constraints from original query (excluding parent-specific local key constraint)
-        $this->copyWhereConstraints($freshQuery, [$this->localKey]);
+        // NOTE: We intentionally do NOT call copyWhereConstraints() here.
+        // MorphTo creates separate queries for each morph type, and the constraints
+        // from the parent query (like whereHas conditions) should not leak into
+        // these type-specific queries. Type-specific constraints should be applied
+        // via the constrain() method instead.
 
         return $instance;
     }
