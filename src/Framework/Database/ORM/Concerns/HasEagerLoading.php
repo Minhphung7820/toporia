@@ -372,7 +372,31 @@ trait HasEagerLoading
         $modelsArray = $models->all();
         $eagerRelation->addEagerConstraints($modelsArray);
 
-        // Execute query to get all related models
+        // MorphTo has special handling - it does its own matching in getEager()
+        // This follows Laravel's architecture where MorphTo creates fresh queries per morph type
+        if ($eagerRelation instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+            // Store relation name before calling getEager (needed for matchToMorphParents)
+            $eagerRelation->match($modelsArray, new ModelCollection([]), $relationName);
+
+            // Execute eager loading - MorphTo handles matching internally
+            // getEager() creates fresh queries for each morph type and matches results
+            $eagerRelation->getEager();
+
+            // Set eagerLoaded flag on models
+            foreach ($modelsArray as $model) {
+                if (!isset($model->eagerLoaded)) {
+                    $model->eagerLoaded = [];
+                }
+                $model->eagerLoaded[$relationName] = true;
+            }
+
+            // MorphTo doesn't support nested relations loading in the same way
+            // because results are different types. Nested loading is handled
+            // via morphWith() method which applies eager loads per morph type.
+            return;
+        }
+
+        // Execute query to get all related models (for non-MorphTo relations)
         $results = $eagerRelation->getResults();
 
         // Early return if no results (avoid unnecessary operations)
