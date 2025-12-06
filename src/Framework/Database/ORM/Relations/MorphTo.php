@@ -48,6 +48,14 @@ class MorphTo extends Relation
     protected array $morphableEagerLoads = [];
 
     /**
+     * Nested eager loads to apply to all morph types (from dot notation like 'imageable.comments').
+     * These are applied AFTER type-specific morphableEagerLoads.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $nestedEagerLoads = [];
+
+    /**
      * Dictionary of models grouped by morph type and foreign key.
      * Structure: [morphType => [foreignKey => [model1, model2, ...]]]
      *
@@ -188,10 +196,17 @@ class MorphTo extends Relation
         // Start with a completely fresh query using static method
         $query = $modelClass::query();
 
-        // Apply eager loads for this type (from morphWith())
-        $eagerLoads = $this->morphableEagerLoads[$modelClass] ?? [];
-        if (!empty($eagerLoads)) {
-            $query->with($eagerLoads);
+        // Build combined eager loads:
+        // 1. Type-specific eager loads from morphWith() (highest priority)
+        // 2. Universal nested eager loads from dot notation (applies to all types)
+        $typeSpecificLoads = $this->morphableEagerLoads[$modelClass] ?? [];
+        $universalLoads = $this->nestedEagerLoads;
+
+        // Merge: type-specific takes priority over universal
+        $combinedEagerLoads = array_merge($universalLoads, $typeSpecificLoads);
+
+        if (!empty($combinedEagerLoads)) {
+            $query->with($combinedEagerLoads);
         }
 
         // Apply constraints for this type (from constrain())
@@ -398,6 +413,40 @@ class MorphTo extends Relation
         return $this;
     }
 
+    /**
+     * Set nested eager loads that apply to ALL morph types.
+     *
+     * This is used internally by the eager loading system when dot notation
+     * is used to load nested relations through MorphTo.
+     *
+     * Example: 'image.imageable.comments' will set ['comments' => constraint]
+     * as a nested eager load that applies to whatever model type imageable resolves to.
+     *
+     * @param array<string, mixed> $nestedLoads Array of relation names to eager load
+     * @return $this
+     *
+     * @internal Used by HasEagerLoading trait
+     */
+    public function setNestedEagerLoads(array $nestedLoads): static
+    {
+        $this->nestedEagerLoads = array_merge(
+            $this->nestedEagerLoads,
+            $nestedLoads
+        );
+
+        return $this;
+    }
+
+    /**
+     * Get the nested eager loads.
+     *
+     * @return array<string, mixed>
+     */
+    public function getNestedEagerLoads(): array
+    {
+        return $this->nestedEagerLoads;
+    }
+
     // =========================================================================
     // FACTORY METHOD FOR EAGER LOADING
     // =========================================================================
@@ -425,6 +474,7 @@ class MorphTo extends Relation
         $instance->setMorphMap($this->morphMap);
         $instance->morphableConstraints = $this->morphableConstraints;
         $instance->morphableEagerLoads = $this->morphableEagerLoads;
+        $instance->nestedEagerLoads = $this->nestedEagerLoads;
 
         return $instance;
     }

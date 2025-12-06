@@ -378,8 +378,34 @@ trait HasEagerLoading
             // Store relation name before calling getEager (needed for matchToMorphParents)
             $eagerRelation->match($modelsArray, new ModelCollection([]), $relationName);
 
+            // Pass nested relations to MorphTo so it can load them for each morph type
+            // This enables dot notation like 'imageable.comments' to work through MorphTo
+            // The nested relations will be applied to ALL morph types (VideoModel, PostModel, etc.)
+            $nestedRelations = $context['nestedRelations'] ?? [];
+            $nestedConstraints = $context['nestedConstraints'] ?? [];
+
+            if (isset($nestedRelations[$relationName]) && !empty($nestedRelations[$relationName])) {
+                $nestedRelationsToLoad = $nestedRelations[$relationName];
+                $nestedConstraintsForThisRelation = $nestedConstraints[$relationName] ?? [];
+
+                // Build nested eager loads with constraints
+                $nestedEagerLoads = [];
+                foreach ($nestedRelationsToLoad as $nestedRelation) {
+                    if (isset($nestedConstraintsForThisRelation[$nestedRelation])) {
+                        $nestedEagerLoads[$nestedRelation] = $nestedConstraintsForThisRelation[$nestedRelation];
+                    } else {
+                        // No constraint - add as simple relation
+                        $nestedEagerLoads[] = $nestedRelation;
+                    }
+                }
+
+                // Set nested eager loads on MorphTo - these will be applied to ALL morph types
+                $eagerRelation->setNestedEagerLoads($nestedEagerLoads);
+            }
+
             // Execute eager loading - MorphTo handles matching internally
             // getEager() creates fresh queries for each morph type and matches results
+            // Nested relations are now included via setNestedEagerLoads()
             $eagerRelation->getEager();
 
             // Set eagerLoaded flag on models
@@ -390,9 +416,6 @@ trait HasEagerLoading
                 $model->eagerLoaded[$relationName] = true;
             }
 
-            // MorphTo doesn't support nested relations loading in the same way
-            // because results are different types. Nested loading is handled
-            // via morphWith() method which applies eager loads per morph type.
             return;
         }
 
