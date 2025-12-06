@@ -1991,6 +1991,9 @@ final class ProductController extends BaseController
                         $q->orderBy('size', 'DESC');
                     }
                 ])
+                ->with('tags', function ($q) {
+                    $q->select('id', 'name', 'slug')->orderBy('name', 'ASC');
+                })
                 ->where('is_published', true)
                 ->limit(5)
                 ->get();
