@@ -2369,8 +2369,8 @@ class ModelQueryBuilder extends QueryBuilder
         /** @var callable $normalizeMethod */
         $normalizeMethod = [$this->modelClass, 'normalizeWithRelations'];
         $normalized = $normalizeMethod($relations);
-        // Set eager load
-        $this->setEagerLoad($normalized);
+        // Merge with existing eager load instead of replacing
+        $this->setEagerLoad(array_merge($this->eagerLoad, $normalized));
 
         return $this;
     }
