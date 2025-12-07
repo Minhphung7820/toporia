@@ -213,12 +213,10 @@ trait HasEagerLoading
                 // Example: 'reviews' => fn($q) => $q->where('helpful_count', '<', 20)
                 // IMPORTANT: Always store constraint, even if relation is already grouped
                 // This ensures constraints aren't lost when both 'relation' and 'relation.nested' are defined
-                // CRITICAL: Parent constraint takes priority - preserve existing constraint if already set
-                // This ensures that when both 'image' and 'image.imageable' are defined,
-                // the 'image' constraint (select, orderBy) defined first is preserved and not overridden
-                if ($constraint !== null && !isset($constraints[$firstLevelRelation])) {
-                    // Preserve parent constraint - only set if not already exists (processed first due to sorting)
-                    // This ensures parent constraints (select, orderBy) are never overridden by nested constraints
+                // CRITICAL FIX: Remove !isset() check to allow overwriting
+                // Due to sorting (direct relations before nested), this ensures direct relation
+                // constraints are ALWAYS set, even if $grouped entry was created during nested parsing
+                if ($constraint !== null) {
                     $constraints[$firstLevelRelation] = $constraint;
                 }
             }
@@ -296,14 +294,14 @@ trait HasEagerLoading
         // Use proper merge to avoid array_merge_recursive issues with duplicate keys
         if (!empty($nestedConstraints)) {
             $existingConstraints = $context['nestedConstraints'] ?? [];
-            foreach ($nestedConstraints as $firstLevel => $constraints) {
+            foreach ($nestedConstraints as $firstLevel => $nestedConstraintList) {
                 if (!isset($existingConstraints[$firstLevel])) {
                     $existingConstraints[$firstLevel] = [];
                 }
                 // Merge constraints, later ones override earlier ones (Laravel behavior)
                 $existingConstraints[$firstLevel] = array_merge(
                     $existingConstraints[$firstLevel],
-                    $constraints
+                    $nestedConstraintList
                 );
             }
             $context['nestedConstraints'] = $existingConstraints;
