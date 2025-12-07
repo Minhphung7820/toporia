@@ -9,7 +9,6 @@ use Toporia\Framework\Database\ORM\ModelCollection;
 use Toporia\Framework\Database\ORM\Exceptions\RelationNotFoundException;
 use Toporia\Framework\Database\Contracts\RelationInterface;
 
-
 /**
  * Trait HasEagerLoading
  *
@@ -147,7 +146,26 @@ trait HasEagerLoading
             return [];
         }
 
+        // CRITICAL FIX: Sort relations to process direct relations BEFORE nested relations
+        // This ensures that when both 'image' and 'image.imageable' are defined,
+        // the constraint for 'image' is processed and not skipped.
+        // Example: ['image.imageable' => fn(), 'image' => fn()] becomes ['image' => fn(), 'image.imageable' => fn()]
+        $directRelations = [];
+        $nestedRelations = [];
         foreach ($relations as $key => $value) {
+            $relationName = is_string($key) ? $key : $value;
+            // Direct relations (no dot) come first, nested relations (with dot) come after
+            // PERFORMANCE: Use native str_contains() instead of Str::contains() for better performance
+            if (!str_contains($relationName, '.')) {
+                $directRelations[$key] = $value;
+            } else {
+                $nestedRelations[$key] = $value;
+            }
+        }
+        // Merge: direct first, then nested
+        $sortedRelations = $directRelations + $nestedRelations;
+
+        foreach ($sortedRelations as $key => $value) {
             // Handle format: ['relation' => Closure] or 'relation'
             $relationName = is_string($key) ? $key : $value;
             $constraint = is_string($key) && is_callable($value) ? $value : null;
@@ -193,12 +211,20 @@ trait HasEagerLoading
             } else {
                 // This is a first-level relation, store constraint for it
                 // Example: 'reviews' => fn($q) => $q->where('helpful_count', '<', 20)
-                if ($constraint !== null) {
+                // IMPORTANT: Always store constraint, even if relation is already grouped
+                // This ensures constraints aren't lost when both 'relation' and 'relation.nested' are defined
+                // CRITICAL: Parent constraint takes priority - preserve existing constraint if already set
+                // This ensures that when both 'image' and 'image.imageable' are defined,
+                // the 'image' constraint (select, orderBy) defined first is preserved and not overridden
+                if ($constraint !== null && !isset($constraints[$firstLevelRelation])) {
+                    // Preserve parent constraint - only set if not already exists (processed first due to sorting)
+                    // This ensures parent constraints (select, orderBy) are never overridden by nested constraints
                     $constraints[$firstLevelRelation] = $constraint;
                 }
             }
 
-            // Skip if already grouped (early exit for performance)
+            // Skip grouping if already grouped (early exit for performance)
+            // But still allow constraint to be stored above
             if (isset($grouped[$firstLevelRelation])) {
                 continue;
             }
@@ -285,6 +311,7 @@ trait HasEagerLoading
 
         // Return grouped relations with constraints
         // OPTIMIZATION: Pre-allocate result array with known size
+        // IMPORTANT: Use constraints array which includes both direct and first-level constraints
         $result = [];
         foreach ($grouped as $relationName => $instances) {
             // Skip empty instances array (defensive programming)
@@ -293,6 +320,8 @@ trait HasEagerLoading
             }
             $result[$relationName] = [
                 'instances' => $instances,
+                // Use constraint from $constraints which was populated above (line 199)
+                // This ensures constraints work even when 'relation.nested' is defined before 'relation'
                 'constraint' => $constraints[$relationName] ?? null,
             ];
         }
@@ -352,19 +381,40 @@ trait HasEagerLoading
             $freshQuery->table($table);
         }
 
-        // Use factory method to create eager loading instance
-        // This eliminates reflection overhead and follows Open/Closed principle
-        $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
-
-        // Apply constraint if provided
-        // For MorphTo relations, pass the relation instance to allow constrain() method
-        // For other relations, pass the query builder
+        // CRITICAL: Apply constraint BEFORE creating eager instance to ensure
+        // select/orderBy from constraint are preserved in the query
+        // This ensures that when both 'image' and 'image.imageable' are defined,
+        // the constraint for 'image' (select, orderBy) is preserved and not lost
+        //
+        // Flow:
+        // 1. Apply constraint to freshQuery (for non-MorphTo relations)
+        // 2. newEagerInstance copies select/orderBy from freshQuery to cleanQuery
+        // 3. For MorphTo, apply constraint after creating instance (needs constrain() method)
         if ($constraint !== null) {
-            if ($eagerRelation instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+            if ($firstRelation instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+                // For MorphTo, we need to create instance first, then apply constraint
+                // because MorphTo uses constrain() method, not direct query manipulation
+                $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
                 $constraint($eagerRelation);
             } else {
-                $constraint($eagerRelation->getQuery());
+                // For other relations, apply constraint to freshQuery first
+                // This ensures select/orderBy are in the query before newEagerInstance copies them
+                $constraint($freshQuery);
+
+                // Use factory method to create eager loading instance
+                // newEagerInstance will copy select/orderBy from freshQuery
+                $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
+
+                // Ensure constraint is also applied to eagerRelation's query
+                // in case newEagerInstance creates a new query instance
+                // This handles edge cases where query instance differs
+                if ($eagerRelation->getQuery() !== $freshQuery) {
+                    $constraint($eagerRelation->getQuery());
+                }
             }
+        } else {
+            // No constraint - just create eager instance normally
+            $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
         }
 
         // Add eager constraints to query (this will add WHERE IN clause for multiple models)

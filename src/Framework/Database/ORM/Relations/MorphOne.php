@@ -298,10 +298,13 @@ class MorphOne extends Relation
             $eagerQuery->table($table);
         }
 
-        // Copy selects
+        // Copy selects - if empty, Grammar will default to SELECT *
         $selects = $this->query->getColumns();
         if (!empty($selects)) {
             $eagerQuery->select($selects);
+        } else {
+            // No custom select from constraint - use default
+            $eagerQuery->select('*');
         }
 
         // Copy all where constraints (including eager constraints from addEagerConstraints)
@@ -449,10 +452,24 @@ class MorphOne extends Relation
             $cleanQuery->table($table);
         }
 
-        // Copy selects from freshQuery if any
+        // CRITICAL: Copy selects and orderBy from freshQuery FIRST
+        // This ensures that constraints from eager loading (like select/orderBy) are preserved
+        // when both direct relation ('image') and nested relation ('image.imageable') are defined
+        // The constraint for 'image' is applied to freshQuery before newEagerInstance is called,
+        // so we need to copy select/orderBy from freshQuery to preserve them
         $selects = $freshQuery->getColumns();
         if (!empty($selects)) {
             $cleanQuery->select($selects);
+        }
+
+        // Copy orderBy from freshQuery if any (from constraint closure)
+        $orders = $freshQuery->getOrders();
+        if (!empty($orders)) {
+            foreach ($orders as $order) {
+                if (isset($order['column'])) {
+                    $cleanQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
+                }
+            }
         }
 
         // CRITICAL: Copy all where constraints from original query (relationship method)

@@ -244,8 +244,24 @@ class HasManyThrough extends Relation
                     }
                 }
 
-                // Select columns needed for window function
-                $baseQuery->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
+                // Copy custom select from constraint closure, or use default
+                $customColumns = $this->query->getColumns();
+                if (!empty($customColumns)) {
+                    $baseQuery->select($customColumns);
+                    // Always need through table key for matching
+                    $baseQuery->selectRaw("{$throughTable}.{$this->firstKey}");
+                } else {
+                    $baseQuery->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
+                }
+
+                // Copy orderBy from constraint closure
+                $customOrders = $this->query->getOrders();
+                if (!empty($customOrders)) {
+                    foreach ($customOrders as $order) {
+                        if (!isset($order['column'])) continue;
+                        $baseQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
+                    }
+                }
 
                 // Build base query SQL and bindings
                 $baseQuerySql = $baseQuery->toSql();

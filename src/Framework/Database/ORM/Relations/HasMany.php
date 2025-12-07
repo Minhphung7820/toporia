@@ -183,13 +183,8 @@ class HasMany extends Relation
                     };
                 }
 
-                // Copy selects if any
-                $selects = $this->query->getColumns();
-                if (!empty($selects)) {
-                    $subQuery->select($selects);
-                } else {
-                    $subQuery->select('*');
-                }
+                // Copy custom select and orderBy from constraint closure
+                $this->copySelectAndOrderBy($this->query, $subQuery, true);
 
                 // Build optimized window function query directly
                 // Performance optimization: Use direct table reference instead of nested subquery when possible
@@ -372,10 +367,24 @@ class HasMany extends Relation
             $cleanQuery->table($table);
         }
 
-        // Copy selects from freshQuery if any
+        // CRITICAL: Copy selects and orderBy from freshQuery FIRST
+        // This ensures that constraints from eager loading (like select/orderBy) are preserved
+        // when both direct relation and nested relation are defined
+        // The constraint for direct relation is applied to freshQuery before newEagerInstance is called,
+        // so we need to copy select/orderBy from freshQuery to preserve them
         $selects = $freshQuery->getColumns();
         if (!empty($selects)) {
             $cleanQuery->select($selects);
+        }
+
+        // Copy orderBy from freshQuery if any (from constraint closure)
+        $orders = $freshQuery->getOrders();
+        if (!empty($orders)) {
+            foreach ($orders as $order) {
+                if (isset($order['column'])) {
+                    $cleanQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
+                }
+            }
         }
 
         // CRITICAL: Copy all where constraints from original query (relationship method)

@@ -246,80 +246,15 @@ class MorphToMany extends Relation
      */
     public function getResults(): ModelCollection
     {
-        $relatedTable = $this->getRelatedTable();
+        // For BOTH lazy and eager loading, ensure proper select with pivot columns
+        $this->ensureProperSelectWithPivot();
 
         if ($this->parent->exists()) {
-            $freshQuery = $this->query->newQuery()->table($relatedTable);
-
-            $freshQuery->join(
-                $this->pivotTable,
-                "{$relatedTable}.{$this->relatedKey}",
-                '=',
-                "{$this->pivotTable}.{$this->relatedPivotKey}"
-            );
-
-            $freshQuery->where("{$this->pivotTable}.{$this->morphType}", $this->getMorphClass());
-            $freshQuery->where("{$this->pivotTable}.{$this->foreignKey}", $this->parent->getAttribute($this->localKey));
-
-            // Always select related table columns
-            $freshQuery->select("{$relatedTable}.*");
-
-            // Always select pivot columns for MorphToMany (required for pivot data)
-            $freshQuery->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
-            $freshQuery->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
-            $freshQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
-
-            // Select additional pivot columns if needed
-            if ($this->shouldIncludePivot()) {
-                // Lazy load pivot columns only when withPivot('*') was used
-                if ($this->withPivotAll) {
-                    $this->ensurePivotColumnsLoaded();
-                }
-
-                $selectedColumns = [
-                    $this->morphType => true,
-                    $this->foreignKey => true,
-                    $this->relatedPivotKey => true,
-                ];
-
-                foreach ($this->pivotColumns as $column) {
-                    if (!isset($selectedColumns[$column])) {
-                        $freshQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
-                        $selectedColumns[$column] = true;
-                    }
-                }
-            }
-
-            $rowCollection = $freshQuery->get();
+            // Lazy loading - execute query directly
+            $rowCollection = $this->query->get();
         } else {
-            $this->query->select("{$relatedTable}.*");
-
-            // Always select pivot columns for MorphToMany (required for pivot data)
-            $this->query->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
-            $this->query->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
-            $this->query->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
-
-            // Select additional pivot columns if needed
-            if ($this->shouldIncludePivot()) {
-                // Lazy load pivot columns only when withPivot('*') was used
-                if ($this->withPivotAll) {
-                    $this->ensurePivotColumnsLoaded();
-                }
-
-                $selectedColumns = [
-                    $this->morphType => true,
-                    $this->foreignKey => true,
-                    $this->relatedPivotKey => true,
-                ];
-
-                foreach ($this->pivotColumns as $column) {
-                    if (!isset($selectedColumns[$column])) {
-                        $this->query->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
-                        $selectedColumns[$column] = true;
-                    }
-                }
-            }
-
+            // Eager loading - execute query directly
+            // ensureProperSelectWithPivot() already handled select and pivot columns above
             $rowCollection = $this->query->get();
         }
 
@@ -340,12 +275,86 @@ class MorphToMany extends Relation
     }
 
     /**
+     * Ensure proper SELECT columns including pivot columns.
+     *
+     * This method intelligently adds:
+     * 1. Custom select from constraint closure (if provided)
+     * 2. Default table.* select (if no custom select)
+     * 3. Pivot columns for matching and pivot data
+     *
+     * Handles both lazy and eager loading scenarios.
+     *
+     * @return void
+     */
+    protected function ensureProperSelectWithPivot(): void
+    {
+        $relatedTable = $this->getRelatedTable();
+        $currentColumns = $this->query->getColumns();
+
+        // Check if we already have pivot columns in select
+        $hasPivotColumns = false;
+        foreach ($currentColumns as $col) {
+            if ($col instanceof \Toporia\Framework\Database\Query\Expression) {
+                $colStr = (string) $col;
+                if (str_contains($colStr, 'pivot_') || str_contains($colStr, $this->pivotTable)) {
+                    $hasPivotColumns = true;
+                    break;
+                }
+            }
+        }
+
+        // If pivot columns already present, skip (avoid duplicates)
+        if ($hasPivotColumns) {
+            return;
+        }
+
+        // Check if we have custom select (filter out Expression objects - those are pivot columns)
+        $tableColumns = array_filter($currentColumns, fn($col) => !($col instanceof \Toporia\Framework\Database\Query\Expression));
+        $hasCustomSelect = !empty($tableColumns) && !in_array('*', $tableColumns, true);
+
+        if ($hasCustomSelect) {
+            // User provided custom select - keep it and append pivot columns
+            // Don't call select() again to avoid replacing existing select
+        } else {
+            // No custom select - add default table.*
+            // This might already be set to '*', but ensure it's table-prefixed for JOIN queries
+            $this->query->select("{$relatedTable}.*");
+        }
+
+        // Append required pivot columns for matching
+        $this->query->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
+        $this->query->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
+        $this->query->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
+
+        // Add additional pivot columns if requested
+        if ($this->shouldIncludePivot()) {
+            // Lazy load pivot columns only when withPivot('*') was used
+            if ($this->withPivotAll) {
+                $this->ensurePivotColumnsLoaded();
+            }
+
+            // Track which columns have already been selected
+            $selectedColumns = [
+                $this->morphType => true,
+                $this->foreignKey => true,
+                $this->relatedPivotKey => true,
+            ];
+
+            foreach ($this->pivotColumns as $column) {
+                if (!isset($selectedColumns[$column])) {
+                    $this->query->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                    $selectedColumns[$column] = true;
+                }
+            }
+        }
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function addEagerConstraints(array $models): void
     {
-        $relatedTable = $this->getRelatedTable();
-
+        // Group models by morph type
         $types = [];
         foreach ($models as $model) {
             // Use getMorphClass() if available, otherwise use get_class()
@@ -355,15 +364,9 @@ class MorphToMany extends Relation
             $types[$type][] = $model->getAttribute($this->localKey);
         }
 
-        $this->query = $this->query->newQuery()->table($relatedTable);
-
-        $this->query->join(
-            $this->pivotTable,
-            "{$relatedTable}.{$this->relatedKey}",
-            '=',
-            "{$this->pivotTable}.{$this->relatedPivotKey}"
-        );
-
+        // Add WHERE constraints for eager loading
+        // DO NOT recreate query - newEagerInstance() already set up JOIN and table
+        // Constraint closure was already applied, so don't erase select()
         $pivotTable = $this->pivotTable;
         $morphType = $this->morphType;
         $foreignKey = $this->foreignKey;
@@ -379,40 +382,9 @@ class MorphToMany extends Relation
             }
         });
 
-        // Select related table columns and pivot columns with alias for consistency
-        $this->query->select("{$relatedTable}.*");
-
-        // Always select morphType, foreignKey, and relatedPivotKey for matching (required for eager loading)
-        $this->query->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
-        $this->query->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
-        $this->query->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
-
-        // Only select additional pivot columns if we should include pivot object
-        if ($this->shouldIncludePivot()) {
-            // Lazy load pivot columns only when withPivot('*') was used
-            if ($this->withPivotAll) {
-                $this->ensurePivotColumnsLoaded();
-            }
-
-            // Track which columns have already been selected to avoid duplicates
-            $selectedColumns = [
-                $this->morphType => true,
-                $this->foreignKey => true,
-                $this->relatedPivotKey => true,
-            ];
-
-            // Add other pivot columns (withTimestamps() already adds created_at/updated_at to $pivotColumns)
-            foreach ($this->pivotColumns as $column) {
-                // Skip if already added (morphType, foreignKey, or relatedPivotKey might be in pivotColumns)
-                if (!isset($selectedColumns[$column])) {
-                    $this->query->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
-                    $selectedColumns[$column] = true;
-                }
-            }
-        }
-
-        // Apply soft delete scope if related model uses soft deletes
-        $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
+        // DO NOT set default select or pivot columns here!
+        // Reason: Constraint closure was ALREADY applied BEFORE this method
+        // getResults() will intelligently add pivot columns to preserve constraint's select()
     }
 
     /**
@@ -874,38 +846,9 @@ class MorphToMany extends Relation
                 "{$this->pivotTable}.{$this->relatedPivotKey}"
             );
 
-        // Build SELECT clause with pivot columns using selectRaw for proper alias handling
-        // This ensures pivot columns are selected with correct aliases
-        $cleanQuery->select("{$relatedTable}.*");
-
-        // Always select morphType, foreignKey, and relatedPivotKey from pivot table (required for matching)
-        $cleanQuery->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
-        $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
-        $cleanQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
-
-        // Only select additional pivot columns if we should include pivot object
-        if ($this->shouldIncludePivot()) {
-            // Lazy load pivot columns only when withPivot('*') was used
-            if ($this->withPivotAll) {
-                $this->ensurePivotColumnsLoaded();
-            }
-
-            // Track which columns have already been selected to avoid duplicates
-            $selectedColumns = [
-                $this->morphType => true,
-                $this->foreignKey => true,
-                $this->relatedPivotKey => true,
-            ];
-
-            // Add other pivot columns (withTimestamps() already adds created_at/updated_at to $pivotColumns)
-            foreach ($this->pivotColumns as $column) {
-                // Skip if already added (morphType, foreignKey, or relatedPivotKey might be in pivotColumns)
-                if (!isset($selectedColumns[$column])) {
-                    $cleanQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
-                    $selectedColumns[$column] = true;
-                }
-            }
-        }
+        // DO NOT set default select here - let it be set by eager loading constraints
+        // If no constraints provide select, getResults() will add it along with pivot columns
+        // This ensures user-provided select() in eager loading constraints is respected
 
         $instance->setQuery($cleanQuery);
 

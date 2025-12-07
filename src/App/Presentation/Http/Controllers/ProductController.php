@@ -1966,6 +1966,10 @@ final class ProductController extends BaseController
                 }
             })
                 ->with([
+                    'image' => function ($q) {
+                        $q->select('id', 'imageable_type', 'imageable_id', 'url', 'width', 'height', 'size', 'alt_text')
+                            ->orderBy('size', 'DESC');
+                    },
                     'image.imageable' => function (MorphTo $morphTo) use ($publishedOnly, $minViews) {
                         $morphTo->constrain([
                             PostModel::class => function ($query) use ($publishedOnly, $minViews) {
@@ -1985,14 +1989,10 @@ final class ProductController extends BaseController
                                 }
                             },
                         ]);
-                    },
-
-                    'image' => function ($q) {
-                        $q->select('id', 'imageable_type', 'imageable_id', 'url', 'width', 'height', 'size', 'alt_text')->orderBy('size', 'DESC');
                     }
                 ])
                 ->with('tags', function ($q) {
-                    $q->select('id', 'name', 'slug')->orderBy('name', 'ASC');
+                    $q->select('tags.id', 'tags.name', 'tags.slug')->orderBy('tags.name', 'ASC');
                 })
                 ->where('is_published', true)
                 ->limit(5)

@@ -751,6 +751,44 @@ abstract class Relation implements RelationInterface
     }
 
     /**
+     * Copy custom select and orderBy from source query to target query.
+     *
+     * This helper ensures eager loading constraint closures that contain
+     * select() and orderBy() calls are properly applied to queries.
+     *
+     * Usage: Call this when rebuilding queries in getResults() methods.
+     *
+     * @param QueryBuilder $sourceQuery Source query with constraints
+     * @param QueryBuilder $targetQuery Target query to copy to
+     * @param bool $addDefaultSelect Whether to add SELECT * if no custom select
+     * @return void
+     */
+    protected function copySelectAndOrderBy(
+        QueryBuilder $sourceQuery,
+        QueryBuilder $targetQuery,
+        bool $addDefaultSelect = true
+    ): void {
+        // Copy custom select from constraint closure if provided
+        $customColumns = $sourceQuery->getColumns();
+        if (!empty($customColumns)) {
+            // User provided custom select - use it
+            $targetQuery->select($customColumns);
+        } elseif ($addDefaultSelect) {
+            // No custom select - use default SELECT *
+            $targetQuery->select('*');
+        }
+
+        // Copy orderBy from constraint closure if provided
+        $customOrders = $sourceQuery->getOrders();
+        if (!empty($customOrders)) {
+            foreach ($customOrders as $order) {
+                if (!isset($order['column'])) continue;
+                $targetQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
+            }
+        }
+    }
+
+    /**
      * Get the order direction for a specific column from query.
      *
      * Helper method for cursor pagination.

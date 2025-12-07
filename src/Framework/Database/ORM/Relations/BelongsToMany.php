@@ -661,11 +661,20 @@ class BelongsToMany extends Relation
                     };
                 }
 
-                // Select columns needed for window function
-                $baseQuery->select("{$relatedTable}.*");
+                // Copy custom select from constraint closure if provided, otherwise use default
+                $customColumns = $this->query->getColumns();
+                if (!empty($customColumns)) {
+                    // User provided custom select - use it
+                    $baseQuery->select($customColumns);
+                } else {
+                    // No custom select - use default table.*
+                    $baseQuery->select("{$relatedTable}.*");
+                }
+
                 // Always need pivot keys for matching (with aliases)
                 $baseQuery->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
                 $baseQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
+
                 // Include additional pivot columns if needed
                 if ($this->shouldIncludePivot()) {
                     // Lazy load pivot columns only when withPivot('*') was used
@@ -677,6 +686,15 @@ class BelongsToMany extends Relation
                         if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
                             $baseQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
                         }
+                    }
+                }
+
+                // Copy orderBy from constraint closure if provided
+                $customOrders = $this->query->getOrders();
+                if (!empty($customOrders)) {
+                    foreach ($customOrders as $order) {
+                        if (!isset($order['column'])) continue;
+                        $baseQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
                     }
                 }
 
@@ -735,19 +753,10 @@ class BelongsToMany extends Relation
      */
     protected function getResultsFallback(): ModelCollection
     {
-        try {
-            $rows = $this->query->get();
-        } catch (\Exception $e) {
-            // If query fails due to missing pivot columns, try without pivot columns
-            if (Str::contains($e->getMessage(), 'Unknown column') && Str::contains($e->getMessage(), 'pivot_')) {
-                // Remove pivot columns from select and retry
-                $relatedTable = $this->getRelatedTableName();
-                $this->query->select("{$relatedTable}.*");
-                $rows = $this->query->get();
-            } else {
-                throw $e;
-            }
-        }
+        // Ensure proper select columns are set before executing query
+        $this->ensureProperSelectWithPivot();
+
+        $rows = $this->query->get();
 
         if ($rows->isEmpty()) {
             return new ModelCollection([]);
@@ -755,6 +764,85 @@ class BelongsToMany extends Relation
 
         // Convert RowCollection to array for hydrate method
         return $this->relatedClass::hydrate($rows->toArray());
+    }
+
+    /**
+     * Ensure query has proper SELECT with pivot columns.
+     *
+     * This method intelligently handles three cases:
+     * 1. User provided custom select via constraint closure - append pivot columns to it
+     * 2. No select specified - set default table.* plus pivot columns
+     * 3. Select already includes pivot columns - do nothing
+     *
+     * This ensures eager loading constraints with select() work correctly
+     * while preserving pivot columns needed for relationship matching.
+     *
+     * @return void
+     */
+    protected function ensureProperSelectWithPivot(): void
+    {
+        $relatedTable = $this->getRelatedTableName();
+        $currentColumns = $this->query->getColumns();
+
+        // Check if we already have pivot columns in select
+        $hasPivotColumns = false;
+        foreach ($currentColumns as $col) {
+            if ($col instanceof \Toporia\Framework\Database\Query\Expression) {
+                $colStr = (string) $col;
+                if (str_contains($colStr, 'pivot_') || str_contains($colStr, $this->pivotTable)) {
+                    $hasPivotColumns = true;
+                    break;
+                }
+            }
+        }
+
+        // If pivot columns already present, don't modify
+        if ($hasPivotColumns) {
+            return;
+        }
+
+        // Determine if user provided custom select or if we need default
+        $hasCustomSelect = !empty($currentColumns);
+
+        if ($hasCustomSelect) {
+            // User provided custom select - preserve it and append pivot columns
+            // Use addSelect() to append without replacing existing columns
+            $this->addPivotColumnsToQuery();
+        } else {
+            // No select specified - set default table.* plus pivot columns
+            $this->query->select("{$relatedTable}.*");
+            $this->addPivotColumnsToQuery();
+        }
+    }
+
+    /**
+     * Add pivot columns to the current query using selectRaw.
+     *
+     * Adds pivot foreign key and related key columns needed for matching,
+     * plus any additional pivot columns specified via withPivot().
+     *
+     * @return void
+     */
+    protected function addPivotColumnsToQuery(): void
+    {
+        // Lazy load pivot columns only when withPivot('*') was used
+        if ($this->shouldIncludePivot() && $this->withPivotAll) {
+            $this->ensurePivotColumnsLoaded();
+        }
+
+        // Always select pivot keys for matching (required even without withPivot)
+        $this->query->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
+        $this->query->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
+
+        // Add additional pivot columns if specified via withPivot()
+        if ($this->shouldIncludePivot()) {
+            foreach ($this->pivotColumns as $column) {
+                // Skip keys we already added
+                if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
+                    $this->query->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                }
+            }
+        }
     }
 
     /**
@@ -2183,35 +2271,12 @@ class BelongsToMany extends Relation
                 "{$this->pivotTable}.{$this->relatedPivotKey}"
             );
 
-        // Build SELECT clause with pivot columns using selectRaw for proper alias handling
-        // This ensures pivot columns are selected with correct aliases
-        $cleanQuery->select("{$relatedTable}.*");
+        // DO NOT set default select here - let it be set by eager loading constraints
+        // If no constraints provide select, getResults() will add it along with pivot columns
+        // This ensures user-provided select() in eager loading constraints is respected
 
-        // Only select pivot keys if we need to include pivot object or for matching in eager loading
-        // Pivot keys are always needed for matching, but we only create pivot object when withPivot/withTimestamps is used
-        if ($this->shouldIncludePivot()) {
-            // Lazy load pivot columns only when withPivot('*') was used
-            if ($this->withPivotAll) {
-                $this->ensurePivotColumnsLoaded();
-            }
-
-            // Always select foreignPivotKey and relatedPivotKey from pivot table
-            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
-            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
-
-            // Add other pivot columns
-            foreach ($this->pivotColumns as $column) {
-                // Skip if already added (foreignPivotKey or relatedPivotKey might be in pivotColumns)
-                if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
-                    $cleanQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
-                }
-            }
-        } else {
-            // Still need pivot keys for matching in eager loading, but don't create pivot object
-            // Select them but we won't create pivot object later
-            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
-            $cleanQuery->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
-        }
+        // Store pivot columns to be added later (after eager loading constraints are applied)
+        // This ensures custom select() from constraints doesn't lose pivot columns needed for matching
 
         // Copy where constraints from original query (excluding pivot and parent-specific constraints)
         // This ensures constraints like ->where('slug', 'like', '%Repellat%') are preserved
