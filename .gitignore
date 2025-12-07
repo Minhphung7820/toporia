@@ -92,6 +92,7 @@ test-results
 # ==========================================
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 *~
