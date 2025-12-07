@@ -1988,7 +1988,7 @@ final class ProductController extends BaseController
                     },
 
                     'image' => function ($q) {
-                        $q->orderBy('size', 'DESC');
+                        $q->select('id', 'imageable_type', 'imageable_id', 'url', 'width', 'height', 'size', 'alt_text')->orderBy('size', 'DESC');
                     }
                 ])
                 ->with('tags', function ($q) {
