@@ -2282,8 +2282,7 @@ final class ProductController extends BaseController
                 $q->whereIn('id', function ($subQ) {
                     $subQ->table('comments')
                         ->select('id')
-                        ->where('is_approved', true)
-                        ->limit(100);
+                        ->where('is_approved', true);
                 });
             })
                 ->where(function ($q) {

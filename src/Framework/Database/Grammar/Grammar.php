@@ -253,19 +253,7 @@ abstract class Grammar implements GrammarInterface
         foreach ($wheres as $index => $where) {
             $boolean = $index === 0 ? 'WHERE' : strtoupper($where['boolean']);
 
-            // Merge bindings from subqueries (inSub, notInSub) before compiling
-            if (
-                in_array($where['type'], ['inSub', 'notInSub', 'InSub', 'NotInSub'])
-                && isset($where['query'])
-                && $where['query'] instanceof \Toporia\Framework\Database\Query\QueryBuilder
-            ) {
-                // Merge subquery bindings into main query
-                foreach ($where['query']->getBindings() as $binding) {
-                    $query->addBinding($binding);
-                }
-            }
-
-            $compiled[] = $boolean . ' ' . $this->compileWhere($where);
+            $compiled[] = $boolean . ' ' . $this->compileWhere($where, $query);
         }
 
         return implode(' ', $compiled);
@@ -275,9 +263,10 @@ abstract class Grammar implements GrammarInterface
      * Compile a single WHERE clause.
      *
      * @param array<string, mixed> $where
+     * @param QueryBuilder|null $mainQuery The main query (for merging subquery bindings)
      * @return string
      */
-    protected function compileWhere(array $where): string
+    protected function compileWhere(array $where, ?QueryBuilder $mainQuery = null): string
     {
         $type = $where['type'];
 
@@ -286,12 +275,12 @@ abstract class Grammar implements GrammarInterface
             'Basic' => $this->compileBasicWhere($where), // Backward compatibility
             'in' => $this->compileWhereIn($where),
             'notIn' => $this->compileWhereNotIn($where),
-            'inSub' => $this->compileWhereInSub($where),
-            'notInSub' => $this->compileWhereNotInSub($where),
+            'inSub' => $this->compileWhereInSub($where, $mainQuery),
+            'notInSub' => $this->compileWhereNotInSub($where, $mainQuery),
             'Null' => $this->compileWhereNull($where),
             'NotNull' => $this->compileWhereNotNull($where),
-            'nested' => $this->compileNestedWhere($where),
-            'Nested' => $this->compileNestedWhere($where), // Backward compatibility
+            'nested' => $this->compileNestedWhere($where, $mainQuery),
+            'Nested' => $this->compileNestedWhere($where, $mainQuery), // Backward compatibility
             'Raw' => $where['sql'],
             'DateBasic' => $this->compileDateBasicWhere($where),
             'MonthBasic' => $this->compileMonthBasicWhere($where),
@@ -301,8 +290,8 @@ abstract class Grammar implements GrammarInterface
             'Column' => $this->compileColumnWhere($where),
             'Exists' => $this->compileExistsWhere($where),
             'NotExists' => $this->compileNotExistsWhere($where),
-            'InSub' => $this->compileWhereInSub($where), // Backward compatibility
-            'NotInSub' => $this->compileWhereNotInSub($where), // Backward compatibility
+            'InSub' => $this->compileWhereInSub($where, $mainQuery), // Backward compatibility
+            'NotInSub' => $this->compileWhereNotInSub($where, $mainQuery), // Backward compatibility
             // JSON WHERE types - multi-database support
             'Json' => $this->compileJsonWhere($where),
             'JsonContainsKey' => $this->compileJsonContainsKeyWhere($where),
@@ -392,12 +381,6 @@ abstract class Grammar implements GrammarInterface
 
             $subquery = $subquery->toSql();
 
-            // MySQL doesn't support LIMIT/OFFSET in IN subqueries
-            // Remove them from the compiled SQL string
-            // Pattern matches: " LIMIT n" or " LIMIT n OFFSET m" or " OFFSET m" at the end
-            $subquery = preg_replace('/\s+LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?\s*$/i', '', $subquery);
-            $subquery = preg_replace('/\s+OFFSET\s+\d+\s*$/i', '', $subquery);
-
             // Validate compiled SQL is not empty
             if (empty(trim($subquery))) {
                 throw new \InvalidArgumentException("Subquery SQL cannot be empty");
@@ -429,12 +412,6 @@ abstract class Grammar implements GrammarInterface
             }
 
             $subquery = $subquery->toSql();
-
-            // MySQL doesn't support LIMIT/OFFSET in NOT IN subqueries
-            // Remove them from the compiled SQL string
-            // Pattern matches: " LIMIT n" or " LIMIT n OFFSET m" or " OFFSET m" at the end
-            $subquery = preg_replace('/\s+LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?\s*$/i', '', $subquery);
-            $subquery = preg_replace('/\s+OFFSET\s+\d+\s*$/i', '', $subquery);
 
             // Validate compiled SQL is not empty
             if (empty(trim($subquery))) {
@@ -475,10 +452,12 @@ abstract class Grammar implements GrammarInterface
      * @param array<string, mixed> $where
      * @return string
      */
-    protected function compileNestedWhere(array $where): string
+    protected function compileNestedWhere(array $where, ?QueryBuilder $mainQuery = null): string
     {
         /** @var QueryBuilder $query */
         $query = $where['query'];
+        // For nested where, pass the nested query itself as the "main" query
+        // so that subqueries within the nested where merge bindings into the nested query
         $compiled = $this->compileWheres($query);
 
         // Remove leading WHERE keyword for nested queries
@@ -607,13 +586,24 @@ abstract class Grammar implements GrammarInterface
      * @param array<string, mixed> $where
      * @return string
      */
-    protected function compileInSubWhere(array $where): string
+    protected function compileInSubWhere(array $where, ?QueryBuilder $mainQuery = null): string
     {
         $column = $this->wrapColumn($where['column']);
         /** @var \Toporia\Framework\Database\Query\QueryBuilder $subquery */
         $subquery = $where['query'];
         $grammar = $subquery->getConnection()->getGrammar();
+
+        // Compile subquery first to ensure all bindings are collected
         $sql = $grammar->compileSelect($subquery);
+
+        // Merge subquery bindings into main query AFTER compilation
+        // This ensures all bindings (including from nested subqueries) are included
+        if ($mainQuery !== null) {
+            foreach ($subquery->getBindings() as $binding) {
+                $mainQuery->addBinding($binding);
+            }
+        }
+
         return "{$column} IN ({$sql})";
     }
 
@@ -623,13 +613,24 @@ abstract class Grammar implements GrammarInterface
      * @param array<string, mixed> $where
      * @return string
      */
-    protected function compileNotInSubWhere(array $where): string
+    protected function compileNotInSubWhere(array $where, ?QueryBuilder $mainQuery = null): string
     {
         $column = $this->wrapColumn($where['column']);
         /** @var \Toporia\Framework\Database\Query\QueryBuilder $subquery */
         $subquery = $where['query'];
         $grammar = $subquery->getConnection()->getGrammar();
+
+        // Compile subquery first to ensure all bindings are collected
         $sql = $grammar->compileSelect($subquery);
+
+        // Merge subquery bindings into main query AFTER compilation
+        // This ensures all bindings (including from nested subqueries) are included
+        if ($mainQuery !== null) {
+            foreach ($subquery->getBindings() as $binding) {
+                $mainQuery->addBinding($binding);
+            }
+        }
+
         return "{$column} NOT IN ({$sql})";
     }
 
