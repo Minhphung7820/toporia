@@ -332,7 +332,8 @@ class MorphToMany extends Relation
                         $column = $where['column'] ?? '';
                         // Skip WHERE IN for pivot morph type and foreign key
                         if ((str_contains($column, $this->pivotTable) && str_contains($column, $foreignPivotKey)) ||
-                            (str_contains($column, $this->pivotTable) && str_contains($column, $relatedPivotKey))) {
+                            (str_contains($column, $this->pivotTable) && str_contains($column, $relatedPivotKey))
+                        ) {
                             continue;
                         }
                     }
@@ -392,7 +393,7 @@ class MorphToMany extends Relation
                     $rowFilter = "toporia_row <= {$limit}";
                 }
 
-                $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedForeignPivotKey}, {$wrappedRelatedPivotKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$wrappedForeignPivotKey} IN ({$morphTypePlaceholders}) AND {$wrappedRelatedPivotKey} IN ({$foreignKeyPlaceholders})) AS toporia_table WHERE {$rowFilter}";
+                $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedForeignPivotKey}, {$wrappedRelatedPivotKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$wrappedForeignPivotKey} IN ({$morphTypePlaceholders}) AND {$wrappedRelatedPivotKey} IN ({$foreignKeyPlaceholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
 
                 // Combine bindings: base query + morph types + foreign keys
                 $allBindings = array_merge($baseQueryBindings, $morphTypeValues, $foreignKeyValues);
