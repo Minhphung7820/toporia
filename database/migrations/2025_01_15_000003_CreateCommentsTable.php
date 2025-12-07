@@ -41,3 +41,4 @@ class CreateCommentsTable extends Migration
 
 
 
+
