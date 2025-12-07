@@ -2271,12 +2271,56 @@ class BelongsToMany extends Relation
                 "{$this->pivotTable}.{$this->relatedPivotKey}"
             );
 
-        // DO NOT set default select here - let it be set by eager loading constraints
-        // If no constraints provide select, getResults() will add it along with pivot columns
-        // This ensures user-provided select() in eager loading constraints is respected
+        // Copy select from freshQuery if provided
+        $selects = $freshQuery->getColumns();
+        if (!empty($selects)) {
+            $cleanQuery->select($selects);
+        }
+        // Otherwise DO NOT set default select here - getResults() will add it along with pivot columns
 
-        // Store pivot columns to be added later (after eager loading constraints are applied)
-        // This ensures custom select() from constraints doesn't lose pivot columns needed for matching
+        // Copy orderBy from freshQuery if any (from constraint closure)
+        $orders = $freshQuery->getOrders();
+        if (!empty($orders)) {
+            foreach ($orders as $order) {
+                if (isset($order['column'])) {
+                    $cleanQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
+                }
+            }
+        }
+
+        // Copy limit and offset from freshQuery (for window function optimization)
+        $limit = $freshQuery->getLimit();
+        if ($limit !== null) {
+            $cleanQuery->limit($limit);
+        }
+        $offset = $freshQuery->getOffset();
+        if ($offset !== null) {
+            $cleanQuery->offset($offset);
+        }
+
+        // CRITICAL: Copy all where constraints from freshQuery (eager loading constraints from callback)
+        // freshQuery contains constraints added by the eager loading callback like ->where('is_active', true)
+        $freshWheres = $freshQuery->getWheres();
+        foreach ($freshWheres as $where) {
+            match ($where['type'] ?? '') {
+                'basic' => $cleanQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $cleanQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $cleanQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $cleanQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $cleanQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'Raw' => $cleanQuery->whereRaw(
+                    $where['sql'] ?? '',
+                    $where['bindings'] ?? [],
+                    $where['boolean'] ?? 'AND'
+                ),
+                default => null
+            };
+        }
 
         // Copy where constraints from original query (excluding pivot and parent-specific constraints)
         // This ensures constraints like ->where('slug', 'like', '%Repellat%') are preserved

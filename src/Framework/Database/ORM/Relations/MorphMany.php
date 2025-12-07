@@ -197,7 +197,7 @@ class MorphMany extends Relation
         // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
         // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
         // Also supports offset()/skip() for pagination within each parent
-        if (($hasWhereIn || $hasMorphWhere) && $this->parent->exists()) {
+        if ($hasWhereIn || $hasMorphWhere) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();
             $offset = $this->query->getOffset();
@@ -247,8 +247,43 @@ class MorphMany extends Relation
                 $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
                 $baseQuery->table($table);
 
-                // Copy all where conditions from original query
+                // Extract morph type and foreign keys from nested where (from addEagerConstraints)
+                // This will be used to build WHERE clause in window function query
+                $morphConditions = [];
                 foreach ($wheres as $where) {
+                    if (strtolower($where['type'] ?? '') === 'nested') {
+                        if (isset($where['query']) && method_exists($where['query'], 'getWheres')) {
+                            $nestedWheres = $where['query']->getWheres();
+                            foreach ($nestedWheres as $nestedWhere) {
+                                // Look for: where($morphType, $type)->whereIn($foreignKey, $ids)
+                                // OR: orWhere($morphType, $type)->whereIn($foreignKey, $ids)
+                                if (isset($nestedWhere['query']) && method_exists($nestedWhere['query'], 'getWheres')) {
+                                    $subWheres = $nestedWhere['query']->getWheres();
+                                    $morphType = null;
+                                    $foreignIds = [];
+                                    foreach ($subWheres as $subWhere) {
+                                        if ($subWhere['type'] === 'basic' && ($subWhere['column'] ?? '') === $this->morphType) {
+                                            $morphType = $subWhere['value'] ?? null;
+                                        } elseif (strtolower($subWhere['type'] ?? '') === 'in' && ($subWhere['column'] ?? '') === $this->foreignKey) {
+                                            $foreignIds = $subWhere['values'] ?? [];
+                                        }
+                                    }
+                                    if ($morphType && !empty($foreignIds)) {
+                                        $morphConditions[] = ['type' => $morphType, 'ids' => $foreignIds];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Copy only non-nested where conditions to base query
+                foreach ($wheres as $where) {
+                    // Skip nested where (from addEagerConstraints), handled separately
+                    if (strtolower($where['type'] ?? '') === 'nested') {
+                        continue;
+                    }
+
                     match ($where['type'] ?? '') {
                         'basic' => $baseQuery->where(
                             $where['column'],
@@ -265,24 +300,6 @@ class MorphMany extends Relation
                             $where['bindings'] ?? [],
                             $where['boolean'] ?? 'AND'
                         ),
-                        'nested' => $baseQuery->where(function ($q) use ($where) {
-                            // Copy nested where conditions
-                            if (isset($where['query']) && method_exists($where['query'], 'getWheres')) {
-                                $nestedWheres = $where['query']->getWheres();
-                                foreach ($nestedWheres as $nestedWhere) {
-                                    if ($nestedWhere['type'] === 'basic') {
-                                        $q->where(
-                                            $nestedWhere['column'],
-                                            $nestedWhere['operator'] ?? '=',
-                                            $nestedWhere['value'] ?? null,
-                                            $nestedWhere['boolean'] ?? 'AND'
-                                        );
-                                    } elseif ($nestedWhere['type'] === 'In') {
-                                        $q->whereIn($nestedWhere['column'], $nestedWhere['values'] ?? [], $nestedWhere['boolean'] ?? 'AND');
-                                    }
-                                }
-                            }
-                        }, $where['boolean'] ?? 'AND'),
                         default => null
                     };
                 }
@@ -298,6 +315,19 @@ class MorphMany extends Relation
                 // Partition by both morphType and foreignKey to handle multiple types
                 // Support both limit and offset (skip) for pagination within each parent
 
+                // Build WHERE clause for morph conditions
+                // WHERE (type = ? AND id IN (...)) OR (type = ? AND id IN (...))
+                $morphWhereParts = [];
+                $morphBindings = [];
+                foreach ($morphConditions as $condition) {
+                    $idCount = count($condition['ids']);
+                    $idPlaceholders = implode(',', array_fill(0, $idCount, '?'));
+                    $morphWhereParts[] = "({$wrappedMorphType} = ? AND {$wrappedForeignKey} IN ({$idPlaceholders}))";
+                    $morphBindings[] = $condition['type'];
+                    $morphBindings = array_merge($morphBindings, $condition['ids']);
+                }
+                $morphWhereClause = implode(' OR ', $morphWhereParts);
+
                 // Build WHERE clause for row number filtering
                 // If offset is present, filter: offset < row <= (offset + limit)
                 // Otherwise, filter: row <= limit
@@ -310,10 +340,14 @@ class MorphMany extends Relation
                 $windowQuery = "SELECT * FROM (
                     SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedMorphType}, {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row
                     FROM ({$baseQuerySql}) AS toporia_base
+                    WHERE {$morphWhereClause}
                 ) AS toporia_table WHERE {$rowFilter}";
 
+                // Combine bindings: base query bindings + morph bindings
+                $allBindings = array_merge($baseQueryBindings, $morphBindings);
+
                 // Execute optimized window function query
-                $rows = $connection->select($windowQuery, $baseQueryBindings);
+                $rows = $connection->select($windowQuery, $allBindings);
 
                 if (empty($rows)) {
                     return new ModelCollection([]);
@@ -478,6 +512,41 @@ class MorphMany extends Relation
                     $cleanQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
                 }
             }
+        }
+
+        // Copy limit and offset from freshQuery (for window function optimization)
+        $limit = $freshQuery->getLimit();
+        if ($limit !== null) {
+            $cleanQuery->limit($limit);
+        }
+        $offset = $freshQuery->getOffset();
+        if ($offset !== null) {
+            $cleanQuery->offset($offset);
+        }
+
+        // CRITICAL: Copy all where constraints from freshQuery (eager loading constraints from callback)
+        // freshQuery contains constraints added by the eager loading callback like ->where('is_approved', true)
+        // These must be copied FIRST before copying constraints from original query
+        $freshWheres = $freshQuery->getWheres();
+        foreach ($freshWheres as $where) {
+            match ($where['type'] ?? '') {
+                'basic' => $cleanQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $cleanQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $cleanQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $cleanQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $cleanQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'Raw' => $cleanQuery->whereRaw(
+                    $where['sql'] ?? '',
+                    $where['bindings'] ?? [],
+                    $where['boolean'] ?? 'AND'
+                ),
+                default => null
+            };
         }
 
         // CRITICAL: Copy all where constraints from original query (relationship method)

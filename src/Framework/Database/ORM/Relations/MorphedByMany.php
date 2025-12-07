@@ -255,6 +255,162 @@ class MorphedByMany extends Relation
     {
         $relatedTable = $this->getRelatedTable();
 
+        // Check if this is eager loading with limit (needs window function optimization)
+        $wheres = $this->query->getWheres();
+        $hasWhereIn = false;
+        foreach ($wheres as $where) {
+            if (strtolower($where['type'] ?? '') === 'in') {
+                $hasWhereIn = true;
+                break;
+            }
+        }
+
+        // If eager loading with limit, use window function for optimal performance
+        if ($hasWhereIn && !$this->parent->exists()) {
+            $orders = $this->query->getOrders();
+            $limit = $this->query->getLimit();
+            $offset = $this->query->getOffset();
+
+            if ($limit !== null && $limit > 0) {
+                $grammar = $this->query->getConnection()->getGrammar();
+
+                // Check if database supports window functions
+                if (!$grammar->supportsFeature('window_functions')) {
+                    // Fallback: Execute query without per-parent limit optimization
+                    $this->query->select("{$relatedTable}.*");
+                    $rows = $this->query->get();
+                    if ($rows->isEmpty()) {
+                        return new ModelCollection([]);
+                    }
+                    return $this->relatedClass::hydrate($rows->toArray());
+                }
+
+                // Build window function query
+                $wrappedParentPivotKey = $grammar->wrapColumn("{$this->pivotTable}.{$this->parentPivotKey}");
+
+                // Build ORDER BY clause
+                $orderParts = [];
+                if (!empty($orders)) {
+                    foreach ($orders as $order) {
+                        $col = $order['column'] ?? '';
+                        $dir = strtoupper($order['direction'] ?? 'ASC');
+                        $wrappedCol = $grammar->wrapColumn($col);
+                        $orderParts[] = "{$wrappedCol} {$dir}";
+                    }
+                } else {
+                    $primaryKey = $this->relatedClass::getPrimaryKey();
+                    $wrappedPrimaryKey = $grammar->wrapColumn($primaryKey);
+                    $orderParts[] = "{$wrappedPrimaryKey} ASC";
+                }
+                $orderByClause = implode(', ', $orderParts);
+
+                // Get parent pivot key values from WHERE IN clause
+                $parentPivotKeyValues = [];
+                foreach ($wheres as $where) {
+                    if (strtolower($where['type'] ?? '') === 'in') {
+                        $column = $where['column'] ?? '';
+                        if (str_contains($column, $this->pivotTable) && str_contains($column, $this->parentPivotKey)) {
+                            $parentPivotKeyValues = $where['values'] ?? [];
+                            break;
+                        }
+                    }
+                }
+
+                // Build base query
+                $connection = $this->query->getConnection();
+                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery->table($relatedTable)
+                    ->join(
+                        $this->pivotTable,
+                        "{$relatedTable}.{$this->relatedKey}",
+                        '=',
+                        "{$this->pivotTable}.{$this->foreignKey}"
+                    );
+
+                // Copy all where conditions except WHERE IN for parent pivot key
+                foreach ($wheres as $where) {
+                    if (strtolower($where['type'] ?? '') === 'in') {
+                        $column = $where['column'] ?? '';
+                        if (str_contains($column, $this->pivotTable) && str_contains($column, $this->parentPivotKey)) {
+                            continue; // Skip, handled in window function
+                        }
+                    }
+                    match ($where['type'] ?? '') {
+                        'basic' => $baseQuery->where(
+                            $where['column'],
+                            $where['operator'] ?? '=',
+                            $where['value'] ?? null,
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        'Null' => $baseQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'NotNull' => $baseQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'In' => $baseQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'NotIn' => $baseQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'Raw' => $baseQuery->whereRaw(
+                            $where['sql'] ?? '',
+                            $where['bindings'] ?? [],
+                            $where['boolean'] ?? 'AND'
+                        ),
+                        default => null
+                    };
+                }
+
+                // Copy custom select or use default
+                $customColumns = $this->query->getColumns();
+                if (!empty($customColumns)) {
+                    $baseQuery->select($customColumns);
+                } else {
+                    $baseQuery->select("{$relatedTable}.*");
+                }
+
+                // Always need pivot key for matching
+                $baseQuery->selectRaw("{$this->pivotTable}.{$this->parentPivotKey} as pivot_{$this->parentPivotKey}");
+
+                // Include additional pivot columns if needed
+                if ($this->shouldIncludePivot()) {
+                    $baseQuery->selectRaw("{$this->pivotTable}.{$this->morphType} as pivot_{$this->morphType}");
+                    $baseQuery->selectRaw("{$this->pivotTable}.{$this->foreignKey} as pivot_{$this->foreignKey}");
+                    foreach ($this->pivotColumns as $column) {
+                        if (!in_array($column, [$this->parentPivotKey, $this->morphType, $this->foreignKey])) {
+                            $baseQuery->selectRaw("{$this->pivotTable}.{$column} as pivot_{$column}");
+                        }
+                    }
+                }
+
+                // Build base query SQL and bindings
+                $baseQuerySql = $baseQuery->toSql();
+                $baseQueryBindings = $baseQuery->getBindings();
+
+                // Build window function query
+                $placeholders = implode(',', array_fill(0, count($parentPivotKeyValues), '?'));
+
+                if ($offset !== null && $offset > 0) {
+                    $rowFilter = "toporia_row > {$offset} AND toporia_row <= " . ($offset + $limit);
+                } else {
+                    $rowFilter = "toporia_row <= {$limit}";
+                }
+
+                $windowQuery = "SELECT * FROM (
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedParentPivotKey} ORDER BY {$orderByClause}) AS toporia_row
+                    FROM ({$baseQuerySql}) AS toporia_base
+                    WHERE {$wrappedParentPivotKey} IN ({$placeholders})
+                ) AS toporia_table WHERE {$rowFilter}";
+
+                // Combine bindings
+                $allBindings = array_merge($baseQueryBindings, $parentPivotKeyValues);
+
+                // Execute window function query
+                $rows = $connection->select($windowQuery, $allBindings);
+
+                if (empty($rows)) {
+                    return new ModelCollection([]);
+                }
+
+                return $this->relatedClass::hydrate($rows);
+            }
+        }
+
+        // Standard execution path (lazy loading or eager without limit)
         if ($this->parent->exists()) {
             $freshQuery = $this->query->newQuery()->table($relatedTable);
 
@@ -886,8 +1042,58 @@ class MorphedByMany extends Relation
                 "{$this->pivotTable}.{$this->foreignKey}"
             );
 
-        // Build SELECT clause with pivot columns using selectRaw for proper alias handling
-        $cleanQuery->select("{$relatedTable}.*");
+        // Copy select from freshQuery if provided
+        $selects = $freshQuery->getColumns();
+        if (!empty($selects)) {
+            $cleanQuery->select($selects);
+        } else {
+            // Build SELECT clause with pivot columns using selectRaw for proper alias handling
+            $cleanQuery->select("{$relatedTable}.*");
+        }
+
+        // Copy orderBy from freshQuery if any (from constraint closure)
+        $orders = $freshQuery->getOrders();
+        if (!empty($orders)) {
+            foreach ($orders as $order) {
+                if (isset($order['column'])) {
+                    $cleanQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
+                }
+            }
+        }
+
+        // Copy limit and offset from freshQuery (for window function optimization)
+        $limit = $freshQuery->getLimit();
+        if ($limit !== null) {
+            $cleanQuery->limit($limit);
+        }
+        $offset = $freshQuery->getOffset();
+        if ($offset !== null) {
+            $cleanQuery->offset($offset);
+        }
+
+        // CRITICAL: Copy all where constraints from freshQuery (eager loading constraints from callback)
+        // freshQuery contains constraints added by the eager loading callback like ->where('is_active', true)
+        $freshWheres = $freshQuery->getWheres();
+        foreach ($freshWheres as $where) {
+            match ($where['type'] ?? '') {
+                'basic' => $cleanQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $cleanQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $cleanQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $cleanQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $cleanQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'Raw' => $cleanQuery->whereRaw(
+                    $where['sql'] ?? '',
+                    $where['bindings'] ?? [],
+                    $where['boolean'] ?? 'AND'
+                ),
+                default => null
+            };
+        }
 
         // Always select pivot keys for matching in eager loading
         if ($this->shouldIncludePivot()) {

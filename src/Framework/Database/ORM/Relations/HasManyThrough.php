@@ -449,8 +449,59 @@ class HasManyThrough extends Relation
                 "{$throughTable}.{$this->secondLocalKey}",
                 '=',
                 "{$relatedTable}.{$this->foreignKey}"
-            )
-            ->select("{$relatedTable}.*");
+            );
+
+        // Copy select from freshQuery if provided
+        $selects = $freshQuery->getColumns();
+        if (!empty($selects)) {
+            $cleanQuery->select($selects);
+        } else {
+            $cleanQuery->select("{$relatedTable}.*");
+        }
+
+        // Copy orderBy from freshQuery if any (from constraint closure)
+        $orders = $freshQuery->getOrders();
+        if (!empty($orders)) {
+            foreach ($orders as $order) {
+                if (isset($order['column'])) {
+                    $cleanQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
+                }
+            }
+        }
+
+        // Copy limit and offset from freshQuery (for window function optimization)
+        $limit = $freshQuery->getLimit();
+        if ($limit !== null) {
+            $cleanQuery->limit($limit);
+        }
+        $offset = $freshQuery->getOffset();
+        if ($offset !== null) {
+            $cleanQuery->offset($offset);
+        }
+
+        // CRITICAL: Copy all where constraints from freshQuery (eager loading constraints from callback)
+        // freshQuery contains constraints added by the eager loading callback like ->where('is_approved', true)
+        $freshWheres = $freshQuery->getWheres();
+        foreach ($freshWheres as $where) {
+            match ($where['type'] ?? '') {
+                'basic' => $cleanQuery->where(
+                    $where['column'],
+                    $where['operator'] ?? '=',
+                    $where['value'] ?? null,
+                    $where['boolean'] ?? 'AND'
+                ),
+                'Null' => $cleanQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
+                'NotNull' => $cleanQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                'In' => $cleanQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'NotIn' => $cleanQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                'Raw' => $cleanQuery->whereRaw(
+                    $where['sql'] ?? '',
+                    $where['bindings'] ?? [],
+                    $where['boolean'] ?? 'AND'
+                ),
+                default => null
+            };
+        }
 
         $instance->setQuery($cleanQuery);
 

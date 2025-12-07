@@ -2207,7 +2207,7 @@ final class ProductController extends BaseController
         if ($type === 'post') {
             // Test 1: Basic with() simple
             $postBasic = PostModel::with(['comments' => function ($q) {
-                $q->where('is_approved', true)->orderBy('created_at', 'DESC');
+                $q->where('is_approved', true)->orderBy('created_at', 'DESC')->limit(4);
             }])->find($id);
             $results['basic_with'] = $postBasic ? [
                 'post' => $postBasic->toArray(),
@@ -2298,14 +2298,15 @@ final class ProductController extends BaseController
                     }
                     $q->orderBy('created_at', 'DESC')
                         ->orderBy('id', 'DESC')
-                        ->limit($limit);
+                        ->limit(10);
                 }])
                 ->withCount(['comments as approved_comments_count' => function ($q) {
                     $q->where('is_approved', true);
                 }])
                 ->orderBy('views', 'DESC')
-                ->limit(10);
-            dd($postsWithComplexComments->get());
+                ->limit(10)
+                ->get();
+
             $results['nested_where_has_complex'] = $postsWithComplexComments->all();
 
             // Test 5: Multiple whereHas with orWhereHas
