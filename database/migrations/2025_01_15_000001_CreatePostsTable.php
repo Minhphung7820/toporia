@@ -39,3 +39,4 @@ class CreatePostsTable extends Migration
 
 
 
+
