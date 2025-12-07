@@ -2411,11 +2411,12 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         foreach ($relations as $key => $value) {
-            // Case 1: 'relation' => callback
+            // Case 1: 'relation' => callback or 'relation as alias' => callback
             if (is_string($key) && is_callable($value)) {
                 $this->addRelationCountSelect($key, $value);
             }
             // Case 2: numeric key with string value (no callback)
+            // Support: 'relation' or 'relation as alias'
             elseif (is_int($key) && is_string($value)) {
                 $this->addRelationCountSelect($value, null);
             }
@@ -3182,15 +3183,20 @@ class ModelQueryBuilder extends QueryBuilder
      */
     private function addRelationCountSelect(string $relation, ?callable $callback = null): void
     {
+        // Parse relation name and alias from format: 'relation' or 'relation as alias'
+        $relationParts = preg_split('/\s+as\s+/i', trim($relation), 2);
+        $relationName = $relationParts[0];
+        $alias = isset($relationParts[1]) ? trim($relationParts[1]) : null;
+
         /** @var callable $getTableName */
         $getTableName = [$this->modelClass, 'getTableName'];
         $table = $getTableName();
 
         $model = new $this->modelClass([]);
-        $relationInstance = $model->$relation();
+        $relationInstance = $model->$relationName();
 
         if (!$relationInstance instanceof RelationInterface) {
-            throw new \InvalidArgumentException("Method '{$relation}' is not a valid relationship");
+            throw new \InvalidArgumentException("Method '{$relationName}' is not a valid relationship");
         }
 
         $relationQuery = $relationInstance->getQuery();
@@ -3215,7 +3221,7 @@ class ModelQueryBuilder extends QueryBuilder
 
         // Special handling for BelongsToMany relationships (many-to-many through pivot table)
         if ($relationInstance instanceof BelongsToMany) {
-            $this->addBelongsToManyCountSelect($relationInstance, $relation, $table, $relationQuery);
+            $this->addBelongsToManyCountSelect($relationInstance, $relationName, $table, $relationQuery, $alias);
             return;
         }
 
@@ -3253,7 +3259,8 @@ class ModelQueryBuilder extends QueryBuilder
             $subquery .= " AND ({$boundWhereClause})";
         }
 
-        $columnAlias = "{$relation}_count";
+        // Use alias if provided, otherwise use relation name
+        $columnAlias = $alias !== null ? trim($alias) : "{$relationName}_count";
 
         // Ensure we select table.* along with the subquery (only once)
         $columns = $this->getColumns();
@@ -3280,7 +3287,8 @@ class ModelQueryBuilder extends QueryBuilder
         BelongsToMany $relationInstance,
         string $relation,
         string $table,
-        QueryBuilder $relationQuery
+        QueryBuilder $relationQuery,
+        ?string $alias = null
     ): void {
         // Get pivot table and keys using public methods
         $pivotTable = $relationInstance->getPivotTable();
@@ -3328,7 +3336,8 @@ class ModelQueryBuilder extends QueryBuilder
         // Note: Pivot where constraints (wherePivot, wherePivotIn) are already applied
         // to the relationQuery, so they'll be included in the above handling
 
-        $columnAlias = "{$relation}_count";
+        // Use alias if provided, otherwise use relation name
+        $columnAlias = $alias !== null ? $alias : "{$relation}_count";
 
         // Ensure we select table.* along with the subquery (only once)
         $columns = $this->getColumns();

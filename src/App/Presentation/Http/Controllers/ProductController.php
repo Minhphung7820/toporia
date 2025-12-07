@@ -2267,15 +2267,7 @@ final class ProductController extends BaseController
                 ->orderBy('comments_count', 'DESC')
                 ->limit(10)
                 ->get();
-            $results['where_has_with_aggregations'] = $postsWithComments->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'views' => $p->views,
-                    'comments_count' => $p->comments_count,
-                    'comments' => $p->comments->toArray(),
-                ];
-            })->all();
+            $results['where_has_with_aggregations'] = $postsWithComments->all();
 
             // Test 4: Nested whereHas with multiple conditions and subqueries
             $postsWithComplexComments = PostModel::whereHas('comments', function ($q) use ($approvedOnly, $dateFrom) {
@@ -2288,8 +2280,8 @@ final class ProductController extends BaseController
                     $q->whereDate('created_at', '>=', $dateFrom);
                 }
                 $q->whereIn('id', function ($subQ) {
-                    $subQ->select('id')
-                        ->from('comments')
+                    $subQ->table('comments')
+                        ->select('id')
                         ->where('is_approved', true)
                         ->limit(100);
                 });
@@ -2313,17 +2305,9 @@ final class ProductController extends BaseController
                     $q->where('is_approved', true);
                 }])
                 ->orderBy('views', 'DESC')
-                ->limit(10)
-                ->get();
-            $results['nested_where_has_complex'] = $postsWithComplexComments->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'views' => $p->views,
-                    'approved_comments_count' => $p->approved_comments_count,
-                    'comments' => $p->comments->toArray(),
-                ];
-            })->all();
+                ->limit(10);
+            dd($postsWithComplexComments->toSql());
+            $results['nested_where_has_complex'] = $postsWithComplexComments->all();
 
             // Test 5: Multiple whereHas with orWhereHas
             $postsWithMultipleConditions = PostModel::whereHas('comments', function ($q) {
@@ -2345,13 +2329,7 @@ final class ProductController extends BaseController
                 ->where('is_published', true)
                 ->limit(10)
                 ->get();
-            $results['multiple_where_has'] = $postsWithMultipleConditions->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'comments' => $p->comments->toArray(),
-                ];
-            })->all();
+            $results['multiple_where_has'] = $postsWithMultipleConditions->all();
         } elseif ($type === 'video') {
             // Test 1: Basic with() simple
             $videoBasic = VideoModel::with(['comments' => function ($q) {
@@ -2439,7 +2417,7 @@ final class ProductController extends BaseController
                 }
                 $q->whereIn('id', function ($subQ) {
                     $subQ->select('id')
-                        ->from('comments')
+                        ->table('comments')
                         ->where('is_approved', true)
                         ->limit(100);
                 });
@@ -2912,7 +2890,7 @@ final class ProductController extends BaseController
                 $subQ->where('views', '>=', $minViews)
                     ->orWhereIn('id', function ($subSubQ) {
                         $subSubQ->select('id')
-                            ->from('posts')
+                            ->table('posts')
                             ->where('is_published', true)
                             ->limit(100);
                     });
@@ -3226,7 +3204,7 @@ final class ProductController extends BaseController
                     })
                     ->whereIn('id', function ($subQ) {
                         $subQ->select('id')
-                            ->from('tags')
+                            ->table('tags')
                             ->where('is_active', true)
                             ->limit(100);
                     });
@@ -3409,7 +3387,7 @@ final class ProductController extends BaseController
                     })
                     ->whereIn('id', function ($subQ) {
                         $subQ->select('id')
-                            ->from('tags')
+                            ->table('tags')
                             ->where('is_active', true)
                             ->limit(100);
                     });

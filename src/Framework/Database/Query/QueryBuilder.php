@@ -678,21 +678,17 @@ class QueryBuilder implements QueryBuilderInterface
             // Execute closure to build subquery
             $values($subQuery);
 
-            // Get subquery SQL and bindings
-            $subquerySql = $subQuery->toSql();
-            $subqueryBindings = $subQuery->getBindings();
-
+            // Store QueryBuilder instance (not SQL string) so compileInSubWhere can call toSql()
+            // This ensures bindings are handled correctly and subquery is compiled at the right time
             $this->wheres[] = [
                 'type' => $type . 'Sub',
                 'column' => $column instanceof Expression ? (string) $column : $column,
-                'query' => $subquerySql,
+                'query' => $subQuery, // Store QueryBuilder instance, not SQL string
                 'boolean' => strtoupper($boolean)
             ];
 
-            // Add subquery bindings
-            foreach ($subqueryBindings as $binding) {
-                $this->bindings[] = $binding;
-            }
+            // Note: Bindings from subquery will be merged when compileInSubWhere calls toSql()
+            // No need to manually merge bindings here
         }
         // Array of values
         else {
@@ -3336,6 +3332,11 @@ class QueryBuilder implements QueryBuilderInterface
         /** @var QueryBuilder $subquery */
         $subquery = $where['query'];
 
+        // Merge bindings from subquery into main query
+        foreach ($subquery->getBindings() as $binding) {
+            $this->bindings[] = $binding;
+        }
+
         return sprintf(' %s %s IN (%s)', $boolean, $where['column'], $subquery->toSql());
     }
 
@@ -3350,6 +3351,11 @@ class QueryBuilder implements QueryBuilderInterface
     {
         /** @var QueryBuilder $subquery */
         $subquery = $where['query'];
+
+        // Merge bindings from subquery into main query
+        foreach ($subquery->getBindings() as $binding) {
+            $this->bindings[] = $binding;
+        }
 
         return sprintf(' %s %s NOT IN (%s)', $boolean, $where['column'], $subquery->toSql());
     }

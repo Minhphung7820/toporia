@@ -252,6 +252,19 @@ abstract class Grammar implements GrammarInterface
         $compiled = [];
         foreach ($wheres as $index => $where) {
             $boolean = $index === 0 ? 'WHERE' : strtoupper($where['boolean']);
+
+            // Merge bindings from subqueries (inSub, notInSub) before compiling
+            if (
+                in_array($where['type'], ['inSub', 'notInSub', 'InSub', 'NotInSub'])
+                && isset($where['query'])
+                && $where['query'] instanceof \Toporia\Framework\Database\Query\QueryBuilder
+            ) {
+                // Merge subquery bindings into main query
+                foreach ($where['query']->getBindings() as $binding) {
+                    $query->addBinding($binding);
+                }
+            }
+
             $compiled[] = $boolean . ' ' . $this->compileWhere($where);
         }
 
@@ -368,6 +381,22 @@ abstract class Grammar implements GrammarInterface
         $column = $this->wrapColumn($where['column']);
         $subquery = $where['query'];
 
+        // Handle QueryBuilder instance (from whereIn with closure)
+        if ($subquery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+            // Validate subquery has table before compiling
+            if (empty($subquery->getTable())) {
+                throw new \InvalidArgumentException(
+                    "Subquery in whereIn must have a table. Use ->table('table_name') in the closure."
+                );
+            }
+            $subquery = $subquery->toSql();
+
+            // Validate compiled SQL is not empty
+            if (empty(trim($subquery))) {
+                throw new \InvalidArgumentException("Subquery SQL cannot be empty");
+            }
+        }
+
         return "{$column} IN ({$subquery})";
     }
 
@@ -382,6 +411,22 @@ abstract class Grammar implements GrammarInterface
     {
         $column = $this->wrapColumn($where['column']);
         $subquery = $where['query'];
+
+        // Handle QueryBuilder instance (from whereNotIn with closure)
+        if ($subquery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+            // Validate subquery has table before compiling
+            if (empty($subquery->getTable())) {
+                throw new \InvalidArgumentException(
+                    "Subquery in whereNotIn must have a table. Use ->table('table_name') in the closure."
+                );
+            }
+            $subquery = $subquery->toSql();
+
+            // Validate compiled SQL is not empty
+            if (empty(trim($subquery))) {
+                throw new \InvalidArgumentException("Subquery SQL cannot be empty");
+            }
+        }
 
         return "{$column} NOT IN ({$subquery})";
     }
