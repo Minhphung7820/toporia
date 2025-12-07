@@ -288,8 +288,8 @@ abstract class Grammar implements GrammarInterface
             'YearBasic' => $this->compileYearBasicWhere($where),
             'TimeBasic' => $this->compileTimeBasicWhere($where),
             'Column' => $this->compileColumnWhere($where),
-            'Exists' => $this->compileExistsWhere($where),
-            'NotExists' => $this->compileNotExistsWhere($where),
+            'Exists' => $this->compileExistsWhere($where, $mainQuery),
+            'NotExists' => $this->compileNotExistsWhere($where, $mainQuery),
             'InSub' => $this->compileWhereInSub($where, $mainQuery), // Backward compatibility
             'NotInSub' => $this->compileWhereNotInSub($where, $mainQuery), // Backward compatibility
             // JSON WHERE types - multi-database support
@@ -364,8 +364,12 @@ abstract class Grammar implements GrammarInterface
      *
      * Performance: O(1) + subquery complexity
      * High Reusability: Subquery SQL already compiled
+     *
+     * @param array<string, mixed> $where WHERE clause data
+     * @param QueryBuilder|null $mainQuery Main query instance for merging bindings
+     * @return string Compiled SQL
      */
-    protected function compileWhereInSub(array $where): string
+    protected function compileWhereInSub(array $where, ?QueryBuilder $mainQuery = null): string
     {
         $column = $this->wrapColumn($where['column']);
         $subquery = $where['query'];
@@ -377,6 +381,14 @@ abstract class Grammar implements GrammarInterface
                 throw new \InvalidArgumentException(
                     "Subquery in whereIn must have a table. Use ->table('table_name') in the closure."
                 );
+            }
+
+            // Merge bindings from subquery into main query BEFORE compiling SQL
+            // This ensures parameter count matches between SQL and bindings array
+            if ($mainQuery !== null) {
+                foreach ($subquery->getBindings() as $binding) {
+                    $mainQuery->addBinding($binding);
+                }
             }
 
             $subquery = $subquery->toSql();
@@ -396,8 +408,12 @@ abstract class Grammar implements GrammarInterface
      * Example: WHERE user_id NOT IN (SELECT user_id FROM banned_users)
      *
      * Performance: O(1) + subquery complexity
+     *
+     * @param array<string, mixed> $where WHERE clause data
+     * @param QueryBuilder|null $mainQuery Main query instance for merging bindings
+     * @return string Compiled SQL
      */
-    protected function compileWhereNotInSub(array $where): string
+    protected function compileWhereNotInSub(array $where, ?QueryBuilder $mainQuery = null): string
     {
         $column = $this->wrapColumn($where['column']);
         $subquery = $where['query'];
@@ -409,6 +425,14 @@ abstract class Grammar implements GrammarInterface
                 throw new \InvalidArgumentException(
                     "Subquery in whereNotIn must have a table. Use ->table('table_name') in the closure."
                 );
+            }
+
+            // Merge bindings from subquery into main query BEFORE compiling SQL
+            // This ensures parameter count matches between SQL and bindings array
+            if ($mainQuery !== null) {
+                foreach ($subquery->getBindings() as $binding) {
+                    $mainQuery->addBinding($binding);
+                }
             }
 
             $subquery = $subquery->toSql();
@@ -553,13 +577,23 @@ abstract class Grammar implements GrammarInterface
     /**
      * Compile EXISTS WHERE clause.
      *
-     * @param array<string, mixed> $where
-     * @return string
+     * @param array<string, mixed> $where WHERE clause data
+     * @param QueryBuilder|null $mainQuery Main query instance for merging bindings
+     * @return string Compiled SQL
      */
-    protected function compileExistsWhere(array $where): string
+    protected function compileExistsWhere(array $where, ?QueryBuilder $mainQuery = null): string
     {
         /** @var \Toporia\Framework\Database\Query\QueryBuilder $subquery */
         $subquery = $where['query'];
+
+        // Merge bindings from subquery into main query BEFORE compiling SQL
+        // This ensures parameter count matches between SQL and bindings array
+        if ($mainQuery !== null) {
+            foreach ($subquery->getBindings() as $binding) {
+                $mainQuery->addBinding($binding);
+            }
+        }
+
         $grammar = $subquery->getConnection()->getGrammar();
         $sql = $grammar->compileSelect($subquery);
         return "EXISTS ({$sql})";
@@ -568,13 +602,23 @@ abstract class Grammar implements GrammarInterface
     /**
      * Compile NOT EXISTS WHERE clause.
      *
-     * @param array<string, mixed> $where
-     * @return string
+     * @param array<string, mixed> $where WHERE clause data
+     * @param QueryBuilder|null $mainQuery Main query instance for merging bindings
+     * @return string Compiled SQL
      */
-    protected function compileNotExistsWhere(array $where): string
+    protected function compileNotExistsWhere(array $where, ?QueryBuilder $mainQuery = null): string
     {
         /** @var \Toporia\Framework\Database\Query\QueryBuilder $subquery */
         $subquery = $where['query'];
+
+        // Merge bindings from subquery into main query BEFORE compiling SQL
+        // This ensures parameter count matches between SQL and bindings array
+        if ($mainQuery !== null) {
+            foreach ($subquery->getBindings() as $binding) {
+                $mainQuery->addBinding($binding);
+            }
+        }
+
         $grammar = $subquery->getConnection()->getGrammar();
         $sql = $grammar->compileSelect($subquery);
         return "NOT EXISTS ({$sql})";
