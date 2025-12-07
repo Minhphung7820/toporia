@@ -396,7 +396,8 @@ class MorphToMany extends Relation
                 $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedForeignPivotKey}, {$wrappedRelatedPivotKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$wrappedForeignPivotKey} IN ({$morphTypePlaceholders}) AND {$wrappedRelatedPivotKey} IN ({$foreignKeyPlaceholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
 
                 // Combine bindings: base query + morph types + foreign keys
-                $allBindings = array_merge($baseQueryBindings, $morphTypeValues, $foreignKeyValues);
+                // PERFORMANCE: Use spread operator for better performance with small arrays
+                $allBindings = [...$baseQueryBindings, ...$morphTypeValues, ...$foreignKeyValues];
 
                 // Execute optimized window function query
                 $rows = $connection->select($windowQuery, $allBindings);

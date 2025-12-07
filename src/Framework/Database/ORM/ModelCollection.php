@@ -38,12 +38,15 @@ class ModelCollection extends DatabaseCollection implements \JsonSerializable
   /**
    * Find the first model with a matching primary key.
    *
+   * PERFORMANCE: Early return on first match. Type check ensures Model instance.
+   *
    * @param int|string $key
    * @return Model|null
    */
   public function find(int|string $key): ?Model
   {
     foreach ($this->all() as $m) {
+      // Type check ensures Model instance (ModelCollection should only contain Models)
       if ($m instanceof Model && $m->getKey() === $key) {
         return $m;
       }
@@ -54,13 +57,18 @@ class ModelCollection extends DatabaseCollection implements \JsonSerializable
   /**
    * Save all models in the collection (if they implement ->save()).
    *
+   * PERFORMANCE: Removed method_exists check since all Model instances have save() method.
+   *
    * @return int Number of successful saves.
    */
   public function save(): int
   {
     $ok = 0;
     foreach ($this->all() as $m) {
-      if (method_exists($m, 'save') && $m->save()) $ok++;
+      // PERFORMANCE: All Model instances have save() method, so method_exists check is redundant
+      if ($m->save()) {
+        $ok++;
+      }
     }
     return $ok;
   }
@@ -68,13 +76,14 @@ class ModelCollection extends DatabaseCollection implements \JsonSerializable
   /**
    * Convert the collection to an array of model arrays.
    *
+   * PERFORMANCE: Removed method_exists check since all Model instances have toArray() method.
+   *
    * @return array<int, array<string,mixed>>
    */
   public function toArray(): array
   {
-    return $this->map(
-      fn(Model $m) => method_exists($m, 'toArray') ? $m->toArray() : get_object_vars($m)
-    )->values()->all();
+    // PERFORMANCE: All Model instances have toArray() method, so method_exists check is redundant
+    return $this->map(fn(Model $m) => $m->toArray())->values()->all();
   }
 
   /**

@@ -402,11 +402,15 @@ class PostgreSQLGrammar extends Grammar
         }
 
         // For nested paths, use -> for all but the last, then ->> for text extraction
-        $jsonPath = $column;
-        for ($i = 0; $i < count($pathParts) - 1; $i++) {
-            $jsonPath .= "->'{$pathParts[$i]}'";
+        // PERFORMANCE: Cache count() result and use array building instead of string concatenation
+        $pathCount = count($pathParts);
+        $lastIndex = $pathCount - 1;
+        $jsonPathParts = [$column];
+        for ($i = 0; $i < $lastIndex; $i++) {
+            $jsonPathParts[] = "->'{$pathParts[$i]}'";
         }
-        $jsonPath .= "->>'" . end($pathParts) . "'";
+        $jsonPathParts[] = "->>'" . $pathParts[$lastIndex] . "'";
+        $jsonPath = implode('', $jsonPathParts);
 
         return "{$jsonPath} {$operator} ?";
     }
@@ -426,10 +430,12 @@ class PostgreSQLGrammar extends Grammar
             $parts = explode('.', $key);
             $lastKey = array_pop($parts);
 
-            $jsonPath = $column;
+            // PERFORMANCE: Use array building instead of string concatenation in loop
+            $jsonPathParts = [$column];
             foreach ($parts as $part) {
-                $jsonPath .= "->'{$part}'";
+                $jsonPathParts[] = "->'{$part}'";
             }
+            $jsonPath = implode('', $jsonPathParts);
 
             return "({$jsonPath}) ? '{$lastKey}'";
         }
@@ -451,10 +457,12 @@ class PostgreSQLGrammar extends Grammar
             $parts = explode('.', $key);
             $lastKey = array_pop($parts);
 
-            $jsonPath = $column;
+            // PERFORMANCE: Use array building instead of string concatenation in loop
+            $jsonPathParts = [$column];
             foreach ($parts as $part) {
-                $jsonPath .= "->'{$part}'";
+                $jsonPathParts[] = "->'{$part}'";
             }
+            $jsonPath = implode('', $jsonPathParts);
 
             return "NOT (({$jsonPath}) ? '{$lastKey}')";
         }
@@ -506,13 +514,15 @@ class PostgreSQLGrammar extends Grammar
         $pgType = $typeMap[$jsonType] ?? $jsonType;
 
         // Build JSON path
+        // PERFORMANCE: Use array building instead of string concatenation in loop
         $pathParts = explode('.', str_replace('->', '.', $path));
-        $jsonPath = $column;
+        $jsonPathParts = [$column];
         foreach ($pathParts as $part) {
             if (!empty($part)) {
-                $jsonPath .= "->'{$part}'";
+                $jsonPathParts[] = "->'{$part}'";
             }
         }
+        $jsonPath = implode('', $jsonPathParts);
 
         return "jsonb_typeof({$jsonPath}) = '{$pgType}'";
     }
@@ -578,16 +588,20 @@ class PostgreSQLGrammar extends Grammar
         $wrappedColumn = $this->wrapColumn($column);
 
         // Build JSON path for nested access
+        // PERFORMANCE: Cache count() result and use array building instead of string concatenation
         $pathParts = explode('.', str_replace('->', '.', $path));
-        $jsonPath = $wrappedColumn;
+        $pathCount = count($pathParts);
+        $lastIndex = $pathCount - 1;
 
         // For nested paths, use -> for all but last, then ->> for text extraction
-        for ($i = 0; $i < count($pathParts) - 1; $i++) {
-            $jsonPath .= "->'{$pathParts[$i]}'";
+        $jsonPathParts = [$wrappedColumn];
+        for ($i = 0; $i < $lastIndex; $i++) {
+            $jsonPathParts[] = "->'{$pathParts[$i]}'";
         }
+        $jsonPath = implode('', $jsonPathParts);
 
         // Last part uses ->> for text or -> for JSON depending on cast
-        $lastKey = end($pathParts);
+        $lastKey = $pathParts[$lastIndex];
 
         $expression = match ($cast) {
             'integer', 'int' => "({$jsonPath}->>'{$lastKey}')::INTEGER",
@@ -613,14 +627,18 @@ class PostgreSQLGrammar extends Grammar
         $wrappedColumn = $this->wrapColumn($column);
 
         // Build JSON path for nested access
+        // PERFORMANCE: Cache count() result and use array building instead of string concatenation
         $pathParts = explode('.', str_replace('->', '.', $path));
-        $jsonPath = $wrappedColumn;
+        $pathCount = count($pathParts);
+        $lastIndex = $pathCount - 1;
 
-        for ($i = 0; $i < count($pathParts) - 1; $i++) {
-            $jsonPath .= "->'{$pathParts[$i]}'";
+        $jsonPathParts = [$wrappedColumn];
+        for ($i = 0; $i < $lastIndex; $i++) {
+            $jsonPathParts[] = "->'{$pathParts[$i]}'";
         }
+        $jsonPath = implode('', $jsonPathParts);
 
-        $lastKey = end($pathParts);
+        $lastKey = $pathParts[$lastIndex];
 
         $expression = match ($cast) {
             'integer', 'int' => "({$jsonPath}->>'{$lastKey}')::INTEGER",

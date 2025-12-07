@@ -340,7 +340,8 @@ class MorphMany extends Relation
                 $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedMorphType}, {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$morphWhereClause}) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
 
                 // Combine bindings: base query bindings + morph bindings
-                $allBindings = array_merge($baseQueryBindings, $morphBindings);
+                // PERFORMANCE: Use spread operator for better performance with small arrays
+                $allBindings = [...$baseQueryBindings, ...$morphBindings];
 
                 // Execute optimized window function query
                 $rows = $connection->select($windowQuery, $allBindings);
