@@ -281,11 +281,7 @@ class HasManyThrough extends Relation
                     $rowFilter = "toporia_row <= {$limit}";
                 }
 
-                $windowQuery = "SELECT * FROM (
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedFirstKey} ORDER BY {$orderByClause}) AS toporia_row
-                    FROM ({$baseQuerySql}) AS toporia_base
-                    WHERE {$wrappedFirstKey} IN ({$placeholders})
-                ) AS toporia_table WHERE {$rowFilter}";
+                $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedFirstKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$wrappedFirstKey} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter}";
 
                 // Combine bindings: base query bindings + foreign key values
                 $allBindings = array_merge($baseQueryBindings, $foreignKeyValues);
