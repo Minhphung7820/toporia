@@ -389,7 +389,14 @@ abstract class Grammar implements GrammarInterface
                     "Subquery in whereIn must have a table. Use ->table('table_name') in the closure."
                 );
             }
+
             $subquery = $subquery->toSql();
+
+            // MySQL doesn't support LIMIT/OFFSET in IN subqueries
+            // Remove them from the compiled SQL string
+            // Pattern matches: " LIMIT n" or " LIMIT n OFFSET m" or " OFFSET m" at the end
+            $subquery = preg_replace('/\s+LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?\s*$/i', '', $subquery);
+            $subquery = preg_replace('/\s+OFFSET\s+\d+\s*$/i', '', $subquery);
 
             // Validate compiled SQL is not empty
             if (empty(trim($subquery))) {
@@ -420,7 +427,14 @@ abstract class Grammar implements GrammarInterface
                     "Subquery in whereNotIn must have a table. Use ->table('table_name') in the closure."
                 );
             }
+
             $subquery = $subquery->toSql();
+
+            // MySQL doesn't support LIMIT/OFFSET in NOT IN subqueries
+            // Remove them from the compiled SQL string
+            // Pattern matches: " LIMIT n" or " LIMIT n OFFSET m" or " OFFSET m" at the end
+            $subquery = preg_replace('/\s+LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?\s*$/i', '', $subquery);
+            $subquery = preg_replace('/\s+OFFSET\s+\d+\s*$/i', '', $subquery);
 
             // Validate compiled SQL is not empty
             if (empty(trim($subquery))) {

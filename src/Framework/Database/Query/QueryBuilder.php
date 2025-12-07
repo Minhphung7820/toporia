@@ -3337,7 +3337,15 @@ class QueryBuilder implements QueryBuilderInterface
             $this->bindings[] = $binding;
         }
 
-        return sprintf(' %s %s IN (%s)', $boolean, $where['column'], $subquery->toSql());
+        $subquerySql = $subquery->toSql();
+
+        // MySQL doesn't support LIMIT/OFFSET in IN subqueries
+        // Remove them from the compiled SQL string
+        // Pattern matches: " LIMIT n" or " LIMIT n OFFSET m" or " OFFSET m" at the end
+        $subquerySql = preg_replace('/\s+LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?\s*$/i', '', $subquerySql);
+        $subquerySql = preg_replace('/\s+OFFSET\s+\d+\s*$/i', '', $subquerySql);
+
+        return sprintf(' %s %s IN (%s)', $boolean, $where['column'], $subquerySql);
     }
 
     /**
@@ -3357,7 +3365,15 @@ class QueryBuilder implements QueryBuilderInterface
             $this->bindings[] = $binding;
         }
 
-        return sprintf(' %s %s NOT IN (%s)', $boolean, $where['column'], $subquery->toSql());
+        $subquerySql = $subquery->toSql();
+
+        // MySQL doesn't support LIMIT/OFFSET in NOT IN subqueries
+        // Remove them from the compiled SQL string
+        // Pattern matches: " LIMIT n" or " LIMIT n OFFSET m" or " OFFSET m" at the end
+        $subquerySql = preg_replace('/\s+LIMIT\s+\d+(?:\s+OFFSET\s+\d+)?\s*$/i', '', $subquerySql);
+        $subquerySql = preg_replace('/\s+OFFSET\s+\d+\s*$/i', '', $subquerySql);
+
+        return sprintf(' %s %s NOT IN (%s)', $boolean, $where['column'], $subquerySql);
     }
 
     /**

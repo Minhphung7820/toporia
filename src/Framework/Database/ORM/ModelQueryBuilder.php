@@ -2186,9 +2186,11 @@ class ModelQueryBuilder extends QueryBuilder
         $relationSql = $relationQuery->toSql();
         $relationBindings = $relationQuery->getBindings();
 
-        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
-            $whereClause = $matches[1];
+        // Extract WHERE clause, handling nested subqueries properly
+        $whereClause = $this->extractCompleteWhereClause($relationSql);
 
+        // Only add if WHERE clause is not empty
+        if (!empty($whereClause)) {
             // Remove unnecessary parentheses and add relation constraints directly
             // Use bindings instead of inlining values for better plan cache optimization
             $subquerySql .= " AND {$whereClause}";
@@ -2259,9 +2261,11 @@ class ModelQueryBuilder extends QueryBuilder
         $relationSql = $relationQuery->toSql();
         $relationBindings = $relationQuery->getBindings();
 
-        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches)) {
-            $whereClause = $matches[1];
+        // Extract WHERE clause, handling nested subqueries properly
+        $whereClause = $this->extractCompleteWhereClause($relationSql);
 
+        // Only add if WHERE clause is not empty
+        if (!empty($whereClause)) {
             // Remove unnecessary parentheses and add relation constraints directly
             // Use bindings instead of inlining values for better plan cache optimization
             $subquerySql .= " AND {$whereClause}";
@@ -2272,6 +2276,81 @@ class ModelQueryBuilder extends QueryBuilder
         $subquerySql .= " LIMIT 1";
 
         return ['sql' => $subquerySql, 'bindings' => $bindings];
+    }
+
+    /**
+     * Extract complete WHERE clause from SQL, handling nested subqueries properly.
+     *
+     * This method correctly handles nested subqueries like IN (SELECT ...) by
+     * counting parentheses to find the complete WHERE clause.
+     *
+     * @param string $sql The SQL query string
+     * @return string The extracted WHERE clause, or empty string if not found
+     */
+    protected function extractCompleteWhereClause(string $sql): string
+    {
+        // Find WHERE keyword
+        if (!preg_match('/\bWHERE\s+/i', $sql, $whereMatch, PREG_OFFSET_CAPTURE)) {
+            return '';
+        }
+
+        $whereStart = $whereMatch[0][1] + strlen($whereMatch[0][0]);
+        $afterWhere = substr($sql, $whereStart);
+
+        // Find the end of WHERE clause by looking for ORDER BY, LIMIT, or end of string
+        // But we need to handle nested subqueries with parentheses
+        $parenCount = 0;
+        $inString = false;
+        $stringChar = null;
+        $length = strlen($afterWhere);
+        $endPos = $length;
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $afterWhere[$i];
+            $nextChar = $i + 1 < $length ? $afterWhere[$i + 1] : '';
+
+            // Handle string literals
+            if (!$inString && ($char === "'" || $char === '"')) {
+                $inString = true;
+                $stringChar = $char;
+            } elseif ($inString && $char === $stringChar && $nextChar !== $stringChar) {
+                $inString = false;
+                $stringChar = null;
+            } elseif ($inString && $char === $stringChar && $nextChar === $stringChar) {
+                // Escaped quote
+                $i++;
+                continue;
+            }
+
+            if ($inString) {
+                continue;
+            }
+
+            // Count parentheses for nested subqueries
+            if ($char === '(') {
+                $parenCount++;
+            } elseif ($char === ')') {
+                $parenCount--;
+            }
+
+            // Check for ORDER BY or LIMIT (only when parentheses are balanced)
+            if ($parenCount === 0) {
+                // Check for ORDER BY (case-insensitive, word boundary aware)
+                $remaining = substr($afterWhere, $i);
+                if (preg_match('/^\s+ORDER\s+BY\b/i', $remaining, $orderMatch)) {
+                    $endPos = $i;
+                    break;
+                }
+                // Check for LIMIT (case-insensitive, word boundary aware)
+                if (preg_match('/^\s+LIMIT\s+\d+/i', $remaining, $limitMatch)) {
+                    $endPos = $i;
+                    break;
+                }
+            }
+        }
+
+        $whereClause = substr($afterWhere, 0, $endPos);
+        return trim($whereClause);
     }
 
     /**

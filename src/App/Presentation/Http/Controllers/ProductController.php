@@ -2306,7 +2306,7 @@ final class ProductController extends BaseController
                 }])
                 ->orderBy('views', 'DESC')
                 ->limit(10);
-            dd($postsWithComplexComments->toSql());
+            dd($postsWithComplexComments->get());
             $results['nested_where_has_complex'] = $postsWithComplexComments->all();
 
             // Test 5: Multiple whereHas with orWhereHas
