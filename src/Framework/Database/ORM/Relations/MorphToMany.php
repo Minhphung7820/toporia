@@ -280,7 +280,7 @@ class MorphToMany extends Relation
                 // Build window function query like BelongsToMany
                 $relatedTable = $this->getRelatedTable();
                 $foreignPivotKey = $this->morphType; // Morph type column (taggable_type)
-                $relatedPivotKey = $this->foreignPivotKey; // Foreign key in pivot (taggable_id)
+                $relatedPivotKey = $this->foreignKey; // Foreign key in pivot (taggable_id)
 
                 $wrappedForeignPivotKey = $grammar->wrapColumn("{$this->pivotTable}.{$foreignPivotKey}");
                 $wrappedRelatedPivotKey = $grammar->wrapColumn("{$this->pivotTable}.{$relatedPivotKey}");
