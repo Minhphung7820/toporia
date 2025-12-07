@@ -62,7 +62,7 @@ class VideoModel extends Model
     public function tags()
     {
         return $this->morphToMany(TagModel::class, 'taggable', 'taggables')
-            ->withPivot('created_at')
+            ->withPivot('id')
             ->withTimestamps();
     }
 }
