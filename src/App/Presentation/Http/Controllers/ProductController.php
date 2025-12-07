@@ -2044,8 +2044,9 @@ final class ProductController extends BaseController
                     },
                     'image.imageable.tags' => function ($q) {
                         // Deep nested: Post -> Image -> Imageable (Post) -> Tags
-                        $q->where('is_active', true)
-                            ->orderBy('name', 'ASC');
+                        $q->select('tags.id', 'tags.name', 'tags.slug')
+                            ->where('tags.is_active', true)
+                            ->orderBy('tags.name', 'ASC')->limit(3);
                     }
                 ])
                 ->limit(3)
