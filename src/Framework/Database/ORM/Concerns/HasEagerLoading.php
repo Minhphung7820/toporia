@@ -406,8 +406,22 @@ trait HasEagerLoading
                 // Ensure constraint is also applied to eagerRelation's query
                 // in case newEagerInstance creates a new query instance
                 // This handles edge cases where query instance differs
+                // CRITICAL: Only apply constraint again if newEagerInstance didn't copy orderBy from freshQuery
+                // Most relation types (MorphOne, HasMany, MorphMany, etc.) copy orderBy from freshQuery
+                // so applying constraint again would cause duplicate orderBy
                 if ($eagerRelation->getQuery() !== $freshQuery) {
-                    $constraint($eagerRelation->getQuery());
+                    $eagerQuery = $eagerRelation->getQuery();
+                    $freshOrders = $freshQuery->getOrders();
+                    $eagerOrders = $eagerQuery->getOrders();
+
+                    // Check if orders were copied from freshQuery
+                    // If orders match, newEagerInstance already copied them, so don't apply constraint again
+                    // If orders don't match or eagerQuery has no orders, apply constraint
+                    $ordersWereCopied = !empty($freshOrders) && $freshOrders === $eagerOrders;
+
+                    if (!$ordersWereCopied) {
+                        $constraint($eagerQuery);
+                    }
                 }
             }
         } else {
