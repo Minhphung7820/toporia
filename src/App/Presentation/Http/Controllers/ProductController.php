@@ -2015,6 +2015,18 @@ final class ProductController extends BaseController
                 });
             })
                 ->with([
+                    'image.imageable' => function (MorphTo $morphTo) use ($publishedOnly, $minViews) {
+                        $morphTo->constrain([
+                            PostModel::class => function ($query) use ($publishedOnly, $minViews) {
+                                if ($publishedOnly) {
+                                    $query->where('is_published', true);
+                                }
+                                if ($minViews > 0) {
+                                    $query->where('views', '>=', $minViews);
+                                }
+                            }
+                        ]);
+                    },
                     // Load imageable and its nested relationships
                     // Note: 'image.imageable.image' creates a circular reference:
                     // Post -> Image -> Imageable (Post) -> Image
