@@ -135,7 +135,7 @@ class MorphedByMany extends Relation
     /**
      * Get cached related table name.
      */
-    protected function getRelatedTable(): string
+    public function getRelatedTable(): string
     {
         return $this->relatedTableCache ??= $this->relatedClass::getTableName();
     }
@@ -1181,6 +1181,66 @@ class MorphedByMany extends Relation
         ];
 
         return $columnNames;
+    }
+
+    // =========================================================================
+    // GETTER METHODS FOR AGGREGATES
+    // =========================================================================
+
+    /**
+     * Get the pivot table name.
+     */
+    public function getPivotTable(): string
+    {
+        return $this->pivotTable;
+    }
+
+    /**
+     * Get the morph type column name.
+     */
+    public function getMorphType(): string
+    {
+        return $this->morphType;
+    }
+
+    /**
+     * Get the foreign pivot key (morph id column in pivot table).
+     */
+    public function getForeignPivotKey(): string
+    {
+        return $this->foreignKey; // This is taggable_id
+    }
+
+    /**
+     * Get the parent pivot key (parent column in pivot table).
+     */
+    public function getParentPivotKey(): string
+    {
+        return $this->parentPivotKey; // This is tag_id
+    }
+
+    /**
+     * Get the parent key (local key on parent model).
+     */
+    public function getParentKey(): string
+    {
+        return $this->parentKey;
+    }
+
+    /**
+     * Get the related key (primary key on related model).
+     */
+    public function getRelatedKey(): string
+    {
+        return $this->relatedKey;
+    }
+
+    /**
+     * Get the related pivot key (same as parent pivot key for MorphedByMany).
+     */
+    public function getRelatedPivotKey(): string
+    {
+        return $this->parentPivotKey; // tag_id in pivot
     }
 
     // =========================================================================

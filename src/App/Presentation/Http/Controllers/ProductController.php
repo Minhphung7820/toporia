@@ -3150,13 +3150,13 @@ final class ProductController extends BaseController
             // Test 3: whereHas with complex conditions
             $postsWithTags = PostModel::whereHas('tags', function ($q) use ($activeTagsOnly, $tagNameContains, $tagIdsArray) {
                 if ($activeTagsOnly) {
-                    $q->where('is_active', true);
+                    $q->where('tags.is_active', true);
                 }
                 if (!empty($tagNameContains)) {
-                    $q->where('name', 'like', '%' . $tagNameContains . '%');
+                    $q->where('tags.name', 'like', '%' . $tagNameContains . '%');
                 }
                 if (!empty($tagIdsArray)) {
-                    $q->whereIn('id', $tagIdsArray);
+                    $q->whereIn('tags.id', $tagIdsArray);
                 }
             })
                 ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
@@ -3164,15 +3164,21 @@ final class ProductController extends BaseController
                         $q->where('is_active', true);
                     }
                 }])
-                ->having('tags_count', '>=', $minTags > 0 ? $minTags : 1)
-                ->where(function ($q) use ($publishedOnly, $minViews) {
+                ->having('tags_count', '>=', $minTags > 0 ? $minTags : 1);
+
+            // Only add where closure if there are actual conditions
+            if ($publishedOnly || $minViews > 0) {
+                $postsWithTags = $postsWithTags->where(function ($q) use ($publishedOnly, $minViews) {
                     if ($publishedOnly) {
                         $q->where('is_published', true);
                     }
                     if ($minViews > 0) {
                         $q->where('views', '>=', $minViews);
                     }
-                })
+                });
+            }
+
+            $postsWithTags = $postsWithTags
                 ->with(['tags' => function ($q) use ($activeTagsOnly) {
                     if ($activeTagsOnly) {
                         $q->where('is_active', true);
@@ -3205,29 +3211,35 @@ final class ProductController extends BaseController
                 } else {
                     $q->whereNotNull('is_active');
                 }
-                $q->where(function ($subQ) use ($tagNameContains) {
-                    if (!empty($tagNameContains)) {
+                // Only add nested where if there are conditions
+                if (!empty($tagNameContains)) {
+                    $q->where(function ($subQ) use ($tagNameContains) {
                         $subQ->where('name', 'like', '%' . $tagNameContains . '%')
                             ->orWhere('slug', 'like', '%' . $tagNameContains . '%');
-                    }
-                });
+                    });
+                }
                 if ($activeTagsOnly) {
                     $q->whereIn('id', function ($subQ) {
                         $subQ->select('id')
-                            ->from('tags')
-                            ->where('is_active', true)
-                            ->limit(100);
+                            ->table('tags')
+                            ->where('is_active', true);
                     });
                 }
-            })
-                ->where(function ($q) use ($publishedOnly, $minViews) {
+            });
+
+            // Only add where closure if there are actual conditions
+            if ($publishedOnly || $minViews > 0) {
+                $postsWithComplexTags = $postsWithComplexTags->where(function ($q) use ($publishedOnly, $minViews) {
                     if ($publishedOnly) {
                         $q->where('is_published', true);
                     }
                     if ($minViews > 0) {
                         $q->where('views', '>=', $minViews);
                     }
-                })
+                });
+            }
+
+            $postsWithComplexTags = $postsWithComplexTags
                 ->with(['tags' => function ($q) use ($activeTagsOnly, $tagIdsArray) {
                     if ($activeTagsOnly) {
                         $q->where('is_active', true);
@@ -3403,9 +3415,8 @@ final class ProductController extends BaseController
                 if ($activeTagsOnly) {
                     $q->whereIn('id', function ($subQ) {
                         $subQ->select('id')
-                            ->from('tags')
-                            ->where('is_active', true)
-                            ->limit(100);
+                            ->table('tags')
+                            ->where('is_active', true);
                     });
                 }
             })

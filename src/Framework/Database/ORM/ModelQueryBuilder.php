@@ -11,6 +11,8 @@ use Toporia\Framework\Database\Contracts\RelationInterface;
 use Toporia\Framework\Database\DatabaseCollection;
 use Toporia\Framework\Database\ORM\Relations\BelongsTo;
 use Toporia\Framework\Database\ORM\Relations\BelongsToMany;
+use Toporia\Framework\Database\ORM\Relations\MorphToMany;
+use Toporia\Framework\Database\ORM\Relations\MorphedByMany;
 
 
 /**
@@ -2123,8 +2125,9 @@ class ModelQueryBuilder extends QueryBuilder
     {
         // Handle different relationship types
         if (
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+            $relation instanceof BelongsToMany ||
+            $relation instanceof MorphToMany ||
+            $relation instanceof MorphedByMany
         ) {
             return $this->buildPivotExistsSubquery($relation, $parentTable, $relationQuery);
         } else {
@@ -2240,7 +2243,7 @@ class ModelQueryBuilder extends QueryBuilder
             $subquerySql = "SELECT 1 FROM {$pivotTable} " .
                 "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
                 "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
-        } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany) {
+        } elseif ($relation instanceof MorphToMany) {
             // Optimized MorphToMany query matching Laravel's structure
             // Laravel starts from related table (tags) and joins pivot (taggables)
             // This is more efficient when filtering by related table columns
@@ -2264,6 +2267,30 @@ class ModelQueryBuilder extends QueryBuilder
                 "WHERE {$parentTable}.{$parentKey} = {$pivotTable}.{$morphId} " .
                 "AND {$pivotTable}.{$morphType} = ?";
             $bindings[] = $morphClass;
+        } elseif ($relation instanceof MorphedByMany) {
+            // MorphedByMany is the inverse of MorphToMany
+            // Example: Tag morphedByMany Posts - start from posts table, join pivot taggables
+            $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
+            $morphType = $this->getRelationProperty($relation, 'morphType');
+            $morphId = $this->getRelationProperty($relation, 'foreignKey');
+            $parentPivotKey = $this->getRelationProperty($relation, 'parentPivotKey');
+            $parentKey = $this->getRelationProperty($relation, 'localKey');
+            $relatedKey = $this->getRelationProperty($relation, 'relatedKey');
+
+            // Get related table - this is the morphable model table (posts, videos, etc.)
+            $relatedTable = $relationQuery->getTable();
+
+            // Start from related table (posts), join pivot (taggables)
+            // SELECT 1 FROM posts INNER JOIN taggables ON posts.id = taggables.taggable_id
+            // WHERE tags.id = taggables.tag_id AND taggables.taggable_type = 'Post'
+            $subquerySql = "SELECT 1 FROM {$relatedTable} " .
+                "INNER JOIN {$pivotTable} ON {$relatedTable}.{$relatedKey} = {$pivotTable}.{$morphId} " .
+                "WHERE {$parentTable}.{$parentKey} = {$pivotTable}.{$parentPivotKey} " .
+                "AND {$pivotTable}.{$morphType} = ?";
+
+            // Get the morph class from the related model - use relation instance method
+            $relatedClass = $relation->getRelatedClass();
+            $bindings[] = $relatedClass;
         }
 
         // Add relation constraints (keep as bindings, don't inline)
@@ -2275,6 +2302,19 @@ class ModelQueryBuilder extends QueryBuilder
 
         // Only add if WHERE clause is not empty
         if (!empty($whereClause)) {
+            // For MorphToMany and MorphedByMany, qualify the 'id' column specifically to avoid ambiguity
+            // since both related table and pivot table typically have 'id' columns
+            if ($relation instanceof MorphToMany || $relation instanceof MorphedByMany) {
+                // Qualify unqualified 'id' column with related table name
+                // Matches: "id IN (...)", "id = value", "id NOT IN (...)", etc.
+                // Handles both simple values and subqueries: "id IN (1,2,3)" or "id IN (SELECT ...)"
+                $whereClause = preg_replace(
+                    '/\b(id)\s+(IN|NOT\s+IN|=|>|<|>=|<=|!=|<>)\s*/i',
+                    "{$relatedTable}.$1 $2 ",
+                    $whereClause
+                );
+            }
+
             // Remove unnecessary parentheses and add relation constraints directly
             // Use bindings instead of inlining values for better plan cache optimization
             $subquerySql .= " AND {$whereClause}";
@@ -3313,6 +3353,18 @@ class ModelQueryBuilder extends QueryBuilder
             return;
         }
 
+        // Special handling for MorphToMany relationships (polymorphic many-to-many through pivot table)
+        if ($relationInstance instanceof MorphToMany) {
+            $this->addMorphToManyCountSelect($relationInstance, $relationName, $table, $relationQuery, $alias);
+            return;
+        }
+
+        // Special handling for MorphedByMany relationships (inverse polymorphic many-to-many)
+        if ($relationInstance instanceof MorphedByMany) {
+            $this->addMorphedByManyCountSelect($relationInstance, $relationName, $table, $relationQuery, $alias);
+            return;
+        }
+
         $foreignKey = $relationInstance->getForeignKey();
         $localKey = $relationInstance->getLocalKey();
         $relationTable = $relationQuery->getTable();
@@ -3416,13 +3468,239 @@ class ModelQueryBuilder extends QueryBuilder
             }
 
             // Replace table references in where clause with alias
+            // First replace explicit table.column with alias.column
             $boundWhereClause = preg_replace('/\b' . preg_quote($relatedTable, '/') . '\./', "{$relatedAlias}.", $boundWhereClause);
+
+            // Then qualify unqualified columns with related table alias to avoid ambiguity
+            // Match column names that are NOT preceded by a table name (no dot before them)
+            // This handles cases like: "id IN (...)" -> "tags_related.id IN (...)"
+            // But preserves: "taggables_pivot.created_at" as is
+            $boundWhereClause = preg_replace_callback(
+                '/(?<![a-z0-9_])([a-z_][a-z0-9_]*)\s*(?=IN\s*\(|=|>|<|>=|<=|!=|<>|LIKE|NOT\s+LIKE|IS\s+NULL|IS\s+NOT\s+NULL)/i',
+                function ($matches) use ($relatedAlias, $pivotAlias) {
+                    $column = $matches[1];
+                    // Don't qualify if it's already an alias or a keyword
+                    if (in_array(strtoupper($column), ['AND', 'OR', 'NOT', 'NULL', 'TRUE', 'FALSE'], true)) {
+                        return $column;
+                    }
+                    // Don't qualify if it contains an alias prefix already
+                    if (stripos($matches[0], $relatedAlias . '.') !== false || stripos($matches[0], $pivotAlias . '.') !== false) {
+                        return $matches[0];
+                    }
+                    return "{$relatedAlias}.{$column}";
+                },
+                $boundWhereClause
+            );
 
             $subquery .= " AND ({$boundWhereClause})";
         }
 
         // Note: Pivot where constraints (wherePivot, wherePivotIn) are already applied
         // to the relationQuery, so they'll be included in the above handling
+
+        // Use alias if provided, otherwise use relation name
+        $columnAlias = $alias !== null ? $alias : "{$relation}_count";
+
+        // Ensure we select table.* along with the subquery (only once)
+        $columns = $this->getColumns();
+        if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+            $this->select("{$table}.*");
+        }
+
+        $this->selectRaw("({$subquery}) AS {$columnAlias}");
+    }
+
+    /**
+     * Add count select for MorphToMany relationships.
+     *
+     * For polymorphic many-to-many relationships, we count records in the pivot table
+     * filtered by morph type and morph id, not the related table directly.
+     *
+     * @param MorphToMany $relationInstance The MorphToMany relation instance
+     * @param string $relation The relation name
+     * @param string $table The parent table name
+     * @param QueryBuilder $relationQuery The relation query builder
+     * @param string|null $alias Optional alias for the count column
+     * @return void
+     */
+    private function addMorphToManyCountSelect(
+        MorphToMany $relationInstance,
+        string $relation,
+        string $table,
+        QueryBuilder $relationQuery,
+        ?string $alias = null
+    ): void {
+        // Get pivot table and keys using public methods
+        $pivotTable = $relationInstance->getPivotTable();
+        $foreignPivotKey = $relationInstance->getForeignPivotKey(); // morph id column (taggable_id)
+        $morphType = $relationInstance->getMorphType(); // morph type column (taggable_type)
+        $parentKey = $relationInstance->getParentKey();
+
+        // Get morph class for the parent model
+        // Use getMorphClass() if available, otherwise use full class name
+        $model = new $this->modelClass([]);
+        $morphClass = method_exists($model, 'getMorphClass')
+            ? $model->getMorphClass()
+            : $this->modelClass;
+
+        // Build subquery counting records in pivot table filtered by morph type and morph id
+        // Example: SELECT COUNT(*) FROM taggables WHERE taggables.taggable_type = 'post' AND taggables.taggable_id = posts.id
+        $pivotAlias = "{$pivotTable}_pivot";
+        $subquery = "SELECT COUNT(*) FROM {$pivotTable} AS {$pivotAlias} " .
+            "WHERE {$pivotAlias}.{$morphType} = " . $this->quoteValue($morphClass) . " " .
+            "AND {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
+
+        // Check if relation query has constraints on the related table
+        // If so, we need to join the related table to apply those constraints
+        $relationSql = $relationQuery->toSql();
+        $hasRelatedConstraints = preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches);
+
+        if ($hasRelatedConstraints) {
+            $whereClause = $matches[1];
+
+            // Get related table info using public methods
+            $relatedTable = $relationInstance->getRelatedTable();
+            $relatedPivotKey = $relationInstance->getRelatedPivotKey(); // tag_id
+            $relatedKey = $relationInstance->getRelatedKey(); // id
+
+            // Join related table to apply constraints
+            $relatedAlias = "{$relatedTable}_related";
+            $subquery = "SELECT COUNT(*) FROM {$pivotTable} AS {$pivotAlias} " .
+                "INNER JOIN {$relatedTable} AS {$relatedAlias} ON {$pivotAlias}.{$relatedPivotKey} = {$relatedAlias}.{$relatedKey} " .
+                "WHERE {$pivotAlias}.{$morphType} = " . $this->quoteValue($morphClass) . " " .
+                "AND {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            // Replace table references in where clause with alias
+            // First replace explicit table.column with alias.column
+            $boundWhereClause = preg_replace('/\b' . preg_quote($relatedTable, '/') . '\./', "{$relatedAlias}.", $boundWhereClause);
+
+            // Then qualify unqualified columns with related table alias to avoid ambiguity
+            // Match column names that are NOT preceded by a table name (no dot before them)
+            // This handles cases like: "id IN (...)" -> "tags_related.id IN (...)"
+            // But preserves: "taggables_pivot.created_at" as is
+            $boundWhereClause = preg_replace_callback(
+                '/(?<![a-z0-9_])([a-z_][a-z0-9_]*)\s*(?=IN\s*\(|=|>|<|>=|<=|!=|<>|LIKE|NOT\s+LIKE|IS\s+NULL|IS\s+NOT\s+NULL)/i',
+                function ($matches) use ($relatedAlias, $pivotAlias) {
+                    $column = $matches[1];
+                    // Don't qualify if it's already an alias or a keyword
+                    if (in_array(strtoupper($column), ['AND', 'OR', 'NOT', 'NULL', 'TRUE', 'FALSE'], true)) {
+                        return $column;
+                    }
+                    // Don't qualify if it contains an alias prefix already
+                    if (stripos($matches[0], $relatedAlias . '.') !== false || stripos($matches[0], $pivotAlias . '.') !== false) {
+                        return $matches[0];
+                    }
+                    return "{$relatedAlias}.{$column}";
+                },
+                $boundWhereClause
+            );
+
+            $subquery .= " AND ({$boundWhereClause})";
+        }
+
+        // Note: Pivot where constraints (wherePivot, wherePivotIn) are already applied
+        // to the relationQuery, so they'll be included in the above handling
+
+        // Use alias if provided, otherwise use relation name
+        $columnAlias = $alias !== null ? $alias : "{$relation}_count";
+
+        // Ensure we select table.* along with the subquery (only once)
+        $columns = $this->getColumns();
+        if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+            $this->select("{$table}.*");
+        }
+
+        $this->selectRaw("({$subquery}) AS {$columnAlias}");
+    }
+
+    /**
+     * Add count select for MorphedByMany relationships.
+     *
+     * For inverse polymorphic many-to-many relationships, we count records in the pivot table
+     * filtered by parent key and morph type of the related model.
+     *
+     * Example: Tag morphedByMany Posts
+     * - Count posts that have this tag
+     * - Filter by taggable_type = 'Post'
+     *
+     * @param MorphedByMany $relationInstance The MorphedByMany relation instance
+     * @param string $relation The relation name
+     * @param string $table The parent table name
+     * @param QueryBuilder $relationQuery The relation query builder
+     * @param string|null $alias Optional alias for the count column
+     * @return void
+     */
+    private function addMorphedByManyCountSelect(
+        MorphedByMany $relationInstance,
+        string $relation,
+        string $table,
+        QueryBuilder $relationQuery,
+        ?string $alias = null
+    ): void {
+        // Get pivot table and keys using public methods
+        $pivotTable = $relationInstance->getPivotTable();
+        $foreignPivotKey = $relationInstance->getForeignPivotKey(); // taggable_id
+        $parentPivotKey = $relationInstance->getParentPivotKey(); // tag_id
+        $morphType = $relationInstance->getMorphType(); // taggable_type
+        $parentKey = $relationInstance->getParentKey();
+
+        // Get the related model class for morph type value
+        $relatedClass = $relationInstance->getRelatedClass();
+
+        // Build subquery counting records in pivot table filtered by parent key and morph type
+        // Example: SELECT COUNT(*) FROM taggables WHERE taggables.tag_id = tags.id AND taggables.taggable_type = 'Post'
+        $pivotAlias = "{$pivotTable}_pivot";
+        $subquery = "SELECT COUNT(*) FROM {$pivotTable} AS {$pivotAlias} " .
+            "WHERE {$pivotAlias}.{$parentPivotKey} = {$table}.{$parentKey} " .
+            "AND {$pivotAlias}.{$morphType} = " . $this->quoteValue($relatedClass);
+
+        // Check if relation query has constraints on the related table
+        // If so, we need to join the related table to apply those constraints
+        $relationSql = $relationQuery->toSql();
+        $hasRelatedConstraints = preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches);
+
+        if ($hasRelatedConstraints) {
+            $whereClause = $matches[1];
+
+            // Get related table info using public methods
+            $relatedTable = $relationInstance->getRelatedTable();
+            $relatedKey = $relationInstance->getRelatedKey(); // id on posts table
+
+            // Join related table to apply constraints
+            $relatedAlias = "{$relatedTable}_related";
+            $subquery = "SELECT COUNT(*) FROM {$pivotTable} AS {$pivotAlias} " .
+                "INNER JOIN {$relatedTable} AS {$relatedAlias} ON {$pivotAlias}.{$foreignPivotKey} = {$relatedAlias}.{$relatedKey} " .
+                "WHERE {$pivotAlias}.{$parentPivotKey} = {$table}.{$parentKey} " .
+                "AND {$pivotAlias}.{$morphType} = " . $this->quoteValue($relatedClass);
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            // Replace table references in where clause with alias
+            $boundWhereClause = preg_replace('/\b' . preg_quote($relatedTable, '/') . '\./', "{$relatedAlias}.", $boundWhereClause);
+
+            // Qualify unqualified 'id' column to avoid ambiguity
+            $boundWhereClause = preg_replace(
+                '/\b(id)\s+(IN\s*\(|=|>|<|>=|<=|!=|<>)/i',
+                "{$relatedAlias}.$1 $2",
+                $boundWhereClause
+            );
+
+            $subquery .= " AND ({$boundWhereClause})";
+        }
 
         // Use alias if provided, otherwise use relation name
         $columnAlias = $alias !== null ? $alias : "{$relation}_count";
@@ -3481,6 +3759,12 @@ class ModelQueryBuilder extends QueryBuilder
         // Special handling for BelongsToMany relationships (many-to-many through pivot table)
         if ($relationInstance instanceof BelongsToMany) {
             $this->addBelongsToManyAggregateSelect($relationInstance, $relation, $column, $function, $table, $relationQuery);
+            return $this;
+        }
+
+        // Special handling for MorphToMany relationships (polymorphic many-to-many through pivot table)
+        if ($relationInstance instanceof MorphToMany) {
+            $this->addMorphToManyAggregateSelect($relationInstance, $relation, $column, $function, $table, $relationQuery);
             return $this;
         }
 
@@ -3618,6 +3902,116 @@ class ModelQueryBuilder extends QueryBuilder
             $pivotAlias = "{$pivotTable}_pivot";
             $subquery = "SELECT {$function}({$pivotAlias}.{$column}) FROM {$pivotTable} AS {$pivotAlias} " .
                 "WHERE {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
+        }
+
+        $functionLower = strtolower($function);
+        $columnAlias = "{$relation}_{$functionLower}_{$column}";
+
+        // Ensure we select table.* along with the subquery (only once)
+        $columns = $this->getColumns();
+        if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+            $this->select("{$table}.*");
+        }
+
+        $this->selectRaw("({$subquery}) AS {$columnAlias}");
+    }
+
+    /**
+     * Add aggregate select for MorphToMany relationships.
+     *
+     * For polymorphic many-to-many relationships, we aggregate records in the pivot table
+     * filtered by morph type and morph id, optionally joining the related table for constraints.
+     *
+     * @param MorphToMany $relationInstance The MorphToMany relation instance
+     * @param string $relation The relation name
+     * @param string $column Column to aggregate
+     * @param string $function Aggregate function (SUM, AVG, MIN, MAX)
+     * @param string $table The parent table name
+     * @param QueryBuilder $relationQuery The relation query builder
+     * @return void
+     */
+    private function addMorphToManyAggregateSelect(
+        MorphToMany $relationInstance,
+        string $relation,
+        string $column,
+        string $function,
+        string $table,
+        QueryBuilder $relationQuery
+    ): void {
+        // Get pivot table and keys using public methods
+        $pivotTable = $relationInstance->getPivotTable();
+        $foreignPivotKey = $relationInstance->getForeignPivotKey(); // morph id column (taggable_id)
+        $morphType = $relationInstance->getMorphType(); // morph type column (taggable_type)
+        $parentKey = $relationInstance->getParentKey();
+
+        // Get morph class for the parent model
+        // Use getMorphClass() if available, otherwise use full class name
+        $model = new $this->modelClass([]);
+        $morphClass = method_exists($model, 'getMorphClass')
+            ? $model->getMorphClass()
+            : $this->modelClass;
+
+        // Check if relation query has constraints on the related table
+        $relationSql = $relationQuery->toSql();
+        $hasRelatedConstraints = preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|$)/s', $relationSql, $matches);
+
+        // Determine if column is in pivot table or related table
+        // By default, assume pivot table. If column contains dot (e.g., "tags.name"),
+        // it's explicitly from related table
+        $isPivotColumn = !str_contains($column, '.');
+
+        if ($hasRelatedConstraints || !$isPivotColumn) {
+            // Need to join related table
+            $relatedTable = $relationInstance->getRelatedTable();
+            $relatedPivotKey = $relationInstance->getRelatedPivotKey(); // tag_id
+            $relatedKey = $relationInstance->getRelatedKey(); // id
+
+            $pivotAlias = "{$pivotTable}_pivot";
+            $relatedAlias = "{$relatedTable}_related";
+
+            // Determine which table the column belongs to
+            if (str_contains($column, '.')) {
+                // Explicit table.column format
+                [$tablePart, $columnPart] = explode('.', $column, 2);
+                if ($tablePart === $relatedTable) {
+                    $aggregateColumn = "{$relatedAlias}.{$columnPart}";
+                } else {
+                    $aggregateColumn = "{$pivotAlias}.{$columnPart}";
+                }
+            } else {
+                // Default: try pivot table first, but we'll join related table for constraints
+                // If column doesn't exist in pivot, it should be in related table
+                $aggregateColumn = "{$pivotAlias}.{$column}";
+            }
+
+            $subquery = "SELECT {$function}({$aggregateColumn}) FROM {$pivotTable} AS {$pivotAlias} " .
+                "INNER JOIN {$relatedTable} AS {$relatedAlias} ON {$pivotAlias}.{$relatedPivotKey} = {$relatedAlias}.{$relatedKey} " .
+                "WHERE {$pivotAlias}.{$morphType} = " . $this->quoteValue($morphClass) . " " .
+                "AND {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
+
+            // Add constraints from relation query
+            if ($hasRelatedConstraints) {
+                $whereClause = $matches[1];
+
+                // Replace placeholders with actual values (safely quoted)
+                $relationBindings = $relationQuery->getBindings();
+                $boundWhereClause = $whereClause;
+                foreach ($relationBindings as $binding) {
+                    $quoted = $this->quoteValue($binding);
+                    $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+                }
+
+                // Replace table references in where clause with alias
+                $boundWhereClause = preg_replace('/\b' . preg_quote($relatedTable, '/') . '\./', "{$relatedAlias}.", $boundWhereClause);
+
+                $subquery .= " AND ({$boundWhereClause})";
+            }
+        } else {
+            // Simple case: aggregate on pivot table column only
+            $pivotAlias = "{$pivotTable}_pivot";
+            $subquery = "SELECT {$function}({$pivotAlias}.{$column}) FROM {$pivotTable} AS {$pivotAlias} " .
+                "WHERE {$pivotAlias}.{$morphType} = " . $this->quoteValue($morphClass) . " " .
+                "AND {$pivotAlias}.{$foreignPivotKey} = {$table}.{$parentKey}";
         }
 
         $functionLower = strtolower($function);

@@ -120,7 +120,7 @@ class MorphToMany extends Relation
     /**
      * Get cached related table name.
      */
-    protected function getRelatedTable(): string
+    public function getRelatedTable(): string
     {
         return $this->relatedTableCache ??= $this->relatedClass::getTableName();
     }
@@ -1854,6 +1854,33 @@ class MorphToMany extends Relation
     public function getMorphType(): string
     {
         return $this->morphType;
+    }
+
+    /**
+     * Get the parent key (local key).
+     */
+    public function getParentKey(): string
+    {
+        return $this->localKey;
+    }
+
+    /**
+     * Get the related key (related model's primary key).
+     */
+    public function getRelatedKey(): string
+    {
+        return $this->relatedKey;
+    }
+
+    /**
+     * Get the foreign pivot key (morph id column in pivot table).
+     *
+     * Note: In MorphToMany, foreignKey is the morph id column (taggable_id),
+     * not the morph type column.
+     */
+    public function getForeignPivotKey(): string
+    {
+        return $this->foreignKey;
     }
 
     // =========================================================================
