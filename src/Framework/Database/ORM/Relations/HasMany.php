@@ -212,9 +212,12 @@ class HasMany extends Relation
                     // Case-insensitive check for 'in' type
                     if (strtolower($where['type'] ?? '') === 'in') {
                         if (($where['column'] ?? '') === $foreignKey) {
-                            continue; // Skip WHERE IN, handled in window function
+                            continue; // Skip WHERE IN for foreignKey only, handled in window function
                         }
                     }
+
+                    // CRITICAL FIX: Add 'In' case to prevent dropping whereIn for other columns
+                    // Previously, whereIn for columns OTHER than foreignKey were silently dropped
                     match ($where['type'] ?? '') {
                         'basic' => $baseQuery->where(
                             $where['column'],
@@ -224,6 +227,7 @@ class HasMany extends Relation
                         ),
                         'Null' => $baseQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
                         'NotNull' => $baseQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
+                        'In' => $baseQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
                         'NotIn' => $baseQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
                         'Raw' => $baseQuery->whereRaw(
                             $where['sql'] ?? '',
