@@ -923,10 +923,13 @@ abstract class Relation implements RelationInterface
      * Used by relationships to detect eager loading patterns and apply
      * window function optimizations when needed.
      *
+     * IMPORTANT: Default maxDepth of 25 supports very complex nested queries
+     * while preventing stack overflow attacks. Real-world queries rarely exceed 5-10 levels.
+     *
      * @param array $whereList List of WHERE clauses
      * @param string $tableName Table name to search for in WHERE IN
      * @param string|null $columnName Optional column name to match (default: any column)
-     * @param int $maxDepth Maximum recursion depth (default: 10)
+     * @param int $maxDepth Maximum recursion depth (default: 25)
      * @param int $currentDepth Current recursion depth (internal)
      * @return bool True if WHERE IN found, false otherwise
      */
@@ -934,10 +937,11 @@ abstract class Relation implements RelationInterface
         array $whereList,
         string $tableName,
         ?string $columnName = null,
-        int $maxDepth = 10,
+        int $maxDepth = 25,
         int $currentDepth = 0
     ): bool {
         // Recursion depth limit to prevent stack overflow
+        // Max depth 25 is generous - typical queries have 3-5 levels max
         if ($currentDepth >= $maxDepth) {
             return false;
         }
@@ -993,11 +997,24 @@ abstract class Relation implements RelationInterface
      * When QueryBuilder has no explicit select(), getColumns() returns ["*"].
      * This helper standardizes the check across all relationship types.
      *
+     * Edge cases handled:
+     * - `[]` - No select, use default
+     * - `['*']` - Wildcard select, use default
+     * - `['*', 'some_column']` - Mixed with wildcard, use default
+     * - `['col1', 'col2']` - Custom columns only, use custom
+     *
      * @param array $columns Columns array from QueryBuilder::getColumns()
      * @return bool True if should use default table.* selection
      */
     protected function shouldUseDefaultSelect(array $columns): bool
     {
-        return empty($columns) || $columns === ['*'];
+        // Empty or exact ['*'] - use default
+        if (empty($columns) || $columns === ['*']) {
+            return true;
+        }
+
+        // Check if wildcard exists anywhere in array (handles ['*', 'col'] edge case)
+        // If user explicitly added '*', they want all columns, so use default table-qualified select
+        return in_array('*', $columns, true);
     }
 }
