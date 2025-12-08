@@ -2880,13 +2880,7 @@ final class ProductController extends BaseController
             ->orderBy('created_at', 'DESC')
             ->limit(15)
             ->get();
-        $results['or_where_has_morph'] = $commentsWithOrConditions->map(function ($c) {
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $c->commentable ? $c->commentable->toArray() : null,
-                'commentable_type' => $c->commentable_type,
-            ];
-        })->all();
+        $results['or_where_has_morph'] = $commentsWithOrConditions->all();
 
         // Test 7: Nested whereHasMorph with subqueries
         $commentsWithNestedConditions = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q, $type) use ($minViews, $publishedOnly) {
@@ -2917,13 +2911,8 @@ final class ProductController extends BaseController
             ->orderBy('created_at', 'DESC')
             ->limit(10)
             ->get();
-        $results['nested_where_has_morph'] = $commentsWithNestedConditions->map(function ($c) {
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $c->commentable ? $c->commentable->toArray() : null,
-                'commentable_type' => $c->commentable_type,
-            ];
-        })->all();
+
+        $results['nested_where_has_morph'] = $commentsWithNestedConditions->all();
 
         // Test 8: Nested relationship - Comment with commentable and commentable has relationships
         $commentsWithNestedCommentable = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
@@ -2980,24 +2969,7 @@ final class ProductController extends BaseController
             ->orderBy('created_at', 'DESC')
             ->limit(10)
             ->get();
-        $results['nested_commentable_relationships'] = $commentsWithNestedCommentable->map(function ($c) {
-            $commentable = $c->commentable;
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $commentable ? [
-                    'commentable' => $commentable->toArray(),
-                    'nested_image' => $commentable->image ? $commentable->image->toArray() : null,
-                    'nested_comments' => $commentable->comments ? $commentable->comments->toArray() : [],
-                    'nested_tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all() : [],
-                ] : null,
-            ];
-        })->all();
+        $results['nested_commentable_relationships'] = $commentsWithNestedCommentable->all();
 
         // Test 9: Deep nested - Comment with commentable, commentable has image, and image has imageable
         $commentsWithDeepNested = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($publishedOnly) {
@@ -3040,21 +3012,7 @@ final class ProductController extends BaseController
             ->where('is_approved', true)
             ->limit(5)
             ->get();
-        $results['deep_nested_commentable_image'] = $commentsWithDeepNested->map(function ($c) {
-            $commentable = $c->commentable;
-            $image = $commentable && $commentable->image ? $commentable->image : null;
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $commentable ? [
-                    'commentable' => $commentable->toArray(),
-                    'image' => $image ? [
-                        'image' => $image->toArray(),
-                        'imageable' => $image->imageable ? $image->imageable->toArray() : null,
-                        'imageable_type' => $image->imageable_type ?? null,
-                    ] : null,
-                ] : null,
-            ];
-        })->all();
+        $results['deep_nested_commentable_image'] = $commentsWithDeepNested->all();
 
         // Test 10: Ultra deep nested - Comment -> Commentable -> Comments -> Commentable (circular nested)
         $commentsWithUltraDeepNested = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) {
@@ -3093,21 +3051,7 @@ final class ProductController extends BaseController
             ->where('is_approved', true)
             ->limit(5)
             ->get();
-        $results['ultra_deep_nested_comments'] = $commentsWithUltraDeepNested->map(function ($c) {
-            $commentable = $c->commentable;
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $commentable ? [
-                    'commentable' => $commentable->toArray(),
-                    'nested_comments' => $commentable->comments ? $commentable->comments->map(function ($nestedComment) {
-                        return [
-                            'comment' => $nestedComment->toArray(),
-                            'nested_commentable' => $nestedComment->commentable ? $nestedComment->commentable->toArray() : null,
-                        ];
-                    })->all() : [],
-                ] : null,
-            ];
-        })->all();
+        $results['ultra_deep_nested_comments'] = $commentsWithUltraDeepNested->all();
 
         $queries = $this->formatQueryLogs(DB::getQueryLog());
 
