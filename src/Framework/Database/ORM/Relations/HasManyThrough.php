@@ -129,31 +129,8 @@ class HasManyThrough extends Relation
         // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
 
-        // Helper function to recursively search for WHERE IN in nested closures
-        // Eager loading creates nested WHERE: WHERE ((foreignKey IN (...)))
-        $findWhereIn = function (array $whereList) use (&$findWhereIn): bool {
-            foreach ($whereList as $whereClause) {
-                $type = strtolower($whereClause['type'] ?? '');
-
-                // Direct WHERE IN - this is eager loading
-                if ($type === 'in') {
-                    return true;
-                }
-
-                // Nested WHERE closure - recurse into it
-                if ($type === 'nested' && isset($whereClause['query'])) {
-                    $nestedQueryBuilder = $whereClause['query'];
-                    if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($nestedQueryBuilder->getWheres())) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        };
-
-        $isEagerLoading = $findWhereIn($wheres);
+        // Use base class helper - search for any WHERE IN (no table filter needed)
+        $isEagerLoading = $this->findWhereInRecursive($wheres, '');
 
         $relatedTable = $this->getRelatedTable();
         $throughTable = $this->getThroughTable();
@@ -263,15 +240,15 @@ class HasManyThrough extends Relation
                 }
 
                 // Copy custom select from constraint closure, or use default
-                // IMPORTANT: If columns is ["*"], treat it as no custom select to avoid selecting from ALL joined tables
+                // Use base class helper to check if we should use default selection
                 $customColumns = $this->query->getColumns();
-                if (!empty($customColumns) && $customColumns !== ['*']) {
+                if ($this->shouldUseDefaultSelect($customColumns)) {
+                    // Use table-qualified wildcard to select only from related table, not all joined tables
+                    $baseQuery->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
+                } else {
                     $baseQuery->select($customColumns);
                     // Always need through table key for matching
                     $baseQuery->selectRaw("{$throughTable}.{$this->firstKey}");
-                } else {
-                    // Use table-qualified wildcard to select only from related table, not all joined tables
-                    $baseQuery->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
                 }
 
                 // Copy orderBy from constraint closure

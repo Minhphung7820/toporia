@@ -181,34 +181,8 @@ class MorphMany extends Relation
         // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
 
-        // Helper function to recursively search for WHERE IN in nested closures
-        // Eager loading creates nested WHERE: WHERE ((morphType = X AND foreignKey IN (...)))
-        $findWhereIn = function (array $whereList) use (&$findWhereIn): bool {
-            foreach ($whereList as $whereClause) {
-                $type = strtolower($whereClause['type'] ?? '');
-
-                // Direct WHERE IN - this is eager loading
-                if ($type === 'in') {
-                    return true;
-                }
-
-                // Nested WHERE closure - recurse into it
-                if ($type === 'nested') {
-                    // Check if nested query exists
-                    if (isset($whereClause['query']) && $whereClause['query'] instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($whereClause['query']->getWheres())) {
-                            return true;
-                        }
-                    } else {
-                        // Nested WHERE can also indicate morph eager loading (morphType + foreignKey IN)
-                        return true;
-                    }
-                }
-            }
-            return false;
-        };
-
-        $isEagerLoading = $findWhereIn($wheres);
+        // Use base class helper - search for any WHERE IN (no table filter needed for MorphMany)
+        $isEagerLoading = $this->findWhereInRecursive($wheres, '');
 
         // If eager loading with limit, use window function for optimal performance
         // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)

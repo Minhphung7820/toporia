@@ -543,34 +543,8 @@ class BelongsToMany extends Relation
         // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
 
-        // Helper function to recursively search for WHERE IN in nested closures
-        // Eager loading creates nested WHERE: WHERE ((type=X AND id IN (...)) OR (type=Y AND id IN (...)))
-        $findWhereIn = function (array $whereList, string $pivotTable, string $foreignPivotKey) use (&$findWhereIn): bool {
-            foreach ($whereList as $whereClause) {
-                $type = strtolower($whereClause['type'] ?? '');
-
-                // Direct WHERE IN - check if it's for pivot table
-                if ($type === 'in') {
-                    $column = $whereClause['column'] ?? '';
-                    if (str_contains($column, $pivotTable) && str_contains($column, $foreignPivotKey)) {
-                        return true;
-                    }
-                }
-
-                // Nested WHERE closure - recurse into it
-                if ($type === 'nested' && isset($whereClause['query'])) {
-                    $nestedQueryBuilder = $whereClause['query'];
-                    if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($nestedQueryBuilder->getWheres(), $pivotTable, $foreignPivotKey)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        };
-
-        $isEagerLoading = $findWhereIn($wheres, $this->pivotTable, $this->foreignPivotKey);
+        // Use base class helper method with recursion depth limit
+        $isEagerLoading = $this->findWhereInRecursive($wheres, $this->pivotTable, $this->foreignPivotKey);
 
         // If eager loading with limit, use window function for optimal performance
         // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
@@ -679,14 +653,14 @@ class BelongsToMany extends Relation
                 }
 
                 // Copy custom select from constraint closure if provided, otherwise use default
-                // IMPORTANT: If columns is ["*"], treat it as no custom select to avoid selecting from ALL joined tables
+                // Use base class helper to check if we should use default selection
                 $customColumns = $this->query->getColumns();
-                if (!empty($customColumns) && $customColumns !== ['*']) {
-                    // User provided custom select - use it
-                    $baseQuery->select($customColumns);
-                } else {
+                if ($this->shouldUseDefaultSelect($customColumns)) {
                     // No custom select - use table-qualified wildcard to select only from related table, not joined pivot table
                     $baseQuery->select("{$relatedTable}.*");
+                } else {
+                    // User provided custom select - use it
+                    $baseQuery->select($customColumns);
                 }
 
                 // Always need pivot keys for matching (with aliases)

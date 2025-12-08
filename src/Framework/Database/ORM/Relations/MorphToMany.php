@@ -249,34 +249,8 @@ class MorphToMany extends Relation
         // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
 
-        // Helper function to recursively search for WHERE IN in nested closures
-        // Eager loading creates nested WHERE: WHERE ((type=X AND id IN (...)) OR (type=Y AND id IN (...)))
-        $findWhereIn = function (array $whereList, string $pivotTable) use (&$findWhereIn): bool {
-            foreach ($whereList as $whereClause) {
-                $type = strtolower($whereClause['type'] ?? '');
-
-                // Direct WHERE IN - check if it's for pivot table
-                if ($type === 'in') {
-                    $column = $whereClause['column'] ?? '';
-                    if (str_contains($column, $pivotTable)) {
-                        return true;
-                    }
-                }
-
-                // Nested WHERE closure - recurse into it
-                if ($type === 'nested' && isset($whereClause['query'])) {
-                    $nestedQueryBuilder = $whereClause['query'];
-                    if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($nestedQueryBuilder->getWheres(), $pivotTable)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        };
-
-        $isEagerLoading = $findWhereIn($wheres, $this->pivotTable);
+        // Use base class helper method with recursion depth limit
+        $isEagerLoading = $this->findWhereInRecursive($wheres, $this->pivotTable);
 
         // If eager loading with limit, use window function for optimal performance
         // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
@@ -332,10 +306,12 @@ class MorphToMany extends Relation
                     foreach ($whereList as $whereClause) {
                         $type = strtolower($whereClause['type'] ?? '');
 
-                        // WHERE IN clause
+                        // WHERE IN clause - extract foreign key values
                         if ($type === 'in') {
                             $column = $whereClause['column'] ?? '';
-                            if (str_contains($column, $this->pivotTable) && str_contains($column, $relatedPivotKey)) {
+                            // OPTIMIZATION: Cache str_contains results to avoid repeated calls
+                            $hasPivotTable = str_contains($column, $this->pivotTable);
+                            if ($hasPivotTable && str_contains($column, $relatedPivotKey)) {
                                 // Foreign key values (taggable_id IN (...))
                                 $values = $whereClause['values'] ?? [];
                                 // Use spread operator instead of array_merge for better performance
@@ -343,11 +319,13 @@ class MorphToMany extends Relation
                             }
                         }
 
-                        // WHERE basic clause for morph type (taggable_type = 'PostModel')
+                        // WHERE basic clause - extract morph type values
                         if ($type === 'basic') {
                             $column = $whereClause['column'] ?? '';
                             $operator = $whereClause['operator'] ?? '=';
-                            if (str_contains($column, $this->pivotTable) && str_contains($column, $foreignPivotKey) && $operator === '=') {
+                            // OPTIMIZATION: Cache str_contains results
+                            $hasPivotTable = str_contains($column, $this->pivotTable);
+                            if ($hasPivotTable && str_contains($column, $foreignPivotKey) && $operator === '=') {
                                 $value = $whereClause['value'] ?? null;
                                 if ($value !== null && !in_array($value, $morphTypeValues, true)) {
                                     $morphTypeValues[] = $value;
@@ -402,11 +380,18 @@ class MorphToMany extends Relation
                     foreach ($nestedWheres as $nestedWhere) {
                         $type = strtolower($nestedWhere['type'] ?? '');
                         $column = $nestedWhere['column'] ?? '';
-                        if ($type === 'basic' && str_contains($column, $foreignPivotKey)) {
+                        // OPTIMIZATION: Early exit when both constraints found
+                        if (!$hasTypeConstraint && $type === 'basic' && str_contains($column, $foreignPivotKey)) {
                             $hasTypeConstraint = true;
+                            if ($hasKeyConstraint) {
+                                return true; // Early exit
+                            }
                         }
-                        if ($type === 'in' && str_contains($column, $relatedPivotKey)) {
+                        if (!$hasKeyConstraint && $type === 'in' && str_contains($column, $relatedPivotKey)) {
                             $hasKeyConstraint = true;
+                            if ($hasTypeConstraint) {
+                                return true; // Early exit
+                            }
                         }
                         // Also check deeper nested (OR clauses)
                         if ($type === 'nested' && isset($nestedWhere['query'])) {
@@ -415,11 +400,17 @@ class MorphToMany extends Relation
                                 foreach ($deepQuery->getWheres() as $deepWhere) {
                                     $deepType = strtolower($deepWhere['type'] ?? '');
                                     $deepColumn = $deepWhere['column'] ?? '';
-                                    if ($deepType === 'basic' && str_contains($deepColumn, $foreignPivotKey)) {
+                                    if (!$hasTypeConstraint && $deepType === 'basic' && str_contains($deepColumn, $foreignPivotKey)) {
                                         $hasTypeConstraint = true;
+                                        if ($hasKeyConstraint) {
+                                            return true; // Early exit
+                                        }
                                     }
-                                    if ($deepType === 'in' && str_contains($deepColumn, $relatedPivotKey)) {
+                                    if (!$hasKeyConstraint && $deepType === 'in' && str_contains($deepColumn, $relatedPivotKey)) {
                                         $hasKeyConstraint = true;
+                                        if ($hasTypeConstraint) {
+                                            return true; // Early exit
+                                        }
                                     }
                                 }
                             }
@@ -439,9 +430,9 @@ class MorphToMany extends Relation
                     // Skip direct WHERE IN for pivot keys
                     if ($whereType === 'in') {
                         $column = $where['column'] ?? '';
-                        if ((str_contains($column, $this->pivotTable) && str_contains($column, $foreignPivotKey)) ||
-                            (str_contains($column, $this->pivotTable) && str_contains($column, $relatedPivotKey))
-                        ) {
+                        // OPTIMIZATION: Cache str_contains to avoid repeated calls
+                        $hasPivotTable = str_contains($column, $this->pivotTable);
+                        if ($hasPivotTable && (str_contains($column, $foreignPivotKey) || str_contains($column, $relatedPivotKey))) {
                             continue;
                         }
                     }
@@ -449,7 +440,9 @@ class MorphToMany extends Relation
                     // Skip WHERE basic for morph type
                     if ($whereType === 'basic') {
                         $column = $where['column'] ?? '';
-                        if (str_contains($column, $this->pivotTable) && str_contains($column, $foreignPivotKey)) {
+                        // OPTIMIZATION: Cache str_contains result
+                        $hasPivotTable = str_contains($column, $this->pivotTable);
+                        if ($hasPivotTable && str_contains($column, $foreignPivotKey)) {
                             continue;
                         }
                     }
@@ -476,13 +469,13 @@ class MorphToMany extends Relation
                 }
 
                 // Copy custom select or use default
-                // IMPORTANT: If columns is ["*"], treat it as no custom select to avoid selecting from ALL joined tables
+                // Use base class helper to check if we should use default selection
                 $customColumns = $this->query->getColumns();
-                if (!empty($customColumns) && $customColumns !== ['*']) {
-                    $baseQuery->select($customColumns);
-                } else {
+                if ($this->shouldUseDefaultSelect($customColumns)) {
                     // Use table-qualified wildcard to select only from related table, not joined pivot table
                     $baseQuery->select("{$relatedTable}.*");
+                } else {
+                    $baseQuery->select($customColumns);
                 }
 
                 // Always need pivot keys for matching (with aliases)

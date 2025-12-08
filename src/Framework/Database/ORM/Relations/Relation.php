@@ -912,4 +912,92 @@ abstract class Relation implements RelationInterface
             return null;
         }
     }
+
+    // =========================================================================
+    // EAGER LOADING OPTIMIZATION HELPERS
+    // =========================================================================
+
+    /**
+     * Recursively search for WHERE IN clause in nested WHERE conditions.
+     *
+     * Used by relationships to detect eager loading patterns and apply
+     * window function optimizations when needed.
+     *
+     * @param array $whereList List of WHERE clauses
+     * @param string $tableName Table name to search for in WHERE IN
+     * @param string|null $columnName Optional column name to match (default: any column)
+     * @param int $maxDepth Maximum recursion depth (default: 10)
+     * @param int $currentDepth Current recursion depth (internal)
+     * @return bool True if WHERE IN found, false otherwise
+     */
+    protected function findWhereInRecursive(
+        array $whereList,
+        string $tableName,
+        ?string $columnName = null,
+        int $maxDepth = 10,
+        int $currentDepth = 0
+    ): bool {
+        // Recursion depth limit to prevent stack overflow
+        if ($currentDepth >= $maxDepth) {
+            return false;
+        }
+
+        foreach ($whereList as $whereClause) {
+            $type = strtolower($whereClause['type'] ?? '');
+
+            // Direct WHERE IN - check if it matches our criteria
+            if ($type === 'in') {
+                // If tableName is empty, match any WHERE IN (used by HasMany/MorphMany)
+                if ($tableName === '') {
+                    return true;
+                }
+
+                $column = $whereClause['column'] ?? '';
+                // Optimize: Single str_contains check if no specific column
+                if ($columnName === null) {
+                    if (str_contains($column, $tableName)) {
+                        return true;
+                    }
+                } else {
+                    // Cache str_contains results to avoid repeated calls
+                    $hasTable = str_contains($column, $tableName);
+                    if ($hasTable && str_contains($column, $columnName)) {
+                        return true;
+                    }
+                }
+            }
+
+            // Nested WHERE closure - recurse into it
+            if ($type === 'nested' && isset($whereClause['query'])) {
+                $nestedQueryBuilder = $whereClause['query'];
+                if ($nestedQueryBuilder instanceof QueryBuilder) {
+                    if ($this->findWhereInRecursive(
+                        $nestedQueryBuilder->getWheres(),
+                        $tableName,
+                        $columnName,
+                        $maxDepth,
+                        $currentDepth + 1
+                    )) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if custom columns array should be treated as default selection.
+     *
+     * When QueryBuilder has no explicit select(), getColumns() returns ["*"].
+     * This helper standardizes the check across all relationship types.
+     *
+     * @param array $columns Columns array from QueryBuilder::getColumns()
+     * @return bool True if should use default table.* selection
+     */
+    protected function shouldUseDefaultSelect(array $columns): bool
+    {
+        return empty($columns) || $columns === ['*'];
+    }
 }

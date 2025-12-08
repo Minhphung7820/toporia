@@ -93,31 +93,9 @@ class HasMany extends Relation
         // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
 
-        // Helper function to recursively search for WHERE IN in nested closures
-        // Eager loading creates nested WHERE: WHERE ((foreignKey IN (...)))
-        $findWhereIn = function (array $whereList) use (&$findWhereIn): bool {
-            foreach ($whereList as $whereClause) {
-                $type = strtolower($whereClause['type'] ?? '');
-
-                // Direct WHERE IN - this is eager loading
-                if ($type === 'in') {
-                    return true;
-                }
-
-                // Nested WHERE closure - recurse into it
-                if ($type === 'nested' && isset($whereClause['query'])) {
-                    $nestedQueryBuilder = $whereClause['query'];
-                    if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($nestedQueryBuilder->getWheres())) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        };
-
-        $isEagerLoading = $findWhereIn($wheres);
+        // Use base class helper - search for any WHERE IN (no table filter needed for HasMany)
+        // We pass empty string as table name to match any WHERE IN clause
+        $isEagerLoading = $this->findWhereInRecursive($wheres, '');
 
         // If eager loading with limit, use window function for optimal performance
         // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
