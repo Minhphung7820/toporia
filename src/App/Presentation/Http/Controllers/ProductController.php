@@ -4089,497 +4089,497 @@ final class ProductController extends BaseController
             ];
         }
 
-        // Test 5: MorphTo - Comment belongs to Post/Video with whereHasMorph
-        $commentQuery = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
-            if ($minViews > 0) {
-                $q->where('views', '>=', $minViews);
-            }
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-        });
+        // // Test 5: MorphTo - Comment belongs to Post/Video with whereHasMorph
+        // $commentQuery = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
+        //     if ($minViews > 0) {
+        //         $q->where('views', '>=', $minViews);
+        //     }
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        // });
 
-        if ($approvedCommentsOnly) {
-            $commentQuery->where('is_approved', true);
-        }
+        // if ($approvedCommentsOnly) {
+        //     $commentQuery->where('is_approved', true);
+        // }
 
-        $comment = $commentQuery->with('commentable')->find($commentId);
-        if ($comment) {
-            $results['comment_with_commentable'] = [
-                'comment' => $comment->toArray(),
-                'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
-                'commentable_type' => $comment->commentable_type,
-            ];
-        }
+        // $comment = $commentQuery->with('commentable')->find($commentId);
+        // if ($comment) {
+        //     $results['comment_with_commentable'] = [
+        //         'comment' => $comment->toArray(),
+        //         'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
+        //         'commentable_type' => $comment->commentable_type,
+        //     ];
+        // }
 
-        // Test 6: MorphToMany - Post has many Tags with complex conditions
-        if ($post) {
-            $post->load(['tags' => function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-                $q->orderBy('name', 'ASC');
-            }]);
-            $results['post_with_tags'] = [
-                'post' => $post->toArray(),
-                'tags' => $post->tags->map(function ($tag) {
-                    $data = $tag->toArray();
-                    if ($tag->pivot) {
-                        $data['pivot'] = $tag->pivot->toArray();
-                    }
-                    return $data;
-                })->all(),
-                'tags_count' => $post->tags->count(),
-            ];
-        }
+        // // Test 6: MorphToMany - Post has many Tags with complex conditions
+        // if ($post) {
+        //     $post->load(['tags' => function ($q) use ($activeTagsOnly) {
+        //         if ($activeTagsOnly) {
+        //             $q->where('is_active', true);
+        //         }
+        //         $q->orderBy('name', 'ASC');
+        //     }]);
+        //     $results['post_with_tags'] = [
+        //         'post' => $post->toArray(),
+        //         'tags' => $post->tags->map(function ($tag) {
+        //             $data = $tag->toArray();
+        //             if ($tag->pivot) {
+        //                 $data['pivot'] = $tag->pivot->toArray();
+        //             }
+        //             return $data;
+        //         })->all(),
+        //         'tags_count' => $post->tags->count(),
+        //     ];
+        // }
 
-        // Test 7: MorphToMany - Video has many Tags with complex conditions
-        if ($video) {
-            $video->load(['tags' => function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-                $q->orderBy('name', 'ASC');
-            }]);
-            $results['video_with_tags'] = [
-                'video' => $video->toArray(),
-                'tags' => $video->tags->map(function ($tag) {
-                    $data = $tag->toArray();
-                    if ($tag->pivot) {
-                        $data['pivot'] = $tag->pivot->toArray();
-                    }
-                    return $data;
-                })->all(),
-                'tags_count' => $video->tags->count(),
-            ];
-        }
+        // // Test 7: MorphToMany - Video has many Tags with complex conditions
+        // if ($video) {
+        //     $video->load(['tags' => function ($q) use ($activeTagsOnly) {
+        //         if ($activeTagsOnly) {
+        //             $q->where('is_active', true);
+        //         }
+        //         $q->orderBy('name', 'ASC');
+        //     }]);
+        //     $results['video_with_tags'] = [
+        //         'video' => $video->toArray(),
+        //         'tags' => $video->tags->map(function ($tag) {
+        //             $data = $tag->toArray();
+        //             if ($tag->pivot) {
+        //                 $data['pivot'] = $tag->pivot->toArray();
+        //             }
+        //             return $data;
+        //         })->all(),
+        //         'tags_count' => $video->tags->count(),
+        //     ];
+        // }
 
-        // Test 8: Complex combined query - Posts with all relationships
-        $postsWithAllRelationships = PostModel::whereHas('image', function ($q) use ($minImageSize) {
-            if ($minImageSize > 0) {
-                $q->where('size', '>=', $minImageSize);
-            }
-        })
-            ->whereHas('comments', function ($q) use ($approvedCommentsOnly) {
-                if ($approvedCommentsOnly) {
-                    $q->where('is_approved', true);
-                }
-            })
-            ->whereHas('tags', function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            })
-            ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            }])
-            ->withCount(['comments' => function ($q) use ($approvedCommentsOnly) {
-                if ($approvedCommentsOnly) {
-                    $q->where('is_approved', true);
-                }
-            }])
-            ->having('tags_count', '>=', $minTags > 0 ? $minTags : 1)
-            ->where(function ($q) use ($publishedOnly, $minViews) {
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
-            })
-            ->with([
-                'image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
-                },
-                'comments' => function ($q) use ($approvedCommentsOnly) {
-                    if ($approvedCommentsOnly) {
-                        $q->where('is_approved', true);
-                    }
-                    $q->orderBy('created_at', 'DESC')->limit(5);
-                },
-                'tags' => function ($q) use ($activeTagsOnly) {
-                    if ($activeTagsOnly) {
-                        $q->where('is_active', true);
-                    }
-                    $q->orderBy('name', 'ASC');
-                }
-            ])
-            ->orderBy('views', 'DESC')
-            ->limit(10)
-            ->get();
-        $results['posts_with_all_relationships'] = $postsWithAllRelationships->map(function ($p) {
-            return [
-                'id' => $p->id,
-                'title' => $p->title,
-                'views' => $p->views,
-                'tags_count' => $p->tags_count,
-                'comments_count' => $p->comments_count,
-                'image' => $p->image ? $p->image->toArray() : null,
-                'comments' => $p->comments->toArray(),
-                'tags' => $p->tags->map(function ($tag) {
-                    $data = $tag->toArray();
-                    if ($tag->pivot) {
-                        $data['pivot'] = $tag->pivot->toArray();
-                    }
-                    return $data;
-                })->all(),
-            ];
-        })->all();
+        // // Test 8: Complex combined query - Posts with all relationships
+        // $postsWithAllRelationships = PostModel::whereHas('image', function ($q) use ($minImageSize) {
+        //     if ($minImageSize > 0) {
+        //         $q->where('size', '>=', $minImageSize);
+        //     }
+        // })
+        //     ->whereHas('comments', function ($q) use ($approvedCommentsOnly) {
+        //         if ($approvedCommentsOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //     })
+        //     ->whereHas('tags', function ($q) use ($activeTagsOnly) {
+        //         if ($activeTagsOnly) {
+        //             $q->where('is_active', true);
+        //         }
+        //     })
+        //     ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
+        //         if ($activeTagsOnly) {
+        //             $q->where('is_active', true);
+        //         }
+        //     }])
+        //     ->withCount(['comments' => function ($q) use ($approvedCommentsOnly) {
+        //         if ($approvedCommentsOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //     }])
+        //     ->having('tags_count', '>=', $minTags > 0 ? $minTags : 1)
+        //     ->where(function ($q) use ($publishedOnly, $minViews) {
+        //         if ($publishedOnly) {
+        //             $q->where('is_published', true);
+        //         }
+        //         if ($minViews > 0) {
+        //             $q->where('views', '>=', $minViews);
+        //         }
+        //     })
+        //     ->with([
+        //         'image' => function ($q) {
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'comments' => function ($q) use ($approvedCommentsOnly) {
+        //             if ($approvedCommentsOnly) {
+        //                 $q->where('is_approved', true);
+        //             }
+        //             $q->orderBy('created_at', 'DESC')->limit(5);
+        //         },
+        //         'tags' => function ($q) use ($activeTagsOnly) {
+        //             if ($activeTagsOnly) {
+        //                 $q->where('is_active', true);
+        //             }
+        //             $q->orderBy('name', 'ASC');
+        //         }
+        //     ])
+        //     ->orderBy('views', 'DESC')
+        //     ->limit(10)
+        //     ->get();
+        // $results['posts_with_all_relationships'] = $postsWithAllRelationships->map(function ($p) {
+        //     return [
+        //         'id' => $p->id,
+        //         'title' => $p->title,
+        //         'views' => $p->views,
+        //         'tags_count' => $p->tags_count,
+        //         'comments_count' => $p->comments_count,
+        //         'image' => $p->image ? $p->image->toArray() : null,
+        //         'comments' => $p->comments->toArray(),
+        //         'tags' => $p->tags->map(function ($tag) {
+        //             $data = $tag->toArray();
+        //             if ($tag->pivot) {
+        //                 $data['pivot'] = $tag->pivot->toArray();
+        //             }
+        //             return $data;
+        //         })->all(),
+        //     ];
+        // })->all();
 
-        // Test 9: Complex combined query - Videos with all relationships
-        $videosWithAllRelationships = VideoModel::whereHas('image', function ($q) use ($minImageSize) {
-            if ($minImageSize > 0) {
-                $q->where('size', '>=', $minImageSize);
-            }
-        })
-            ->whereHas('comments', function ($q) use ($approvedCommentsOnly) {
-                if ($approvedCommentsOnly) {
-                    $q->where('is_approved', true);
-                }
-            })
-            ->whereHas('tags', function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            })
-            ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            }])
-            ->withCount(['comments' => function ($q) use ($approvedCommentsOnly) {
-                if ($approvedCommentsOnly) {
-                    $q->where('is_approved', true);
-                }
-            }])
-            ->having('tags_count', '>=', $minTags > 0 ? $minTags : 1)
-            ->where(function ($q) use ($publishedOnly, $minViews) {
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
-            })
-            ->where('duration', '>', 0)
-            ->with([
-                'image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
-                },
-                'comments' => function ($q) use ($approvedCommentsOnly) {
-                    if ($approvedCommentsOnly) {
-                        $q->where('is_approved', true);
-                    }
-                    $q->orderBy('created_at', 'DESC')->limit(5);
-                },
-                'tags' => function ($q) use ($activeTagsOnly) {
-                    if ($activeTagsOnly) {
-                        $q->where('is_active', true);
-                    }
-                    $q->orderBy('name', 'ASC');
-                }
-            ])
-            ->orderBy('views', 'DESC')
-            ->limit(10)
-            ->get();
-        $results['videos_with_all_relationships'] = $videosWithAllRelationships->map(function ($v) {
-            return [
-                'id' => $v->id,
-                'title' => $v->title,
-                'views' => $v->views,
-                'duration' => $v->duration,
-                'tags_count' => $v->tags_count,
-                'comments_count' => $v->comments_count,
-                'image' => $v->image ? $v->image->toArray() : null,
-                'comments' => $v->comments->toArray(),
-                'tags' => $v->tags->map(function ($tag) {
-                    $data = $tag->toArray();
-                    if ($tag->pivot) {
-                        $data['pivot'] = $tag->pivot->toArray();
-                    }
-                    return $data;
-                })->all(),
-            ];
-        })->all();
+        // // Test 9: Complex combined query - Videos with all relationships
+        // $videosWithAllRelationships = VideoModel::whereHas('image', function ($q) use ($minImageSize) {
+        //     if ($minImageSize > 0) {
+        //         $q->where('size', '>=', $minImageSize);
+        //     }
+        // })
+        //     ->whereHas('comments', function ($q) use ($approvedCommentsOnly) {
+        //         if ($approvedCommentsOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //     })
+        //     ->whereHas('tags', function ($q) use ($activeTagsOnly) {
+        //         if ($activeTagsOnly) {
+        //             $q->where('is_active', true);
+        //         }
+        //     })
+        //     ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
+        //         if ($activeTagsOnly) {
+        //             $q->where('is_active', true);
+        //         }
+        //     }])
+        //     ->withCount(['comments' => function ($q) use ($approvedCommentsOnly) {
+        //         if ($approvedCommentsOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //     }])
+        //     ->having('tags_count', '>=', $minTags > 0 ? $minTags : 1)
+        //     ->where(function ($q) use ($publishedOnly, $minViews) {
+        //         if ($publishedOnly) {
+        //             $q->where('is_published', true);
+        //         }
+        //         if ($minViews > 0) {
+        //             $q->where('views', '>=', $minViews);
+        //         }
+        //     })
+        //     ->where('duration', '>', 0)
+        //     ->with([
+        //         'image' => function ($q) {
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'comments' => function ($q) use ($approvedCommentsOnly) {
+        //             if ($approvedCommentsOnly) {
+        //                 $q->where('is_approved', true);
+        //             }
+        //             $q->orderBy('created_at', 'DESC')->limit(5);
+        //         },
+        //         'tags' => function ($q) use ($activeTagsOnly) {
+        //             if ($activeTagsOnly) {
+        //                 $q->where('is_active', true);
+        //             }
+        //             $q->orderBy('name', 'ASC');
+        //         }
+        //     ])
+        //     ->orderBy('views', 'DESC')
+        //     ->limit(10)
+        //     ->get();
+        // $results['videos_with_all_relationships'] = $videosWithAllRelationships->map(function ($v) {
+        //     return [
+        //         'id' => $v->id,
+        //         'title' => $v->title,
+        //         'views' => $v->views,
+        //         'duration' => $v->duration,
+        //         'tags_count' => $v->tags_count,
+        //         'comments_count' => $v->comments_count,
+        //         'image' => $v->image ? $v->image->toArray() : null,
+        //         'comments' => $v->comments->toArray(),
+        //         'tags' => $v->tags->map(function ($tag) {
+        //             $data = $tag->toArray();
+        //             if ($tag->pivot) {
+        //                 $data['pivot'] = $tag->pivot->toArray();
+        //             }
+        //             return $data;
+        //         })->all(),
+        //     ];
+        // })->all();
 
-        // Test 10: Comments with whereHasMorph for both Post and Video
-        $commentsWithBothTypesQuery = CommentModel::whereHasMorph('commentable', [PostModel::class], function ($q) use ($minViews, $publishedOnly) {
-            if ($minViews > 0) {
-                $q->where('views', '>=', $minViews);
-            }
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-        })
-            ->orWhereHasMorph('commentable', [VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                $q->where('duration', '>', 0);
-            });
+        // // Test 10: Comments with whereHasMorph for both Post and Video
+        // $commentsWithBothTypesQuery = CommentModel::whereHasMorph('commentable', [PostModel::class], function ($q) use ($minViews, $publishedOnly) {
+        //     if ($minViews > 0) {
+        //         $q->where('views', '>=', $minViews);
+        //     }
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        // })
+        //     ->orWhereHasMorph('commentable', [VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
+        //         if ($minViews > 0) {
+        //             $q->where('views', '>=', $minViews);
+        //         }
+        //         if ($publishedOnly) {
+        //             $q->where('is_published', true);
+        //         }
+        //         $q->where('duration', '>', 0);
+        //     });
 
-        if ($approvedCommentsOnly) {
-            $commentsWithBothTypesQuery->where('is_approved', true);
-        }
+        // if ($approvedCommentsOnly) {
+        //     $commentsWithBothTypesQuery->where('is_approved', true);
+        // }
 
-        $commentsWithBothTypes = $commentsWithBothTypesQuery
-            ->with('commentable')
-            ->orderBy('created_at', 'DESC')
-            ->limit(20)
-            ->get();
-        $results['comments_with_both_types'] = $commentsWithBothTypes->map(function ($c) {
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $c->commentable ? $c->commentable->toArray() : null,
-                'commentable_type' => $c->commentable_type,
-            ];
-        })->all();
+        // $commentsWithBothTypes = $commentsWithBothTypesQuery
+        //     ->with('commentable')
+        //     ->orderBy('created_at', 'DESC')
+        //     ->limit(20)
+        //     ->get();
+        // $results['comments_with_both_types'] = $commentsWithBothTypes->map(function ($c) {
+        //     return [
+        //         'comment' => $c->toArray(),
+        //         'commentable' => $c->commentable ? $c->commentable->toArray() : null,
+        //         'commentable_type' => $c->commentable_type,
+        //     ];
+        // })->all();
 
-        // Test 11: Ultra complex nested - Posts with all relationships and nested relationships
-        $postsWithUltraNested = PostModel::whereHas('image', function ($q) use ($minImageSize) {
-            if ($minImageSize > 0) {
-                $q->where('size', '>=', $minImageSize);
-            }
-        })
-            ->whereHas('comments', function ($q) use ($approvedCommentsOnly) {
-                if ($approvedCommentsOnly) {
-                    $q->where('is_approved', true);
-                }
-            })
-            ->whereHas('tags', function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            })
-            ->with([
-                'image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
-                },
-                'image.imageable' => function ($q) {
-                    // Nested: Post -> Image -> Imageable
-                },
-                'comments' => function ($q) use ($approvedCommentsOnly) {
-                    if ($approvedCommentsOnly) {
-                        $q->where('is_approved', true);
-                    }
-                    $q->orderBy('created_at', 'DESC')->limit(5);
-                },
-                'comments.commentable' => function ($q) {
-                    // Nested: Post -> Comments -> Commentable
-                },
-                'comments.commentable.image' => function ($q) {
-                    // Deep nested: Post -> Comments -> Commentable -> Image
-                    $q->orderBy('size', 'DESC');
-                },
-                'comments.commentable.tags' => function ($q) {
-                    // Deep nested: Post -> Comments -> Commentable -> Tags
-                    $q->where('is_active', true)
-                        ->orderBy('name', 'ASC');
-                },
-                'tags' => function ($q) use ($activeTagsOnly) {
-                    if ($activeTagsOnly) {
-                        $q->where('is_active', true);
-                    }
-                    $q->orderBy('name', 'ASC');
-                }
-            ])
-            ->where(function ($q) use ($publishedOnly, $minViews) {
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
-            })
-            ->limit(3)
-            ->get();
-        $results['ultra_nested_posts'] = $postsWithUltraNested->map(function ($p) {
-            return [
-                'id' => $p->id,
-                'title' => $p->title,
-                'image' => $p->image ? [
-                    'image' => $p->image->toArray(),
-                    'imageable' => $p->image->imageable ? $p->image->imageable->toArray() : null,
-                ] : null,
-                'comments' => $p->comments->map(function ($comment) {
-                    $commentable = $comment->commentable;
-                    return [
-                        'comment' => $comment->toArray(),
-                        'commentable' => $commentable ? [
-                            'commentable' => $commentable->toArray(),
-                            'nested_image' => $commentable->image ? $commentable->image->toArray() : null,
-                            'nested_tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
-                                $data = $tag->toArray();
-                                if ($tag->pivot) {
-                                    $data['pivot'] = $tag->pivot->toArray();
-                                }
-                                return $data;
-                            })->all() : [],
-                        ] : null,
-                    ];
-                })->all(),
-                'tags' => $p->tags->map(function ($tag) {
-                    $data = $tag->toArray();
-                    if ($tag->pivot) {
-                        $data['pivot'] = $tag->pivot->toArray();
-                    }
-                    return $data;
-                })->all(),
-            ];
-        })->all();
+        // // Test 11: Ultra complex nested - Posts with all relationships and nested relationships
+        // $postsWithUltraNested = PostModel::whereHas('image', function ($q) use ($minImageSize) {
+        //     if ($minImageSize > 0) {
+        //         $q->where('size', '>=', $minImageSize);
+        //     }
+        // })
+        //     ->whereHas('comments', function ($q) use ($approvedCommentsOnly) {
+        //         if ($approvedCommentsOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //     })
+        //     ->whereHas('tags', function ($q) use ($activeTagsOnly) {
+        //         if ($activeTagsOnly) {
+        //             $q->where('is_active', true);
+        //         }
+        //     })
+        //     ->with([
+        //         'image' => function ($q) {
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'image.imageable' => function ($q) {
+        //             // Nested: Post -> Image -> Imageable
+        //         },
+        //         'comments' => function ($q) use ($approvedCommentsOnly) {
+        //             if ($approvedCommentsOnly) {
+        //                 $q->where('is_approved', true);
+        //             }
+        //             $q->orderBy('created_at', 'DESC')->limit(5);
+        //         },
+        //         'comments.commentable' => function ($q) {
+        //             // Nested: Post -> Comments -> Commentable
+        //         },
+        //         'comments.commentable.image' => function ($q) {
+        //             // Deep nested: Post -> Comments -> Commentable -> Image
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'comments.commentable.tags' => function ($q) {
+        //             // Deep nested: Post -> Comments -> Commentable -> Tags
+        //             $q->where('is_active', true)
+        //                 ->orderBy('name', 'ASC');
+        //         },
+        //         'tags' => function ($q) use ($activeTagsOnly) {
+        //             if ($activeTagsOnly) {
+        //                 $q->where('is_active', true);
+        //             }
+        //             $q->orderBy('name', 'ASC');
+        //         }
+        //     ])
+        //     ->where(function ($q) use ($publishedOnly, $minViews) {
+        //         if ($publishedOnly) {
+        //             $q->where('is_published', true);
+        //         }
+        //         if ($minViews > 0) {
+        //             $q->where('views', '>=', $minViews);
+        //         }
+        //     })
+        //     ->limit(3)
+        //     ->get();
+        // $results['ultra_nested_posts'] = $postsWithUltraNested->map(function ($p) {
+        //     return [
+        //         'id' => $p->id,
+        //         'title' => $p->title,
+        //         'image' => $p->image ? [
+        //             'image' => $p->image->toArray(),
+        //             'imageable' => $p->image->imageable ? $p->image->imageable->toArray() : null,
+        //         ] : null,
+        //         'comments' => $p->comments->map(function ($comment) {
+        //             $commentable = $comment->commentable;
+        //             return [
+        //                 'comment' => $comment->toArray(),
+        //                 'commentable' => $commentable ? [
+        //                     'commentable' => $commentable->toArray(),
+        //                     'nested_image' => $commentable->image ? $commentable->image->toArray() : null,
+        //                     'nested_tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
+        //                         $data = $tag->toArray();
+        //                         if ($tag->pivot) {
+        //                             $data['pivot'] = $tag->pivot->toArray();
+        //                         }
+        //                         return $data;
+        //                     })->all() : [],
+        //                 ] : null,
+        //             ];
+        //         })->all(),
+        //         'tags' => $p->tags->map(function ($tag) {
+        //             $data = $tag->toArray();
+        //             if ($tag->pivot) {
+        //                 $data['pivot'] = $tag->pivot->toArray();
+        //             }
+        //             return $data;
+        //         })->all(),
+        //     ];
+        // })->all();
 
-        // Test 12: Ultra complex nested - Videos with all relationships and nested relationships
-        $videosWithUltraNested = VideoModel::whereHas('image', function ($q) use ($minImageSize) {
-            if ($minImageSize > 0) {
-                $q->where('size', '>=', $minImageSize);
-            }
-        })
-            ->whereHas('comments', function ($q) use ($approvedCommentsOnly) {
-                if ($approvedCommentsOnly) {
-                    $q->where('is_approved', true);
-                }
-            })
-            ->whereHas('tags', function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            })
-            ->with([
-                'image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
-                },
-                'image.imageable' => function ($q) {
-                    // Nested: Video -> Image -> Imageable
-                },
-                'comments' => function ($q) use ($approvedCommentsOnly) {
-                    if ($approvedCommentsOnly) {
-                        $q->where('is_approved', true);
-                    }
-                    $q->orderBy('created_at', 'DESC')->limit(5);
-                },
-                'comments.commentable' => function ($q) {
-                    // Nested: Video -> Comments -> Commentable
-                },
-                'comments.commentable.image' => function ($q) {
-                    // Deep nested: Video -> Comments -> Commentable -> Image
-                    $q->orderBy('size', 'DESC');
-                },
-                'comments.commentable.tags' => function ($q) {
-                    // Deep nested: Video -> Comments -> Commentable -> Tags
-                    $q->where('is_active', true)
-                        ->orderBy('name', 'ASC');
-                },
-                'tags' => function ($q) use ($activeTagsOnly) {
-                    if ($activeTagsOnly) {
-                        $q->where('is_active', true);
-                    }
-                    $q->orderBy('name', 'ASC');
-                }
-            ])
-            ->where(function ($q) use ($publishedOnly, $minViews) {
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
-            })
-            ->where('duration', '>', 60)
-            ->limit(3)
-            ->get();
-        $results['ultra_nested_videos'] = $videosWithUltraNested->map(function ($v) {
-            return [
-                'id' => $v->id,
-                'title' => $v->title,
-                'duration' => $v->duration,
-                'image' => $v->image ? [
-                    'image' => $v->image->toArray(),
-                    'imageable' => $v->image->imageable ? $v->image->imageable->toArray() : null,
-                ] : null,
-                'comments' => $v->comments->map(function ($comment) {
-                    $commentable = $comment->commentable;
-                    return [
-                        'comment' => $comment->toArray(),
-                        'commentable' => $commentable ? [
-                            'commentable' => $commentable->toArray(),
-                            'nested_image' => $commentable->image ? $commentable->image->toArray() : null,
-                            'nested_tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
-                                $data = $tag->toArray();
-                                if ($tag->pivot) {
-                                    $data['pivot'] = $tag->pivot->toArray();
-                                }
-                                return $data;
-                            })->all() : [],
-                        ] : null,
-                    ];
-                })->all(),
-                'tags' => $v->tags->map(function ($tag) {
-                    $data = $tag->toArray();
-                    if ($tag->pivot) {
-                        $data['pivot'] = $tag->pivot->toArray();
-                    }
-                    return $data;
-                })->all(),
-            ];
-        })->all();
+        // // Test 12: Ultra complex nested - Videos with all relationships and nested relationships
+        // $videosWithUltraNested = VideoModel::whereHas('image', function ($q) use ($minImageSize) {
+        //     if ($minImageSize > 0) {
+        //         $q->where('size', '>=', $minImageSize);
+        //     }
+        // })
+        //     ->whereHas('comments', function ($q) use ($approvedCommentsOnly) {
+        //         if ($approvedCommentsOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //     })
+        //     ->whereHas('tags', function ($q) use ($activeTagsOnly) {
+        //         if ($activeTagsOnly) {
+        //             $q->where('is_active', true);
+        //         }
+        //     })
+        //     ->with([
+        //         'image' => function ($q) {
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'image.imageable' => function ($q) {
+        //             // Nested: Video -> Image -> Imageable
+        //         },
+        //         'comments' => function ($q) use ($approvedCommentsOnly) {
+        //             if ($approvedCommentsOnly) {
+        //                 $q->where('is_approved', true);
+        //             }
+        //             $q->orderBy('created_at', 'DESC')->limit(5);
+        //         },
+        //         'comments.commentable' => function ($q) {
+        //             // Nested: Video -> Comments -> Commentable
+        //         },
+        //         'comments.commentable.image' => function ($q) {
+        //             // Deep nested: Video -> Comments -> Commentable -> Image
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'comments.commentable.tags' => function ($q) {
+        //             // Deep nested: Video -> Comments -> Commentable -> Tags
+        //             $q->where('is_active', true)
+        //                 ->orderBy('name', 'ASC');
+        //         },
+        //         'tags' => function ($q) use ($activeTagsOnly) {
+        //             if ($activeTagsOnly) {
+        //                 $q->where('is_active', true);
+        //             }
+        //             $q->orderBy('name', 'ASC');
+        //         }
+        //     ])
+        //     ->where(function ($q) use ($publishedOnly, $minViews) {
+        //         if ($publishedOnly) {
+        //             $q->where('is_published', true);
+        //         }
+        //         if ($minViews > 0) {
+        //             $q->where('views', '>=', $minViews);
+        //         }
+        //     })
+        //     ->where('duration', '>', 60)
+        //     ->limit(3)
+        //     ->get();
+        // $results['ultra_nested_videos'] = $videosWithUltraNested->map(function ($v) {
+        //     return [
+        //         'id' => $v->id,
+        //         'title' => $v->title,
+        //         'duration' => $v->duration,
+        //         'image' => $v->image ? [
+        //             'image' => $v->image->toArray(),
+        //             'imageable' => $v->image->imageable ? $v->image->imageable->toArray() : null,
+        //         ] : null,
+        //         'comments' => $v->comments->map(function ($comment) {
+        //             $commentable = $comment->commentable;
+        //             return [
+        //                 'comment' => $comment->toArray(),
+        //                 'commentable' => $commentable ? [
+        //                     'commentable' => $commentable->toArray(),
+        //                     'nested_image' => $commentable->image ? $commentable->image->toArray() : null,
+        //                     'nested_tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
+        //                         $data = $tag->toArray();
+        //                         if ($tag->pivot) {
+        //                             $data['pivot'] = $tag->pivot->toArray();
+        //                         }
+        //                         return $data;
+        //                     })->all() : [],
+        //                 ] : null,
+        //             ];
+        //         })->all(),
+        //         'tags' => $v->tags->map(function ($tag) {
+        //             $data = $tag->toArray();
+        //             if ($tag->pivot) {
+        //                 $data['pivot'] = $tag->pivot->toArray();
+        //             }
+        //             return $data;
+        //         })->all(),
+        //     ];
+        // })->all();
 
-        // Test 13: Circular nested - Comments with commentable, commentable has comments (circular)
-        $commentsWithCircularNested = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($publishedOnly) {
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-        })
-            ->with([
-                'commentable' => function ($q) {
-                    // Load commentable with all relationships
-                },
-                'commentable.image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
-                },
-                'commentable.tags' => function ($q) {
-                    $q->where('is_active', true)
-                        ->orderBy('name', 'ASC');
-                },
-                'commentable.comments' => function ($q) {
-                    $q->where('is_approved', true)
-                        ->orderBy('created_at', 'DESC')
-                        ->limit(3);
-                },
-                'commentable.comments.commentable' => function ($q) {
-                    // Circular nested: Comment -> Commentable -> Comments -> Commentable
-                }
-            ])
-            ->where('is_approved', true)
-            ->limit(5)
-            ->get();
-        $results['circular_nested_comments'] = $commentsWithCircularNested->map(function ($c) {
-            $commentable = $c->commentable;
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $commentable ? [
-                    'commentable' => $commentable->toArray(),
-                    'image' => $commentable->image ? $commentable->image->toArray() : null,
-                    'tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all() : [],
-                    'nested_comments' => $commentable->comments ? $commentable->comments->map(function ($nestedComment) {
-                        return [
-                            'comment' => $nestedComment->toArray(),
-                            'nested_commentable' => $nestedComment->commentable ? $nestedComment->commentable->toArray() : null,
-                        ];
-                    })->all() : [],
-                ] : null,
-            ];
-        })->all();
+        // // Test 13: Circular nested - Comments with commentable, commentable has comments (circular)
+        // $commentsWithCircularNested = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($publishedOnly) {
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        // })
+        //     ->with([
+        //         'commentable' => function ($q) {
+        //             // Load commentable with all relationships
+        //         },
+        //         'commentable.image' => function ($q) {
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'commentable.tags' => function ($q) {
+        //             $q->where('is_active', true)
+        //                 ->orderBy('name', 'ASC');
+        //         },
+        //         'commentable.comments' => function ($q) {
+        //             $q->where('is_approved', true)
+        //                 ->orderBy('created_at', 'DESC')
+        //                 ->limit(3);
+        //         },
+        //         'commentable.comments.commentable' => function ($q) {
+        //             // Circular nested: Comment -> Commentable -> Comments -> Commentable
+        //         }
+        //     ])
+        //     ->where('is_approved', true)
+        //     ->limit(5)
+        //     ->get();
+        // $results['circular_nested_comments'] = $commentsWithCircularNested->map(function ($c) {
+        //     $commentable = $c->commentable;
+        //     return [
+        //         'comment' => $c->toArray(),
+        //         'commentable' => $commentable ? [
+        //             'commentable' => $commentable->toArray(),
+        //             'image' => $commentable->image ? $commentable->image->toArray() : null,
+        //             'tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
+        //                 $data = $tag->toArray();
+        //                 if ($tag->pivot) {
+        //                     $data['pivot'] = $tag->pivot->toArray();
+        //                 }
+        //                 return $data;
+        //             })->all() : [],
+        //             'nested_comments' => $commentable->comments ? $commentable->comments->map(function ($nestedComment) {
+        //                 return [
+        //                     'comment' => $nestedComment->toArray(),
+        //                     'nested_commentable' => $nestedComment->commentable ? $nestedComment->commentable->toArray() : null,
+        //                 ];
+        //             })->all() : [],
+        //         ] : null,
+        //     ];
+        // })->all();
 
         $queries = $this->formatQueryLogs(DB::getQueryLog());
 

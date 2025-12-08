@@ -46,6 +46,9 @@ final class DatabaseSeeder extends Seeder
 
         // Seed polymorphic relationships (posts, videos, comments, images)
         // $this->call(PolymorphicRelationshipsSeeder::class);
+
+        // Seed relationship testing data (countries, cities, authors, books, etc.)
+        $this->call(RelationshipTestSeeder::class);
     }
 
     /**

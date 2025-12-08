@@ -299,6 +299,13 @@ class HasManyThrough extends Relation
         $this->query->select("{$relatedTable}.*");
 
         $rowCollection = $this->query->get();
+
+        // If already a ModelCollection, return as is
+        if ($rowCollection instanceof ModelCollection) {
+            return $rowCollection;
+        }
+
+        // Convert RowCollection to array
         $rows = $rowCollection instanceof RowCollection
             ? $rowCollection->all()
             : $rowCollection;

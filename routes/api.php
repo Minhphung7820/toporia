@@ -15,6 +15,7 @@ use Toporia\Framework\Http\Request;
 use App\Presentation\Http\Controllers\Api\AuthController;
 use App\Presentation\Http\Controllers\Api\CsrfCookieController;
 use App\Presentation\Http\Controllers\ProductController;
+use App\Presentation\Http\Controllers\RelationshipTestController;
 
 // CSRF Cookie endpoint for SPA authentication (must be called before login/register)
 // CSRF cookie endpoint for SPA authentication
@@ -95,6 +96,19 @@ Route::post('/polymorphic/comments', [ProductController::class, 'createComment']
 Route::get('/polymorphic/available-ids', [ProductController::class, 'getAvailableIds']);
 Route::get('/polymorphic/sample-data', [ProductController::class, 'getSampleData']);
 Route::post('/polymorphic/seed-data', [ProductController::class, 'seedPolymorphicData']);
+
+// =========================================================================
+// COMPREHENSIVE RELATIONSHIP TESTING ROUTES
+// =========================================================================
+
+// Main test endpoint - Tests ALL relationship types
+Route::get('/relationships/test-all', [RelationshipTestController::class, 'testAllRelationships']);
+
+// Individual relationship type tests
+Route::get('/relationships/has-one', [RelationshipTestController::class, 'testHasOne']);
+Route::get('/relationships/has-many', [RelationshipTestController::class, 'testHasMany']);
+Route::get('/relationships/has-many-through', [RelationshipTestController::class, 'testHasManyThrough']);
+Route::get('/relationships/belongs-to-many', [RelationshipTestController::class, 'testBelongsToMany']);
 
 // 404 Handler - Global handler for unmatched routes
 // This will be called automatically when no route matches the request

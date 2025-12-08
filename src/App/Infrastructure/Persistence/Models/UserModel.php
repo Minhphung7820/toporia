@@ -94,6 +94,20 @@ class UserModel extends Model
     }
 
     /**
+     * Roles assigned to this user (many-to-many).
+     */
+    public function roles()
+    {
+        return $this->belongsToMany(
+            RoleModel::class,
+            'role_user',
+            'user_id',
+            'role_id'
+        )->withPivot('assigned_at', 'assigned_by', 'expires_at', 'is_active')
+          ->withTimestamps();
+    }
+
+    /**
      * Check if user is admin.
      */
     public function isAdmin(): bool

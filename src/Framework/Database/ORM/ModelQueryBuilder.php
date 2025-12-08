@@ -1117,6 +1117,11 @@ class ModelQueryBuilder extends QueryBuilder
      */
     public function whereHas(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): self
     {
+        // Auto-detect nested relations (dot notation) and delegate to whereHasNested
+        if (str_contains($relation, '.')) {
+            return $this->whereHasNested($relation, $callback, $operator, $count);
+        }
+
         // For count-based queries (count != 1), use the count approach
         if ($count !== 1 || $operator !== '>=') {
             return $this->whereHasWithCount($relation, $callback, $operator, $count);
@@ -1229,6 +1234,11 @@ class ModelQueryBuilder extends QueryBuilder
      */
     public function orWhereHas(string $relation, ?callable $callback = null, string $operator = '>=', int $count = 1): self
     {
+        // Auto-detect nested relations (dot notation) and delegate to orWhereHasNested
+        if (str_contains($relation, '.')) {
+            return $this->orWhereHasNested($relation, $callback, $operator, $count);
+        }
+
         // For count-based queries (count != 1), use the count approach
         if ($count !== 1 || $operator !== '>=') {
             return $this->orWhereHasWithCount($relation, $callback, $operator, $count);
