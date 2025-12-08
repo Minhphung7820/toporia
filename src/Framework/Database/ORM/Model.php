@@ -1560,16 +1560,19 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
 
     /**
      * Update timestamps on the model (created_at on insert, updated_at always).
+     * CRITICAL FIX: Use setAttribute() to respect custom casts
      */
     private function updateTimestamps(): void
     {
         $time = now()->toDateTimeString();
 
+        // CRITICAL FIX: Use setAttribute() instead of direct assignment
+        // This ensures custom casts are applied (e.g., user might cast timestamps to Carbon)
         if (!$this->exists) {
-            $this->attributes['created_at'] = $time;
+            $this->setAttribute('created_at', $time);
         }
 
-        $this->attributes['updated_at'] = $time;
+        $this->setAttribute('updated_at', $time);
     }
 
     /**

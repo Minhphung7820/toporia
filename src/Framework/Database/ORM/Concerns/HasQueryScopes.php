@@ -33,6 +33,13 @@ trait HasQueryScopes
     protected static array $localScopes = [];
 
     /**
+     * PERFORMANCE FIX: Cache Reflection instances to avoid overhead.
+     *
+     * @var array<string, \ReflectionClass>
+     */
+    private static array $reflectionCache = [];
+
+    /**
      * Boot the query scopes trait.
      *
      * This is called automatically when the model is first used.
@@ -70,12 +77,14 @@ trait HasQueryScopes
      * Example: scopeActive() becomes ->active()
      *
      * Performance: O(n) where n = number of methods (runs once per class)
+     * PERFORMANCE FIX: Cache Reflection instance to avoid repeated creation
      *
      * @return void
      */
     protected static function discoverLocalScopes(): void
     {
-        $reflection = new \ReflectionClass(static::class);
+        // PERFORMANCE FIX: Use cached Reflection instance
+        $reflection = static::getReflectionClass(static::class);
         $methods = $reflection->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
 
         foreach ($methods as $method) {
@@ -94,11 +103,26 @@ trait HasQueryScopes
     }
 
     /**
+     * PERFORMANCE FIX: Get cached Reflection instance.
+     *
+     * @param string $class Class name
+     * @return \ReflectionClass
+     */
+    private static function getReflectionClass(string $class): \ReflectionClass
+    {
+        if (!isset(self::$reflectionCache[$class])) {
+            self::$reflectionCache[$class] = new \ReflectionClass($class);
+        }
+        return self::$reflectionCache[$class];
+    }
+
+    /**
      * Add a global scope (delegates to HasGlobalScopes trait).
      *
      * Note: This matches Model's signature from HasGlobalScopes trait.
      * Model already includes HasGlobalScopes which handles global scopes.
      * We access the trait's static property directly to ensure correct class context.
+     * PERFORMANCE FIX: Cache Reflection instance
      *
      * @param string|object $scope Scope name or scope object
      * @param \Closure|null $implementation Closure if scope is string name
@@ -106,8 +130,8 @@ trait HasQueryScopes
      */
     public static function addGlobalScope(string|object $scope, ?\Closure $implementation = null): void
     {
-        // Access HasGlobalScopes trait's static property directly
-        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        // PERFORMANCE FIX: Use cached Reflection instance
+        $reflection = static::getReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
         $property = $reflection->getProperty('globalScopes');
         $property->setAccessible(true);
         $globalScopes = $property->getValue(null) ?? [];
@@ -132,13 +156,14 @@ trait HasQueryScopes
 
     /**
      * Get all global scopes (delegates to HasGlobalScopes trait).
+     * PERFORMANCE FIX: Cache Reflection instance
      *
      * @return array<string, callable>
      */
     public static function getGlobalScopes(): array
     {
-        // Access HasGlobalScopes trait's static property with correct class context
-        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        // PERFORMANCE FIX: Use cached Reflection instance
+        $reflection = static::getReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
         $property = $reflection->getProperty('globalScopes');
         $property->setAccessible(true);
         $globalScopes = $property->getValue(null) ?? [];
@@ -147,14 +172,15 @@ trait HasQueryScopes
 
     /**
      * Check if a global scope exists (delegates to HasGlobalScopes trait).
+     * PERFORMANCE FIX: Cache Reflection instance
      *
      * @param string $name Scope name
      * @return bool
      */
     public static function hasGlobalScope(string $name): bool
     {
-        // Access HasGlobalScopes trait's static property with correct class context
-        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        // PERFORMANCE FIX: Use cached Reflection instance
+        $reflection = static::getReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
         $property = $reflection->getProperty('globalScopes');
         $property->setAccessible(true);
         $globalScopes = $property->getValue(null) ?? [];
@@ -163,14 +189,15 @@ trait HasQueryScopes
 
     /**
      * Remove a global scope (delegates to HasGlobalScopes trait).
+     * PERFORMANCE FIX: Cache Reflection instance
      *
      * @param string $name Scope name
      * @return void
      */
     public static function removeGlobalScope(string $name): void
     {
-        // Access HasGlobalScopes trait's static property with correct class context
-        $reflection = new \ReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
+        // PERFORMANCE FIX: Use cached Reflection instance
+        $reflection = static::getReflectionClass('Toporia\Framework\Database\ORM\Concerns\HasGlobalScopes');
         $property = $reflection->getProperty('globalScopes');
         $property->setAccessible(true);
         $globalScopes = $property->getValue(null) ?? [];
