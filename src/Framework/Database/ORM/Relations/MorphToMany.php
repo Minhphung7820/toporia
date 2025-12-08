@@ -982,9 +982,16 @@ class MorphToMany extends Relation
      */
     public function newEagerInstance(QueryBuilder $freshQuery): static
     {
+        // Create a dummy parent model that doesn't exist to prevent performJoin()
+        // from adding WHERE morphType = ? AND foreignKey = ? constraints. This ensures only
+        // the constraints from addEagerConstraints() are used during eager loading.
+        // Creating a new instance ensures exists() returns false and localKey is null
+        $parentClass = get_class($this->parent);
+        $dummyParent = new $parentClass();
+
         $instance = new static(
             $freshQuery,
-            $this->parent,
+            $dummyParent,
             $this->relatedClass,
             $this->morphName,
             $this->pivotTable,
