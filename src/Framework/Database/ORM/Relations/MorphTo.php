@@ -272,6 +272,14 @@ class MorphTo extends Relation
      */
     protected function getEagerWithUnionAll(array $types): ModelCollection
     {
+        // CRITICAL FIX: Find common columns across all tables to prevent UNION ALL column mismatch
+        // Bug: Different tables may have different number of columns, causing SQL error:
+        // "The used SELECT statements have a different number of columns"
+        //
+        // Solution: Query schema for each table and find intersection of columns,
+        // then SELECT only common columns in UNION ALL query.
+        $commonColumns = $this->findCommonColumns($types);
+
         $unionParts = [];
         $allBindings = [];
 
@@ -294,8 +302,16 @@ class MorphTo extends Relation
             $quotedMorphType = $this->quoteValue($morphTypeValue);
             $placeholders = implode(', ', array_fill(0, count($ids), '?'));
 
-            // Select all columns plus morph type identifier
-            $selectSql = "SELECT {$table}.*, {$quotedMorphType} AS __morph_type FROM {$table} WHERE {$table}.{$ownerKey} IN ({$placeholders})";
+            // CRITICAL FIX: Select only common columns instead of * to support UNION ALL
+            // Wrap each column with table prefix and backticks for safety
+            $grammar = $this->query->getConnection()->getGrammar();
+            $columnsList = array_map(
+                fn($col) => $grammar->wrapColumn("{$table}.{$col}"),
+                $commonColumns
+            );
+            $columnsStr = implode(', ', $columnsList);
+
+            $selectSql = "SELECT {$columnsStr}, {$quotedMorphType} AS __morph_type FROM {$table} WHERE {$table}.{$ownerKey} IN ({$placeholders})";
 
             // Apply soft delete scope if model uses it
             if (method_exists($modelClass, 'usesSoftDeletes') && $modelClass::usesSoftDeletes()) {
@@ -389,6 +405,103 @@ class MorphTo extends Relation
         }
 
         return null;
+    }
+
+    /**
+     * Find common columns across all morph type tables for UNION ALL compatibility.
+     *
+     * CRITICAL FIX: UNION ALL requires all SELECT statements to have same number of columns.
+     * This method queries schema information for each table and returns intersection.
+     *
+     * Strategy:
+     * 1. Query column names from information_schema or SHOW COLUMNS for each table
+     * 2. Find intersection (common columns present in ALL tables)
+     * 3. Always include primary key even if not common (required for matching)
+     *
+     * Performance: Cached per connection to avoid repeated schema queries.
+     *
+     * @param array<string> $types Morph type identifiers
+     * @return array<string> List of common column names
+     */
+    protected function findCommonColumns(array $types): array
+    {
+        static $cache = [];
+
+        // Create cache key from sorted types to enable cache reuse
+        $cacheKey = md5(implode('|', array_map(fn($t) => $this->getModelClass($t) . '::' . $this->getModelClass($t)::getTableName(), $types)));
+
+        if (isset($cache[$cacheKey])) {
+            return $cache[$cacheKey];
+        }
+
+        $allColumnsByTable = [];
+        $connection = $this->query->getConnection();
+
+        foreach ($types as $type) {
+            $modelClass = $this->getModelClass($type);
+            $table = $modelClass::getTableName();
+
+            // Get columns for this table using SHOW COLUMNS (works for MySQL, MariaDB, SQLite)
+            // Alternative: Query information_schema for PostgreSQL
+            try {
+                $driver = $connection->getDriverName();
+
+                if ($driver === 'pgsql') {
+                    // PostgreSQL: Query information_schema
+                    $columns = $connection->select(
+                        "SELECT column_name FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
+                        [$table]
+                    );
+                    $columnNames = array_map(fn($col) => is_object($col) ? $col->column_name : $col['column_name'], $columns);
+                } else {
+                    // MySQL/SQLite: Use SHOW COLUMNS
+                    $columns = $connection->select("SHOW COLUMNS FROM {$table}");
+                    $columnNames = array_map(fn($col) => is_object($col) ? $col->Field : $col['Field'], $columns);
+                }
+
+                $allColumnsByTable[$table] = $columnNames;
+            } catch (\Exception $e) {
+                // Fallback: If schema query fails, use model's fillable + guarded + timestamps
+                // This is less accurate but prevents complete failure
+                error_log("MorphTo: Failed to query schema for table '{$table}': {$e->getMessage()}. Using fallback method.");
+
+                $fillable = method_exists($modelClass, 'getFillable') ? $modelClass::getFillable() : [];
+                $guarded = method_exists($modelClass, 'getGuarded') ? $modelClass::getGuarded() : [];
+                $timestamps = ['created_at', 'updated_at'];
+                $primaryKey = $modelClass::getKeyName();
+
+                $columnNames = array_unique(array_merge([$primaryKey], $fillable, $timestamps));
+                // Remove guarded columns except primary key
+                $columnNames = array_diff($columnNames, array_diff($guarded, [$primaryKey]));
+
+                $allColumnsByTable[$table] = array_values($columnNames);
+            }
+        }
+
+        if (empty($allColumnsByTable)) {
+            return ['id']; // Fallback to primary key only
+        }
+
+        // Find intersection (common columns)
+        $commonColumns = array_shift($allColumnsByTable);
+        foreach ($allColumnsByTable as $columns) {
+            $commonColumns = array_intersect($commonColumns, $columns);
+        }
+
+        // IMPORTANT: Always ensure primary key is included even if not in all tables
+        // This is required for matching results back to parent models
+        $firstModelClass = $this->getModelClass($types[0]);
+        $primaryKey = $firstModelClass::getKeyName();
+
+        if (!in_array($primaryKey, $commonColumns, true)) {
+            array_unshift($commonColumns, $primaryKey);
+        }
+
+        // Reset array keys and cache result
+        $commonColumns = array_values($commonColumns);
+        $cache[$cacheKey] = $commonColumns;
+
+        return $commonColumns;
     }
 
     /**

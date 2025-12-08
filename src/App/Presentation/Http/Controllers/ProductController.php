@@ -2738,15 +2738,35 @@ final class ProductController extends BaseController
             'commentable_class' => $commentBasic->commentable ? get_class($commentBasic->commentable) : null,
         ] : ['error' => 'Comment not found'];
 
-        // Test 2: Complex with() callback - filter commentable by conditions
-        $commentComplex = CommentModel::with(['commentable' => function ($q) use ($typeFilter, $minViews, $publishedOnly) {
-            if ($typeFilter === 'post') {
-                $q->where('commentable_type', PostModel::class);
-            } elseif ($typeFilter === 'video') {
-                $q->where('commentable_type', VideoModel::class);
+        // Test 2: Complex with() callback - filter commentable by conditions using MorphTo's constrain() method
+        $commentComplex = CommentModel::with(['commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($typeFilter, $minViews, $publishedOnly) {
+            $constraints = [];
+
+            if ($typeFilter === 'post' || $typeFilter === 'both') {
+                $constraints[PostModel::class] = function ($query) use ($minViews, $publishedOnly) {
+                    if ($minViews > 0) {
+                        $query->where('views', '>=', $minViews);
+                    }
+                    if ($publishedOnly) {
+                        $query->where('is_published', true);
+                    }
+                };
             }
-            // Note: MorphTo doesn't support direct filtering on related model fields in with()
-            // This is a limitation - we'll filter in whereHas instead
+
+            if ($typeFilter === 'video' || $typeFilter === 'both') {
+                $constraints[VideoModel::class] = function ($query) use ($minViews, $publishedOnly) {
+                    if ($minViews > 0) {
+                        $query->where('views', '>=', $minViews);
+                    }
+                    if ($publishedOnly) {
+                        $query->where('is_published', true);
+                    }
+                };
+            }
+
+            if (!empty($constraints)) {
+                $morphTo->constrain($constraints);
+            }
         }])->find($commentId);
         $results['complex_with_callback'] = $commentComplex ? [
             'comment' => $commentComplex->toArray(),
@@ -2773,9 +2793,7 @@ final class ProductController extends BaseController
                     $q->where('content', 'like', '%' . $contentContains . '%');
                 }
             })
-            ->with(['commentable' => function ($q) {
-                // Load with specific fields
-            }])
+            ->with('commentable')
             ->orderBy('created_at', 'DESC')
             ->limit(10)
             ->get();
@@ -2809,14 +2827,7 @@ final class ProductController extends BaseController
             ->orderBy('created_at', 'DESC')
             ->limit(10)
             ->get();
-        $results['where_has_morph_videos'] = $commentsWithVideo->map(function ($c) {
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $c->commentable ? $c->commentable->toArray() : null,
-                'commentable_type' => $c->commentable_type,
-            ];
-        })->all();
-
+        $results['where_has_morph_videos'] = $commentsWithVideo->all();
         // Test 5: whereHasMorph with multiple types (Post and Video)
         $commentsWithBoth = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
             if ($minViews > 0) {
@@ -2878,14 +2889,16 @@ final class ProductController extends BaseController
         })->all();
 
         // Test 7: Nested whereHasMorph with subqueries
-        $commentsWithNestedConditions = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
-            $q->where(function ($subQ) use ($minViews) {
+        $commentsWithNestedConditions = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q, $type) use ($minViews, $publishedOnly) {
+            // Use $type parameter to handle different model types correctly
+            $q->where(function ($subQ) use ($minViews, $type) {
                 $subQ->where('views', '>=', $minViews)
-                    ->orWhereIn('id', function ($subSubQ) {
+                    ->orWhereIn('id', function ($subSubQ) use ($type) {
+                        // Use the correct table based on morph type
+                        $table = $type === PostModel::class ? 'posts' : 'videos';
                         $subSubQ->select('id')
-                            ->table('posts')
-                            ->where('is_published', true)
-                            ->limit(100);
+                            ->table($table)
+                            ->where('is_published', true);
                     });
             });
             if ($publishedOnly) {
@@ -2900,10 +2913,7 @@ final class ProductController extends BaseController
                     $q->whereNotNull('user_id');
                 }
             })
-            ->with(['commentable' => function ($q) {
-                // Additional constraints if needed
-            }])
-            ->withCount('commentable')
+            ->with('commentable')
             ->orderBy('created_at', 'DESC')
             ->limit(10)
             ->get();
@@ -2930,8 +2940,26 @@ final class ProductController extends BaseController
                 }
             })
             ->with([
-                'commentable' => function ($q) {
-                    // Load commentable with its own relationships
+                'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($minViews, $publishedOnly) {
+                    // Apply constraints to both Post and Video types
+                    $morphTo->constrain([
+                        PostModel::class => function ($query) use ($minViews, $publishedOnly) {
+                            if ($minViews > 0) {
+                                $query->where('views', '>=', $minViews);
+                            }
+                            if ($publishedOnly) {
+                                $query->where('is_published', true);
+                            }
+                        },
+                        VideoModel::class => function ($query) use ($minViews, $publishedOnly) {
+                            if ($minViews > 0) {
+                                $query->where('views', '>=', $minViews);
+                            }
+                            if ($publishedOnly) {
+                                $query->where('is_published', true);
+                            }
+                        }
+                    ]);
                 },
                 'commentable.image' => function ($q) {
                     // Nested: commentable -> image (MorphOne)
@@ -2978,14 +3006,35 @@ final class ProductController extends BaseController
             }
         })
             ->with([
-                'commentable.image.imageable' => function ($q) {
+                'commentable.image.imageable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
                     // Deep nested: Comment -> Commentable -> Image -> Imageable
+                    // Apply constraints to both Post and Video types for imageable
+                    $morphTo->constrain([
+                        PostModel::class => function ($query) {
+                            $query->where('is_published', true);
+                        },
+                        VideoModel::class => function ($query) {
+                            $query->where('is_published', true);
+                        }
+                    ]);
                 },
                 'commentable.image' => function ($q) {
                     $q->orderBy('size', 'DESC');
                 },
-                'commentable' => function ($q) {
-                    // Load commentable
+                'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($publishedOnly) {
+                    // Load commentable with constraints
+                    $morphTo->constrain([
+                        PostModel::class => function ($query) use ($publishedOnly) {
+                            if ($publishedOnly) {
+                                $query->where('is_published', true);
+                            }
+                        },
+                        VideoModel::class => function ($query) use ($publishedOnly) {
+                            if ($publishedOnly) {
+                                $query->where('is_published', true);
+                            }
+                        }
+                    ]);
                 }
             ])
             ->where('is_approved', true)
@@ -3012,16 +3061,33 @@ final class ProductController extends BaseController
             $q->where('is_published', true);
         })
             ->with([
-                'commentable.comments.commentable' => function ($q) {
+                'commentable.comments.commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
                     // Ultra deep nested: Comment -> Commentable -> Comments -> Commentable
+                    // Apply constraints to both Post and Video types
+                    $morphTo->constrain([
+                        PostModel::class => function ($query) {
+                            $query->where('is_published', true);
+                        },
+                        VideoModel::class => function ($query) {
+                            $query->where('is_published', true);
+                        }
+                    ]);
                 },
                 'commentable.comments' => function ($q) {
                     $q->where('is_approved', true)
                         ->orderBy('created_at', 'DESC')
                         ->limit(3);
                 },
-                'commentable' => function ($q) {
-                    // Load commentable
+                'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
+                    // Load commentable with constraints
+                    $morphTo->constrain([
+                        PostModel::class => function ($query) {
+                            $query->where('is_published', true);
+                        },
+                        VideoModel::class => function ($query) {
+                            $query->where('is_published', true);
+                        }
+                    ]);
                 }
             ])
             ->where('is_approved', true)
