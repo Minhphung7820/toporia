@@ -282,7 +282,8 @@ class MorphedByMany extends Relation
                 }
 
                 // Build window function query
-                $wrappedParentPivotKey = $grammar->wrapColumn("{$this->pivotTable}.{$this->parentPivotKey}");
+                // Use pivot alias (not table-qualified name) because baseQuery selects it as "pivot_*"
+                $parentPivotKeyAlias = $grammar->wrapColumn("pivot_{$this->parentPivotKey}");
 
                 // Build ORDER BY clause
                 $orderParts = [];
@@ -388,7 +389,9 @@ class MorphedByMany extends Relation
                     $rowFilter = "toporia_row <= {$limit}";
                 }
 
-                $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedParentPivotKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$wrappedParentPivotKey} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
+                // Window query: partition by pivot alias and filter by parent IDs
+                // Note: We use toporia_base.pivot_* aliases because baseQuery selects pivot columns as "pivot_*"
+                $windowQuery = "SELECT * FROM (SELECT toporia_base.*, ROW_NUMBER() OVER (PARTITION BY toporia_base.{$parentPivotKeyAlias} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE toporia_base.{$parentPivotKeyAlias} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
 
                 // Combine bindings
                 // PERFORMANCE: Use spread operator for better performance with small arrays
@@ -681,6 +684,39 @@ class MorphedByMany extends Relation
     }
 
     /**
+     * Add an "or where" clause for a pivot table column.
+     *
+     * @param string $column Pivot column name
+     * @param mixed $operator Comparison operator or value if no operator provided
+     * @param mixed $value Value to compare (optional if operator is omitted)
+     * @return $this
+     */
+    public function orWherePivot(string $column, mixed $operator, mixed $value = null): static
+    {
+        [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
+
+        $this->pivotWheres[] = compact('column', 'operator', 'value') + ['type' => 'or'];
+        $this->query->orWhere($this->qualifyPivotColumn($column), $operator, $value);
+
+        return $this;
+    }
+
+    /**
+     * Add an "or where in" clause for a pivot table column.
+     *
+     * @param string $column Pivot column name
+     * @param array $values Array of values to match
+     * @return $this
+     */
+    public function orWherePivotIn(string $column, array $values): static
+    {
+        $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false, 'type' => 'or'];
+        $this->query->orWhereIn($this->qualifyPivotColumn($column), $values);
+
+        return $this;
+    }
+
+    /**
      * Add an order by clause on a pivot column.
      */
     public function orderByPivot(string $column, string $direction = 'asc'): static
@@ -690,6 +726,58 @@ class MorphedByMany extends Relation
         $this->query->orderBy($this->qualifyPivotColumn($column), $direction);
 
         return $this;
+    }
+
+    /**
+     * Add a date-based constraint on a pivot column.
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param string $value Date value (Y-m-d format)
+     * @return $this
+     */
+    public function wherePivotDate(string $column, string $operator, string $value): static
+    {
+        return $this->addPivotFunctionConstraint('DATE', $column, $operator, $value);
+    }
+
+    /**
+     * Add a month-based constraint on a pivot column.
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param int $value Month value (1-12)
+     * @return $this
+     */
+    public function wherePivotMonth(string $column, string $operator, int $value): static
+    {
+        return $this->addPivotFunctionConstraint('MONTH', $column, $operator, $value);
+    }
+
+    /**
+     * Add a year-based constraint on a pivot column.
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param int $value Year value
+     * @return $this
+     */
+    public function wherePivotYear(string $column, string $operator, int $value): static
+    {
+        return $this->addPivotFunctionConstraint('YEAR', $column, $operator, $value);
+    }
+
+    /**
+     * Add a time-based constraint on a pivot column.
+     *
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param string $value Time value (H:i:s format)
+     * @return $this
+     */
+    public function wherePivotTime(string $column, string $operator, string $value): static
+    {
+        return $this->addPivotFunctionConstraint('TIME', $column, $operator, $value);
     }
 
     /**
@@ -713,6 +801,30 @@ class MorphedByMany extends Relation
     protected function qualifyPivotColumn(string $column): string
     {
         return "{$this->pivotTable}.{$column}";
+    }
+
+    /**
+     * Add a SQL function-based constraint on a pivot column.
+     *
+     * @param string $function SQL function name (DATE, MONTH, YEAR, TIME, etc.)
+     * @param string $column Pivot column name
+     * @param string $operator Comparison operator
+     * @param mixed $value Value to compare
+     * @return $this
+     */
+    protected function addPivotFunctionConstraint(string $function, string $column, string $operator, mixed $value): static
+    {
+        $qualifiedColumn = $this->qualifyPivotColumn($column);
+        $this->query->whereRaw("{$function}({$qualifiedColumn}) {$operator} ?", [$value]);
+
+        $this->pivotWheres[] = [
+            'column' => "{$function}({$column})",
+            'operator' => $operator,
+            'value' => $value,
+            'type' => 'function'
+        ];
+
+        return $this;
     }
 
     /**

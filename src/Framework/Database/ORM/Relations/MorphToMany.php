@@ -1327,6 +1327,39 @@ class MorphToMany extends Relation
     }
 
     /**
+     * Add an "or where" clause for a pivot table column.
+     *
+     * @param string $column Pivot column name
+     * @param mixed $operator Comparison operator or value if no operator provided
+     * @param mixed $value Value to compare (optional if operator is omitted)
+     * @return $this
+     */
+    public function orWherePivot(string $column, mixed $operator, mixed $value = null): static
+    {
+        [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
+
+        $this->pivotWheres[] = compact('column', 'operator', 'value') + ['type' => 'or'];
+        $this->query->orWhere("{$this->pivotTable}.{$column}", $operator, $value);
+
+        return $this;
+    }
+
+    /**
+     * Add an "or where in" clause for a pivot table column.
+     *
+     * @param string $column Pivot column name
+     * @param array $values Array of values to match
+     * @return $this
+     */
+    public function orWherePivotIn(string $column, array $values): static
+    {
+        $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false, 'type' => 'or'];
+        $this->query->orWhereIn("{$this->pivotTable}.{$column}", $values);
+
+        return $this;
+    }
+
+    /**
      * Add an order by clause on the pivot table.
      */
     public function orderByPivot(string $column, string $direction = 'asc'): static

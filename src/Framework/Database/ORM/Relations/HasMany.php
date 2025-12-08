@@ -260,7 +260,8 @@ class HasMany extends Relation
                     $rowFilter = "toporia_row <= {$limit}";
                 }
 
-                $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$wrappedForeignKey} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
+                // Window query: partition by foreign key and filter by parent IDs
+                $windowQuery = "SELECT * FROM (SELECT toporia_base.*, ROW_NUMBER() OVER (PARTITION BY toporia_base.{$wrappedForeignKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE toporia_base.{$wrappedForeignKey} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
 
                 // Combine bindings: base query bindings + foreign key values
                 // PERFORMANCE: Use spread operator for better performance with small arrays

@@ -183,6 +183,39 @@ class BelongsToMany extends Relation
     }
 
     /**
+     * Add an "or where" clause for a pivot table column.
+     *
+     * @param string $column Pivot column name
+     * @param mixed $operator Comparison operator or value if no operator provided
+     * @param mixed $value Value to compare (optional if operator is omitted)
+     * @return $this
+     */
+    public function orWherePivot(string $column, mixed $operator, mixed $value = null): static
+    {
+        [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
+
+        $this->pivotWheres[] = compact('column', 'operator', 'value', 'type') + ['type' => 'or'];
+        $this->query->orWhere($this->qualifyPivotColumn($column), $operator, $value);
+
+        return $this;
+    }
+
+    /**
+     * Add an "or where in" clause for a pivot table column.
+     *
+     * @param string $column Pivot column name
+     * @param array $values Array of values to match
+     * @return $this
+     */
+    public function orWherePivotIn(string $column, array $values): static
+    {
+        $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false, 'type' => 'or'];
+        $this->query->orWhereIn($this->qualifyPivotColumn($column), $values);
+
+        return $this;
+    }
+
+    /**
      * Add an order by clause on the pivot table.
      */
     public function orderByPivot(string $column, string $direction = 'asc'): static
@@ -572,7 +605,10 @@ class BelongsToMany extends Relation
                     return $this->hydrateWithPivot($rows->toArray());
                 }
 
-                $wrappedPivotForeignKey = $grammar->wrapColumn("{$this->pivotTable}.{$this->foreignPivotKey}");
+                // Use pivot aliases (not table-qualified names) for window query
+                // BaseQuery selects: book_category.book_id AS pivot_book_id
+                // So in window query subquery result, we reference: pivot_book_id (not book_category.book_id)
+                $pivotForeignKeyAlias = $grammar->wrapColumn("pivot_{$this->foreignPivotKey}");
 
                 // Build ORDER BY clause for window function
                 // If no explicit orderBy, use primary key as default for consistent ordering
@@ -708,7 +744,9 @@ class BelongsToMany extends Relation
                     $rowFilter = "toporia_row <= {$limit}";
                 }
 
-                $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedPivotForeignKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$wrappedPivotForeignKey} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
+                // Window query: partition by pivot alias and filter by parent IDs
+                // Note: We use toporia_base.pivot_* aliases because baseQuery selects pivot columns as "pivot_*"
+                $windowQuery = "SELECT * FROM (SELECT toporia_base.*, ROW_NUMBER() OVER (PARTITION BY toporia_base.{$pivotForeignKeyAlias} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE toporia_base.{$pivotForeignKeyAlias} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
 
                 // Combine bindings: base query bindings + foreign key values
                 // PERFORMANCE: Use spread operator for better performance with small arrays

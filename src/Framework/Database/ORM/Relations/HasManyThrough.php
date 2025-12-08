@@ -161,7 +161,9 @@ class HasManyThrough extends Relation
                     return $this->relatedClass::hydrate($rows->toArray());
                 }
 
-                $wrappedFirstKey = $grammar->wrapColumn("{$throughTable}.{$this->firstKey}");
+                // Use column name without table prefix because baseQuery selects it without alias
+                // BaseQuery: SELECT related.*, through.first_key (result column is just "first_key", not "through.first_key")
+                $wrappedFirstKey = $grammar->wrapColumn($this->firstKey);
 
                 // Build ORDER BY clause for window function
                 // If no explicit orderBy, use primary key as default for consistent ordering
@@ -278,7 +280,9 @@ class HasManyThrough extends Relation
                     $rowFilter = "toporia_row <= {$limit}";
                 }
 
-                $windowQuery = "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {$wrappedFirstKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE {$wrappedFirstKey} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
+                // Window query: partition by first key and filter by parent IDs
+                // Note: We use toporia_base.first_key because baseQuery includes it in SELECT
+                $windowQuery = "SELECT * FROM (SELECT toporia_base.*, ROW_NUMBER() OVER (PARTITION BY toporia_base.{$wrappedFirstKey} ORDER BY {$orderByClause}) AS toporia_row FROM ({$baseQuerySql}) AS toporia_base WHERE toporia_base.{$wrappedFirstKey} IN ({$placeholders})) AS toporia_table WHERE {$rowFilter} ORDER BY toporia_row";
 
                 // Combine bindings: base query bindings + foreign key values
                 // PERFORMANCE: Use spread operator for better performance with small arrays
