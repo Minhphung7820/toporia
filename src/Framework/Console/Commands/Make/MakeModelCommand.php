@@ -101,7 +101,7 @@ final class MakeModelCommand extends GeneratorCommand
         // We'll use reflection to set protected properties or create a helper method
         try {
             // Use reflection to set name and model
-            $reflection = reflection()->getClass($factoryCommand);
+            $reflection = new \ReflectionClass($factoryCommand);
 
             // Set name property
             $nameProperty = $reflection->getProperty('arguments');
@@ -140,7 +140,7 @@ final class MakeModelCommand extends GeneratorCommand
 
         try {
             // Use reflection to set name
-            $reflection = reflection()->getClass($seederCommand);
+            $reflection = new \ReflectionClass($seederCommand);
 
             // Set name property
             $nameProperty = $reflection->getProperty('arguments');

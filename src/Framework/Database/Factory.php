@@ -327,7 +327,7 @@ abstract class Factory implements FactoryInterface
             } elseif (property_exists($modelClass, 'timestamps')) {
                 // Fallback: try to access static property safely
                 try {
-                    $reflection = reflection()->getProperty($modelClass, 'timestamps');
+                    $reflection = (new \ReflectionClass($modelClass))->getProperty('timestamps');
                     if ($reflection->isStatic() && $reflection->getValue()) {
                         $now = now()->toDateTimeString();
                         $modelAttributes['created_at'] = $modelAttributes['created_at'] ?? $now;
@@ -451,7 +451,7 @@ abstract class Factory implements FactoryInterface
     protected static function guessTableName(string $modelClass): string
     {
         // Get class name without namespace using Reflection
-        $reflection = reflection()->getClass($modelClass);
+        $reflection = new \ReflectionClass($modelClass);
         $className = $reflection->getShortName();
 
         // Remove 'Model' suffix if present

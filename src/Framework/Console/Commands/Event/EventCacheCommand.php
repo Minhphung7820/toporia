@@ -83,7 +83,7 @@ final class EventCacheCommand extends Command
                 continue;
             }
 
-            $reflection = reflection()->getClass($className);
+            $reflection = new \ReflectionClass($className);
             if (!$reflection->hasMethod('handle')) {
                 continue;
             }
