@@ -546,22 +546,22 @@ class BelongsToMany extends Relation
         // Helper function to recursively search for WHERE IN in nested closures
         // Eager loading creates nested WHERE: WHERE ((type=X AND id IN (...)) OR (type=Y AND id IN (...)))
         $findWhereIn = function (array $whereList, string $pivotTable, string $foreignPivotKey) use (&$findWhereIn): bool {
-            foreach ($whereList as $where) {
-                $type = strtolower($where['type'] ?? '');
+            foreach ($whereList as $whereClause) {
+                $type = strtolower($whereClause['type'] ?? '');
 
                 // Direct WHERE IN - check if it's for pivot table
                 if ($type === 'in') {
-                    $column = $where['column'] ?? '';
+                    $column = $whereClause['column'] ?? '';
                     if (str_contains($column, $pivotTable) && str_contains($column, $foreignPivotKey)) {
                         return true;
                     }
                 }
 
                 // Nested WHERE closure - recurse into it
-                if ($type === 'nested' && isset($where['query'])) {
-                    $nestedQuery = $where['query'];
-                    if ($nestedQuery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($nestedQuery->getWheres(), $pivotTable, $foreignPivotKey)) {
+                if ($type === 'nested' && isset($whereClause['query'])) {
+                    $nestedQueryBuilder = $whereClause['query'];
+                    if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                        if ($findWhereIn($nestedQueryBuilder->getWheres(), $pivotTable, $foreignPivotKey)) {
                             return true;
                         }
                     }
@@ -679,12 +679,13 @@ class BelongsToMany extends Relation
                 }
 
                 // Copy custom select from constraint closure if provided, otherwise use default
+                // IMPORTANT: If columns is ["*"], treat it as no custom select to avoid selecting from ALL joined tables
                 $customColumns = $this->query->getColumns();
-                if (!empty($customColumns)) {
+                if (!empty($customColumns) && $customColumns !== ['*']) {
                     // User provided custom select - use it
                     $baseQuery->select($customColumns);
                 } else {
-                    // No custom select - use default table.*
+                    // No custom select - use table-qualified wildcard to select only from related table, not joined pivot table
                     $baseQuery->select("{$relatedTable}.*");
                 }
 

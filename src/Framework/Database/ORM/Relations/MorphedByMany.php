@@ -261,22 +261,22 @@ class MorphedByMany extends Relation
         // Helper function to recursively search for WHERE IN in nested closures
         // Eager loading creates nested WHERE: WHERE ((type=X AND id IN (...)) OR (type=Y AND id IN (...)))
         $findWhereIn = function (array $whereList, string $pivotTable) use (&$findWhereIn): bool {
-            foreach ($whereList as $where) {
-                $type = strtolower($where['type'] ?? '');
+            foreach ($whereList as $whereClause) {
+                $type = strtolower($whereClause['type'] ?? '');
 
                 // Direct WHERE IN - check if it's for pivot table
                 if ($type === 'in') {
-                    $column = $where['column'] ?? '';
+                    $column = $whereClause['column'] ?? '';
                     if (str_contains($column, $pivotTable)) {
                         return true;
                     }
                 }
 
                 // Nested WHERE closure - recurse into it
-                if ($type === 'nested' && isset($where['query'])) {
-                    $nestedQuery = $where['query'];
-                    if ($nestedQuery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($nestedQuery->getWheres(), $pivotTable)) {
+                if ($type === 'nested' && isset($whereClause['query'])) {
+                    $nestedQueryBuilder = $whereClause['query'];
+                    if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                        if ($findWhereIn($nestedQueryBuilder->getWheres(), $pivotTable)) {
                             return true;
                         }
                     }
@@ -378,10 +378,12 @@ class MorphedByMany extends Relation
                 }
 
                 // Copy custom select or use default
+                // IMPORTANT: If columns is ["*"], treat it as no custom select to avoid selecting from ALL joined tables
                 $customColumns = $this->query->getColumns();
-                if (!empty($customColumns)) {
+                if (!empty($customColumns) && $customColumns !== ['*']) {
                     $baseQuery->select($customColumns);
                 } else {
+                    // Use table-qualified wildcard to select only from related table, not joined pivot table
                     $baseQuery->select("{$relatedTable}.*");
                 }
 

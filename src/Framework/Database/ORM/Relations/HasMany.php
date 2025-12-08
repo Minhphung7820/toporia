@@ -96,8 +96,8 @@ class HasMany extends Relation
         // Helper function to recursively search for WHERE IN in nested closures
         // Eager loading creates nested WHERE: WHERE ((foreignKey IN (...)))
         $findWhereIn = function (array $whereList) use (&$findWhereIn): bool {
-            foreach ($whereList as $where) {
-                $type = strtolower($where['type'] ?? '');
+            foreach ($whereList as $whereClause) {
+                $type = strtolower($whereClause['type'] ?? '');
 
                 // Direct WHERE IN - this is eager loading
                 if ($type === 'in') {
@@ -105,10 +105,10 @@ class HasMany extends Relation
                 }
 
                 // Nested WHERE closure - recurse into it
-                if ($type === 'nested' && isset($where['query'])) {
-                    $nestedQuery = $where['query'];
-                    if ($nestedQuery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($nestedQuery->getWheres())) {
+                if ($type === 'nested' && isset($whereClause['query'])) {
+                    $nestedQueryBuilder = $whereClause['query'];
+                    if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                        if ($findWhereIn($nestedQueryBuilder->getWheres())) {
                             return true;
                         }
                     }

@@ -184,8 +184,8 @@ class MorphMany extends Relation
         // Helper function to recursively search for WHERE IN in nested closures
         // Eager loading creates nested WHERE: WHERE ((morphType = X AND foreignKey IN (...)))
         $findWhereIn = function (array $whereList) use (&$findWhereIn): bool {
-            foreach ($whereList as $where) {
-                $type = strtolower($where['type'] ?? '');
+            foreach ($whereList as $whereClause) {
+                $type = strtolower($whereClause['type'] ?? '');
 
                 // Direct WHERE IN - this is eager loading
                 if ($type === 'in') {
@@ -195,8 +195,8 @@ class MorphMany extends Relation
                 // Nested WHERE closure - recurse into it
                 if ($type === 'nested') {
                     // Check if nested query exists
-                    if (isset($where['query']) && $where['query'] instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($where['query']->getWheres())) {
+                    if (isset($whereClause['query']) && $whereClause['query'] instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                        if ($findWhereIn($whereClause['query']->getWheres())) {
                             return true;
                         }
                     } else {

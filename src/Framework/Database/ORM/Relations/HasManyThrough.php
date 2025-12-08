@@ -132,8 +132,8 @@ class HasManyThrough extends Relation
         // Helper function to recursively search for WHERE IN in nested closures
         // Eager loading creates nested WHERE: WHERE ((foreignKey IN (...)))
         $findWhereIn = function (array $whereList) use (&$findWhereIn): bool {
-            foreach ($whereList as $where) {
-                $type = strtolower($where['type'] ?? '');
+            foreach ($whereList as $whereClause) {
+                $type = strtolower($whereClause['type'] ?? '');
 
                 // Direct WHERE IN - this is eager loading
                 if ($type === 'in') {
@@ -141,10 +141,10 @@ class HasManyThrough extends Relation
                 }
 
                 // Nested WHERE closure - recurse into it
-                if ($type === 'nested' && isset($where['query'])) {
-                    $nestedQuery = $where['query'];
-                    if ($nestedQuery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
-                        if ($findWhereIn($nestedQuery->getWheres())) {
+                if ($type === 'nested' && isset($whereClause['query'])) {
+                    $nestedQueryBuilder = $whereClause['query'];
+                    if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                        if ($findWhereIn($nestedQueryBuilder->getWheres())) {
                             return true;
                         }
                     }
@@ -263,12 +263,14 @@ class HasManyThrough extends Relation
                 }
 
                 // Copy custom select from constraint closure, or use default
+                // IMPORTANT: If columns is ["*"], treat it as no custom select to avoid selecting from ALL joined tables
                 $customColumns = $this->query->getColumns();
-                if (!empty($customColumns)) {
+                if (!empty($customColumns) && $customColumns !== ['*']) {
                     $baseQuery->select($customColumns);
                     // Always need through table key for matching
                     $baseQuery->selectRaw("{$throughTable}.{$this->firstKey}");
                 } else {
+                    // Use table-qualified wildcard to select only from related table, not all joined tables
                     $baseQuery->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
                 }
 
