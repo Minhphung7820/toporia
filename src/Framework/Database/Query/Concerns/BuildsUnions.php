@@ -96,7 +96,7 @@ trait BuildsUnions
 
         // Merge bindings from union query
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'union');
         }
 
         return $this;
@@ -143,7 +143,7 @@ trait BuildsUnions
 
         // Merge bindings from union query
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'union');
         }
 
         return $this;

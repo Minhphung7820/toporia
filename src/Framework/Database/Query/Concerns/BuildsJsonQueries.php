@@ -79,7 +79,7 @@ trait BuildsJsonQueries
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -188,7 +188,7 @@ trait BuildsJsonQueries
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = json_encode($values);
+        $this->addBinding(json_encode($values), 'where');
         $this->invalidateCache();
 
         return $this;
@@ -264,7 +264,7 @@ trait BuildsJsonQueries
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $depth;
+        $this->addBinding($depth, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -406,7 +406,7 @@ trait BuildsJsonQueries
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $searchValue;
+        $this->addBinding($searchValue, 'where');
         $this->invalidateCache();
 
         return $this;

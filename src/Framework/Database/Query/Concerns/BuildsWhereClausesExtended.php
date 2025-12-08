@@ -73,8 +73,8 @@ trait BuildsWhereClausesExtended
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $values[0];
-        $this->bindings[] = $values[1];
+        $this->addBinding($values[0], 'where');
+        $this->addBinding($values[1], 'where');
         $this->invalidateCache();
 
         return $this;
@@ -109,8 +109,8 @@ trait BuildsWhereClausesExtended
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $values[0];
-        $this->bindings[] = $values[1];
+        $this->addBinding($values[0], 'where');
+        $this->addBinding($values[1], 'where');
         $this->invalidateCache();
 
         return $this;
@@ -176,7 +176,7 @@ trait BuildsWhereClausesExtended
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -206,7 +206,7 @@ trait BuildsWhereClausesExtended
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -273,7 +273,7 @@ trait BuildsWhereClausesExtended
             'boolean' => 'AND',
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -302,7 +302,7 @@ trait BuildsWhereClausesExtended
             'boolean' => 'OR',
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -335,7 +335,7 @@ trait BuildsWhereClausesExtended
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $pattern;
+        $this->addBinding($pattern, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -358,7 +358,7 @@ trait BuildsWhereClausesExtended
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $pattern;
+        $this->addBinding($pattern, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -415,7 +415,7 @@ trait BuildsWhereClausesExtended
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $pattern;
+        $this->addBinding($pattern, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -467,7 +467,7 @@ trait BuildsWhereClausesExtended
             'boolean' => strtoupper($boolean),
         ];
 
-        $this->bindings[] = $term;
+        $this->addBinding($term, 'where');
         $this->invalidateCache();
 
         return $this;

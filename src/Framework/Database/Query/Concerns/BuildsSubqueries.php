@@ -67,7 +67,7 @@ trait BuildsSubqueries
 
         // Merge bindings from subquery
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -91,7 +91,7 @@ trait BuildsSubqueries
         ];
 
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -124,7 +124,7 @@ trait BuildsSubqueries
         ];
 
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -148,7 +148,7 @@ trait BuildsSubqueries
         ];
 
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -186,7 +186,7 @@ trait BuildsSubqueries
         ];
 
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -212,7 +212,7 @@ trait BuildsSubqueries
         ];
 
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -246,7 +246,7 @@ trait BuildsSubqueries
         ];
 
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -272,7 +272,7 @@ trait BuildsSubqueries
         ];
 
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -312,7 +312,7 @@ trait BuildsSubqueries
 
         // Merge bindings
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;

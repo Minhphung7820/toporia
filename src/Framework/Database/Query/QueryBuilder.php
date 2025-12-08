@@ -111,11 +111,25 @@ class QueryBuilder implements QueryBuilderInterface
     private bool $distinct = false;
 
     /**
-     * Positional bindings for prepared statements.
+     * Positional bindings for prepared statements, organized by type.
+     * This ensures bindings are merged in the same order as SQL components are compiled.
      *
-     * @var array<mixed>
+     * Types match SQL component order:
+     * - 'select' => SELECT clause bindings (from raw expressions)
+     * - 'join'   => JOIN clause bindings
+     * - 'where'  => WHERE clause bindings
+     * - 'having' => HAVING clause bindings
+     * - 'union'  => UNION clause bindings
+     *
+     * @var array<string, array<mixed>>
      */
-    private array $bindings = [];
+    private array $bindings = [
+        'select' => [],
+        'join'   => [],
+        'where'  => [],
+        'having' => [],
+        'union'  => [],
+    ];
 
 
     /**
@@ -320,7 +334,7 @@ class QueryBuilder implements QueryBuilderInterface
         $this->columns[] = new Expression($expression);
 
         foreach ($bindings as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'select');
         }
 
         return $this;
@@ -424,7 +438,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         // Add bindings
         foreach ($bindings as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'select');
         }
 
         $this->invalidateCache();
@@ -507,11 +521,30 @@ class QueryBuilder implements QueryBuilderInterface
      * Add a binding to the query.
      *
      * @param mixed $value Binding value
+     * @param string $type Binding type (select, join, where, having)
      * @return void
      */
-    public function addBinding(mixed $value): void
+    public function addBinding(mixed $value, string $type = 'where'): void
     {
-        $this->bindings[] = $value;
+        if (!array_key_exists($type, $this->bindings)) {
+            throw new \InvalidArgumentException("Invalid binding type: {$type}");
+        }
+
+        $this->bindings[$type][] = $value;
+    }
+
+    /**
+     * Add multiple bindings to a specific type.
+     *
+     * @param array<mixed> $values Binding values
+     * @param string $type Binding type (select, join, where, having)
+     * @return void
+     */
+    private function addBindings(array $values, string $type = 'where'): void
+    {
+        foreach ($values as $value) {
+            $this->addBinding($value, $type);
+        }
     }
 
     /**
@@ -581,7 +614,7 @@ class QueryBuilder implements QueryBuilderInterface
             'boolean' => 'AND'
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
         $this->invalidateCache();
 
         return $this;
@@ -633,7 +666,7 @@ class QueryBuilder implements QueryBuilderInterface
             'boolean' => 'OR'
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
 
         return $this;
     }
@@ -694,7 +727,7 @@ class QueryBuilder implements QueryBuilderInterface
             //
             // Fix: Merge bindings immediately so they are available in getBindings() calls.
             foreach ($subQuery->getBindings() as $binding) {
-                $this->bindings[] = $binding;
+                $this->addBinding($binding, 'where');
             }
         }
         // Array of values
@@ -719,7 +752,7 @@ class QueryBuilder implements QueryBuilderInterface
 
             // Add value bindings
             foreach ($values as $value) {
-                $this->bindings[] = $value;
+                $this->addBinding($value, 'where');
             }
         }
 
@@ -831,7 +864,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         // Merge bindings from nested query
         foreach ($query->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return $this;
@@ -853,7 +886,7 @@ class QueryBuilder implements QueryBuilderInterface
         ];
 
         foreach ($bindings as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         // CRITICAL FIX: Invalidate SQL cache when WHERE clause is modified
@@ -1337,7 +1370,7 @@ class QueryBuilder implements QueryBuilderInterface
         // Get bindings from subquery
         if ($query instanceof QueryBuilder) {
             foreach ($query->getBindings() as $binding) {
-                $this->bindings[] = $binding;
+                $this->addBinding($binding, 'join');
             }
         }
 
@@ -1520,7 +1553,7 @@ class QueryBuilder implements QueryBuilderInterface
             'boolean' => 'AND'
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'having');
 
         return $this;
     }
@@ -1545,7 +1578,7 @@ class QueryBuilder implements QueryBuilderInterface
         ];
 
         foreach ($bindings as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'having');
         }
 
         return $this;
@@ -1568,7 +1601,7 @@ class QueryBuilder implements QueryBuilderInterface
             'boolean' => 'OR'
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'having');
 
         return $this;
     }
@@ -1701,7 +1734,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         // Connection::select() will log the query automatically
         // No need to log here to avoid duplicate logs
-        $rows = $this->connection->select($sql, $this->bindings); // array<array>
+        $rows = $this->connection->select($sql, $this->getBindings()); // array<array>
 
         return new RowCollection($rows);
     }
@@ -2095,7 +2128,7 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         // Merge SET bindings and WHERE bindings
-        $bindings = array_merge($bindings, $this->bindings);
+        $bindings = array_merge($bindings, $this->getBindings());
 
         // Connection::affectingStatement() will log the query automatically
         return $this->connection->affectingStatement($sql, $bindings);
@@ -2115,7 +2148,7 @@ class QueryBuilder implements QueryBuilderInterface
         $sql = $grammar->compileDelete($this);
 
         // Connection::affectingStatement() will log the query automatically
-        return $this->connection->affectingStatement($sql, $this->bindings);
+        return $this->connection->affectingStatement($sql, $this->getBindings());
     }
 
     // =========================================================================
@@ -2283,7 +2316,7 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         // Add WHERE bindings
-        $bindings = array_merge($bindings, $this->bindings);
+        $bindings = array_merge($bindings, $this->getBindings());
 
         $sql = sprintf(
             'UPDATE %s SET %s%s',
@@ -2346,7 +2379,7 @@ class QueryBuilder implements QueryBuilderInterface
         }
 
         // Add WHERE bindings
-        $bindings = array_merge($bindings, $this->bindings);
+        $bindings = array_merge($bindings, $this->getBindings());
 
         $sql = sprintf(
             'UPDATE %s SET %s%s',
@@ -2652,7 +2685,7 @@ class QueryBuilder implements QueryBuilderInterface
         // Execute query directly to get raw array result
         // Don't use first() as it may be overridden in subclasses (ModelQueryBuilder)
         $sql = $this->toSql();
-        $rows = $this->connection->select($sql, $this->bindings);
+        $rows = $this->connection->select($sql, $this->getBindings());
         $result = $rows[0] ?? null;
 
         $this->columns = $originalColumns;
@@ -2682,7 +2715,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         // Execute lightweight exists-style query
         $sql = $this->toSql();
-        $result = $this->connection->selectOne($sql, $this->bindings);
+        $result = $this->connection->selectOne($sql, $this->getBindings());
 
         // Restore original state
         $this->columns = $originalColumns;
@@ -2977,12 +3010,12 @@ class QueryBuilder implements QueryBuilderInterface
                 // Merge bindings from anchor and recursive queries
                 if ($anchor instanceof QueryBuilder) {
                     foreach ($anchor->getBindings() as $binding) {
-                        $this->bindings[] = $binding;
+                        $this->addBinding($binding, 'select');
                     }
                 }
                 if ($recursive instanceof QueryBuilder) {
                     foreach ($recursive->getBindings() as $binding) {
-                        $this->bindings[] = $binding;
+                        $this->addBinding($binding, 'select');
                     }
                 }
 
@@ -2993,7 +3026,7 @@ class QueryBuilder implements QueryBuilderInterface
                 // Merge bindings from CTE query into main query bindings
                 if ($query instanceof QueryBuilder) {
                     foreach ($query->getBindings() as $binding) {
-                        $this->bindings[] = $binding;
+                        $this->addBinding($binding, 'select');
                     }
                 }
 
@@ -3021,11 +3054,26 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Return the current parameter bindings in positional order.
      *
+     * Bindings are merged in the same order as SQL components are compiled:
+     * 1. SELECT clause (raw expressions)
+     * 2. JOIN clause
+     * 3. WHERE clause
+     * 4. HAVING clause
+     * 5. UNION clause
+     *
+     * This ensures the binding order matches the placeholder order in the compiled SQL.
+     *
      * @return array<mixed>
      */
     public function getBindings(): array
     {
-        return $this->bindings;
+        return array_merge(
+            $this->bindings['select'],
+            $this->bindings['join'],
+            $this->bindings['where'],
+            $this->bindings['having'],
+            $this->bindings['union']
+        );
     }
 
 
@@ -3331,7 +3379,7 @@ class QueryBuilder implements QueryBuilderInterface
         // CRITICAL: Merge bindings from subquery into main query
         // Without this, subquery parameters are lost and query execution fails
         foreach ($subquery->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return sprintf(' %s EXISTS (%s)', $boolean, $subquery->toSql());
@@ -3352,7 +3400,7 @@ class QueryBuilder implements QueryBuilderInterface
         // CRITICAL: Merge bindings from subquery into main query
         // Without this, subquery parameters are lost and query execution fails
         foreach ($subquery->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         return sprintf(' %s NOT EXISTS (%s)', $boolean, $subquery->toSql());
@@ -3372,7 +3420,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         // Merge bindings from subquery into main query
         foreach ($subquery->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         $subquerySql = $subquery->toSql();
@@ -3400,7 +3448,7 @@ class QueryBuilder implements QueryBuilderInterface
 
         // Merge bindings from subquery into main query
         foreach ($subquery->getBindings() as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         $subquerySql = $subquery->toSql();

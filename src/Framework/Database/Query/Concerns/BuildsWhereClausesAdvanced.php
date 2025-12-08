@@ -67,7 +67,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'AND',
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
 
         return $this;
     }
@@ -95,7 +95,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'OR',
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
 
         return $this;
     }
@@ -131,7 +131,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'AND',
         ];
 
-        $this->bindings[] = (int)$value;
+        $this->addBinding((int)$value, 'where');
 
         return $this;
     }
@@ -159,7 +159,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'OR',
         ];
 
-        $this->bindings[] = (int)$value;
+        $this->addBinding((int)$value, 'where');
 
         return $this;
     }
@@ -195,7 +195,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'AND',
         ];
 
-        $this->bindings[] = (int)$value;
+        $this->addBinding((int)$value, 'where');
 
         return $this;
     }
@@ -223,7 +223,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'OR',
         ];
 
-        $this->bindings[] = (int)$value;
+        $this->addBinding((int)$value, 'where');
 
         return $this;
     }
@@ -259,7 +259,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'AND',
         ];
 
-        $this->bindings[] = (int)$value;
+        $this->addBinding((int)$value, 'where');
 
         return $this;
     }
@@ -287,7 +287,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'OR',
         ];
 
-        $this->bindings[] = (int)$value;
+        $this->addBinding((int)$value, 'where');
 
         return $this;
     }
@@ -323,7 +323,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'AND',
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
 
         return $this;
     }
@@ -351,7 +351,7 @@ trait BuildsWhereClausesAdvanced
             'boolean' => 'OR',
         ];
 
-        $this->bindings[] = $value;
+        $this->addBinding($value, 'where');
 
         return $this;
     }
@@ -474,7 +474,7 @@ trait BuildsWhereClausesAdvanced
         ];
 
         foreach ($bindings as $binding) {
-            $this->bindings[] = $binding;
+            $this->addBinding($binding, 'where');
         }
 
         // CRITICAL FIX: Invalidate SQL cache when WHERE clause is modified
