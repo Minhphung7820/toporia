@@ -687,8 +687,15 @@ class QueryBuilder implements QueryBuilderInterface
                 'boolean' => strtoupper($boolean)
             ];
 
-            // Note: Bindings from subquery will be merged when compileInSubWhere calls toSql()
-            // No need to manually merge bindings here
+            // CRITICAL FIX: Immediately merge bindings from subquery
+            // Bug: When whereIn(closure) is used inside nested where(closure), bindings were not
+            // included in getBindings() because they were only merged during compilation.
+            // This caused "number of bound variables does not match" errors in whereHasMorph.
+            //
+            // Fix: Merge bindings immediately so they are available in getBindings() calls.
+            foreach ($subQuery->getBindings() as $binding) {
+                $this->bindings[] = $binding;
+            }
         }
         // Array of values
         else {

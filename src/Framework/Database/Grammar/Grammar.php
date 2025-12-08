@@ -400,13 +400,13 @@ abstract class Grammar implements GrammarInterface
                 );
             }
 
-            // Merge bindings from subquery into main query BEFORE compiling SQL
-            // This ensures parameter count matches between SQL and bindings array
-            if ($mainQuery !== null) {
-                foreach ($subquery->getBindings() as $binding) {
-                    $mainQuery->addBinding($binding);
-                }
-            }
+            // CRITICAL FIX: Bindings are now merged immediately in whereIn() method
+            // No need to merge again here to avoid duplicates.
+            // Previous code merged bindings here, but this caused issues when whereIn(closure)
+            // was used inside nested where(closure) because bindings weren't available early enough.
+            //
+            // Now bindings are merged when whereIn(closure) is called, ensuring they are
+            // included in getBindings() calls before compilation.
 
             $subquery = $subquery->toSql();
 
@@ -444,13 +444,9 @@ abstract class Grammar implements GrammarInterface
                 );
             }
 
-            // Merge bindings from subquery into main query BEFORE compiling SQL
-            // This ensures parameter count matches between SQL and bindings array
-            if ($mainQuery !== null) {
-                foreach ($subquery->getBindings() as $binding) {
-                    $mainQuery->addBinding($binding);
-                }
-            }
+            // CRITICAL FIX: Bindings are now merged immediately in whereIn() method
+            // No need to merge again here to avoid duplicates.
+            // See compileWhereInSub() for detailed explanation.
 
             $subquery = $subquery->toSql();
 
