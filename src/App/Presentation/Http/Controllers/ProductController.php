@@ -3125,7 +3125,7 @@ final class ProductController extends BaseController
                     $q->where('is_active', true);
                 }
                 if (!empty($tagIdsArray)) {
-                    $q->whereIn('tags.id', $tagIdsArray);
+                    $q->whereIn('id', $tagIdsArray);
                 }
                 if (!empty($tagNameContains)) {
                     $q->where('name', 'like', '%' . $tagNameContains . '%');
@@ -3156,7 +3156,7 @@ final class ProductController extends BaseController
                     $q->where('name', 'like', '%' . $tagNameContains . '%');
                 }
                 if (!empty($tagIdsArray)) {
-                    $q->whereIn('tags.id', $tagIdsArray);
+                    $q->whereIn('id', $tagIdsArray);
                 }
             })
                 ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
@@ -3200,19 +3200,25 @@ final class ProductController extends BaseController
 
             // Test 4: Nested whereHas with multiple conditions and subqueries
             $postsWithComplexTags = PostModel::whereHas('tags', function ($q) use ($activeTagsOnly, $tagNameContains) {
-                $q->where('is_active', $activeTagsOnly ? true : '!=', null)
-                    ->where(function ($subQ) use ($tagNameContains) {
-                        if (!empty($tagNameContains)) {
-                            $subQ->where('name', 'like', '%' . $tagNameContains . '%')
-                                ->orWhere('slug', 'like', '%' . $tagNameContains . '%');
-                        }
-                    })
-                    ->whereIn('id', function ($subQ) {
+                if ($activeTagsOnly) {
+                    $q->where('is_active', true);
+                } else {
+                    $q->whereNotNull('is_active');
+                }
+                $q->where(function ($subQ) use ($tagNameContains) {
+                    if (!empty($tagNameContains)) {
+                        $subQ->where('name', 'like', '%' . $tagNameContains . '%')
+                            ->orWhere('slug', 'like', '%' . $tagNameContains . '%');
+                    }
+                });
+                if ($activeTagsOnly) {
+                    $q->whereIn('id', function ($subQ) {
                         $subQ->select('id')
-                            ->table('tags')
+                            ->from('tags')
                             ->where('is_active', true)
                             ->limit(100);
                     });
+                }
             })
                 ->where(function ($q) use ($publishedOnly, $minViews) {
                     if ($publishedOnly) {
@@ -3227,7 +3233,7 @@ final class ProductController extends BaseController
                         $q->where('is_active', true);
                     }
                     if (!empty($tagIdsArray)) {
-                        $q->whereIn('tags.id', $tagIdsArray);
+                        $q->whereIn('id', $tagIdsArray);
                     }
                     $q->orderBy('name', 'ASC');
                 }])
@@ -3306,7 +3312,7 @@ final class ProductController extends BaseController
                     $q->where('is_active', true);
                 }
                 if (!empty($tagIdsArray)) {
-                    $q->whereIn('tags.id', $tagIdsArray);
+                    $q->whereIn('id', $tagIdsArray);
                 }
                 if (!empty($tagNameContains)) {
                     $q->where('name', 'like', '%' . $tagNameContains . '%');
@@ -3337,7 +3343,7 @@ final class ProductController extends BaseController
                     $q->where('name', 'like', '%' . $tagNameContains . '%');
                 }
                 if (!empty($tagIdsArray)) {
-                    $q->whereIn('tags.id', $tagIdsArray);
+                    $q->whereIn('id', $tagIdsArray);
                 }
             })
                 ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
@@ -3383,19 +3389,25 @@ final class ProductController extends BaseController
 
             // Test 4: Nested whereHas with multiple conditions and subqueries
             $videosWithComplexTags = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly, $tagNameContains) {
-                $q->where('is_active', $activeTagsOnly ? true : '!=', null)
-                    ->where(function ($subQ) use ($tagNameContains) {
-                        if (!empty($tagNameContains)) {
-                            $subQ->where('name', 'like', '%' . $tagNameContains . '%')
-                                ->orWhere('slug', 'like', '%' . $tagNameContains . '%');
-                        }
-                    })
-                    ->whereIn('id', function ($subQ) {
+                if ($activeTagsOnly) {
+                    $q->where('is_active', true);
+                } else {
+                    $q->whereNotNull('is_active');
+                }
+                $q->where(function ($subQ) use ($tagNameContains) {
+                    if (!empty($tagNameContains)) {
+                        $subQ->where('name', 'like', '%' . $tagNameContains . '%')
+                            ->orWhere('slug', 'like', '%' . $tagNameContains . '%');
+                    }
+                });
+                if ($activeTagsOnly) {
+                    $q->whereIn('id', function ($subQ) {
                         $subQ->select('id')
-                            ->table('tags')
+                            ->from('tags')
                             ->where('is_active', true)
                             ->limit(100);
                     });
+                }
             })
                 ->where(function ($q) use ($publishedOnly, $minViews) {
                     if ($publishedOnly) {
@@ -3411,7 +3423,7 @@ final class ProductController extends BaseController
                         $q->where('is_active', true);
                     }
                     if (!empty($tagIdsArray)) {
-                        $q->whereIn('tags.id', $tagIdsArray);
+                        $q->whereIn('id', $tagIdsArray);
                     }
                     $q->orderBy('name', 'ASC');
                 }])
@@ -3545,20 +3557,20 @@ final class ProductController extends BaseController
             $results['deep_nested_tagged_items'] = $postsWithTaggedItems->map(function ($p) {
                 $tagIds = $p->tags->pluck('id')->all();
                 $relatedPosts = PostModel::whereHas('tags', function ($q) use ($tagIds) {
-                    $q->whereIn('tags.id', $tagIds);
+                    $q->whereIn('id', $tagIds);
                 })
                     ->where('id', '!=', $p->id)
                     ->with(['tags' => function ($q) use ($tagIds) {
-                        $q->whereIn('tags.id', $tagIds);
+                        $q->whereIn('id', $tagIds);
                     }])
                     ->limit(3)
                     ->get();
 
                 $relatedVideos = VideoModel::whereHas('tags', function ($q) use ($tagIds) {
-                    $q->whereIn('tags.id', $tagIds);
+                    $q->whereIn('id', $tagIds);
                 })
                     ->with(['tags' => function ($q) use ($tagIds) {
-                        $q->whereIn('tags.id', $tagIds);
+                        $q->whereIn('id', $tagIds);
                     }])
                     ->limit(3)
                     ->get();
@@ -3652,20 +3664,20 @@ final class ProductController extends BaseController
             $results['deep_nested_tagged_items'] = $videosWithTaggedItems->map(function ($v) {
                 $tagIds = $v->tags->pluck('id')->all();
                 $relatedPosts = PostModel::whereHas('tags', function ($q) use ($tagIds) {
-                    $q->whereIn('tags.id', $tagIds);
+                    $q->whereIn('id', $tagIds);
                 })
                     ->with(['tags' => function ($q) use ($tagIds) {
-                        $q->whereIn('tags.id', $tagIds);
+                        $q->whereIn('id', $tagIds);
                     }])
                     ->limit(3)
                     ->get();
 
                 $relatedVideos = VideoModel::whereHas('tags', function ($q) use ($tagIds) {
-                    $q->whereIn('tags.id', $tagIds);
+                    $q->whereIn('id', $tagIds);
                 })
                     ->where('id', '!=', $v->id)
                     ->with(['tags' => function ($q) use ($tagIds) {
-                        $q->whereIn('tags.id', $tagIds);
+                        $q->whereIn('id', $tagIds);
                     }])
                     ->limit(3)
                     ->get();
