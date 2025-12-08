@@ -25,9 +25,9 @@ if [ -f "$PHP_FPM_CONF" ]; then
         echo "listen = 0.0.0.0:9000" >> "$PHP_FPM_CONF"
     fi
 
-    # Clear allowed_clients to allow all connections
-    sed -i 's/^listen.allowed_clients = .*/listen.allowed_clients = /' "$PHP_FPM_CONF" 2>/dev/null || true
-    sed -i 's/^;listen.allowed_clients = .*/listen.allowed_clients = /' "$PHP_FPM_CONF" 2>/dev/null || true
+    # Comment out allowed_clients to allow all connections (empty string causes errors)
+    sed -i 's/^listen.allowed_clients = .*/; listen.allowed_clients = /' "$PHP_FPM_CONF" 2>/dev/null || true
+    sed -i 's/^listen.allowed_clients =$/; listen.allowed_clients =/' "$PHP_FPM_CONF" 2>/dev/null || true
 
     # Verify configuration
     if grep -q "^listen = 0.0.0.0:9000" "$PHP_FPM_CONF"; then
