@@ -3133,7 +3133,7 @@ final class ProductController extends BaseController
                 if (!empty($tagColor)) {
                     $q->where('color', $tagColor);
                 }
-                $q->orderBy('name', 'ASC');
+                $q->select('tags.id', 'tags.name')->orderBy('name', 'ASC');
             }])->find($id);
             $results['complex_with_callback'] = $postComplex ? [
                 'post' => $postComplex->toArray(),

@@ -2302,17 +2302,23 @@ class ModelQueryBuilder extends QueryBuilder
 
         // Only add if WHERE clause is not empty
         if (!empty($whereClause)) {
-            // For MorphToMany and MorphedByMany, qualify the 'id' column specifically to avoid ambiguity
-            // since both related table and pivot table typically have 'id' columns
+            // For MorphToMany and MorphedByMany, qualify common ambiguous columns
+            // since both related table and pivot table may have columns with same names
             if ($relation instanceof MorphToMany || $relation instanceof MorphedByMany) {
-                // Qualify unqualified 'id' column with related table name
-                // Matches: "id IN (...)", "id = value", "id NOT IN (...)", etc.
-                // Handles both simple values and subqueries: "id IN (1,2,3)" or "id IN (SELECT ...)"
-                $whereClause = preg_replace(
-                    '/\b(id)\s+(IN|NOT\s+IN|=|>|<|>=|<=|!=|<>)\s*/i',
-                    "{$relatedTable}.$1 $2 ",
-                    $whereClause
-                );
+                // List of common columns that typically exist in both tables
+                // Users can still manually qualify other columns if needed
+                $ambiguousColumns = ['id', 'created_at', 'updated_at'];
+
+                foreach ($ambiguousColumns as $col) {
+                    // Qualify unqualified column with related table name
+                    // Only replace if column is not already qualified (no dot before it)
+                    // Matches: "column IN (...)", "column = value", etc.
+                    $whereClause = preg_replace(
+                        '/(?<!\w\.)(\b' . preg_quote($col, '/') . '\b)\s+(IN|NOT\s+IN|=|>|<|>=|<=|!=|<>|BETWEEN|LIKE|NOT\s+LIKE|IS|IS\s+NOT)\s*/i',
+                        "{$relatedTable}.$1 $2 ",
+                        $whereClause
+                    );
+                }
             }
 
             // Remove unnecessary parentheses and add relation constraints directly
@@ -3471,26 +3477,18 @@ class ModelQueryBuilder extends QueryBuilder
             // First replace explicit table.column with alias.column
             $boundWhereClause = preg_replace('/\b' . preg_quote($relatedTable, '/') . '\./', "{$relatedAlias}.", $boundWhereClause);
 
-            // Then qualify unqualified columns with related table alias to avoid ambiguity
-            // Match column names that are NOT preceded by a table name (no dot before them)
-            // This handles cases like: "id IN (...)" -> "tags_related.id IN (...)"
-            // But preserves: "taggables_pivot.created_at" as is
-            $boundWhereClause = preg_replace_callback(
-                '/(?<![a-z0-9_])([a-z_][a-z0-9_]*)\s*(?=IN\s*\(|=|>|<|>=|<=|!=|<>|LIKE|NOT\s+LIKE|IS\s+NULL|IS\s+NOT\s+NULL)/i',
-                function ($matches) use ($relatedAlias, $pivotAlias) {
-                    $column = $matches[1];
-                    // Don't qualify if it's already an alias or a keyword
-                    if (in_array(strtoupper($column), ['AND', 'OR', 'NOT', 'NULL', 'TRUE', 'FALSE'], true)) {
-                        return $column;
-                    }
-                    // Don't qualify if it contains an alias prefix already
-                    if (stripos($matches[0], $relatedAlias . '.') !== false || stripos($matches[0], $pivotAlias . '.') !== false) {
-                        return $matches[0];
-                    }
-                    return "{$relatedAlias}.{$column}";
-                },
-                $boundWhereClause
-            );
+            // Qualify common ambiguous columns to avoid conflicts between pivot and related tables
+            // Only qualify specific known columns instead of all columns to avoid false positives
+            // This is safer than using aggressive regex that might match values/functions
+            $ambiguousColumns = ['id', 'created_at', 'updated_at'];
+            foreach ($ambiguousColumns as $col) {
+                // Only qualify if not already qualified (no table/alias prefix)
+                $boundWhereClause = preg_replace(
+                    '/(?<!\w\.)(\b' . preg_quote($col, '/') . '\b)\s*(?=IN\s*\(|=|>|<|>=|<=|!=|<>|LIKE|NOT\s+LIKE|IS\s+NULL|IS\s+NOT\s+NULL)/i',
+                    "{$relatedAlias}.$1 ",
+                    $boundWhereClause
+                );
+            }
 
             $subquery .= " AND ({$boundWhereClause})";
         }
@@ -3582,26 +3580,18 @@ class ModelQueryBuilder extends QueryBuilder
             // First replace explicit table.column with alias.column
             $boundWhereClause = preg_replace('/\b' . preg_quote($relatedTable, '/') . '\./', "{$relatedAlias}.", $boundWhereClause);
 
-            // Then qualify unqualified columns with related table alias to avoid ambiguity
-            // Match column names that are NOT preceded by a table name (no dot before them)
-            // This handles cases like: "id IN (...)" -> "tags_related.id IN (...)"
-            // But preserves: "taggables_pivot.created_at" as is
-            $boundWhereClause = preg_replace_callback(
-                '/(?<![a-z0-9_])([a-z_][a-z0-9_]*)\s*(?=IN\s*\(|=|>|<|>=|<=|!=|<>|LIKE|NOT\s+LIKE|IS\s+NULL|IS\s+NOT\s+NULL)/i',
-                function ($matches) use ($relatedAlias, $pivotAlias) {
-                    $column = $matches[1];
-                    // Don't qualify if it's already an alias or a keyword
-                    if (in_array(strtoupper($column), ['AND', 'OR', 'NOT', 'NULL', 'TRUE', 'FALSE'], true)) {
-                        return $column;
-                    }
-                    // Don't qualify if it contains an alias prefix already
-                    if (stripos($matches[0], $relatedAlias . '.') !== false || stripos($matches[0], $pivotAlias . '.') !== false) {
-                        return $matches[0];
-                    }
-                    return "{$relatedAlias}.{$column}";
-                },
-                $boundWhereClause
-            );
+            // Qualify common ambiguous columns to avoid conflicts between pivot and related tables
+            // Only qualify specific known columns instead of all columns to avoid false positives
+            // This is safer than using aggressive regex that might match values/functions
+            $ambiguousColumns = ['id', 'created_at', 'updated_at'];
+            foreach ($ambiguousColumns as $col) {
+                // Only qualify if not already qualified (no table/alias prefix)
+                $boundWhereClause = preg_replace(
+                    '/(?<!\w\.)(\b' . preg_quote($col, '/') . '\b)\s*(?=IN\s*\(|=|>|<|>=|<=|!=|<>|LIKE|NOT\s+LIKE|IS\s+NULL|IS\s+NOT\s+NULL)/i',
+                    "{$relatedAlias}.$1 ",
+                    $boundWhereClause
+                );
+            }
 
             $subquery .= " AND ({$boundWhereClause})";
         }
