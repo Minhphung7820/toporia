@@ -285,8 +285,10 @@ class MorphTo extends Relation
                 continue;
             }
 
-            // Resolve morph type alias
-            $morphTypeValue = Relation::getMorphAlias($modelClass);
+            // CRITICAL FIX: Use dictionary key as identifier, not alias
+            // This prevents collision when dictionary has both 'post' and 'App\Models\Post'
+            // The dictionary key is what we need to match back to the correct parent models
+            $morphTypeValue = $type;
 
             // Build SELECT with morph type column for identification
             $quotedMorphType = $this->quoteValue($morphTypeValue);
@@ -343,13 +345,13 @@ class MorphTo extends Relation
 
         // Match results to parents
         foreach ($resultsByType as $morphType => $typeResults) {
-            // Find the original type key in dictionary
-            $originalType = $this->findOriginalTypeKey($morphType);
-            if ($originalType === null) {
+            // CRITICAL FIX: morphType is now the dictionary key directly
+            // No need for findOriginalTypeKey() since we store the exact key in __morph_type
+            if (!isset($this->dictionary[$morphType])) {
                 continue;
             }
 
-            $modelClass = $this->getModelClass($originalType);
+            $modelClass = $this->getModelClass($morphType);
 
             // Hydrate results into models
             /** @var callable $hydrate */
@@ -363,7 +365,7 @@ class MorphTo extends Relation
                 $eagerLoadRelations($hydratedModels, $this->nestedEagerLoads);
             }
 
-            $this->matchToMorphParents($originalType, $hydratedModels);
+            $this->matchToMorphParents($morphType, $hydratedModels);
         }
 
         return $this->models ?? new ModelCollection([]);

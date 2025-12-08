@@ -151,22 +151,7 @@ class Connection implements ConnectionInterface
     {
         try {
             $statement = $this->getPdo()->prepare($query);
-
-            // Bind parameters
-            foreach ($bindings as $key => $value) {
-                // Convert arrays/objects to JSON strings for JSON columns
-                if (is_array($value) || is_object($value)) {
-                    $value = json_encode($value, JSON_UNESCAPED_UNICODE);
-                }
-
-                $type = $this->getPdoType($value);
-                $statement->bindValue(
-                    is_int($key) ? $key + 1 : $key,
-                    $value,
-                    $type
-                );
-            }
-
+            $this->bindParameters($statement, $bindings);
             $statement->execute();
 
             return $statement;
@@ -175,16 +160,9 @@ class Connection implements ConnectionInterface
             if ($this->isConnectionLost($e)) {
                 $this->reconnect();
 
-                // Retry the query
+                // Retry the query with same binding logic
                 $statement = $this->getPdo()->prepare($query);
-                foreach ($bindings as $key => $value) {
-                    $type = $this->getPdoType($value);
-                    $statement->bindValue(
-                        is_int($key) ? $key + 1 : $key,
-                        $value,
-                        $type
-                    );
-                }
+                $this->bindParameters($statement, $bindings);
                 $statement->execute();
                 return $statement;
             }
@@ -194,6 +172,30 @@ class Connection implements ConnectionInterface
                 $query,
                 $bindings,
                 $e
+            );
+        }
+    }
+
+    /**
+     * Bind parameters to PDO statement with proper type handling.
+     *
+     * @param \PDOStatement $statement
+     * @param array $bindings
+     * @return void
+     */
+    private function bindParameters(\PDOStatement $statement, array $bindings): void
+    {
+        foreach ($bindings as $key => $value) {
+            // Convert arrays/objects to JSON strings for JSON columns
+            if (is_array($value) || is_object($value)) {
+                $value = json_encode($value, JSON_UNESCAPED_UNICODE);
+            }
+
+            $type = $this->getPdoType($value);
+            $statement->bindValue(
+                is_int($key) ? $key + 1 : $key,
+                $value,
+                $type
             );
         }
     }

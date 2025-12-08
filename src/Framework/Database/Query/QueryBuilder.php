@@ -3302,6 +3302,12 @@ class QueryBuilder implements QueryBuilderInterface
         /** @var QueryBuilder $subquery */
         $subquery = $where['query'];
 
+        // CRITICAL: Merge bindings from subquery into main query
+        // Without this, subquery parameters are lost and query execution fails
+        foreach ($subquery->getBindings() as $binding) {
+            $this->bindings[] = $binding;
+        }
+
         return sprintf(' %s EXISTS (%s)', $boolean, $subquery->toSql());
     }
 
@@ -3316,6 +3322,12 @@ class QueryBuilder implements QueryBuilderInterface
     {
         /** @var QueryBuilder $subquery */
         $subquery = $where['query'];
+
+        // CRITICAL: Merge bindings from subquery into main query
+        // Without this, subquery parameters are lost and query execution fails
+        foreach ($subquery->getBindings() as $binding) {
+            $this->bindings[] = $binding;
+        }
 
         return sprintf(' %s NOT EXISTS (%s)', $boolean, $subquery->toSql());
     }

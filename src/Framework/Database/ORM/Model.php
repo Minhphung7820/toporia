@@ -1379,8 +1379,26 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
         $dirty = [];
 
         foreach ($this->attributes as $key => $value) {
-            if (!array_key_exists($key, $this->original) || $this->original[$key] !== $value) {
+            // CRITICAL FIX: Apply casts to both sides before comparison
+            // This prevents false positives when database returns strings but casts convert to int/float
+            // Example: DB returns "123" (string), cast to int becomes 123, "123" !== 123 would fail
+            if (!array_key_exists($key, $this->original)) {
                 $dirty[$key] = $value;
+                continue;
+            }
+
+            $originalValue = $this->original[$key];
+
+            // Cast both values to their proper types before comparison
+            if (isset(static::$casts[$key])) {
+                $castType = static::$casts[$key];
+                $originalValue = $this->castAttribute($key, $originalValue, $castType);
+                $value = $this->castAttribute($key, $value, $castType);
+            }
+
+            // Use type-safe comparison after casting
+            if ($originalValue !== $value) {
+                $dirty[$key] = $this->attributes[$key]; // Return original attribute value
             }
         }
 
@@ -1763,8 +1781,36 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
 
         // Check if accessing an unloaded relationship when lazy loading is prevented
         if (static::$preventLazyLoading && method_exists($this, $key)) {
-            // Check if it's a relationship method by calling it
+            // CRITICAL FIX: Use Reflection to check return type WITHOUT calling the method
+            // Calling $this->$key() would actually trigger lazy loading, defeating the purpose
             try {
+                $reflection = new \ReflectionMethod($this, $key);
+
+                // Check if method has a return type hint
+                $returnType = $reflection->getReturnType();
+
+                // If return type is RelationInterface or a subclass, it's a relationship
+                if ($returnType instanceof \ReflectionNamedType) {
+                    $typeName = $returnType->getName();
+
+                    // Check if it's a relationship type
+                    if ($typeName === RelationInterface::class ||
+                        is_subclass_of($typeName, RelationInterface::class)) {
+                        throw new \RuntimeException(
+                            sprintf(
+                                'Attempted to lazy load [%s] on model [%s] but lazy loading is disabled. ' .
+                                    'Use eager loading instead: %s::with(\'%s\')->get()',
+                                $key,
+                                static::class,
+                                static::class,
+                                $key
+                            )
+                        );
+                    }
+                }
+
+                // Fallback: If no return type hint, check by calling (less ideal but necessary)
+                // This only happens for relationships without type hints
                 $relation = $this->$key();
                 if ($relation instanceof RelationInterface) {
                     throw new \RuntimeException(
