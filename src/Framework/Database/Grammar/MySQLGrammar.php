@@ -59,14 +59,20 @@ class MySQLGrammar extends Grammar
         // Handle qualified tables (database.table)
         if (str_contains($table, '.')) {
             [$database, $tableName] = explode('.', $table, 2);
+            // CRITICAL FIX: Escape backticks to prevent SQL injection
+            $database = str_replace('`', '``', $database);
+            $tableName = str_replace('`', '``', $tableName);
             return "`{$database}`.`{$tableName}`";
         }
 
         // Handle aliases (table AS alias or table alias)
         if (preg_match('/^(.+?)\s+(?:as\s+)?(.+)$/i', $table, $matches)) {
-            return $this->wrapTable($matches[1]) . ' AS `' . $matches[2] . '`';
+            $alias = str_replace('`', '``', $matches[2]); // Escape backticks
+            return $this->wrapTable($matches[1]) . ' AS `' . $alias . '`';
         }
 
+        // CRITICAL FIX: Escape backticks to prevent SQL injection
+        $table = str_replace('`', '``', $table);
         return "`{$table}`";
     }
 
@@ -104,6 +110,8 @@ class MySQLGrammar extends Grammar
             $result = "{$function}({$argument})";
 
             if ($hasAlias && $alias) {
+                // CRITICAL FIX: Escape backticks to prevent SQL injection
+                $alias = str_replace('`', '``', $alias);
                 $result .= " {$asKeyword} `{$alias}`";
             }
 
@@ -113,7 +121,12 @@ class MySQLGrammar extends Grammar
         // Handle qualified columns (table.column)
         if (str_contains($column, '.')) {
             [$table, $col] = explode('.', $column, 2);
-            return $this->wrapTable($table) . '.' . ($col === '*' ? '*' : "`{$col}`");
+            // CRITICAL FIX: Escape backticks to prevent SQL injection
+            if ($col !== '*') {
+                $col = str_replace('`', '``', $col);
+                return $this->wrapTable($table) . ".`{$col}`";
+            }
+            return $this->wrapTable($table) . '.*';
         }
 
         // Handle aliases (column AS alias or column as alias)
@@ -121,17 +134,23 @@ class MySQLGrammar extends Grammar
             $column = $matches[1];
             $asKeyword = $matches[2]; // Preserve original case of AS/as
             $alias = $matches[3];
+            // CRITICAL FIX: Escape backticks to prevent SQL injection
+            $alias = str_replace('`', '``', $alias);
             return $this->wrapColumn($column) . " {$asKeyword} `{$alias}`";
         }
 
         // Handle JSON operators (column->path or column->>path)
         if (preg_match('/^(.+?)(->|->>\')(.+)$/', $column, $matches)) {
-            $baseColumn = "`{$matches[1]}`";
+            // CRITICAL FIX: Escape backticks to prevent SQL injection
+            $baseColumn = str_replace('`', '``', $matches[1]);
+            $baseColumn = "`{$baseColumn}`";
             $operator = $matches[2];
             $path = $matches[3];
             return "{$baseColumn}{$operator}{$path}";
         }
 
+        // CRITICAL FIX: Escape backticks to prevent SQL injection
+        $column = str_replace('`', '``', $column);
         return "`{$column}`";
     }
 

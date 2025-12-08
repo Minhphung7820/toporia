@@ -2359,37 +2359,51 @@ class QueryBuilder implements QueryBuilderInterface
      * ```
      *
      * Performance:
-     * - 2 queries: SELECT + (UPDATE or INSERT)
+     * - CRITICAL FIX: Now uses native UPSERT (1 query) instead of SELECT + UPDATE/INSERT (2-3 queries)
      * - For bulk operations, use upsert() instead
      *
-     * @param array<string,mixed> $attributes Columns to match
+     * @param array<string,mixed> $attributes Columns to match (used as unique constraint)
      * @param array<string,mixed> $values Values to set
      * @return bool True if row was updated or inserted
      */
     public function updateOrInsert(array $attributes, array $values = []): bool
     {
-        // Try to find existing record
-        $exists = $this->where(function ($query) use ($attributes) {
-            foreach ($attributes as $column => $value) {
-                $query->where($column, $value);
-            }
-        })->exists();
+        // CRITICAL FIX: Use native UPSERT to avoid N+1 problem
+        // Old approach: SELECT (exists check) + UPDATE/INSERT = 2-3 queries
+        // New approach: Single UPSERT query = 1 query
 
-        if ($exists) {
-            // Update existing record
-            $this->where(function ($query) use ($attributes) {
+        $allValues = array_merge($attributes, $values);
+        $uniqueColumns = array_keys($attributes);
+        $updateColumns = empty($values) ? null : array_keys($values);
+
+        try {
+            $this->upsert([$allValues], $uniqueColumns, $updateColumns);
+            return true;
+        } catch (\Exception $e) {
+            // Fallback to old approach if database doesn't support UPSERT
+            // or if there's no unique constraint on the columns
+            $exists = $this->where(function ($query) use ($attributes) {
                 foreach ($attributes as $column => $value) {
                     $query->where($column, $value);
                 }
-            })->update($values);
+            })->exists();
+
+            if ($exists) {
+                // Update existing record
+                $this->where(function ($query) use ($attributes) {
+                    foreach ($attributes as $column => $value) {
+                        $query->where($column, $value);
+                    }
+                })->update($values);
+
+                return true;
+            }
+
+            // Insert new record
+            $this->insert($allValues);
 
             return true;
         }
-
-        // Insert new record
-        $this->insert(array_merge($attributes, $values));
-
-        return true;
     }
 
     /**
