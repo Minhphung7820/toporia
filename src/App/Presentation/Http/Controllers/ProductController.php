@@ -3508,7 +3508,7 @@ final class ProductController extends BaseController
                         // Nested: Post -> Tags + Comments
                         $q->where('is_approved', true)
                             ->orderBy('created_at', 'DESC')
-                            ->limit(5);
+                            ->limit(13);
                     },
                     'comments.commentable' => function ($q) {
                         // Deep nested: Post -> Tags + Comments -> Commentable
