@@ -158,8 +158,9 @@ class JoinClause
         ];
 
         // Add binding to parent query if available
+        // FIXED: Specify 'join' type for proper binding categorization
         if ($this->parentQuery) {
-            $this->parentQuery->addBinding($value);
+            $this->parentQuery->addBinding($value, 'join');
         }
 
         return $this;

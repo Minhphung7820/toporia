@@ -118,7 +118,9 @@ class QueryBuilder implements QueryBuilderInterface
      * - 'select' => SELECT clause bindings (from raw expressions)
      * - 'join'   => JOIN clause bindings
      * - 'where'  => WHERE clause bindings
+     * - 'group'  => GROUP BY clause bindings (from raw expressions)
      * - 'having' => HAVING clause bindings
+     * - 'order'  => ORDER BY clause bindings (from raw expressions)
      * - 'union'  => UNION clause bindings
      *
      * @var array<string, array<mixed>>
@@ -127,7 +129,9 @@ class QueryBuilder implements QueryBuilderInterface
         'select' => [],
         'join'   => [],
         'where'  => [],
+        'group'  => [],
         'having' => [],
+        'order'  => [],
         'union'  => [],
     ];
 
@@ -1059,6 +1063,47 @@ class QueryBuilder implements QueryBuilderInterface
     }
 
     /**
+     * Add a raw ORDER BY clause with parameter bindings.
+     *
+     * Useful for complex ORDER BY expressions that require parameter binding
+     * for security (prevent SQL injection when sorting by user input).
+     *
+     * @param string $sql Raw SQL expression for ORDER BY
+     * @param array<mixed> $bindings Parameter bindings for the expression
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Order by FIELD with parameters (custom sort order)
+     * $query->orderByRaw('FIELD(status, ?, ?, ?)', ['active', 'pending', 'inactive']);
+     *
+     * // Order by distance calculation
+     * $query->orderByRaw('SQRT(POW(lat - ?, 2) + POW(lng - ?, 2))', [51.5074, -0.1278]);
+     *
+     * // Order by conditional expression
+     * $query->orderByRaw('CASE WHEN priority = ? THEN 0 ELSE 1 END, created_at DESC', ['high']);
+     *
+     * // Order by JSON field extraction
+     * $query->orderByRaw('JSON_EXTRACT(metadata, ?) DESC', ['$.score']);
+     * ```
+     */
+    public function orderByRaw(string $sql, array $bindings = []): self
+    {
+        $this->orders[] = [
+            'column' => $sql,
+            'direction' => '', // Raw SQL already includes direction
+            'isExpression' => true,
+        ];
+
+        foreach ($bindings as $binding) {
+            $this->addBinding($binding, 'order');
+        }
+
+        $this->invalidateCache();
+        return $this;
+    }
+
+    /**
      * Set LIMIT.
      */
     public function limit(int $limit): self
@@ -1514,6 +1559,39 @@ class QueryBuilder implements QueryBuilderInterface
             } else {
                 $this->groups[] = $column instanceof Expression ? (string) $column : $column;
             }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Add a raw GROUP BY clause with parameter bindings.
+     *
+     * Useful for complex GROUP BY expressions that require parameter binding
+     * for security (prevent SQL injection).
+     *
+     * @param string $sql Raw SQL expression for GROUP BY
+     * @param array<mixed> $bindings Parameter bindings for the expression
+     * @return $this
+     *
+     * @example
+     * ```php
+     * // Group by date format with parameter
+     * $query->groupByRaw('DATE_FORMAT(created_at, ?)', ['%Y-%m']);
+     *
+     * // Group by conditional expression
+     * $query->groupByRaw('CASE WHEN price > ? THEN "expensive" ELSE "cheap" END', [100]);
+     *
+     * // Group by extracted JSON field
+     * $query->groupByRaw('JSON_EXTRACT(metadata, ?)', ['$.category']);
+     * ```
+     */
+    public function groupByRaw(string $sql, array $bindings = []): self
+    {
+        $this->groups[] = $sql;
+
+        foreach ($bindings as $binding) {
+            $this->addBinding($binding, 'group');
         }
 
         return $this;
@@ -3058,8 +3136,10 @@ class QueryBuilder implements QueryBuilderInterface
      * 1. SELECT clause (raw expressions)
      * 2. JOIN clause
      * 3. WHERE clause
-     * 4. HAVING clause
-     * 5. UNION clause
+     * 4. GROUP BY clause (raw expressions)
+     * 5. HAVING clause
+     * 6. ORDER BY clause (raw expressions)
+     * 7. UNION clause
      *
      * This ensures the binding order matches the placeholder order in the compiled SQL.
      *
@@ -3071,7 +3151,9 @@ class QueryBuilder implements QueryBuilderInterface
             $this->bindings['select'],
             $this->bindings['join'],
             $this->bindings['where'],
+            $this->bindings['group'],
             $this->bindings['having'],
+            $this->bindings['order'],
             $this->bindings['union']
         );
     }
