@@ -2537,6 +2537,9 @@ final class ProductController extends BaseController
                     if ($minViews > 0) {
                         $morphQuery->where('views', '>=', $minViews);
                     }
+                    $morphQuery->whereHas('tags', function ($subq) {
+                        $subq->where('is_active', true);
+                    });
                 });
             })
                 ->with([
