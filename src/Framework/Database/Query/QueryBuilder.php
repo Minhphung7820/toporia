@@ -849,6 +849,11 @@ class QueryBuilder implements QueryBuilderInterface
             $this->bindings[] = $binding;
         }
 
+        // CRITICAL FIX: Invalidate SQL cache when WHERE clause is modified
+        // Bug: whereRaw() was not invalidating cache, causing toSql() to return stale SQL
+        // This caused whereHasMorph to query wrong table when orderBy had no table prefix
+        $this->invalidateCache();
+
         return $this;
     }
 

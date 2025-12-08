@@ -477,6 +477,10 @@ trait BuildsWhereClausesAdvanced
             $this->bindings[] = $binding;
         }
 
+        // CRITICAL FIX: Invalidate SQL cache when WHERE clause is modified
+        // Bug: orWhereRaw() was not invalidating cache, causing toSql() to return stale SQL
+        $this->invalidateCache();
+
         return $this;
     }
 }

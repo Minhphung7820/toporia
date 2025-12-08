@@ -62,11 +62,19 @@ abstract class Grammar implements GrammarInterface
      */
     public function compileSelect(QueryBuilder $query): string
     {
-        // Check cache first for performance
-        $hash = $this->getQueryHash($query);
-        if (isset($this->compilationCache[$hash])) {
-            return $this->compilationCache[$hash];
-        }
+        // CRITICAL FIX: Disable compilation cache due to hash collision bug
+        // Bug: Nested queries with whereRaw() having same structure but different SQL strings
+        // resulted in identical hashes, causing wrong SQL to be returned from cache.
+        //
+        // Example: whereHasMorph with PostModel and VideoModel produced same hash when
+        // orderBy had no table prefix, causing VideoModel query to return PostModel's cached SQL.
+        //
+        // Root cause: getQueryHash() hashes nested query objects via json_encode(), which doesn't
+        // include class names or raw SQL strings, only object properties. This causes collisions
+        // when nested queries have similar structure but different raw SQL.
+        //
+        // Future improvement: Enhance getQueryHash() to include raw SQL strings from whereRaw()
+        // in the hash calculation to avoid collisions while still benefiting from caching.
 
         $components = [
             $this->compileSelectClause($query),
@@ -82,8 +90,7 @@ abstract class Grammar implements GrammarInterface
         // Filter empty components and join with spaces
         $sql = implode(' ', array_filter($components));
 
-        // Cache the result
-        return $this->compilationCache[$hash] = $sql;
+        return $sql;
     }
 
     /**
