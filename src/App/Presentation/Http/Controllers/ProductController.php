@@ -4090,21 +4090,20 @@ final class ProductController extends BaseController
         }
 
         // Test 5: MorphTo - Comment belongs to Post/Video with whereHasMorph
-        $comment = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
+        $commentQuery = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
             if ($minViews > 0) {
                 $q->where('views', '>=', $minViews);
             }
             if ($publishedOnly) {
                 $q->where('is_published', true);
             }
-        })
-            ->where(function ($q) use ($approvedCommentsOnly) {
-                if ($approvedCommentsOnly) {
-                    $q->where('is_approved', true);
-                }
-            })
-            ->with('commentable')
-            ->find($commentId);
+        });
+
+        if ($approvedCommentsOnly) {
+            $commentQuery->where('is_approved', true);
+        }
+
+        $comment = $commentQuery->with('commentable')->find($commentId);
         if ($comment) {
             $results['comment_with_commentable'] = [
                 'comment' => $comment->toArray(),
@@ -4166,7 +4165,7 @@ final class ProductController extends BaseController
                     $q->where('is_approved', true);
                 }
             })
-            ->whereHas('tags', function ($q) use ($activeTagsOnly, $minTags) {
+            ->whereHas('tags', function ($q) use ($activeTagsOnly) {
                 if ($activeTagsOnly) {
                     $q->where('is_active', true);
                 }
@@ -4240,7 +4239,7 @@ final class ProductController extends BaseController
                     $q->where('is_approved', true);
                 }
             })
-            ->whereHas('tags', function ($q) use ($activeTagsOnly, $minTags) {
+            ->whereHas('tags', function ($q) use ($activeTagsOnly) {
                 if ($activeTagsOnly) {
                     $q->where('is_active', true);
                 }
@@ -4306,7 +4305,7 @@ final class ProductController extends BaseController
         })->all();
 
         // Test 10: Comments with whereHasMorph for both Post and Video
-        $commentsWithBothTypes = CommentModel::whereHasMorph('commentable', [PostModel::class], function ($q) use ($minViews, $publishedOnly) {
+        $commentsWithBothTypesQuery = CommentModel::whereHasMorph('commentable', [PostModel::class], function ($q) use ($minViews, $publishedOnly) {
             if ($minViews > 0) {
                 $q->where('views', '>=', $minViews);
             }
@@ -4322,12 +4321,13 @@ final class ProductController extends BaseController
                     $q->where('is_published', true);
                 }
                 $q->where('duration', '>', 0);
-            })
-            ->where(function ($q) use ($approvedCommentsOnly) {
-                if ($approvedCommentsOnly) {
-                    $q->where('is_approved', true);
-                }
-            })
+            });
+
+        if ($approvedCommentsOnly) {
+            $commentsWithBothTypesQuery->where('is_approved', true);
+        }
+
+        $commentsWithBothTypes = $commentsWithBothTypesQuery
             ->with('commentable')
             ->orderBy('created_at', 'DESC')
             ->limit(20)
@@ -4357,11 +4357,17 @@ final class ProductController extends BaseController
                 }
             })
             ->with([
+                'image' => function ($q) {
+                    $q->orderBy('size', 'DESC');
+                },
                 'image.imageable' => function ($q) {
                     // Nested: Post -> Image -> Imageable
                 },
-                'image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
+                'comments' => function ($q) use ($approvedCommentsOnly) {
+                    if ($approvedCommentsOnly) {
+                        $q->where('is_approved', true);
+                    }
+                    $q->orderBy('created_at', 'DESC')->limit(5);
                 },
                 'comments.commentable' => function ($q) {
                     // Nested: Post -> Comments -> Commentable
@@ -4374,12 +4380,6 @@ final class ProductController extends BaseController
                     // Deep nested: Post -> Comments -> Commentable -> Tags
                     $q->where('is_active', true)
                         ->orderBy('name', 'ASC');
-                },
-                'comments' => function ($q) use ($approvedCommentsOnly) {
-                    if ($approvedCommentsOnly) {
-                        $q->where('is_approved', true);
-                    }
-                    $q->orderBy('created_at', 'DESC')->limit(5);
                 },
                 'tags' => function ($q) use ($activeTagsOnly) {
                     if ($activeTagsOnly) {
@@ -4450,11 +4450,17 @@ final class ProductController extends BaseController
                 }
             })
             ->with([
+                'image' => function ($q) {
+                    $q->orderBy('size', 'DESC');
+                },
                 'image.imageable' => function ($q) {
                     // Nested: Video -> Image -> Imageable
                 },
-                'image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
+                'comments' => function ($q) use ($approvedCommentsOnly) {
+                    if ($approvedCommentsOnly) {
+                        $q->where('is_approved', true);
+                    }
+                    $q->orderBy('created_at', 'DESC')->limit(5);
                 },
                 'comments.commentable' => function ($q) {
                     // Nested: Video -> Comments -> Commentable
@@ -4467,12 +4473,6 @@ final class ProductController extends BaseController
                     // Deep nested: Video -> Comments -> Commentable -> Tags
                     $q->where('is_active', true)
                         ->orderBy('name', 'ASC');
-                },
-                'comments' => function ($q) use ($approvedCommentsOnly) {
-                    if ($approvedCommentsOnly) {
-                        $q->where('is_approved', true);
-                    }
-                    $q->orderBy('created_at', 'DESC')->limit(5);
                 },
                 'tags' => function ($q) use ($activeTagsOnly) {
                     if ($activeTagsOnly) {
@@ -4535,14 +4535,6 @@ final class ProductController extends BaseController
             }
         })
             ->with([
-                'commentable.comments.commentable' => function ($q) {
-                    // Circular nested: Comment -> Commentable -> Comments -> Commentable
-                },
-                'commentable.comments' => function ($q) {
-                    $q->where('is_approved', true)
-                        ->orderBy('created_at', 'DESC')
-                        ->limit(3);
-                },
                 'commentable' => function ($q) {
                     // Load commentable with all relationships
                 },
@@ -4552,6 +4544,14 @@ final class ProductController extends BaseController
                 'commentable.tags' => function ($q) {
                     $q->where('is_active', true)
                         ->orderBy('name', 'ASC');
+                },
+                'commentable.comments' => function ($q) {
+                    $q->where('is_approved', true)
+                        ->orderBy('created_at', 'DESC')
+                        ->limit(3);
+                },
+                'commentable.comments.commentable' => function ($q) {
+                    // Circular nested: Comment -> Commentable -> Comments -> Commentable
                 }
             ])
             ->where('is_approved', true)
