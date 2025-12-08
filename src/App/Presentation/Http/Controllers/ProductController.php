@@ -2552,8 +2552,9 @@ final class ProductController extends BaseController
                     },
                     'comments.commentable.tags' => function ($q) {
                         // Deep nested: Post -> Comments -> Commentable (Post) -> Tags
-                        $q->where('is_active', true)
-                            ->orderBy('name', 'ASC');
+                        $q->where('tags.is_active', true)
+                            ->orderBy('name', 'ASC')
+                            ->limit(3);
                     },
                     'comments.commentable.comments' => function ($q) {
                         // Deep nested: Post -> Comments -> Commentable (Post) -> Comments

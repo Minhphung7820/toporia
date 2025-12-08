@@ -92,20 +92,38 @@ class HasMany extends Relation
     {
         // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
-        $hasWhereIn = false;
-        foreach ($wheres as $where) {
-            // Case-insensitive check for 'in' type (handles 'in', 'In', 'IN')
-            if (strtolower($where['type'] ?? '') === 'in') {
-                $hasWhereIn = true;
-                break;
+
+        // Helper function to recursively search for WHERE IN in nested closures
+        // Eager loading creates nested WHERE: WHERE ((foreignKey IN (...)))
+        $findWhereIn = function (array $whereList) use (&$findWhereIn): bool {
+            foreach ($whereList as $where) {
+                $type = strtolower($where['type'] ?? '');
+
+                // Direct WHERE IN - this is eager loading
+                if ($type === 'in') {
+                    return true;
+                }
+
+                // Nested WHERE closure - recurse into it
+                if ($type === 'nested' && isset($where['query'])) {
+                    $nestedQuery = $where['query'];
+                    if ($nestedQuery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                        if ($findWhereIn($nestedQuery->getWheres())) {
+                            return true;
+                        }
+                    }
+                }
             }
-        }
+            return false;
+        };
+
+        $isEagerLoading = $findWhereIn($wheres);
 
         // If eager loading with limit, use window function for optimal performance
         // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
         // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
         // Also supports offset()/skip() for pagination within each parent
-        if ($hasWhereIn) {
+        if ($isEagerLoading) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();
             $offset = $this->query->getOffset();

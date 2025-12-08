@@ -542,23 +542,40 @@ class BelongsToMany extends Relation
     {
         // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
-        $hasWhereIn = false;
-        foreach ($wheres as $where) {
-            // Case-insensitive check for 'in' type (handles 'in', 'In', 'IN')
-            if (strtolower($where['type'] ?? '') === 'in') {
-                // Check if it's the pivot foreign key WHERE IN (eager loading)
-                $column = $where['column'] ?? '';
-                if (str_contains($column, $this->pivotTable) && str_contains($column, $this->foreignPivotKey)) {
-                    $hasWhereIn = true;
-                    break;
+
+        // Helper function to recursively search for WHERE IN in nested closures
+        // Eager loading creates nested WHERE: WHERE ((type=X AND id IN (...)) OR (type=Y AND id IN (...)))
+        $findWhereIn = function (array $whereList, string $pivotTable, string $foreignPivotKey) use (&$findWhereIn): bool {
+            foreach ($whereList as $where) {
+                $type = strtolower($where['type'] ?? '');
+
+                // Direct WHERE IN - check if it's for pivot table
+                if ($type === 'in') {
+                    $column = $where['column'] ?? '';
+                    if (str_contains($column, $pivotTable) && str_contains($column, $foreignPivotKey)) {
+                        return true;
+                    }
+                }
+
+                // Nested WHERE closure - recurse into it
+                if ($type === 'nested' && isset($where['query'])) {
+                    $nestedQuery = $where['query'];
+                    if ($nestedQuery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                        if ($findWhereIn($nestedQuery->getWheres(), $pivotTable, $foreignPivotKey)) {
+                            return true;
+                        }
+                    }
                 }
             }
-        }
+            return false;
+        };
+
+        $isEagerLoading = $findWhereIn($wheres, $this->pivotTable, $this->foreignPivotKey);
 
         // If eager loading with limit, use window function for optimal performance
         // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
         // Also supports offset()/skip() for pagination within each parent
-        if ($hasWhereIn) {
+        if ($isEagerLoading) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();
             $offset = $this->query->getOffset();

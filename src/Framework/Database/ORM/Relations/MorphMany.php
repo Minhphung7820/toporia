@@ -180,24 +180,41 @@ class MorphMany extends Relation
     {
         // Check if this is eager loading with limit (needs window function optimization)
         $wheres = $this->query->getWheres();
-        $hasWhereIn = false;
-        $hasMorphWhere = false;
-        foreach ($wheres as $where) {
-            // Case-insensitive check for 'in' type (handles 'in', 'In', 'IN')
-            if (strtolower($where['type'] ?? '') === 'in') {
-                $hasWhereIn = true;
+
+        // Helper function to recursively search for WHERE IN in nested closures
+        // Eager loading creates nested WHERE: WHERE ((morphType = X AND foreignKey IN (...)))
+        $findWhereIn = function (array $whereList) use (&$findWhereIn): bool {
+            foreach ($whereList as $where) {
+                $type = strtolower($where['type'] ?? '');
+
+                // Direct WHERE IN - this is eager loading
+                if ($type === 'in') {
+                    return true;
+                }
+
+                // Nested WHERE closure - recurse into it
+                if ($type === 'nested') {
+                    // Check if nested query exists
+                    if (isset($where['query']) && $where['query'] instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                        if ($findWhereIn($where['query']->getWheres())) {
+                            return true;
+                        }
+                    } else {
+                        // Nested WHERE can also indicate morph eager loading (morphType + foreignKey IN)
+                        return true;
+                    }
+                }
             }
-            // Check for morph type + foreign key IN pattern (from addEagerConstraints)
-            if (strtolower($where['type'] ?? '') === 'nested') {
-                $hasMorphWhere = true;
-            }
-        }
+            return false;
+        };
+
+        $isEagerLoading = $findWhereIn($wheres);
 
         // If eager loading with limit, use window function for optimal performance
         // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
         // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
         // Also supports offset()/skip() for pagination within each parent
-        if ($hasWhereIn || $hasMorphWhere) {
+        if ($isEagerLoading) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();
             $offset = $this->query->getOffset();
