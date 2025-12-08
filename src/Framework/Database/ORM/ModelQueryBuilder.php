@@ -2174,20 +2174,31 @@ class ModelQueryBuilder extends QueryBuilder
             $subquerySql = "SELECT 1 FROM {$fromClause} WHERE {$relationAlias}.{$foreignKey} = {$parentTable}.{$localKey}";
         }
 
-        // For polymorphic relationships, add the morph_type condition with binding
-        if ($isPolymorphic) {
-            $morphType = $this->getRelationProperty($relation, 'morphType');
-            $morphClass = $this->getMorphClassFromRelation($relation);
-            $subquerySql .= " AND {$relationAlias}.{$morphType} = ?";
-            $bindings[] = $morphClass;
-        }
-
         // Add relation constraints (keep as bindings, don't inline)
         $relationSql = $relationQuery->toSql();
         $relationBindings = $relationQuery->getBindings();
 
         // Extract WHERE clause, handling nested subqueries properly
         $whereClause = $this->extractCompleteWhereClause($relationSql);
+
+        // For polymorphic relationships, check if we need to add morph_type constraint
+        // IMPORTANT: Only add morph_type constraint if callback doesn't already handle it
+        // This fixes the bug where whereHasMorph inside whereHas callback gets conflicting constraints
+        if ($isPolymorphic) {
+            $morphType = $this->getRelationProperty($relation, 'morphType');
+            $morphClass = $this->getMorphClassFromRelation($relation);
+
+            // Check if the WHERE clause already contains the morph_type column
+            // If callback uses whereHasMorph on the same morph relation, it will handle morph_type itself
+            $morphTypePattern = preg_quote("{$relationAlias}.{$morphType}", '/');
+            $hasMorphTypeInCallback = !empty($whereClause) && preg_match("/{$morphTypePattern}/", $whereClause);
+
+            if (!$hasMorphTypeInCallback) {
+                // Callback doesn't handle morph_type, so we add it
+                $subquerySql .= " AND {$relationAlias}.{$morphType} = ?";
+                $bindings[] = $morphClass;
+            }
+        }
 
         // Only add if WHERE clause is not empty
         if (!empty($whereClause)) {
