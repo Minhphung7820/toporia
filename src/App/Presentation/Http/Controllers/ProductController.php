@@ -2729,148 +2729,150 @@ final class ProductController extends BaseController
 
         $results = [];
 
-        // Test 1: Basic with() simple
-        $commentBasic = CommentModel::with('commentable')->find($commentId);
-        $results['basic_with'] = $commentBasic ? [
-            'comment' => $commentBasic->toArray(),
-            'commentable' => $commentBasic->commentable ? $commentBasic->commentable->toArray() : null,
-            'commentable_type' => $commentBasic->commentable_type,
-            'commentable_class' => $commentBasic->commentable ? get_class($commentBasic->commentable) : null,
-        ] : ['error' => 'Comment not found'];
+        // // Test 1: Basic with() simple
+        // $commentBasic = CommentModel::with('commentable')->find($commentId);
+        // $results['basic_with'] = $commentBasic ? [
+        //     'comment' => $commentBasic->toArray(),
+        //     'commentable' => $commentBasic->commentable ? $commentBasic->commentable->toArray() : null,
+        //     'commentable_type' => $commentBasic->commentable_type,
+        //     'commentable_class' => $commentBasic->commentable ? get_class($commentBasic->commentable) : null,
+        // ] : ['error' => 'Comment not found'];
 
-        // Test 2: Complex with() callback - filter commentable by conditions using MorphTo's constrain() method
-        $commentComplex = CommentModel::with(['commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($typeFilter, $minViews, $publishedOnly) {
-            $constraints = [];
+        // // Test 2: Complex with() callback - filter commentable by conditions using MorphTo's constrain() method
+        // $commentComplex = CommentModel::with(['commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($typeFilter, $minViews, $publishedOnly) {
+        //     $constraints = [];
 
-            if ($typeFilter === 'post' || $typeFilter === 'both') {
-                $constraints[PostModel::class] = function ($query) use ($minViews, $publishedOnly) {
-                    if ($minViews > 0) {
-                        $query->where('views', '>=', $minViews);
-                    }
-                    if ($publishedOnly) {
-                        $query->where('is_published', true);
-                    }
-                };
-            }
+        //     if ($typeFilter === 'post' || $typeFilter === 'both') {
+        //         $constraints[PostModel::class] = function ($query) use ($minViews, $publishedOnly) {
+        //             if ($minViews > 0) {
+        //                 $query->where('views', '>=', $minViews);
+        //             }
+        //             if ($publishedOnly) {
+        //                 $query->where('is_published', true);
+        //             }
+        //         };
+        //     }
 
-            if ($typeFilter === 'video' || $typeFilter === 'both') {
-                $constraints[VideoModel::class] = function ($query) use ($minViews, $publishedOnly) {
-                    if ($minViews > 0) {
-                        $query->where('views', '>=', $minViews);
-                    }
-                    if ($publishedOnly) {
-                        $query->where('is_published', true);
-                    }
-                };
-            }
+        //     if ($typeFilter === 'video' || $typeFilter === 'both') {
+        //         $constraints[VideoModel::class] = function ($query) use ($minViews, $publishedOnly) {
+        //             if ($minViews > 0) {
+        //                 $query->where('views', '>=', $minViews);
+        //             }
+        //             if ($publishedOnly) {
+        //                 $query->where('is_published', true);
+        //             }
+        //         };
+        //     }
 
-            if (!empty($constraints)) {
-                $morphTo->constrain($constraints);
-            }
-        }])->find($commentId);
-        $results['complex_with_callback'] = $commentComplex ? [
-            'comment' => $commentComplex->toArray(),
-            'commentable' => $commentComplex->commentable ? $commentComplex->commentable->toArray() : null,
-        ] : ['error' => 'Comment not found'];
+        //     if (!empty($constraints)) {
+        //         $morphTo->constrain($constraints);
+        //     }
+        // }])->find($commentId);
+        // $results['complex_with_callback'] = $commentComplex ? [
+        //     'comment' => $commentComplex->toArray(),
+        //     'commentable' => $commentComplex->commentable ? $commentComplex->commentable->toArray() : null,
+        // ] : ['error' => 'Comment not found'];
 
-        // Test 3: whereHas with complex conditions - filter comments by commentable properties
-        $commentsWithPost = CommentModel::whereHasMorph('commentable', [PostModel::class], function ($q) use ($minViews, $publishedOnly) {
-            if ($minViews > 0) {
-                $q->where('views', '>=', $minViews);
-            }
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-        })
-            ->where(function ($q) use ($approvedOnly, $hasUser, $contentContains) {
-                if ($approvedOnly) {
-                    $q->where('is_approved', true);
-                }
-                if ($hasUser) {
-                    $q->whereNotNull('user_id');
-                }
-                if (!empty($contentContains)) {
-                    $q->where('content', 'like', '%' . $contentContains . '%');
-                }
-            })
-            ->with('commentable')
-            ->orderBy('created_at', 'DESC')
-            ->limit(10)
-            ->get();
-        $results['where_has_morph_posts'] = $commentsWithPost->map(function ($c) {
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $c->commentable ? $c->commentable->toArray() : null,
-                'commentable_type' => $c->commentable_type,
-            ];
-        })->all();
+        // // Test 3: whereHas with complex conditions - filter comments by commentable properties
+        // $commentsWithPost = CommentModel::whereHasMorph('commentable', [PostModel::class], function ($q) use ($minViews, $publishedOnly) {
+        //     if ($minViews > 0) {
+        //         $q->where('views', '>=', $minViews);
+        //     }
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        // })
+        //     ->where(function ($q) use ($approvedOnly, $hasUser, $contentContains) {
+        //         if ($approvedOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //         if ($hasUser) {
+        //             $q->whereNotNull('user_id');
+        //         }
+        //         if (!empty($contentContains)) {
+        //             $q->where('content', 'like', '%' . $contentContains . '%');
+        //         }
+        //     })
+        //     ->with('commentable')
+        //     ->orderBy('created_at', 'DESC')
+        //     ->limit(10)
+        //     ->get();
+        // $results['where_has_morph_posts'] = $commentsWithPost->map(function ($c) {
+        //     return [
+        //         'comment' => $c->toArray(),
+        //         'commentable' => $c->commentable ? $c->commentable->toArray() : null,
+        //         'commentable_type' => $c->commentable_type,
+        //     ];
+        // })->all();
 
-        // Test 4: whereHasMorph with Video
-        $commentsWithVideo = CommentModel::whereHasMorph('commentable', [VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
-            if ($minViews > 0) {
-                $q->where('views', '>=', $minViews);
-            }
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-            $q->where('duration', '>', 0);
-        })
-            ->where(function ($q) use ($approvedOnly, $hasUser) {
-                if ($approvedOnly) {
-                    $q->where('is_approved', true);
-                }
-                if ($hasUser) {
-                    $q->whereNotNull('user_id');
-                }
-            })
-            ->with('commentable')
-            ->orderBy('created_at', 'DESC')
-            ->limit(10)
-            ->get();
-        $results['where_has_morph_videos'] = $commentsWithVideo->all();
-        // Test 5: whereHasMorph with multiple types (Post and Video)
-        $commentsWithBoth = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
-            if ($minViews > 0) {
-                $q->where('views', '>=', $minViews);
-            }
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-        })
-            ->where(function ($q) use ($approvedOnly, $hasUser, $contentContains) {
-                if ($approvedOnly) {
-                    $q->where('is_approved', true);
-                }
-                if ($hasUser) {
-                    $q->whereNotNull('user_id');
-                }
-                if (!empty($contentContains)) {
-                    $q->where('content', 'like', '%' . $contentContains . '%');
-                }
-            })
-            ->with('commentable')
-            ->orderBy('created_at', 'DESC')
-            ->limit(20)
-            ->get();
-        $results['where_has_morph_both'] = $commentsWithBoth->map(function ($c) {
-            return [
-                'comment' => $c->toArray(),
-                'commentable' => $c->commentable ? $c->commentable->toArray() : null,
-                'commentable_type' => $c->commentable_type,
-                'commentable_class' => $c->commentable ? get_class($c->commentable) : null,
-            ];
-        })->all();
+        // // Test 4: whereHasMorph with Video
+        // $commentsWithVideo = CommentModel::whereHasMorph('commentable', [VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
+        //     if ($minViews > 0) {
+        //         $q->where('views', '>=', $minViews);
+        //     }
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        //     $q->where('duration', '>', 0);
+        // })
+        //     ->where(function ($q) use ($approvedOnly, $hasUser) {
+        //         if ($approvedOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //         if ($hasUser) {
+        //             $q->whereNotNull('user_id');
+        //         }
+        //     })
+        //     ->with('commentable')
+        //     ->orderBy('created_at', 'DESC')
+        //     ->limit(10)
+        //     ->get();
+        // $results['where_has_morph_videos'] = $commentsWithVideo->all();
+        // // Test 5: whereHasMorph with multiple types (Post and Video)
+        // $commentsWithBoth = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
+        //     if ($minViews > 0) {
+        //         $q->where('views', '>=', $minViews);
+        //     }
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        // })
+        //     ->where(function ($q) use ($approvedOnly, $hasUser, $contentContains) {
+        //         if ($approvedOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //         if ($hasUser) {
+        //             $q->whereNotNull('user_id');
+        //         }
+        //         if (!empty($contentContains)) {
+        //             $q->where('content', 'like', '%' . $contentContains . '%');
+        //         }
+        //     })
+        //     ->with('commentable')
+        //     ->orderBy('created_at', 'DESC')
+        //     ->limit(20)
+        //     ->get();
+        // $results['where_has_morph_both'] = $commentsWithBoth->map(function ($c) {
+        //     return [
+        //         'comment' => $c->toArray(),
+        //         'commentable' => $c->commentable ? $c->commentable->toArray() : null,
+        //         'commentable_type' => $c->commentable_type,
+        //         'commentable_class' => $c->commentable ? get_class($c->commentable) : null,
+        //     ];
+        // })->all();
 
         // Test 6: orWhereHasMorph - complex conditions
-        $commentsWithOrConditions = CommentModel::whereHasMorph('commentable', [PostModel::class], function ($q) {
-            $q->where('views', '>', 100)
-                ->where('is_published', true);
-        })
-            ->orWhereHasMorph('commentable', [VideoModel::class], function ($q) {
+        $commentsWithOrConditions = CommentModel::where(function ($query) {
+            $query->whereHasMorph('commentable', [PostModel::class], function ($q) {
+                $q->where('views', '>', 100)
+                    ->where('is_published', true);
+            });
+            $query->orWhereHasMorph('commentable', [VideoModel::class], function ($q) {
                 $q->where('views', '>', 500)
                     ->where('duration', '>', 60)
                     ->where('is_published', true);
-            })
+            });
+        })
             ->where(function ($q) use ($approvedOnly) {
                 if ($approvedOnly) {
                     $q->where('is_approved', true);
@@ -2882,176 +2884,176 @@ final class ProductController extends BaseController
             ->get();
         $results['or_where_has_morph'] = $commentsWithOrConditions->all();
 
-        // Test 7: Nested whereHasMorph with subqueries
-        $commentsWithNestedConditions = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q, $type) use ($minViews, $publishedOnly) {
-            // Use $type parameter to handle different model types correctly
-            $q->where(function ($subQ) use ($minViews, $type) {
-                $subQ->where('views', '>=', $minViews)
-                    ->orWhereIn('id', function ($subSubQ) use ($type) {
-                        // Use the correct table based on morph type
-                        $table = $type === PostModel::class ? 'posts' : 'videos';
-                        $subSubQ->select('id')
-                            ->table($table)
-                            ->where('is_published', true);
-                    });
-            });
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-        })
-            ->where(function ($q) use ($approvedOnly, $hasUser) {
-                if ($approvedOnly) {
-                    $q->where('is_approved', true);
-                }
-                if ($hasUser) {
-                    $q->whereNotNull('user_id');
-                }
-            })
-            ->with('commentable')
-            ->orderBy('created_at', 'DESC')
-            ->limit(10)
-            ->get();
+        // // Test 7: Nested whereHasMorph with subqueries
+        // $commentsWithNestedConditions = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q, $type) use ($minViews, $publishedOnly) {
+        //     // Use $type parameter to handle different model types correctly
+        //     $q->where(function ($subQ) use ($minViews, $type) {
+        //         $subQ->where('views', '>=', $minViews)
+        //             ->orWhereIn('id', function ($subSubQ) use ($type) {
+        //                 // Use the correct table based on morph type
+        //                 $table = $type === PostModel::class ? 'posts' : 'videos';
+        //                 $subSubQ->select('id')
+        //                     ->table($table)
+        //                     ->where('is_published', true);
+        //             });
+        //     });
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        // })
+        //     ->where(function ($q) use ($approvedOnly, $hasUser) {
+        //         if ($approvedOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //         if ($hasUser) {
+        //             $q->whereNotNull('user_id');
+        //         }
+        //     })
+        //     ->with('commentable')
+        //     ->orderBy('created_at', 'DESC')
+        //     ->limit(10)
+        //     ->get();
 
-        $results['nested_where_has_morph'] = $commentsWithNestedConditions->all();
+        // $results['nested_where_has_morph'] = $commentsWithNestedConditions->all();
 
-        // Test 8: Nested relationship - Comment with commentable and commentable has relationships
-        $commentsWithNestedCommentable = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
-            if ($minViews > 0) {
-                $q->where('views', '>=', $minViews);
-            }
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-        })
-            ->where(function ($q) use ($approvedOnly) {
-                if ($approvedOnly) {
-                    $q->where('is_approved', true);
-                }
-            })
-            ->with([
-                'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($minViews, $publishedOnly) {
-                    // Apply constraints to both Post and Video types
-                    $morphTo->constrain([
-                        PostModel::class => function ($query) use ($minViews, $publishedOnly) {
-                            if ($minViews > 0) {
-                                $query->where('views', '>=', $minViews);
-                            }
-                            if ($publishedOnly) {
-                                $query->where('is_published', true);
-                            }
-                        },
-                        VideoModel::class => function ($query) use ($minViews, $publishedOnly) {
-                            if ($minViews > 0) {
-                                $query->where('views', '>=', $minViews);
-                            }
-                            if ($publishedOnly) {
-                                $query->where('is_published', true);
-                            }
-                        }
-                    ]);
-                },
-                'commentable.image' => function ($q) {
-                    // Nested: commentable -> image (MorphOne)
-                    $q->orderBy('size', 'DESC');
-                },
-                'commentable.comments' => function ($q) {
-                    // Nested: commentable -> comments (MorphMany)
-                    $q->where('is_approved', true)
-                        ->orderBy('created_at', 'DESC')
-                        ->limit(5);
-                },
-                'commentable.tags' => function ($q) {
-                    // Nested: commentable -> tags (MorphToMany)
-                    $q->where('is_active', true)
-                        ->orderBy('name', 'ASC');
-                }
-            ])
-            ->orderBy('created_at', 'DESC')
-            ->limit(10)
-            ->get();
-        $results['nested_commentable_relationships'] = $commentsWithNestedCommentable->all();
+        // // Test 8: Nested relationship - Comment with commentable and commentable has relationships
+        // $commentsWithNestedCommentable = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($minViews, $publishedOnly) {
+        //     if ($minViews > 0) {
+        //         $q->where('views', '>=', $minViews);
+        //     }
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        // })
+        //     ->where(function ($q) use ($approvedOnly) {
+        //         if ($approvedOnly) {
+        //             $q->where('is_approved', true);
+        //         }
+        //     })
+        //     ->with([
+        //         'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($minViews, $publishedOnly) {
+        //             // Apply constraints to both Post and Video types
+        //             $morphTo->constrain([
+        //                 PostModel::class => function ($query) use ($minViews, $publishedOnly) {
+        //                     if ($minViews > 0) {
+        //                         $query->where('views', '>=', $minViews);
+        //                     }
+        //                     if ($publishedOnly) {
+        //                         $query->where('is_published', true);
+        //                     }
+        //                 },
+        //                 VideoModel::class => function ($query) use ($minViews, $publishedOnly) {
+        //                     if ($minViews > 0) {
+        //                         $query->where('views', '>=', $minViews);
+        //                     }
+        //                     if ($publishedOnly) {
+        //                         $query->where('is_published', true);
+        //                     }
+        //                 }
+        //             ]);
+        //         },
+        //         'commentable.image' => function ($q) {
+        //             // Nested: commentable -> image (MorphOne)
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'commentable.comments' => function ($q) {
+        //             // Nested: commentable -> comments (MorphMany)
+        //             $q->where('is_approved', true)
+        //                 ->orderBy('created_at', 'DESC')
+        //                 ->limit(5);
+        //         },
+        //         'commentable.tags' => function ($q) {
+        //             // Nested: commentable -> tags (MorphToMany)
+        //             $q->where('is_active', true)
+        //                 ->orderBy('name', 'ASC');
+        //         }
+        //     ])
+        //     ->orderBy('created_at', 'DESC')
+        //     ->limit(10)
+        //     ->get();
+        // $results['nested_commentable_relationships'] = $commentsWithNestedCommentable->all();
 
-        // Test 9: Deep nested - Comment with commentable, commentable has image, and image has imageable
-        $commentsWithDeepNested = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($publishedOnly) {
-            if ($publishedOnly) {
-                $q->where('is_published', true);
-            }
-        })
-            ->with([
-                'commentable.image.imageable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
-                    // Deep nested: Comment -> Commentable -> Image -> Imageable
-                    // Apply constraints to both Post and Video types for imageable
-                    $morphTo->constrain([
-                        PostModel::class => function ($query) {
-                            $query->where('is_published', true);
-                        },
-                        VideoModel::class => function ($query) {
-                            $query->where('is_published', true);
-                        }
-                    ]);
-                },
-                'commentable.image' => function ($q) {
-                    $q->orderBy('size', 'DESC');
-                },
-                'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($publishedOnly) {
-                    // Load commentable with constraints
-                    $morphTo->constrain([
-                        PostModel::class => function ($query) use ($publishedOnly) {
-                            if ($publishedOnly) {
-                                $query->where('is_published', true);
-                            }
-                        },
-                        VideoModel::class => function ($query) use ($publishedOnly) {
-                            if ($publishedOnly) {
-                                $query->where('is_published', true);
-                            }
-                        }
-                    ]);
-                }
-            ])
-            ->where('is_approved', true)
-            ->limit(5)
-            ->get();
-        $results['deep_nested_commentable_image'] = $commentsWithDeepNested->all();
+        // // Test 9: Deep nested - Comment with commentable, commentable has image, and image has imageable
+        // $commentsWithDeepNested = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) use ($publishedOnly) {
+        //     if ($publishedOnly) {
+        //         $q->where('is_published', true);
+        //     }
+        // })
+        //     ->with([
+        //         'commentable.image.imageable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
+        //             // Deep nested: Comment -> Commentable -> Image -> Imageable
+        //             // Apply constraints to both Post and Video types for imageable
+        //             $morphTo->constrain([
+        //                 PostModel::class => function ($query) {
+        //                     $query->where('is_published', true);
+        //                 },
+        //                 VideoModel::class => function ($query) {
+        //                     $query->where('is_published', true);
+        //                 }
+        //             ]);
+        //         },
+        //         'commentable.image' => function ($q) {
+        //             $q->orderBy('size', 'DESC');
+        //         },
+        //         'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) use ($publishedOnly) {
+        //             // Load commentable with constraints
+        //             $morphTo->constrain([
+        //                 PostModel::class => function ($query) use ($publishedOnly) {
+        //                     if ($publishedOnly) {
+        //                         $query->where('is_published', true);
+        //                     }
+        //                 },
+        //                 VideoModel::class => function ($query) use ($publishedOnly) {
+        //                     if ($publishedOnly) {
+        //                         $query->where('is_published', true);
+        //                     }
+        //                 }
+        //             ]);
+        //         }
+        //     ])
+        //     ->where('is_approved', true)
+        //     ->limit(5)
+        //     ->get();
+        // $results['deep_nested_commentable_image'] = $commentsWithDeepNested->all();
 
-        // Test 10: Ultra deep nested - Comment -> Commentable -> Comments -> Commentable (circular nested)
-        $commentsWithUltraDeepNested = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) {
-            $q->where('is_published', true);
-        })
-            ->with([
-                'commentable.comments.commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
-                    // Ultra deep nested: Comment -> Commentable -> Comments -> Commentable
-                    // Apply constraints to both Post and Video types
-                    $morphTo->constrain([
-                        PostModel::class => function ($query) {
-                            $query->where('is_published', true);
-                        },
-                        VideoModel::class => function ($query) {
-                            $query->where('is_published', true);
-                        }
-                    ]);
-                },
-                'commentable.comments' => function ($q) {
-                    $q->where('is_approved', true)
-                        ->orderBy('created_at', 'DESC')
-                        ->limit(3);
-                },
-                'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
-                    // Load commentable with constraints
-                    $morphTo->constrain([
-                        PostModel::class => function ($query) {
-                            $query->where('is_published', true);
-                        },
-                        VideoModel::class => function ($query) {
-                            $query->where('is_published', true);
-                        }
-                    ]);
-                }
-            ])
-            ->where('is_approved', true)
-            ->limit(5)
-            ->get();
-        $results['ultra_deep_nested_comments'] = $commentsWithUltraDeepNested->all();
+        // // Test 10: Ultra deep nested - Comment -> Commentable -> Comments -> Commentable (circular nested)
+        // $commentsWithUltraDeepNested = CommentModel::whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($q) {
+        //     $q->where('is_published', true);
+        // })
+        //     ->with([
+        //         'commentable.comments.commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
+        //             // Ultra deep nested: Comment -> Commentable -> Comments -> Commentable
+        //             // Apply constraints to both Post and Video types
+        //             $morphTo->constrain([
+        //                 PostModel::class => function ($query) {
+        //                     $query->where('is_published', true);
+        //                 },
+        //                 VideoModel::class => function ($query) {
+        //                     $query->where('is_published', true);
+        //                 }
+        //             ]);
+        //         },
+        //         'commentable.comments' => function ($q) {
+        //             $q->where('is_approved', true)
+        //                 ->orderBy('created_at', 'DESC')
+        //                 ->limit(3);
+        //         },
+        //         'commentable' => function (\Toporia\Framework\Database\ORM\Relations\MorphTo $morphTo) {
+        //             // Load commentable with constraints
+        //             $morphTo->constrain([
+        //                 PostModel::class => function ($query) {
+        //                     $query->where('is_published', true);
+        //                 },
+        //                 VideoModel::class => function ($query) {
+        //                     $query->where('is_published', true);
+        //                 }
+        //             ]);
+        //         }
+        //     ])
+        //     ->where('is_approved', true)
+        //     ->limit(5)
+        //     ->get();
+        // $results['ultra_deep_nested_comments'] = $commentsWithUltraDeepNested->all();
 
         $queries = $this->formatQueryLogs(DB::getQueryLog());
 
