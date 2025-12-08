@@ -1902,6 +1902,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
 
     /**
      * Hydrate model instances from an array of database rows.
+     * PERFORMANCE FIX: Avoid creating temporary instance for newCollection()
      *
      * @param array<int, array<string,mixed>> $rows
      * @return ModelCollection<static>
@@ -1922,7 +1923,10 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
             $m->syncOriginal();
             $out[] = $m;
         }
-        return (new static())->newCollection($out);
+
+        // PERFORMANCE FIX: Reuse first model instance if exists, or create new if empty
+        // This avoids creating an unnecessary temporary instance
+        return empty($out) ? new ModelCollection([]) : $out[0]->newCollection($out);
     }
 
     /**

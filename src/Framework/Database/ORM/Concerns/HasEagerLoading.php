@@ -241,31 +241,22 @@ trait HasEagerLoading
                 );
             }
 
-            // OPTIMIZATION: Only create relation instances for all models when needed
-            // For eager loading, we only need one instance to determine the type
-            // The actual instances will be created in loadRelationBatch if needed
-            // This reduces overhead from creating unnecessary relation instances
-            $grouped[$firstLevelRelation] = [];
+            // PERFORMANCE FIX: Only create ONE relation instance instead of N instances
+            // loadRelationBatch() only uses $relationInstances[0], so creating N instances is wasteful
+            // For 100 models, this saves 99 unnecessary object creations per relation
+            $relationInstance = $firstModel->$firstLevelRelation();
 
-            // Create relation instances for all models
-            // All models should have the same relation method (same model class)
-            // If a model doesn't have it, throw exception to catch inconsistencies
-            foreach ($models as $model) {
-                // CRITICAL: All models of the same class should have the same relations
-                // If one doesn't, it's likely a programming error
-                if (!method_exists($model, $firstLevelRelation)) {
-                    $modelClass = get_class($model);
-                    throw RelationNotFoundException::forRelation($modelClass, $firstLevelRelation, $relationName);
-                }
-
-                $instance = $model->$firstLevelRelation();
-                if (!$instance instanceof RelationInterface) {
-                    $modelClass = get_class($model);
-                    throw RelationNotFoundException::forRelation($modelClass, $firstLevelRelation, $relationName);
-                }
-
-                $grouped[$firstLevelRelation][] = $instance;
+            if (!$relationInstance instanceof RelationInterface) {
+                $modelClass = get_class($firstModel);
+                throw RelationNotFoundException::forRelation(
+                    $modelClass,
+                    $firstLevelRelation,
+                    $relationName
+                );
             }
+
+            // Store single instance in array to maintain interface compatibility with loadRelationBatch
+            $grouped[$firstLevelRelation] = [$relationInstance];
         }
 
         // Store nested relations in context for processing after first level is loaded
