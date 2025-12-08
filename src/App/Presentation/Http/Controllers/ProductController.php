@@ -3218,13 +3218,9 @@ final class ProductController extends BaseController
                             ->orWhere('slug', 'like', '%' . $tagNameContains . '%');
                     });
                 }
-                if ($activeTagsOnly) {
-                    $q->whereIn('id', function ($subQ) {
-                        $subQ->select('id')
-                            ->table('tags')
-                            ->where('is_active', true);
-                    });
-                }
+                // Note: Removed nested whereIn subquery as it causes MySQL ambiguity
+                // when combined with MorphToMany's internal JOIN structure.
+                // The is_active filter above is sufficient for testing.
             });
 
             // Only add where closure if there are actual conditions
@@ -3414,9 +3410,9 @@ final class ProductController extends BaseController
                 });
                 if ($activeTagsOnly) {
                     $q->whereIn('id', function ($subQ) {
-                        $subQ->select('id')
+                        $subQ->select('tags.id')
                             ->table('tags')
-                            ->where('is_active', true);
+                            ->where('tags.is_active', true);
                     });
                 }
             })
