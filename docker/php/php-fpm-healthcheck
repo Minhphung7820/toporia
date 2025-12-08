@@ -1,0 +1,18 @@
+#!/bin/sh
+# PHP-FPM Healthcheck Script
+# Simple and reliable healthcheck for Docker
+
+# Check if PHP-FPM is running
+if ! pgrep -x php-fpm > /dev/null; then
+    echo "PHP-FPM process not found"
+    exit 1
+fi
+
+# Check if PHP-FPM is listening on port 9000
+if ! nc -z localhost 9000 2>/dev/null; then
+    echo "PHP-FPM not listening on port 9000"
+    exit 1
+fi
+
+echo "PHP-FPM is healthy"
+exit 0

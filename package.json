@@ -4,10 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm_config_userconfig=./configs/.npmrc vite",
-    "build": "npm_config_userconfig=./configs/.npmrc vite build",
-    "preview": "npm_config_userconfig=./configs/.npmrc vite preview",
-    "postinstall": "bash scripts/fix-permissions.sh"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.1",
