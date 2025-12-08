@@ -370,54 +370,24 @@ trait HasEagerLoading
             $freshQuery->table($table);
         }
 
-        // CRITICAL: Apply constraint BEFORE creating eager instance to ensure
-        // select/orderBy from constraint are preserved in the query
-        // This ensures that when both 'image' and 'image.imageable' are defined,
-        // the constraint for 'image' (select, orderBy) is preserved and not lost
+        // CRITICAL: Create eager instance first, then apply constraint to the RELATION instance
+        // This allows constraint callbacks to use relationship-specific methods like:
+        // - wherePivot(), withPivot(), orderByPivot() for BelongsToMany/MorphToMany
+        // - where(), orderBy(), limit() for all relations
         //
         // Flow:
-        // 1. Apply constraint to freshQuery (for non-MorphTo relations)
-        // 2. newEagerInstance copies select/orderBy from freshQuery to cleanQuery
-        // 3. For MorphTo, apply constraint after creating instance (needs constrain() method)
+        // 1. Create eager instance from freshQuery
+        // 2. Apply constraint to eager instance (relationship object, NOT query)
+        // 3. Relationship methods modify the internal query
+        //
+        // This matches Laravel's behavior where callbacks receive the relationship instance
+
+        // Create eager instance first
+        $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
+
+        // Apply constraint to the RELATIONSHIP instance (not the query)
         if ($constraint !== null) {
-            if ($firstRelation instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
-                // For MorphTo, we need to create instance first, then apply constraint
-                // because MorphTo uses constrain() method, not direct query manipulation
-                $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
-                $constraint($eagerRelation);
-            } else {
-                // For other relations, apply constraint to freshQuery first
-                // This ensures select/orderBy are in the query before newEagerInstance copies them
-                $constraint($freshQuery);
-
-                // Use factory method to create eager loading instance
-                // newEagerInstance will copy select/orderBy from freshQuery
-                $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
-
-                // Ensure constraint is also applied to eagerRelation's query
-                // in case newEagerInstance creates a new query instance
-                // This handles edge cases where query instance differs
-                // CRITICAL: Only apply constraint again if newEagerInstance didn't copy orderBy from freshQuery
-                // Most relation types (MorphOne, HasMany, MorphMany, etc.) copy orderBy from freshQuery
-                // so applying constraint again would cause duplicate orderBy
-                if ($eagerRelation->getQuery() !== $freshQuery) {
-                    $eagerQuery = $eagerRelation->getQuery();
-                    $freshOrders = $freshQuery->getOrders();
-                    $eagerOrders = $eagerQuery->getOrders();
-
-                    // Check if orders were copied from freshQuery
-                    // If orders match, newEagerInstance already copied them, so don't apply constraint again
-                    // If orders don't match or eagerQuery has no orders, apply constraint
-                    $ordersWereCopied = !empty($freshOrders) && $freshOrders === $eagerOrders;
-
-                    if (!$ordersWereCopied) {
-                        $constraint($eagerQuery);
-                    }
-                }
-            }
-        } else {
-            // No constraint - just create eager instance normally
-            $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
+            $constraint($eagerRelation);
         }
 
         // Add eager constraints to query (this will add WHERE IN clause for multiple models)

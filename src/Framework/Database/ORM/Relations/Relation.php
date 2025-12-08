@@ -1017,4 +1017,28 @@ abstract class Relation implements RelationInterface
         // If user explicitly added '*', they want all columns, so use default table-qualified select
         return in_array('*', $columns, true);
     }
+
+    // =========================================================================
+    // MAGIC METHODS - QUERY BUILDER PROXY
+    // =========================================================================
+
+    /**
+     * Forward method calls to the underlying query builder.
+     *
+     * This allows relationship instances to act as query builders in eager loading callbacks.
+     * Example: $query->where(), $query->orderBy(), $query->limit(), etc.
+     *
+     * @param string $method Method name
+     * @param array $parameters Method parameters
+     * @return mixed
+     */
+    public function __call(string $method, array $parameters): mixed
+    {
+        // Forward to query builder and return $this for fluent chaining
+        $result = $this->query->$method(...$parameters);
+
+        // If query builder returns itself, return the relationship instance instead
+        // This maintains fluent interface for method chaining
+        return $result === $this->query ? $this : $result;
+    }
 }
