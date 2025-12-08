@@ -2332,206 +2332,212 @@ final class ProductController extends BaseController
             $results['multiple_where_has'] = $postsWithMultipleConditions->all();
         } elseif ($type === 'video') {
             // Test 1: Basic with() simple
-            $videoBasic = VideoModel::with(['comments' => function ($q) {
-                $q->where('is_approved', true)->orderBy('created_at', 'DESC');
-            }])->find($id);
-            $results['basic_with'] = $videoBasic ? [
-                'video' => $videoBasic->toArray(),
-                'comments' => $videoBasic->comments->toArray(),
-                'comments_count' => $videoBasic->comments->count(),
-            ] : ['error' => 'Video not found'];
+            // $videoBasic = VideoModel::with(['comments' => function ($q) {
+            //     $q->where('is_approved', true)->orderBy('created_at', 'DESC');
+            // }])->find($id);
+            // $results['basic_with'] = $videoBasic ? [
+            //     'video' => $videoBasic->toArray(),
+            //     'comments' => $videoBasic->comments->toArray(),
+            //     'comments_count' => $videoBasic->comments->count(),
+            // ] : ['error' => 'Video not found'];
 
-            // Test 2: Complex with() callback - multiple nested conditions
-            $videoComplex = VideoModel::with(['comments' => function ($q) use ($approvedOnly, $hasUser, $dateFrom, $dateTo, $contentContains, $limit) {
-                if ($approvedOnly) {
-                    $q->where('is_approved', true);
-                }
-                if ($hasUser) {
-                    $q->whereNotNull('user_id');
-                }
-                if (!empty($dateFrom)) {
-                    $q->whereDate('created_at', '>=', $dateFrom);
-                }
-                if (!empty($dateTo)) {
-                    $q->whereDate('created_at', '<=', $dateTo);
-                }
-                if (!empty($contentContains)) {
-                    $q->where('content', 'like', '%' . $contentContains . '%');
-                }
-                $q->orderBy('created_at', 'DESC')
-                    ->orderBy('id', 'DESC')
-                    ->limit($limit);
-            }])->find($id);
-            $results['complex_with_callback'] = $videoComplex ? [
-                'video' => $videoComplex->toArray(),
-                'comments' => $videoComplex->comments->toArray(),
-                'comments_count' => $videoComplex->comments->count(),
-            ] : ['error' => 'Video not found'];
+            // // Test 2: Complex with() callback - multiple nested conditions
+            // $videoComplex = VideoModel::with(['comments' => function ($q) use ($approvedOnly, $hasUser, $dateFrom, $dateTo, $contentContains, $limit) {
+            //     if ($approvedOnly) {
+            //         $q->where('is_approved', true);
+            //     }
+            //     if ($hasUser) {
+            //         $q->whereNotNull('user_id');
+            //     }
+            //     if (!empty($dateFrom)) {
+            //         $q->whereDate('created_at', '>=', $dateFrom);
+            //     }
+            //     if (!empty($dateTo)) {
+            //         $q->whereDate('created_at', '<=', $dateTo);
+            //     }
+            //     if (!empty($contentContains)) {
+            //         $q->where('content', 'like', '%' . $contentContains . '%');
+            //     }
+            //     $q->orderBy('created_at', 'DESC')
+            //         ->orderBy('id', 'DESC')
+            //         ->limit($limit);
+            // }])->find($id);
+            // $results['complex_with_callback'] = $videoComplex ? [
+            //     'video' => $videoComplex->toArray(),
+            //     'comments' => $videoComplex->comments->toArray(),
+            //     'comments_count' => $videoComplex->comments->count(),
+            // ] : ['error' => 'Video not found'];
 
             // Test 3: whereHas with complex conditions and aggregations
-            $videosWithComments = VideoModel::whereHas('comments', function ($q) use ($approvedOnly, $hasUser, $minComments) {
-                if ($approvedOnly) {
-                    $q->where('is_approved', true);
-                }
-                if ($hasUser) {
-                    $q->whereNotNull('user_id');
-                }
-            })
-                ->withCount(['comments' => function ($q) use ($approvedOnly) {
-                    if ($approvedOnly) {
-                        $q->where('is_approved', true);
-                    }
-                }])
-                ->having('comments_count', '>=', $minComments > 0 ? $minComments : 1)
-                ->where('is_published', true)
-                ->where('duration', '>', 0)
-                ->with(['comments' => function ($q) use ($approvedOnly, $limit) {
-                    if ($approvedOnly) {
-                        $q->where('is_approved', true);
-                    }
-                    $q->orderBy('created_at', 'DESC')->limit($limit);
-                }])
-                ->orderBy('comments_count', 'DESC')
-                ->limit(10)
-                ->get();
-            $results['where_has_with_aggregations'] = $videosWithComments->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'views' => $v->views,
-                    'duration' => $v->duration,
-                    'comments_count' => $v->comments_count,
-                    'comments' => $v->comments->toArray(),
-                ];
-            })->all();
+            // $videosWithComments = VideoModel::whereHas('comments', function ($q) use ($approvedOnly, $hasUser, $minComments) {
+            //     if ($approvedOnly) {
+            //         $q->where('is_approved', true);
+            //     }
+            //     if ($hasUser) {
+            //         $q->whereNotNull('user_id');
+            //     }
+            // })
+            //     ->withCount(['comments' => function ($q) use ($approvedOnly) {
+            //         if ($approvedOnly) {
+            //             $q->where('is_approved', true);
+            //         }
+            //     }])
+            //     ->having('comments_count', '>=', $minComments > 0 ? $minComments : 1)
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 0)
+            //     ->with(['comments' => function ($q) use ($approvedOnly, $limit) {
+            //         if ($approvedOnly) {
+            //             $q->where('is_approved', true);
+            //         }
+            //         $q->orderBy('created_at', 'DESC')->limit($limit);
+            //     }])
+            //     ->orderBy('comments_count', 'DESC')
+            //     ->limit(10)
+            //     ->get();
+            // $results['where_has_with_aggregations'] = $videosWithComments->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'views' => $v->views,
+            //         'duration' => $v->duration,
+            //         'comments_count' => $v->comments_count,
+            //         'comments' => $v->comments->toArray(),
+            //     ];
+            // })->all();
 
             // Test 4: Nested whereHas with multiple conditions and subqueries
-            $videosWithComplexComments = VideoModel::whereHas('comments', function ($q) use ($approvedOnly, $dateFrom) {
-                $q->where('is_approved', $approvedOnly)
-                    ->where(function ($subQ) {
-                        $subQ->whereNotNull('user_id')
-                            ->orWhere('content', '!=', '');
-                    });
-                if (!empty($dateFrom)) {
-                    $q->whereDate('created_at', '>=', $dateFrom);
-                }
-                $q->whereIn('id', function ($subQ) {
-                    $subQ->select('id')
-                        ->table('comments')
-                        ->where('is_approved', true)
-                        ->limit(100);
-                });
-            })
-                ->where(function ($q) {
-                    $q->where('views', '>', 500)
-                        ->orWhere('is_published', true);
-                })
-                ->where('duration', '>', 60)
-                ->with(['comments' => function ($q) use ($approvedOnly, $hasUser, $limit) {
-                    if ($approvedOnly) {
-                        $q->where('is_approved', true);
-                    }
-                    if ($hasUser) {
-                        $q->whereNotNull('user_id');
-                    }
-                    $q->orderBy('created_at', 'DESC')
-                        ->orderBy('id', 'DESC')
-                        ->limit($limit);
-                }])
-                ->withCount(['comments as approved_comments_count' => function ($q) {
-                    $q->where('is_approved', true);
-                }])
-                ->orderBy('views', 'DESC')
-                ->limit(10)
-                ->get();
-            $results['nested_where_has_complex'] = $videosWithComplexComments->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'views' => $v->views,
-                    'duration' => $v->duration,
-                    'approved_comments_count' => $v->approved_comments_count,
-                    'comments' => $v->comments->toArray(),
-                ];
-            })->all();
+            // $videosWithComplexComments = VideoModel::whereHas('comments', function ($q) use ($approvedOnly, $dateFrom) {
+            //     $q->where('is_approved', $approvedOnly)
+            //         ->where(function ($subQ) {
+            //             $subQ->whereNotNull('user_id')
+            //                 ->orWhere('content', '!=', '');
+            //         });
+            //     if (!empty($dateFrom)) {
+            //         $q->whereDate('created_at', '>=', $dateFrom);
+            //     }
+            //     $q->whereIn('id', function ($subQ) {
+            //         $subQ->select('id')
+            //             ->table('comments')
+            //             ->where('is_approved', true);
+            //     });
+            // })
+            //     ->where(function ($q) {
+            //         $q->where('views', '>', 500)
+            //             ->orWhere('is_published', true);
+            //     })
+            //     ->where('duration', '>', 60)
+            //     ->with(['comments' => function ($q) use ($approvedOnly, $hasUser, $limit) {
+            //         if ($approvedOnly) {
+            //             $q->where('is_approved', true);
+            //         }
+            //         if ($hasUser) {
+            //             $q->whereNotNull('user_id');
+            //         }
+            //         $q->orderBy('created_at', 'DESC')
+            //             ->orderBy('id', 'DESC')
+            //             ->limit($limit);
+            //     }])
+            //     ->withCount(['comments as approved_comments_count' => function ($q) {
+            //         $q->where('is_approved', true);
+            //     }])
+            //     ->orderBy('views', 'DESC')
+            //     ->limit(10)
+            //     ->get();
+            // $results['nested_where_has_complex'] = $videosWithComplexComments->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'views' => $v->views,
+            //         'duration' => $v->duration,
+            //         'approved_comments_count' => $v->approved_comments_count,
+            //         'comments' => $v->comments->toArray(),
+            //     ];
+            // })->all();
 
             // Test 5: Multiple whereHas with orWhereHas
-            $videosWithMultipleConditions = VideoModel::whereHas('comments', function ($q) {
-                $q->where('is_approved', true)
-                    ->whereDate('created_at', '>=', '2024-01-01');
-            })
-                ->orWhereHas('comments', function ($q) {
-                    $q->whereNotNull('user_id')
-                        ->where('content', 'like', '%awesome%');
-                })
-                ->with(['comments' => function ($q) {
-                    $q->where(function ($subQ) {
-                        $subQ->where('is_approved', true)
-                            ->orWhereNotNull('user_id');
-                    })
-                        ->orderBy('created_at', 'DESC')
-                        ->limit(5);
-                }])
-                ->where('is_published', true)
-                ->where('duration', '>', 60)
-                ->limit(10)
-                ->get();
-            $results['multiple_where_has'] = $videosWithMultipleConditions->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'comments' => $v->comments->toArray(),
-                ];
-            })->all();
+            // $videosWithMultipleConditions = VideoModel::whereHas('comments', function ($q) {
+            //     $q->where('is_approved', true)
+            //         ->whereDate('created_at', '>=', '2024-01-01');
+            // })
+            //     ->orWhereHas('comments', function ($q) {
+            //         $q->whereNotNull('user_id')
+            //             ->where('content', 'like', '%awesome%');
+            //     })
+            //     ->with(['comments' => function ($q) {
+            //         $q->where(function ($subQ) {
+            //             $subQ->where('is_approved', true)
+            //                 ->orWhereNotNull('user_id');
+            //         })
+            //             ->orderBy('created_at', 'DESC')
+            //             ->limit(5);
+            //     }])
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 60)
+            //     ->limit(10)
+            //     ->get();
+            // $results['multiple_where_has'] = $videosWithMultipleConditions->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'comments' => $v->comments->toArray(),
+            //     ];
+            // })->all();
 
-            // Test 6: Nested relationship - Post with comments and comments have commentable (nested MorphTo)
-            $postsWithNestedComments = PostModel::whereHas('comments', function ($q) use ($approvedOnly) {
+            // // Test 6: Nested relationship - Post with comments and comments have commentable (nested MorphTo)
+            // $postsWithNestedComments = PostModel::whereHas('comments', function ($q) use ($approvedOnly) {
+            //     if ($approvedOnly) {
+            //         $q->where('is_approved', true);
+            //     }
+            // })
+            //     ->with([
+            //         'comments.commentable' => function ($q) use ($publishedOnly, $minViews) {
+            //             // Nested: comments -> commentable (Post/Video)
+            //             if ($publishedOnly) {
+            //                 $q->where('is_published', true);
+            //             }
+            //             if ($minViews > 0) {
+            //                 $q->where('views', '>=', $minViews);
+            //             }
+            //         },
+            //         'comments' => function ($q) use ($approvedOnly, $limit) {
+            //             if ($approvedOnly) {
+            //                 $q->where('is_approved', true);
+            //             }
+            //             $q->orderBy('created_at', 'DESC')->limit($limit);
+            //         }
+            //     ])
+            //     ->where('is_published', true)
+            //     ->limit(5)
+            //     ->get();
+            // $results['nested_comments_commentable'] = $postsWithNestedComments->map(function ($p) {
+            //     return [
+            //         'id' => $p->id,
+            //         'title' => $p->title,
+            //         'comments' => $p->comments->map(function ($comment) {
+            //             return [
+            //                 'comment' => $comment->toArray(),
+            //                 'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
+            //                 'commentable_type' => $comment->commentable_type,
+            //             ];
+            //         })->all(),
+            //     ];
+            // })->all();
+
+            // Test 7: Deep nested - Post with comments, comments have commentable, and commentable has relationships
+            // Use whereHasMorph to query through MorphTo relationship properly
+            $postsWithDeepNestedComments = PostModel::whereHas('comments', function ($q) use ($approvedOnly, $publishedOnly, $minViews) {
                 if ($approvedOnly) {
                     $q->where('is_approved', true);
                 }
-            })
-                ->with([
-                    'comments.commentable' => function ($q) use ($publishedOnly, $minViews) {
-                        // Nested: comments -> commentable (Post/Video)
-                        if ($publishedOnly) {
-                            $q->where('is_published', true);
-                        }
-                        if ($minViews > 0) {
-                            $q->where('views', '>=', $minViews);
-                        }
-                    },
-                    'comments' => function ($q) use ($approvedOnly, $limit) {
-                        if ($approvedOnly) {
-                            $q->where('is_approved', true);
-                        }
-                        $q->orderBy('created_at', 'DESC')->limit($limit);
+                // whereHasMorph allows querying through polymorphic relationships
+                $q->whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($morphQuery, $type) use ($publishedOnly, $minViews) {
+                    if ($publishedOnly) {
+                        $morphQuery->where('is_published', true);
                     }
-                ])
-                ->where('is_published', true)
-                ->limit(5)
-                ->get();
-            $results['nested_comments_commentable'] = $postsWithNestedComments->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'comments' => $p->comments->map(function ($comment) {
-                        return [
-                            'comment' => $comment->toArray(),
-                            'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
-                            'commentable_type' => $comment->commentable_type,
-                        ];
-                    })->all(),
-                ];
-            })->all();
-
-            // Test 7: Deep nested - Post with comments, comments have commentable, and commentable has relationships
-            $postsWithDeepNestedComments = PostModel::whereHas('comments.commentable', function ($q) use ($publishedOnly, $minViews) {
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
+                    if ($minViews > 0) {
+                        $morphQuery->where('views', '>=', $minViews);
+                    }
+                });
             })
                 ->with([
                     'comments.commentable' => function ($q) {
@@ -2562,136 +2568,120 @@ final class ProductController extends BaseController
                 ->where('is_published', true)
                 ->limit(3)
                 ->get();
-            $results['deep_nested_comments'] = $postsWithDeepNestedComments->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'comments' => $p->comments->map(function ($comment) {
-                        $commentable = $comment->commentable;
-                        return [
-                            'comment' => $comment->toArray(),
-                            'commentable' => $commentable ? [
-                                'commentable' => $commentable->toArray(),
-                                'nested_image' => $commentable->image ? $commentable->image->toArray() : null,
-                                'nested_tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
-                                    $data = $tag->toArray();
-                                    if ($tag->pivot) {
-                                        $data['pivot'] = $tag->pivot->toArray();
-                                    }
-                                    return $data;
-                                })->all() : [],
-                                'nested_comments' => $commentable->comments ? $commentable->comments->toArray() : [],
-                            ] : null,
-                        ];
-                    })->all(),
-                ];
-            })->all();
-        } elseif ($type === 'video') {
-            // Test 6: Nested relationship - Video with comments and comments have commentable (nested MorphTo)
-            $videosWithNestedComments = VideoModel::whereHas('comments', function ($q) use ($approvedOnly) {
-                if ($approvedOnly) {
-                    $q->where('is_approved', true);
-                }
-            })
-                ->with([
-                    'comments.commentable' => function ($q) use ($publishedOnly, $minViews) {
-                        // Nested: comments -> commentable (Post/Video)
-                        if ($publishedOnly) {
-                            $q->where('is_published', true);
-                        }
-                        if ($minViews > 0) {
-                            $q->where('views', '>=', $minViews);
-                        }
-                    },
-                    'comments' => function ($q) use ($approvedOnly, $limit) {
-                        if ($approvedOnly) {
-                            $q->where('is_approved', true);
-                        }
-                        $q->orderBy('created_at', 'DESC')->limit($limit);
-                    }
-                ])
-                ->where('is_published', true)
-                ->where('duration', '>', 0)
-                ->limit(5)
-                ->get();
-            $results['nested_comments_commentable'] = $videosWithNestedComments->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'comments' => $v->comments->map(function ($comment) {
-                        return [
-                            'comment' => $comment->toArray(),
-                            'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
-                            'commentable_type' => $comment->commentable_type,
-                        ];
-                    })->all(),
-                ];
-            })->all();
+            $results['deep_nested_comments'] = $postsWithDeepNestedComments->all();
 
-            // Test 7: Deep nested - Video with comments, comments have commentable, and commentable has relationships
-            $videosWithDeepNestedComments = VideoModel::whereHas('comments.commentable', function ($q) use ($publishedOnly, $minViews) {
-                if ($publishedOnly) {
-                    $q->where('is_published', true);
-                }
-                if ($minViews > 0) {
-                    $q->where('views', '>=', $minViews);
-                }
-            })
-                ->with([
-                    'comments.commentable' => function ($q) {
-                        // Load commentable with its own relationships
-                    },
-                    'comments.commentable.image' => function ($q) {
-                        // Deep nested: Video -> Comments -> Commentable (Video) -> Image
-                        $q->orderBy('size', 'DESC');
-                    },
-                    'comments.commentable.tags' => function ($q) {
-                        // Deep nested: Video -> Comments -> Commentable (Video) -> Tags
-                        $q->where('is_active', true)
-                            ->orderBy('name', 'ASC');
-                    },
-                    'comments.commentable.comments' => function ($q) {
-                        // Deep nested: Video -> Comments -> Commentable (Video) -> Comments
-                        $q->where('is_approved', true)
-                            ->orderBy('created_at', 'DESC')
-                            ->limit(3);
-                    },
-                    'comments' => function ($q) use ($approvedOnly) {
-                        if ($approvedOnly) {
-                            $q->where('is_approved', true);
-                        }
-                        $q->orderBy('created_at', 'DESC')->limit(5);
-                    }
-                ])
-                ->where('is_published', true)
-                ->where('duration', '>', 60)
-                ->limit(3)
-                ->get();
-            $results['deep_nested_comments'] = $videosWithDeepNestedComments->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'duration' => $v->duration,
-                    'comments' => $v->comments->map(function ($comment) {
-                        $commentable = $comment->commentable;
-                        return [
-                            'comment' => $comment->toArray(),
-                            'commentable' => $commentable ? [
-                                'commentable' => $commentable->toArray(),
-                                'nested_image' => $commentable->image ? $commentable->image->toArray() : null,
-                                'nested_tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
-                                    $data = $tag->toArray();
-                                    if ($tag->pivot) {
-                                        $data['pivot'] = $tag->pivot->toArray();
-                                    }
-                                    return $data;
-                                })->all() : [],
-                                'nested_comments' => $commentable->comments ? $commentable->comments->toArray() : [],
-                            ] : null,
-                        ];
-                    })->all(),
-                ];
-            })->all();
+            // // Test 6: Nested relationship - Video with comments and comments have commentable (nested MorphTo)
+            // $videosWithNestedComments = VideoModel::whereHas('comments', function ($q) use ($approvedOnly) {
+            //     if ($approvedOnly) {
+            //         $q->where('is_approved', true);
+            //     }
+            // })
+            //     ->with([
+            //         'comments.commentable' => function ($q) use ($publishedOnly, $minViews) {
+            //             // Nested: comments -> commentable (Post/Video)
+            //             if ($publishedOnly) {
+            //                 $q->where('is_published', true);
+            //             }
+            //             if ($minViews > 0) {
+            //                 $q->where('views', '>=', $minViews);
+            //             }
+            //         },
+            //         'comments' => function ($q) use ($approvedOnly, $limit) {
+            //             if ($approvedOnly) {
+            //                 $q->where('is_approved', true);
+            //             }
+            //             $q->orderBy('created_at', 'DESC')->limit($limit);
+            //         }
+            //     ])
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 0)
+            //     ->limit(5)
+            //     ->get();
+            // $results['nested_comments_commentable'] = $videosWithNestedComments->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'comments' => $v->comments->map(function ($comment) {
+            //             return [
+            //                 'comment' => $comment->toArray(),
+            //                 'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
+            //                 'commentable_type' => $comment->commentable_type,
+            //             ];
+            //         })->all(),
+            //     ];
+            // })->all();
+
+            // // Test 7: Deep nested - Video with comments, comments have commentable, and commentable has relationships
+            // // Use whereHasMorph to query through MorphTo relationship properly
+            // $videosWithDeepNestedComments = VideoModel::whereHas('comments', function ($q) use ($approvedOnly, $publishedOnly, $minViews) {
+            //     if ($approvedOnly) {
+            //         $q->where('is_approved', true);
+            //     }
+            //     // whereHasMorph allows querying through polymorphic relationships
+            //     $q->whereHasMorph('commentable', [PostModel::class, VideoModel::class], function ($morphQuery, $type) use ($publishedOnly, $minViews) {
+            //         if ($publishedOnly) {
+            //             $morphQuery->where('is_published', true);
+            //         }
+            //         if ($minViews > 0) {
+            //             $morphQuery->where('views', '>=', $minViews);
+            //         }
+            //     });
+            // })
+            //     ->with([
+            //         'comments.commentable' => function ($q) {
+            //             // Load commentable with its own relationships
+            //         },
+            //         'comments.commentable.image' => function ($q) {
+            //             // Deep nested: Video -> Comments -> Commentable (Video) -> Image
+            //             $q->orderBy('size', 'DESC');
+            //         },
+            //         'comments.commentable.tags' => function ($q) {
+            //             // Deep nested: Video -> Comments -> Commentable (Video) -> Tags
+            //             $q->where('is_active', true)
+            //                 ->orderBy('name', 'ASC');
+            //         },
+            //         'comments.commentable.comments' => function ($q) {
+            //             // Deep nested: Video -> Comments -> Commentable (Video) -> Comments
+            //             $q->where('is_approved', true)
+            //                 ->orderBy('created_at', 'DESC')
+            //                 ->limit(3);
+            //         },
+            //         'comments' => function ($q) use ($approvedOnly) {
+            //             if ($approvedOnly) {
+            //                 $q->where('is_approved', true);
+            //             }
+            //             $q->orderBy('created_at', 'DESC')->limit(5);
+            //         }
+            //     ])
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 60)
+            //     ->limit(3)
+            //     ->get();
+            // $results['deep_nested_comments'] = $videosWithDeepNestedComments->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'duration' => $v->duration,
+            //         'comments' => $v->comments->map(function ($comment) {
+            //             $commentable = $comment->commentable;
+            //             return [
+            //                 'comment' => $comment->toArray(),
+            //                 'commentable' => $commentable ? [
+            //                     'commentable' => $commentable->toArray(),
+            //                     'nested_image' => $commentable->image ? $commentable->image->toArray() : null,
+            //                     'nested_tags' => $commentable->tags ? $commentable->tags->map(function ($tag) {
+            //                         $data = $tag->toArray();
+            //                         if ($tag->pivot) {
+            //                             $data['pivot'] = $tag->pivot->toArray();
+            //                         }
+            //                         return $data;
+            //                     })->all() : [],
+            //                     'nested_comments' => $commentable->comments ? $commentable->comments->toArray() : [],
+            //                 ] : null,
+            //             ];
+            //         })->all(),
+            //     ];
+            // })->all();
         }
 
         $queries = $this->formatQueryLogs(DB::getQueryLog());
