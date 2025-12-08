@@ -3301,195 +3301,188 @@ final class ProductController extends BaseController
             })->all();
         } elseif ($type === 'video') {
             // Test 1: Basic with() simple
-            $videoBasic = VideoModel::with('tags')->find($id);
-            $results['basic_with'] = $videoBasic ? [
-                'video' => $videoBasic->toArray(),
-                'tags' => $videoBasic->tags->map(function ($tag) {
-                    $data = $tag->toArray();
-                    if ($tag->pivot) {
-                        $data['pivot'] = $tag->pivot->toArray();
-                    }
-                    return $data;
-                })->all(),
-                'tags_count' => $videoBasic->tags->count(),
-            ] : ['error' => 'Video not found'];
+            // $videoBasic = VideoModel::with('tags')->find($id);
+            // $results['basic_with'] = $videoBasic ? [
+            //     'video' => $videoBasic->toArray(),
+            //     'tags' => $videoBasic->tags->map(function ($tag) {
+            //         $data = $tag->toArray();
+            //         if ($tag->pivot) {
+            //             $data['pivot'] = $tag->pivot->toArray();
+            //         }
+            //         return $data;
+            //     })->all(),
+            //     'tags_count' => $videoBasic->tags->count(),
+            // ] : ['error' => 'Video not found'];
 
             // Test 2: Complex with() callback - multiple conditions on tags
-            $videoComplex = VideoModel::with(['tags' => function ($q) use ($activeTagsOnly, $tagIdsArray, $tagNameContains, $tagColor) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-                if (!empty($tagIdsArray)) {
-                    $q->whereIn('id', $tagIdsArray);
-                }
-                if (!empty($tagNameContains)) {
-                    $q->where('name', 'like', '%' . $tagNameContains . '%');
-                }
-                if (!empty($tagColor)) {
-                    $q->where('color', $tagColor);
-                }
-                $q->orderBy('name', 'ASC');
-            }])->find($id);
-            $results['complex_with_callback'] = $videoComplex ? [
-                'video' => $videoComplex->toArray(),
-                'tags' => $videoComplex->tags->map(function ($tag) {
-                    $data = $tag->toArray();
-                    if ($tag->pivot) {
-                        $data['pivot'] = $tag->pivot->toArray();
-                    }
-                    return $data;
-                })->all(),
-                'tags_count' => $videoComplex->tags->count(),
-            ] : ['error' => 'Video not found'];
+            // $videoComplex = VideoModel::with(['tags' => function ($q) use ($activeTagsOnly, $tagIdsArray, $tagNameContains, $tagColor) {
+            //     if ($activeTagsOnly) {
+            //         $q->where('is_active', true);
+            //     }
+            //     if (!empty($tagIdsArray)) {
+            //         $q->whereIn('id', $tagIdsArray);
+            //     }
+            //     if (!empty($tagNameContains)) {
+            //         $q->where('name', 'like', '%' . $tagNameContains . '%');
+            //     }
+            //     if (!empty($tagColor)) {
+            //         $q->where('color', $tagColor);
+            //     }
+            //     $q->orderBy('name', 'ASC');
+            // }])->find($id);
+            // $results['complex_with_callback'] = $videoComplex ? [
+            //     'video' => $videoComplex->toArray(),
+            //     'tags' => $videoComplex->tags->map(function ($tag) {
+            //         $data = $tag->toArray();
+            //         if ($tag->pivot) {
+            //             $data['pivot'] = $tag->pivot->toArray();
+            //         }
+            //         return $data;
+            //     })->all(),
+            //     'tags_count' => $videoComplex->tags->count(),
+            // ] : ['error' => 'Video not found'];
 
             // Test 3: whereHas with complex conditions
-            $videosWithTags = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly, $tagNameContains, $tagIdsArray) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-                if (!empty($tagNameContains)) {
-                    $q->where('name', 'like', '%' . $tagNameContains . '%');
-                }
-                if (!empty($tagIdsArray)) {
-                    $q->whereIn('id', $tagIdsArray);
-                }
-            })
-                ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
-                    if ($activeTagsOnly) {
-                        $q->where('is_active', true);
-                    }
-                }])
-                ->having('tags_count', '>=', $minTags > 0 ? $minTags : 1)
-                ->where(function ($q) use ($publishedOnly, $minViews) {
-                    if ($publishedOnly) {
-                        $q->where('is_published', true);
-                    }
-                    if ($minViews > 0) {
-                        $q->where('views', '>=', $minViews);
-                    }
-                })
-                ->where('duration', '>', 0)
-                ->with(['tags' => function ($q) use ($activeTagsOnly) {
-                    if ($activeTagsOnly) {
-                        $q->where('is_active', true);
-                    }
-                    $q->orderBy('name', 'ASC');
-                }])
-                ->orderBy('tags_count', 'DESC')
-                ->limit(10)
-                ->get();
-            $results['where_has_with_aggregations'] = $videosWithTags->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'views' => $v->views,
-                    'duration' => $v->duration,
-                    'tags_count' => $v->tags_count,
-                    'tags' => $v->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all(),
-                ];
-            })->all();
+            // $videosWithTags = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly, $tagNameContains, $tagIdsArray) {
+            //     if ($activeTagsOnly) {
+            //         $q->where('is_active', true);
+            //     }
+            //     if (!empty($tagNameContains)) {
+            //         $q->where('name', 'like', '%' . $tagNameContains . '%');
+            //     }
+            //     if (!empty($tagIdsArray)) {
+            //         $q->whereIn('id', $tagIdsArray);
+            //     }
+            // })
+            //     ->withCount(['tags' => function ($q) use ($activeTagsOnly) {
+            //         if ($activeTagsOnly) {
+            //             $q->where('is_active', true);
+            //         }
+            //     }])
+            //     ->having('tags_count', '>=', $minTags > 0 ? $minTags : 1);
+
+            // // Only add where closure if there are actual conditions
+            // if ($publishedOnly || $minViews > 0) {
+            //     $videosWithTags = $videosWithTags->where(function ($q) use ($publishedOnly, $minViews) {
+            //         if ($publishedOnly) {
+            //             $q->where('is_published', true);
+            //         }
+            //         if ($minViews > 0) {
+            //             $q->where('views', '>=', $minViews);
+            //         }
+            //     });
+            // }
+
+            // $videosWithTags = $videosWithTags->where('duration', '>', 0)
+            //     ->with(['tags' => function ($q) use ($activeTagsOnly) {
+            //         if ($activeTagsOnly) {
+            //             $q->where('is_active', true);
+            //         }
+            //         $q->orderBy('name', 'ASC');
+            //     }])
+            //     ->orderBy('tags_count', 'DESC')
+            //     ->limit(10)
+            //     ->get();
+            // $results['where_has_with_aggregations'] = $videosWithTags->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'views' => $v->views,
+            //         'duration' => $v->duration,
+            //         'tags_count' => $v->tags_count,
+            //         'tags' => $v->tags->map(function ($tag) {
+            //             $data = $tag->toArray();
+            //             if ($tag->pivot) {
+            //                 $data['pivot'] = $tag->pivot->toArray();
+            //             }
+            //             return $data;
+            //         })->all(),
+            //     ];
+            // })->all();
 
             // Test 4: Nested whereHas with multiple conditions and subqueries
-            $videosWithComplexTags = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly, $tagNameContains) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                } else {
-                    $q->whereNotNull('is_active');
-                }
-                $q->where(function ($subQ) use ($tagNameContains) {
-                    if (!empty($tagNameContains)) {
-                        $subQ->where('name', 'like', '%' . $tagNameContains . '%')
-                            ->orWhere('slug', 'like', '%' . $tagNameContains . '%');
-                    }
-                });
-                if ($activeTagsOnly) {
-                    $q->whereIn('id', function ($subQ) {
-                        $subQ->select('tags.id')
-                            ->table('tags')
-                            ->where('tags.is_active', true);
-                    });
-                }
-            })
-                ->where(function ($q) use ($publishedOnly, $minViews) {
-                    if ($publishedOnly) {
-                        $q->where('is_published', true);
-                    }
-                    if ($minViews > 0) {
-                        $q->where('views', '>=', $minViews);
-                    }
-                })
-                ->where('duration', '>', 60)
-                ->with(['tags' => function ($q) use ($activeTagsOnly, $tagIdsArray) {
-                    if ($activeTagsOnly) {
-                        $q->where('is_active', true);
-                    }
-                    if (!empty($tagIdsArray)) {
-                        $q->whereIn('id', $tagIdsArray);
-                    }
-                    $q->orderBy('name', 'ASC');
-                }])
-                ->withCount(['tags as active_tags_count' => function ($q) {
-                    $q->where('is_active', true);
-                }])
-                ->orderBy('views', 'DESC')
-                ->limit(10)
-                ->get();
-            $results['nested_where_has_complex'] = $videosWithComplexTags->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'views' => $v->views,
-                    'duration' => $v->duration,
-                    'active_tags_count' => $v->active_tags_count,
-                    'tags' => $v->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all(),
-                ];
-            })->all();
+            // $videosWithComplexTags = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly, $tagNameContains) {
+            //     if ($activeTagsOnly) {
+            //         $q->where('is_active', true);
+            //     } else {
+            //         $q->whereNotNull('is_active');
+            //     }
+            //     // Only add nested where if there are conditions
+            //     if (!empty($tagNameContains)) {
+            //         $q->where(function ($subQ) use ($tagNameContains) {
+            //             $subQ->where('name', 'like', '%' . $tagNameContains . '%')
+            //                 ->orWhere('slug', 'like', '%' . $tagNameContains . '%');
+            //         });
+            //     }
+            //     // Note: Removed nested whereIn subquery to avoid MySQL ambiguity issues
+            // });
+
+            // Only add where closure if there are actual conditions
+            // if ($publishedOnly || $minViews > 0) {
+            //     $videosWithComplexTags = $videosWithComplexTags->where(function ($q) use ($publishedOnly, $minViews) {
+            //         if ($publishedOnly) {
+            //             $q->where('is_published', true);
+            //         }
+            //         if ($minViews > 0) {
+            //             $q->where('views', '>=', $minViews);
+            //         }
+            //     });
+            // }
+
+            // $videosWithComplexTags = $videosWithComplexTags->where('duration', '>', 60)
+            //     ->with(['tags' => function ($q) use ($activeTagsOnly, $tagIdsArray) {
+            //         if ($activeTagsOnly) {
+            //             $q->where('is_active', true);
+            //         }
+            //         if (!empty($tagIdsArray)) {
+            //             $q->whereIn('tags.id', $tagIdsArray);
+            //         }
+            //         $q->orderBy('name', 'ASC');
+            //     }])
+            //     ->withCount(['tags as active_tags_count' => function ($q) {
+            //         $q->where('is_active', true);
+            //     }])
+            //     ->orderBy('views', 'DESC')
+            //     ->limit(10)
+            //     ->get();
+            // $results['nested_where_has_complex'] = $videosWithComplexTags->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'views' => $v->views,
+            //         'duration' => $v->duration,
+            //         'active_tags_count' => $v->active_tags_count,
+            //         'tags' => $v->tags->map(function ($tag) {
+            //             $data = $tag->toArray();
+            //             if ($tag->pivot) {
+            //                 $data['pivot'] = $tag->pivot->toArray();
+            //             }
+            //             return $data;
+            //         })->all(),
+            //     ];
+            // })->all();
 
             // Test 5: Multiple whereHas with orWhereHas
-            $videosWithMultipleTagConditions = VideoModel::whereHas('tags', function ($q) {
-                $q->where('is_active', true)
-                    ->where('name', 'like', '%video%');
-            })
-                ->orWhereHas('tags', function ($q) {
-                    $q->where('is_active', true)
-                        ->where('color', 'like', '%red%');
-                })
-                ->with(['tags' => function ($q) {
-                    $q->where(function ($subQ) {
-                        $subQ->where('is_active', true)
-                            ->orWhere('name', 'like', '%featured%');
-                    })
-                        ->orderBy('name', 'ASC');
-                }])
-                ->where('is_published', true)
-                ->where('duration', '>', 60)
-                ->limit(10)
-                ->get();
-            $results['multiple_where_has'] = $videosWithMultipleTagConditions->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'tags' => $v->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all(),
-                ];
-            })->all();
+            // $videosWithMultipleTagConditions = VideoModel::whereHas('tags', function ($q) {
+            //     $q->where('is_active', true)
+            //         ->where('name', 'like', '%video%');
+            // })
+            //     ->orWhereHas('tags', function ($q) {
+            //         $q->where('is_active', true)
+            //             ->where('color', 'like', '%red%');
+            //     })
+            //     ->with(['tags' => function ($q) {
+            //         $q->where(function ($subQ) {
+            //             $subQ->where('is_active', true)
+            //                 ->orWhere('name', 'like', '%featured%');
+            //         })
+            //             ->orderBy('name', 'ASC');
+            //     }])
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 60)
+            //     ->limit(10)
+            //     ->get();
+            // $results['multiple_where_has'] = $videosWithMultipleTagConditions->all();
 
             // Test 6: Nested relationship - Post with tags and all other relationships
             $postsWithNestedTags = PostModel::whereHas('tags', function ($q) use ($activeTagsOnly) {
@@ -3502,7 +3495,9 @@ final class ProductController extends BaseController
                         if ($activeTagsOnly) {
                             $q->where('is_active', true);
                         }
-                        $q->orderBy('name', 'ASC');
+                        $q->select('tags.id', 'tags.name', 'tags.slug')
+                            ->orderBy('name', 'ASC')
+                            ->limit(10);
                     },
                     'image' => function ($q) {
                         // Nested: Post -> Tags + Image
@@ -3521,189 +3516,169 @@ final class ProductController extends BaseController
                 ->where('is_published', true)
                 ->limit(5)
                 ->get();
-            $results['nested_tags_with_relationships'] = $postsWithNestedTags->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'tags' => $p->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all(),
-                    'image' => $p->image ? $p->image->toArray() : null,
-                    'comments' => $p->comments->map(function ($comment) {
-                        return [
-                            'comment' => $comment->toArray(),
-                            'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
-                        ];
-                    })->all(),
-                ];
-            })->all();
+            $results['nested_tags_with_relationships'] = $postsWithNestedTags->all();
 
-            // Test 7: Deep nested - Post with tags, and tags used by other Posts/Videos
-            $postsWithTaggedItems = PostModel::whereHas('tags', function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            })
-                ->with([
-                    'tags' => function ($q) use ($activeTagsOnly) {
-                        if ($activeTagsOnly) {
-                            $q->where('is_active', true);
-                        }
-                        $q->orderBy('name', 'ASC');
-                    }
-                ])
-                ->where('is_published', true)
-                ->limit(3)
-                ->get();
+            // // Test 7: Deep nested - Post with tags, and tags used by other Posts/Videos
+            // $postsWithTaggedItems = PostModel::whereHas('tags', function ($q) use ($activeTagsOnly) {
+            //     if ($activeTagsOnly) {
+            //         $q->where('is_active', true);
+            //     }
+            // })
+            //     ->with([
+            //         'tags' => function ($q) use ($activeTagsOnly) {
+            //             if ($activeTagsOnly) {
+            //                 $q->where('is_active', true);
+            //             }
+            //             $q->orderBy('name', 'ASC');
+            //         }
+            //     ])
+            //     ->where('is_published', true)
+            //     ->limit(3)
+            //     ->get();
 
-            // Load other items with same tags (reverse relationship through tags)
-            $results['deep_nested_tagged_items'] = $postsWithTaggedItems->map(function ($p) {
-                $tagIds = $p->tags->pluck('id')->all();
-                $relatedPosts = PostModel::whereHas('tags', function ($q) use ($tagIds) {
-                    $q->whereIn('id', $tagIds);
-                })
-                    ->where('id', '!=', $p->id)
-                    ->with(['tags' => function ($q) use ($tagIds) {
-                        $q->whereIn('id', $tagIds);
-                    }])
-                    ->limit(3)
-                    ->get();
+            // // Load other items with same tags (reverse relationship through tags)
+            // $results['deep_nested_tagged_items'] = $postsWithTaggedItems->map(function ($p) {
+            //     $tagIds = $p->tags->pluck('id')->all();
+            //     $relatedPosts = PostModel::whereHas('tags', function ($q) use ($tagIds) {
+            //         $q->whereIn('tags.id', $tagIds);
+            //     })
+            //         ->where('id', '!=', $p->id)
+            //         ->with(['tags' => function ($q) use ($tagIds) {
+            //             $q->whereIn('tags.id', $tagIds);
+            //         }])
+            //         ->limit(3)
+            //         ->get();
 
-                $relatedVideos = VideoModel::whereHas('tags', function ($q) use ($tagIds) {
-                    $q->whereIn('id', $tagIds);
-                })
-                    ->with(['tags' => function ($q) use ($tagIds) {
-                        $q->whereIn('id', $tagIds);
-                    }])
-                    ->limit(3)
-                    ->get();
+            //     $relatedVideos = VideoModel::whereHas('tags', function ($q) use ($tagIds) {
+            //         $q->whereIn('tags.id', $tagIds);
+            //     })
+            //         ->with(['tags' => function ($q) use ($tagIds) {
+            //             $q->whereIn('tags.id', $tagIds);
+            //         }])
+            //         ->limit(3)
+            //         ->get();
 
-                return [
-                    'post' => $p->toArray(),
-                    'tags' => $p->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all(),
-                    'related_posts_with_same_tags' => $relatedPosts->toArray(),
-                    'related_videos_with_same_tags' => $relatedVideos->toArray(),
-                ];
-            })->all();
-        } elseif ($type === 'video') {
+            //     return [
+            //         'post' => $p->toArray(),
+            //         'tags' => $p->tags->map(function ($tag) {
+            //             $data = $tag->toArray();
+            //             if ($tag->pivot) {
+            //                 $data['pivot'] = $tag->pivot->toArray();
+            //             }
+            //             return $data;
+            //         })->all(),
+            //         'related_posts_with_same_tags' => $relatedPosts->toArray(),
+            //         'related_videos_with_same_tags' => $relatedVideos->toArray(),
+            //     ];
+            // })->all();
+
             // Test 6: Nested relationship - Video with tags and all other relationships
-            $videosWithNestedTags = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            })
-                ->with([
-                    'tags' => function ($q) use ($activeTagsOnly) {
-                        if ($activeTagsOnly) {
-                            $q->where('is_active', true);
-                        }
-                        $q->orderBy('name', 'ASC');
-                    },
-                    'image' => function ($q) {
-                        // Nested: Video -> Tags + Image
-                        $q->orderBy('size', 'DESC');
-                    },
-                    'comments' => function ($q) {
-                        // Nested: Video -> Tags + Comments
-                        $q->where('is_approved', true)
-                            ->orderBy('created_at', 'DESC')
-                            ->limit(5);
-                    },
-                    'comments.commentable' => function ($q) {
-                        // Deep nested: Video -> Tags + Comments -> Commentable
-                    }
-                ])
-                ->where('is_published', true)
-                ->where('duration', '>', 0)
-                ->limit(5)
-                ->get();
-            $results['nested_tags_with_relationships'] = $videosWithNestedTags->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'title' => $v->title,
-                    'tags' => $v->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all(),
-                    'image' => $v->image ? $v->image->toArray() : null,
-                    'comments' => $v->comments->map(function ($comment) {
-                        return [
-                            'comment' => $comment->toArray(),
-                            'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
-                        ];
-                    })->all(),
-                ];
-            })->all();
+            // $videosWithNestedTags = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly) {
+            //     if ($activeTagsOnly) {
+            //         $q->where('is_active', true);
+            //     }
+            // })
+            //     ->with([
+            //         'tags' => function ($q) use ($activeTagsOnly) {
+            //             if ($activeTagsOnly) {
+            //                 $q->where('is_active', true);
+            //             }
+            //             $q->orderBy('name', 'ASC');
+            //         },
+            //         'image' => function ($q) {
+            //             // Nested: Video -> Tags + Image
+            //             $q->orderBy('size', 'DESC');
+            //         },
+            //         'comments' => function ($q) {
+            //             // Nested: Video -> Tags + Comments
+            //             $q->where('is_approved', true)
+            //                 ->orderBy('created_at', 'DESC')
+            //                 ->limit(5);
+            //         },
+            //         'comments.commentable' => function ($q) {
+            //             // Deep nested: Video -> Tags + Comments -> Commentable
+            //         }
+            //     ])
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 0)
+            //     ->limit(5)
+            //     ->get();
+            // $results['nested_tags_with_relationships'] = $videosWithNestedTags->map(function ($v) {
+            //     return [
+            //         'id' => $v->id,
+            //         'title' => $v->title,
+            //         'tags' => $v->tags->map(function ($tag) {
+            //             $data = $tag->toArray();
+            //             if ($tag->pivot) {
+            //                 $data['pivot'] = $tag->pivot->toArray();
+            //             }
+            //             return $data;
+            //         })->all(),
+            //         'image' => $v->image ? $v->image->toArray() : null,
+            //         'comments' => $v->comments->map(function ($comment) {
+            //             return [
+            //                 'comment' => $comment->toArray(),
+            //                 'commentable' => $comment->commentable ? $comment->commentable->toArray() : null,
+            //             ];
+            //         })->all(),
+            //     ];
+            // })->all();
 
-            // Test 7: Deep nested - Video with tags, and tags used by other Posts/Videos
-            $videosWithTaggedItems = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly) {
-                if ($activeTagsOnly) {
-                    $q->where('is_active', true);
-                }
-            })
-                ->with([
-                    'tags' => function ($q) use ($activeTagsOnly) {
-                        if ($activeTagsOnly) {
-                            $q->where('is_active', true);
-                        }
-                        $q->orderBy('name', 'ASC');
-                    }
-                ])
-                ->where('is_published', true)
-                ->where('duration', '>', 60)
-                ->limit(3)
-                ->get();
+            // // Test 7: Deep nested - Video with tags, and tags used by other Posts/Videos
+            // $videosWithTaggedItems = VideoModel::whereHas('tags', function ($q) use ($activeTagsOnly) {
+            //     if ($activeTagsOnly) {
+            //         $q->where('is_active', true);
+            //     }
+            // })
+            //     ->with([
+            //         'tags' => function ($q) use ($activeTagsOnly) {
+            //             if ($activeTagsOnly) {
+            //                 $q->where('is_active', true);
+            //             }
+            //             $q->orderBy('name', 'ASC');
+            //         }
+            //     ])
+            //     ->where('is_published', true)
+            //     ->where('duration', '>', 60)
+            //     ->limit(3)
+            //     ->get();
 
-            // Load other items with same tags (reverse relationship through tags)
-            $results['deep_nested_tagged_items'] = $videosWithTaggedItems->map(function ($v) {
-                $tagIds = $v->tags->pluck('id')->all();
-                $relatedPosts = PostModel::whereHas('tags', function ($q) use ($tagIds) {
-                    $q->whereIn('id', $tagIds);
-                })
-                    ->with(['tags' => function ($q) use ($tagIds) {
-                        $q->whereIn('id', $tagIds);
-                    }])
-                    ->limit(3)
-                    ->get();
+            // // Load other items with same tags (reverse relationship through tags)
+            // $results['deep_nested_tagged_items'] = $videosWithTaggedItems->map(function ($v) {
+            //     $tagIds = $v->tags->pluck('id')->all();
+            //     $relatedPosts = PostModel::whereHas('tags', function ($q) use ($tagIds) {
+            //         $q->whereIn('tags.id', $tagIds);
+            //     })
+            //         ->with(['tags' => function ($q) use ($tagIds) {
+            //             $q->whereIn('tags.id', $tagIds);
+            //         }])
+            //         ->limit(3)
+            //         ->get();
 
-                $relatedVideos = VideoModel::whereHas('tags', function ($q) use ($tagIds) {
-                    $q->whereIn('id', $tagIds);
-                })
-                    ->where('id', '!=', $v->id)
-                    ->with(['tags' => function ($q) use ($tagIds) {
-                        $q->whereIn('id', $tagIds);
-                    }])
-                    ->limit(3)
-                    ->get();
+            //     $relatedVideos = VideoModel::whereHas('tags', function ($q) use ($tagIds) {
+            //         $q->whereIn('tags.id', $tagIds);
+            //     })
+            //         ->where('id', '!=', $v->id)
+            //         ->with(['tags' => function ($q) use ($tagIds) {
+            //             $q->whereIn('tags.id', $tagIds);
+            //         }])
+            //         ->limit(3)
+            //         ->get();
 
-                return [
-                    'video' => $v->toArray(),
-                    'tags' => $v->tags->map(function ($tag) {
-                        $data = $tag->toArray();
-                        if ($tag->pivot) {
-                            $data['pivot'] = $tag->pivot->toArray();
-                        }
-                        return $data;
-                    })->all(),
-                    'related_posts_with_same_tags' => $relatedPosts->toArray(),
-                    'related_videos_with_same_tags' => $relatedVideos->toArray(),
-                ];
-            })->all();
+            //     return [
+            //         'video' => $v->toArray(),
+            //         'tags' => $v->tags->map(function ($tag) {
+            //             $data = $tag->toArray();
+            //             if ($tag->pivot) {
+            //                 $data['pivot'] = $tag->pivot->toArray();
+            //             }
+            //             return $data;
+            //         })->all(),
+            //         'related_posts_with_same_tags' => $relatedPosts->toArray(),
+            //         'related_videos_with_same_tags' => $relatedVideos->toArray(),
+            //     ];
+            // })->all();
         }
-
         $queries = $this->formatQueryLogs(DB::getQueryLog());
 
         return response()->json([
