@@ -218,6 +218,9 @@ health: ## Check health of all services
 	@echo "Nginx:"
 	@curl -s http://localhost:8000/health || echo "Nginx is down"
 
+test-docker: ## Run Docker setup tests
+	@bash docker/test.sh
+
 # ============================================
 # Development
 # ============================================

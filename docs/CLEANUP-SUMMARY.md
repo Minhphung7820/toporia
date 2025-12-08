@@ -234,14 +234,15 @@ All should work perfectly! ✅
 ## Removed Files
 
 Total removed:
-- **2 directories** (`configs/`, `scripts/`)
-- **~15 files** (config files + scripts)
-- **~500 lines** of redundant code
+- **3 directories** (`configs/`, `scripts/`, `docker/kafka/`)
+- **~20 files** (config files + scripts + kafka configs)
+- **~800 lines** of redundant code
 
 Replaced with:
-- **1 Makefile** (~200 lines, all commands)
+- **1 Makefile** (~230 lines, all commands)
 - **Simplified package.json** (3 lines scripts)
 - **Better Docker setup** (automated, healthchecks)
+- **Organized structure** (docker-test.sh → docker/test.sh)
 
 ## Summary
 
