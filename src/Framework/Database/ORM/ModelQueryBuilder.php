@@ -770,9 +770,8 @@ class ModelQueryBuilder extends QueryBuilder
                             $callbackBindings = $subqueryBuilder->getBindings();
 
                             // Extract WHERE part from the full SQL
-                            if (preg_match('/WHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s+GROUP|\s*$)/is', $callbackQuerySql, $matches)) {
-                                $callbackSql = $matches[1];
-                            }
+                            // IMPORTANT: Use extractCompleteWhereClause to handle nested subqueries properly
+                            $callbackSql = $this->extractCompleteWhereClause($callbackQuerySql);
                         }
                     }
 
@@ -813,9 +812,8 @@ class ModelQueryBuilder extends QueryBuilder
                             $callbackQuerySql = $subqueryBuilder->toSql();
                             $callbackBindings = $subqueryBuilder->getBindings();
 
-                            if (preg_match('/WHERE\s+(.+?)(?:\s+ORDER|\s+LIMIT|\s+GROUP|\s*$)/is', $callbackQuerySql, $matches)) {
-                                $callbackSql = $matches[1];
-                            }
+                            // IMPORTANT: Use extractCompleteWhereClause to handle nested subqueries properly
+                            $callbackSql = $this->extractCompleteWhereClause($callbackQuerySql);
                         }
                     }
 
