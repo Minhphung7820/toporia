@@ -53,23 +53,45 @@ final class ExponentialBackoff implements BackoffStrategy
      *
      * Performance: O(1) - pow() is constant time
      *
+     * Formula: delay = base^attempts (capped at max)
+     *
+     * CRITICAL: attempts MUST be >= 1 for correct calculation
+     * - If attempts = 0, will return 1 (base^0 = 1) which is almost immediate
+     * - If attempts = 1, will return base (e.g., 5^1 = 5s)
+     * - If attempts = 2, will return base^2 (e.g., 5^2 = 25s)
+     * - If attempts = 3, will return base^3 (e.g., 5^3 = 125s, capped at max=60 → 60s)
+     *
      * @example
+     * $backoff = new ExponentialBackoff(base: 5, max: 60);
+     * $backoff->calculate(1); // 5 seconds (5^1)
+     * $backoff->calculate(2); // 25 seconds (5^2)
+     * $backoff->calculate(3); // 60 seconds (5^3 = 125, capped at 60)
+     *
+     * @example With base: 2
      * $backoff = new ExponentialBackoff(base: 2, max: 300);
      * $backoff->calculate(1); // 2 seconds (2^1)
      * $backoff->calculate(2); // 4 seconds (2^2)
      * $backoff->calculate(3); // 8 seconds (2^3)
      * $backoff->calculate(4); // 16 seconds (2^4)
-     * $backoff->calculate(10); // 300 seconds (capped at max)
+     * $backoff->calculate(10); // 300 seconds (2^10 = 1024, capped at max)
      *
-     * @param int $attempts Current attempt number (1-indexed)
+     * @param int $attempts Current attempt number (MUST be >= 1)
      * @return int Delay in seconds
      */
     public function calculate(int $attempts): int
     {
+        // SAFETY: Ensure attempts is at least 1
+        // If attempts = 0, would return 1 second (base^0 = 1) which is too fast
+        if ($attempts < 1) {
+            $attempts = 1;
+        }
+
         // Calculate: base^attempts
+        // Example with base=5: 5^1=5, 5^2=25, 5^3=125
         $delay = (int) pow($this->base, $attempts);
 
         // Cap at maximum to prevent infinite delays
+        // Example: 125 seconds capped at max=60 → 60 seconds
         return min($delay, $this->max);
     }
 }

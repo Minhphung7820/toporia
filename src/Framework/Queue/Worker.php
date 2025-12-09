@@ -88,16 +88,27 @@ final class Worker
      */
     public function work(string|array $queues = 'default'): void
     {
-        // Disable output buffering for real-time logs
-        if (ob_get_level()) {
+        // CRITICAL: Disable ALL output buffering for real-time logs
+        // PHP can have multiple output buffer levels, we need to disable ALL of them
+        while (ob_get_level()) {
             ob_end_flush();
         }
+
+        // Enable implicit flush - automatically flush after every output
+        // This ensures logs appear immediately without manual flush() calls
+        ini_set('implicit_flush', '1');
+        ob_implicit_flush(true);
 
         // Normalize to array
         $queueArray = is_array($queues) ? $queues : [$queues];
 
         $queueNames = implode(',', $queueArray);
         $this->logger->info("Queue worker started. Listening on queue: {$queueNames}");
+
+        // Force flush to ensure startup message is displayed immediately
+        if (function_exists('flush')) {
+            flush();
+        }
 
         while (!$this->shouldQuit) {
             // Dispatch pending signals before checking for jobs
@@ -206,6 +217,11 @@ final class Worker
             $attemptNumber = $job->attempts() + 1;
             $this->logger->info("Processing job: {$job->getId()} (attempt {$attemptNumber})");
 
+            // Force flush to show log immediately
+            if (function_exists('flush')) {
+                flush();
+            }
+
             $job->incrementAttempts();
 
             // Dispatch JobProcessing event
@@ -229,6 +245,11 @@ final class Worker
             $this->logger->success("Job completed: {$job->getId()}");
             $success = true;
 
+            // Force flush success log
+            if (function_exists('flush')) {
+                flush();
+            }
+
             // Dispatch JobProcessed event
             $this->dispatchEvent(new JobProcessed($job, $attemptNumber));
         } catch (JobTimeoutException $e) {
@@ -250,18 +271,49 @@ final class Worker
             $this->dispatchEvent(new JobFailed($job, $e, $job->attempts(), $willRetry));
 
             if ($willRetry) {
+                // CRITICAL: Calculate backoff delay AFTER attempts increment
+                // At this point, attempts has already been incremented (line 225)
                 $delay = $job->getBackoffDelay();
+                $nextAttempt = $job->attempts() + 1;
+                $maxAttempts = $job->getMaxAttempts();
+
                 $this->dispatchEvent(new JobRetrying($job, $job->attempts(), $delay, $e));
 
                 if ($delay > 0) {
-                    $this->logger->warning("Retrying job: {$job->getId()} in {$delay}s (attempt {$job->attempts()})");
+                    // Show clear retry info: "Retry attempt X/Y in Ns"
+                    $this->logger->warning(
+                        "⏱️  Retrying job: {$job->getId()} in {$delay}s " .
+                            "(attempt {$nextAttempt}/{$maxAttempts}, current attempts: {$job->attempts()})"
+                    );
+
+                    // Force flush retry message
+                    if (function_exists('flush')) {
+                        flush();
+                    }
+
                     $this->queue->later($job, $delay, $job->getQueue());
                 } else {
-                    $this->logger->warning("Retrying job: {$job->getId()} immediately (attempt {$job->attempts()})");
+                    // Immediate retry (delay = 0)
+                    $this->logger->warning(
+                        "⚡ Retrying job: {$job->getId()} immediately " .
+                            "(attempt {$nextAttempt}/{$maxAttempts}, current attempts: {$job->attempts()})"
+                    );
+
+                    // Force flush immediate retry message
+                    if (function_exists('flush')) {
+                        flush();
+                    }
+
                     $this->queue->push($job, $job->getQueue());
                 }
             } else {
-                $this->logger->error("Job exceeded max attempts: {$job->getId()}");
+                $this->logger->error("❌ Job exceeded max attempts: {$job->getId()} ({$job->attempts()}/{$job->getMaxAttempts()})");
+
+                // Force flush exceeded message
+                if (function_exists('flush')) {
+                    flush();
+                }
+
                 $job->failed($e);
 
                 // Store failed job in both Database and Redis queues
@@ -298,6 +350,11 @@ final class Worker
 
             $this->logger->error("Job failed: {$job->getId()} - {$e->getMessage()}");
 
+            // Force flush error log immediately
+            if (function_exists('flush')) {
+                flush();
+            }
+
             // Check if we should retry
             $willRetry = $job->attempts() < $job->getMaxAttempts();
             $this->dispatchEvent(new JobFailed($job, $e, $job->attempts(), $willRetry));
@@ -316,6 +373,12 @@ final class Worker
                 }
             } else {
                 $this->logger->error("Job exceeded max attempts: {$job->getId()}");
+
+                // Force flush exceeded message
+                if (function_exists('flush')) {
+                    flush();
+                }
+
                 $job->failed($e);
 
                 // Store in failed jobs table if using DatabaseQueue or RedisQueue

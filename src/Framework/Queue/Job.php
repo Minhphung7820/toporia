@@ -268,6 +268,13 @@ abstract class Job implements JobInterface, QueueableInterface
      *
      * Performance: O(1) - Backoff calculation is constant time
      *
+     * CRITICAL: Pass current attempt count (not attempts - 1) to backoff strategy.
+     * The backoff strategy is responsible for calculating delay based on attempt number.
+     * For exponential backoff with base=5:
+     * - Attempt 1: 5^1 = 5s
+     * - Attempt 2: 5^2 = 25s
+     * - Attempt 3: 5^3 = 125s (capped at max)
+     *
      * @return int Delay in seconds
      *
      * @example
@@ -288,11 +295,15 @@ abstract class Job implements JobInterface, QueueableInterface
         }
 
         // Priority 2: Backoff strategy
+        // CRITICAL FIX: Ensure we have valid attempts count
+        // Pass current attempts (after increment) for accurate backoff calculation
         if ($this->backoff !== null) {
-            return $this->backoff->calculate($this->attempts);
+            // Ensure attempts is at least 1 for first retry
+            $attemptCount = max(1, $this->attempts);
+            return $this->backoff->calculate($attemptCount);
         }
 
-        // Priority 3: No delay
+        // Priority 3: No delay (immediate retry)
         return 0;
     }
 

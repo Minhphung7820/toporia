@@ -38,6 +38,7 @@ final class SendEmailJob extends Job implements ShouldQueueInterface
 
     public function handle(): void
     {
+        Log::info("Attemps: " . $this->attempts());
         try {
             $mail = new SimpleMail($this->subject, $this->message);
 
