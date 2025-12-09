@@ -620,6 +620,10 @@ abstract class Relation implements RelationInterface
      * OPTIMIZED: Automatically applies soft delete scope if related model uses soft deletes.
      * PERFORMANCE: Uses array_flip for O(n) deduplication instead of array_unique O(n log n).
      *
+     * IMPORTANT: Wraps existing WHERE conditions in nested group to handle OR operator precedence.
+     * Without wrapping: WHERE a = 1 OR b = 2 AND foreign_key IN (...) → WRONG (OR has lower precedence)
+     * With wrapping: WHERE (a = 1 OR b = 2) AND foreign_key IN (...) → CORRECT
+     *
      * @param array<int, Model> $models
      * @return void
      */
@@ -645,6 +649,97 @@ abstract class Relation implements RelationInterface
         if (!empty($keys)) {
             // array_keys is O(n) and preserves order, better than array_unique for large arrays
             $uniqueKeys = array_keys($keys);
+
+            // CRITICAL FIX: Wrap existing WHERE conditions to handle OR operator precedence
+            // If user callback has OR conditions, we need to wrap them in parentheses
+            // Example: (is_capital = 1 OR population > 5M) AND country_id IN (...)
+            $existingWheres = $this->query->getWheres();
+            if (!empty($existingWheres)) {
+                // Check if any existing WHERE uses OR operator
+                $hasOrOperator = false;
+                foreach ($existingWheres as $where) {
+                    if (isset($where['boolean']) && strtoupper($where['boolean']) === 'OR') {
+                        $hasOrOperator = true;
+                        break;
+                    }
+                }
+
+                if ($hasOrOperator) {
+                    // Save existing wheres
+                    $originalWheres = $existingWheres;
+
+                    // Use reflection to clear existing wheres (no public API)
+                    $reflection = new \ReflectionClass($this->query);
+                    $wheresProperty = $reflection->getProperty('wheres');
+                    $wheresProperty->setAccessible(true);
+                    $wheresProperty->setValue($this->query, []);
+                    $wheresProperty->setAccessible(false);
+
+                    // Also clear bindings for WHERE clause
+                    $bindingsProperty = $reflection->getProperty('bindings');
+                    $bindingsProperty->setAccessible(true);
+                    $bindings = $bindingsProperty->getValue($this->query);
+                    $whereBindings = $bindings['where'] ?? [];
+                    $bindings['where'] = [];
+                    $bindingsProperty->setValue($this->query, $bindings);
+                    $bindingsProperty->setAccessible(false);
+
+                    // Wrap existing conditions in nested WHERE
+                    $this->query->where(function($q) use ($originalWheres, $whereBindings) {
+                        // Track binding index
+                        $bindingIndex = 0;
+                        $isFirst = true;
+
+                        // Manually reconstruct WHERE conditions in nested closure
+                        foreach ($originalWheres as $where) {
+                            // Determine boolean operator (first condition has no boolean, subsequent use their stored boolean)
+                            $boolean = $isFirst ? 'AND' : ($where['boolean'] ?? 'AND');
+                            $useOr = !$isFirst && strtoupper($boolean) === 'OR';
+                            $isFirst = false;
+
+                            match ($where['type'] ?? '') {
+                                'basic' => $useOr
+                                    ? $q->orWhere(
+                                        $where['column'],
+                                        $where['operator'] ?? '=',
+                                        $whereBindings[$bindingIndex++] ?? ($where['value'] ?? null)
+                                    )
+                                    : $q->where(
+                                        $where['column'],
+                                        $where['operator'] ?? '=',
+                                        $whereBindings[$bindingIndex++] ?? ($where['value'] ?? null)
+                                    ),
+                                'Null' => $useOr ? $q->orWhereNull($where['column']) : $q->whereNull($where['column']),
+                                'NotNull' => $useOr ? $q->orWhereNotNull($where['column']) : $q->whereNotNull($where['column']),
+                                'In' => (function() use ($q, $where, &$whereBindings, &$bindingIndex, $useOr) {
+                                    $values = $where['values'] ?? [];
+                                    $count = count($values);
+                                    $boundValues = array_slice($whereBindings, $bindingIndex, $count);
+                                    $bindingIndex += $count;
+                                    $useOr
+                                        ? $q->orWhereIn($where['column'], $boundValues ?: $values)
+                                        : $q->whereIn($where['column'], $boundValues ?: $values);
+                                })(),
+                                'NotIn' => (function() use ($q, $where, &$whereBindings, &$bindingIndex, $useOr) {
+                                    $values = $where['values'] ?? [];
+                                    $count = count($values);
+                                    $boundValues = array_slice($whereBindings, $bindingIndex, $count);
+                                    $bindingIndex += $count;
+                                    $useOr
+                                        ? $q->orWhereNotIn($where['column'], $boundValues ?: $values)
+                                        : $q->whereNotIn($where['column'], $boundValues ?: $values);
+                                })(),
+                                'Raw' => $useOr
+                                    ? $q->orWhereRaw($where['sql'] ?? '', $where['bindings'] ?? [])
+                                    : $q->whereRaw($where['sql'] ?? '', $where['bindings'] ?? []),
+                                default => null
+                            };
+                        }
+                    });
+                }
+            }
+
+            // Add whereIn for eager loading (always use AND to ensure proper filtering)
             $this->query->whereIn($this->foreignKey, $uniqueKeys);
         }
 

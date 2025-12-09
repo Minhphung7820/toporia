@@ -65,24 +65,24 @@ final class RelationshipTestController extends BaseController
         // TEST 2: hasMany Relationship
         // ================================================================================
         // Country -> cities (hasMany)
-        $results['test_2_has_many'] = [
-            'title' => 'hasMany: Countries with Cities',
-            'description' => 'Countries with their cities, ordered by population',
-            'data' => CountryModel::with(['cities' => function ($q) {
-                $q->where('population', '>', 5000000)
-                    ->orderBy('population', 'DESC')
-                    ->limit(3);
-            }])
-                ->whereHas('cities', function ($q) {
-                    $q->where('population', '>', 10000000);
-                })
-                ->withCount('cities')
-                ->having('cities_count', '>', 0)
-                ->orderBy('cities_count', 'DESC')
-                ->limit(5)
-                ->get()
-                ->toArray()
-        ];
+        // $results['test_2_has_many'] = [
+        //     'title' => 'hasMany: Countries with Cities',
+        //     'description' => 'Countries with their cities, ordered by population',
+        //     'data' => CountryModel::with(['cities' => function ($q) {
+        //         $q->where('population', '>', 5000000)
+        //             ->orderBy('population', 'DESC')
+        //             ->limit(3);
+        //     }])
+        //         ->whereHas('cities', function ($q) {
+        //             $q->where('population', '>', 10000000);
+        //         })
+        //         ->withCount('cities')
+        //         ->having('cities_count', '>', 0)
+        //         ->orderBy('cities_count', 'DESC')
+        //         ->limit(5)
+        //         ->get()
+        //         ->toArray()
+        // ];
 
         // ================================================================================
         // TEST 3: belongsTo Relationship
@@ -103,22 +103,22 @@ final class RelationshipTestController extends BaseController
         // TEST 4: belongsToMany Relationship
         // ================================================================================
         // Book -> categories (belongsToMany with pivot)
-        $results['test_4_belongs_to_many'] = [
-            'title' => 'belongsToMany: Books with Categories',
-            'description' => 'Books with their categories and pivot data',
-            'data' => BookModel::with(['categories' => function ($q) {
-                $q->wherePivot('is_primary', 1)
-                    ->limit(2);
-            }, 'author', 'publisher'])
-                // ->whereHas('categories', function ($q) {
-                //     $q->where('name', 'LIKE', '%Fiction%');
-                // })
-                ->where('is_available', true)
-                ->orderBy('rating', 'DESC')
-                ->limit(10)
-                ->get()
-                ->toArray()
-        ];
+        // $results['test_4_belongs_to_many'] = [
+        //     'title' => 'belongsToMany: Books with Categories',
+        //     'description' => 'Books with their categories and pivot data',
+        //     'data' => BookModel::with(['categories' => function ($q) {
+        //         $q->wherePivot('is_primary', 1)
+        //             ->limit(2);
+        //     }, 'author', 'publisher'])
+        //         // ->whereHas('categories', function ($q) {
+        //         //     $q->where('name', 'LIKE', '%Fiction%');
+        //         // })
+        //         ->where('is_available', true)
+        //         ->orderBy('rating', 'DESC')
+        //         ->limit(10)
+        //         ->get()
+        //         ->toArray()
+        // ];
 
         // // ================================================================================
         // // TEST 5: hasOneThrough Relationship
@@ -144,24 +144,24 @@ final class RelationshipTestController extends BaseController
         // // TEST 6: hasManyThrough Relationship (Simple)
         // // ================================================================================
         // // City -> books through authors (hasManyThrough)
-        $results['test_6_has_many_through_simple'] = [
-            'title' => 'hasManyThrough: City Books through Authors',
-            'description' => 'City -> Authors -> Books using hasManyThrough',
-            'data' => CityModel::with(['books' => function ($q) {
-                $q->where('is_available', true)
-                    ->orderBy('rating', 'DESC')
-                    ->limit(5);
-            }, 'country'])
-                ->whereHas('books', function ($q) {
-                    $q->where('rating', '>=', 4.0);
-                })
-                ->withCount('books')
-                ->having('books_count', '>=', 3)
-                ->orderBy('books_count', 'DESC')
-                ->limit(10)
-                ->get()
-                ->toArray()
-        ];
+        // $results['test_6_has_many_through_simple'] = [
+        //     'title' => 'hasManyThrough: City Books through Authors',
+        //     'description' => 'City -> Authors -> Books using hasManyThrough',
+        //     'data' => CityModel::with(['books' => function ($q) {
+        //         $q->where('is_available', true)
+        //             ->orderBy('rating', 'DESC')
+        //             ->limit(5);
+        //     }, 'country'])
+        //         ->whereHas('books', function ($q) {
+        //             $q->where('rating', '>=', 4.0);
+        //         })
+        //         ->withCount('books')
+        //         ->having('books_count', '>=', 3)
+        //         ->orderBy('books_count', 'DESC')
+        //         ->limit(10)
+        //         ->get()
+        //         ->toArray()
+        // ];
 
         // // ================================================================================
         // // TEST 7: hasManyThrough Relationship (Complex)
@@ -264,7 +264,8 @@ final class RelationshipTestController extends BaseController
         //         },
         //         'chapters' => function ($q) {
         //             $q->where('words_count', '>', 1000)
-        //                 ->orderBy('chapter_number', 'ASC');
+        //                 ->orderBy('chapter_number', 'ASC')
+        //                 ->limit(15);
         //         },
         //         'author'
         //     ])
@@ -285,55 +286,55 @@ final class RelationshipTestController extends BaseController
         // // ================================================================================
         // // TEST 11: Mixed Relationships Ultra Complex
         // // ================================================================================
-        // $results['test_11_mixed_ultra_complex'] = [
-        //     'title' => 'ULTRA COMPLEX: All relationship types combined',
-        //     'description' => 'Combining hasMany, belongsTo, hasManyThrough, belongsToMany',
-        //     'data' => CountryModel::with([
-        //         // hasMany
-        //         'cities' => function ($q) {
-        //             $q->where('is_capital', true)
-        //                 ->orWhere('population', '>', 5000000);
-        //         },
-        //         // hasManyThrough level 1
-        //         'cities.authors' => function ($q) {
-        //             $q->where('is_verified', true)
-        //                 ->where('rating', '>=', 4.0);
-        //         },
-        //         // hasMany through hasManyThrough
-        //         'cities.authors.books' => function ($q) {
-        //             $q->where('is_available', true)
-        //                 ->where('stock', '>', 0);
-        //         },
-        //         // belongsToMany through hasManyThrough
-        //         'cities.authors.books.categories' => function ($q) {
-        //             $q->wherePivot('is_primary', true);
-        //         },
-        //         // hasMany through multiple levels
-        //         'cities.authors.books.chapters' => function ($q) {
-        //             $q->where('is_free_preview', true)
-        //                 ->limit(2);
-        //         },
-        //         // hasMany
-        //         'publishers' => function ($q) {
-        //             $q->where('publishers.is_active', true);
-        //         },
-        //     ])
-        //         ->whereHas('cities.authors.books', function ($q) {
-        //             $q->where('rating', '>=', 4.5)
-        //                 ->where('reviews_count', '>', 100);
-        //         })
-        //         ->withCount([
-        //             'cities',
-        //             'authors',
-        //             'publishers'
-        //         ])
-        //         ->having('cities_count', '>=', 3)
-        //         ->having('authors_count', '>=', 10)
-        //         ->orderBy('authors_count', 'DESC')
-        //         ->limit(3)
-        //         ->get()
-        //         ->toArray()
-        // ];
+        $results['test_11_mixed_ultra_complex'] = [
+            'title' => 'ULTRA COMPLEX: All relationship types combined',
+            'description' => 'Combining hasMany, belongsTo, hasManyThrough, belongsToMany',
+            'data' => CountryModel::with([
+                // hasMany
+                'cities' => function ($q) {
+                    $q->where('is_capital', true)
+                        ->orWhere('population', '>', 5000000);
+                },
+                // hasManyThrough level 1
+                'cities.authors' => function ($q) {
+                    $q->where('is_verified', true)
+                        ->where('rating', '>=', 4.0);
+                },
+                // hasMany through hasManyThrough
+                'cities.authors.books' => function ($q) {
+                    $q->where('is_available', true)
+                        ->where('stock', '>', 0);
+                },
+                // belongsToMany through hasManyThrough
+                'cities.authors.books.categories' => function ($q) {
+                    $q->wherePivot('is_primary', true);
+                },
+                // hasMany through multiple levels
+                'cities.authors.books.chapters' => function ($q) {
+                    $q->where('is_free_preview', true)
+                        ->limit(2);
+                },
+                // hasMany
+                'publishers' => function ($q) {
+                    $q->where('publishers.is_active', true);
+                },
+            ])
+                ->whereHas('cities.authors.books', function ($q) {
+                    $q->where('rating', '>=', 4.5)
+                        ->where('reviews_count', '>', 100);
+                })
+                ->withCount([
+                    'cities',
+                    'authors',
+                    'publishers'
+                ])
+                ->having('cities_count', '>=', 3)
+                ->having('authors_count', '>=', 10)
+                ->orderBy('authors_count', 'DESC')
+                ->limit(3)
+                ->get()
+                ->toArray()
+        ];
 
         // // ================================================================================
         // // TEST 12: Conditional Eager Loading
