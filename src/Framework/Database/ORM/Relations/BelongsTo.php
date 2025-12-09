@@ -312,7 +312,7 @@ class BelongsTo extends Relation
         // This prevents WHERE id = ? AND id IN (...) issue during eager loading
         $table = $freshQuery->getTable();
         $connection = $freshQuery->getConnection();
-        $cleanQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+        $cleanQuery = new QueryBuilder($connection);
 
         if ($table !== null) {
             $cleanQuery->table($table);

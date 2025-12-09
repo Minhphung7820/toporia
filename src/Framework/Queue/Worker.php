@@ -8,8 +8,10 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Support\ColoredLogger;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
 use Toporia\Framework\Queue\Exceptions\{RateLimitExceededException, JobAlreadyRunningException, JobTimeoutException};
-use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
 use Toporia\Framework\Queue\Events\{JobQueued, JobProcessing, JobProcessed, JobFailed, JobTimedOut, JobRetrying, WorkerStopping};
+use Toporia\Framework\Queue\Middleware\EnsureUnique;
+use Toporia\Framework\Queue\Support\{JobCancellation, JobMetrics, QueueMetrics};
+use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
 
 /**
  * Class Worker
@@ -319,7 +321,7 @@ final class Worker
         }
 
         try {
-            $cancellation = new \Toporia\Framework\Queue\Support\JobCancellation(
+            $cancellation = new JobCancellation(
                 $this->container->get('cache')
             );
             return $cancellation->isCancelled($job->getId());
@@ -350,13 +352,13 @@ final class Worker
             $memory = memory_get_usage(true) - $startMemory;
 
             // Record job metrics
-            $jobMetrics = new \Toporia\Framework\Queue\Support\JobMetrics(
+            $jobMetrics = new JobMetrics(
                 $this->container->get('cache')
             );
             $jobMetrics->record(get_class($job), $success, $duration, $memory);
 
             // Record queue metrics
-            $queueMetrics = new \Toporia\Framework\Queue\Support\QueueMetrics(
+            $queueMetrics = new QueueMetrics(
                 $this->container->get('cache')
             );
             $queueMetrics->record($job->getQueue() ?? 'default', 'process', $duration);
@@ -388,7 +390,7 @@ final class Worker
         if ($job instanceof \Toporia\Framework\Queue\Job && $job->getUniqueId() !== null) {
             if ($this->container && $this->container->has('cache')) {
                 $cache = $this->container->get('cache');
-                $ensureUnique = new \Toporia\Framework\Queue\Middleware\EnsureUnique($cache);
+                $ensureUnique = new EnsureUnique($cache);
                 // Add to beginning of middleware stack
                 array_unshift($middleware, $ensureUnique);
             }

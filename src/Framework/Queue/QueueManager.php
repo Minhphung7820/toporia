@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Queue;
 
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface, QueueManagerInterface};
+use Toporia\Framework\Queue\Events\JobQueued;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
 
@@ -181,7 +182,7 @@ final class QueueManager implements QueueManagerInterface
         if ($this->container && $this->container->has(EventDispatcherInterface::class)) {
             try {
                 $dispatcher = $this->container->get(EventDispatcherInterface::class);
-                $dispatcher->dispatch(new \Toporia\Framework\Queue\Events\JobQueued($job, $queue, $delay));
+                $dispatcher->dispatch(new JobQueued($job, $queue, $delay));
             } catch (\Throwable $e) {
                 // Silent fail - event dispatch should not break job queuing
             }

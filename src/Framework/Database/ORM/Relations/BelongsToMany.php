@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection, Pivot};
 use Toporia\Framework\Database\Query\QueryBuilder;
+use Toporia\Framework\Support\Pagination\CursorPaginator;
 use Toporia\Framework\Support\Str;
 
 /**
@@ -636,7 +637,7 @@ class BelongsToMany extends Relation
 
                 // Build base query with JOIN and all conditions
                 $connection = $this->query->getConnection();
-                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery = new QueryBuilder($connection);
                 $baseQuery->table($relatedTable);
                 $baseQuery->join(
                     $this->pivotTable,
@@ -2766,7 +2767,7 @@ class BelongsToMany extends Relation
         // Previous cursor is the current cursor (for backward navigation)
         $prevCursor = $cursor;
 
-        return new \Toporia\Framework\Support\Pagination\CursorPaginator(
+        return new CursorPaginator(
             items: $models,
             perPage: $perPage,
             nextCursor: $nextCursor,

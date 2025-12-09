@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Auth\Access;
 
 use Stringable;
+use Toporia\Framework\Auth\AuthorizationException;
 
 /**
  * Class Response
@@ -109,7 +110,7 @@ final class Response implements Stringable
     public function authorize(): self
     {
         if ($this->denied()) {
-            throw new \Toporia\Framework\Auth\AuthorizationException(
+            throw new AuthorizationException(
                 $this->message ?? 'This action is unauthorized.',
                 $this->code ?? 403
             );

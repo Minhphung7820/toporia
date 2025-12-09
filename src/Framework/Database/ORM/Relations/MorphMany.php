@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
+use Toporia\Framework\Support\Pagination\CursorPaginator;
 
 /**
  * MorphMany Relationship
@@ -235,7 +236,7 @@ class MorphMany extends Relation
 
                 // Build base query with all conditions
                 $connection = $this->query->getConnection();
-                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery = new QueryBuilder($connection);
                 $baseQuery->table($table);
 
                 // Extract morph type and foreign keys from nested where (from addEagerConstraints)
@@ -477,7 +478,7 @@ class MorphMany extends Relation
         // Create a clean query with table and selects from freshQuery
         $table = $freshQuery->getTable();
         $connection = $freshQuery->getConnection();
-        $cleanQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+        $cleanQuery = new QueryBuilder($connection);
 
         if ($table !== null) {
             $cleanQuery->table($table);
@@ -1033,7 +1034,7 @@ class MorphMany extends Relation
         // Previous cursor is the current cursor (for backward navigation)
         $prevCursor = $cursor;
 
-        return new \Toporia\Framework\Support\Pagination\CursorPaginator(
+        return new CursorPaginator(
             items: $models,
             perPage: $perPage,
             nextCursor: $nextCursor,

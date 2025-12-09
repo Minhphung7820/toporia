@@ -7,6 +7,8 @@ namespace Toporia\Framework\Database\Query;
 use Toporia\Framework\Database\Contracts\{ConnectionInterface, QueryBuilderInterface};
 use Toporia\Framework\Database\Query\{Expression, RowCollection};
 use Toporia\Framework\Database\DatabaseCollection;
+use Toporia\Framework\Support\Pagination\CursorPaginator;
+use Toporia\Framework\Support\Pagination\Paginator;
 
 
 /**
@@ -3904,7 +3906,7 @@ class QueryBuilder implements QueryBuilderInterface
         $items = $this->limit($perPage)->offset($offset)->get();
 
         // Step 3: Return Paginator value object
-        return new \Toporia\Framework\Support\Pagination\Paginator(
+        return new Paginator(
             items: $items,
             total: $total,
             perPage: $perPage,
@@ -4029,7 +4031,7 @@ class QueryBuilder implements QueryBuilderInterface
         // Previous cursor is the current cursor (for backward navigation)
         $prevCursor = $cursor;
 
-        return new \Toporia\Framework\Support\Pagination\CursorPaginator(
+        return new CursorPaginator(
             items: $items,
             perPage: $perPage,
             nextCursor: $nextCursor,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Testing\Concerns;
 
+use Toporia\Framework\Foundation\Application;
 use Toporia\Framework\Testing\TestResponse;
 
 
@@ -98,7 +99,7 @@ trait InteractsWithHttp
             if (!$app instanceof \Toporia\Framework\Foundation\Application) {
                 // Create app instance manually to set global before bootstrap
                 $basePath = dirname(__DIR__, 4);
-                $app = new \Toporia\Framework\Foundation\Application($basePath);
+                $app = new Application($basePath);
 
                 // Set global app FIRST (before any helpers are called)
                 $GLOBALS['app'] = $app;

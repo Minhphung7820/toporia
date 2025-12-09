@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Webhook;
 
 use Toporia\Framework\Webhook\Contracts\{WebhookDispatcherInterface, SignatureGeneratorInterface};
+use Toporia\Framework\Webhook\Jobs\DispatchWebhookJob;
 use Toporia\Framework\Http\Contracts\{HttpClientInterface, HttpResponseInterface};
 use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
 use Toporia\Framework\Log\Contracts\LoggerInterface;
@@ -154,7 +155,7 @@ final class WebhookDispatcher implements WebhookDispatcherInterface
         }
 
         // Create job instance with proper constructor arguments
-        $job = new \Toporia\Framework\Webhook\Jobs\DispatchWebhookJob(
+        $job = new DispatchWebhookJob(
             event: $event,
             payload: $payload,
             endpoint: $endpoint,

@@ -6,6 +6,7 @@ namespace Toporia\Framework\Console\Scheduling;
 
 use Toporia\Framework\Console\Scheduling\Contracts\MutexInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Mail\Message;
 
 /**
  * Class Scheduler
@@ -673,7 +674,7 @@ final class Scheduler
         if ($this->container && $this->container->has(\Toporia\Framework\Mail\Contracts\MailManagerInterface::class)) {
             try {
                 $mailer = $this->container->get(\Toporia\Framework\Mail\Contracts\MailManagerInterface::class);
-                $message = new \Toporia\Framework\Mail\Message();
+                $message = new Message();
                 $message->to($email)
                     ->subject($subject)
                     ->html(nl2br(htmlspecialchars($body)));

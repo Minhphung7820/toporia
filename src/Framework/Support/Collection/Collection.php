@@ -6,6 +6,7 @@ namespace Toporia\Framework\Support\Collection;
 
 use Toporia\Framework\Support\Contracts\CollectionInterface;
 use Toporia\Framework\Support\Macroable;
+use Toporia\Framework\Support\Pagination\Paginator;
 
 
 /**
@@ -1444,7 +1445,7 @@ class Collection implements CollectionInterface, \JsonSerializable
         $items = $this->slice($offset, $perPage);
         $total = $this->count();
 
-        return new \Toporia\Framework\Support\Pagination\Paginator(
+        return new Paginator(
             items: $items,
             total: $total,
             perPage: $perPage,

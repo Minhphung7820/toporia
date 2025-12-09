@@ -6,6 +6,7 @@ namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection};
 use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
+use Toporia\Framework\Support\Pagination\CursorPaginator;
 
 /**
  * HasMany Relationship
@@ -153,7 +154,7 @@ class HasMany extends Relation
                 // Build subquery from QueryBuilder to ensure all conditions are included
                 // Create a new query builder with same connection and table
                 $connection = $this->query->getConnection();
-                $subQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $subQuery = new QueryBuilder($connection);
                 $subQuery->table($table);
 
                 // Copy all wheres from original query (includes foreignKey IN (...), and other conditions)
@@ -200,7 +201,7 @@ class HasMany extends Relation
                 }
 
                 // Build base query with all conditions except WHERE IN (handled in window function)
-                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery = new QueryBuilder($connection);
                 $baseQuery->table($table);
 
                 // Apply all where conditions except the WHERE IN for foreignKey
@@ -359,7 +360,7 @@ class HasMany extends Relation
         // Create a clean query with table and selects from freshQuery
         $table = $freshQuery->getTable();
         $connection = $freshQuery->getConnection();
-        $cleanQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+        $cleanQuery = new QueryBuilder($connection);
 
         if ($table !== null) {
             $cleanQuery->table($table);
@@ -1042,7 +1043,7 @@ class HasMany extends Relation
         // Previous cursor is the current cursor (for backward navigation)
         $prevCursor = $cursor;
 
-        return new \Toporia\Framework\Support\Pagination\CursorPaginator(
+        return new CursorPaginator(
             items: $models,
             perPage: $perPage,
             nextCursor: $nextCursor,

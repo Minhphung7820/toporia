@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM\Concerns;
 
 use Toporia\Framework\Database\ORM\Model;
+use Toporia\Framework\Database\ORM\ModelQueryBuilder;
 use Toporia\Framework\Database\Query\QueryBuilder;
 
 
@@ -227,7 +228,7 @@ trait SoftDeletes
     {
         // Create ModelQueryBuilder with skipGlobalScopes flag
         $connection = static::getConnection();
-        $queryBuilder = new \Toporia\Framework\Database\ORM\ModelQueryBuilder(
+        $queryBuilder = new ModelQueryBuilder(
             $connection,
             static::class,
             true // Skip global scopes

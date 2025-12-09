@@ -13,6 +13,8 @@ use Toporia\Framework\Database\ORM\Relations\BelongsTo;
 use Toporia\Framework\Database\ORM\Relations\BelongsToMany;
 use Toporia\Framework\Database\ORM\Relations\MorphToMany;
 use Toporia\Framework\Database\ORM\Relations\MorphedByMany;
+use Toporia\Framework\Support\Pagination\CursorPaginator;
+use Toporia\Framework\Support\Pagination\Paginator;
 
 
 /**
@@ -182,7 +184,7 @@ class ModelQueryBuilder extends QueryBuilder
         $items = $this->limit($perPage)->offset($offset)->getModels(); // Hydrates and loads relationships
 
         // Step 3: Return Paginator value object
-        return new \Toporia\Framework\Support\Pagination\Paginator(
+        return new Paginator(
             items: $items,
             total: $total,
             perPage: $perPage,
@@ -325,7 +327,7 @@ class ModelQueryBuilder extends QueryBuilder
         // Previous cursor is the current cursor (for backward navigation)
         $prevCursor = $cursor;
 
-        return new \Toporia\Framework\Support\Pagination\CursorPaginator(
+        return new CursorPaginator(
             items: $items,
             perPage: $perPage,
             nextCursor: $nextCursor,

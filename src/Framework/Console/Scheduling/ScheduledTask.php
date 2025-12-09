@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Console\Scheduling;
 
+use Toporia\Framework\Console\Scheduling\Support\CronExpression;
+
 /**
  * Class ScheduledTask
  *
@@ -598,7 +600,7 @@ final class ScheduledTask
         }
 
         try {
-            $cron = new \Toporia\Framework\Console\Scheduling\Support\CronExpression($this->expression);
+            $cron = new CronExpression($this->expression);
             return $cron->matches($currentTime);
         } catch (\InvalidArgumentException $e) {
             // Fallback to old parser for backward compatibility
@@ -642,7 +644,7 @@ final class ScheduledTask
         }
 
         try {
-            $cron = new \Toporia\Framework\Console\Scheduling\Support\CronExpression($this->expression);
+            $cron = new CronExpression($this->expression);
             $nextRun = $cron->getNextRunTime($fromTime);
 
             // Convert back to default timezone if needed

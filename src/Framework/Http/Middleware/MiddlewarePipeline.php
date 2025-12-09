@@ -7,6 +7,7 @@ namespace Toporia\Framework\Http\Middleware;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Http\{Request, Response};
+use Toporia\Framework\Http\Middleware\ThrottleRequests;
 
 /**
  * Class MiddlewarePipeline
@@ -227,7 +228,7 @@ final class MiddlewarePipeline
     ): \Toporia\Framework\Http\Middleware\ThrottleRequests {
         // If parameters is a string, it's a named limiter
         if (is_string($parameters)) {
-            return new \Toporia\Framework\Http\Middleware\ThrottleRequests(
+            return new ThrottleRequests(
                 $limiter,
                 null, // maxAttempts
                 null, // decayMinutes
@@ -238,7 +239,7 @@ final class MiddlewarePipeline
 
         // If parameters is an array, it's direct config [maxAttempts, decayMinutes]
         if (is_array($parameters) && count($parameters) >= 2) {
-            return new \Toporia\Framework\Http\Middleware\ThrottleRequests(
+            return new ThrottleRequests(
                 $limiter,
                 (int) $parameters[0], // maxAttempts
                 (int) $parameters[1], // decayMinutes
@@ -248,7 +249,7 @@ final class MiddlewarePipeline
         }
 
         // Fallback: use defaults
-        return new \Toporia\Framework\Http\Middleware\ThrottleRequests($limiter);
+        return new ThrottleRequests($limiter);
     }
 
     /**

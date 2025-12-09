@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use Toporia\Framework\Http\Exceptions\HttpException;
+use Toporia\Framework\Support\HigherOrderTapProxy;
+use Toporia\Framework\Support\Optional;
+
 /**
  * Toporia Framework Helper Functions
  *
@@ -143,7 +147,7 @@ if (!function_exists('abort')) {
      */
     function abort(int $code, string $message = '', array $headers = []): never
     {
-        throw new \Toporia\Framework\Http\Exceptions\HttpException(
+        throw new HttpException(
             $code,
             $message ?: "HTTP {$code} Error",
             $headers
@@ -201,7 +205,7 @@ if (!function_exists('tap')) {
     function tap(mixed $value, ?callable $callback = null): mixed
     {
         if ($callback === null) {
-            return new \Toporia\Framework\Support\HigherOrderTapProxy($value);
+            return new HigherOrderTapProxy($value);
         }
 
         $callback($value);
@@ -321,7 +325,7 @@ if (!function_exists('optional')) {
     function optional(mixed $value = null, ?callable $callback = null): mixed
     {
         if ($callback === null) {
-            return new \Toporia\Framework\Support\Optional($value);
+            return new Optional($value);
         }
 
         if ($value !== null) {

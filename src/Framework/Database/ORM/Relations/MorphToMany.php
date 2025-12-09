@@ -351,7 +351,7 @@ class MorphToMany extends Relation
 
                 // Build base query with all conditions except WHERE IN
                 $connection = $this->query->getConnection();
-                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery = new QueryBuilder($connection);
                 $baseQuery->table($relatedTable)
                     ->join(
                         $this->pivotTable,

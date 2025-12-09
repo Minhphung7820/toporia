@@ -315,7 +315,7 @@ class MorphedByMany extends Relation
 
                 // Build base query
                 $connection = $this->query->getConnection();
-                $baseQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+                $baseQuery = new QueryBuilder($connection);
                 $baseQuery->table($relatedTable)
                     ->join(
                         $this->pivotTable,

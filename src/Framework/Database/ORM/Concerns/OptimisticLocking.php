@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM\Concerns;
 
 use Toporia\Framework\Database\ORM\Model;
+use Toporia\Framework\Database\ORM\Exceptions\StaleObjectException;
 
 /**
  * Trait OptimisticLocking
@@ -182,7 +183,7 @@ trait OptimisticLocking
             // Refresh to get latest version
             $this->refresh();
 
-            throw new \Toporia\Framework\Database\ORM\Exceptions\StaleObjectException(
+            throw new StaleObjectException(
                 sprintf(
                     'The model [%s] with ID [%s] was modified by another transaction. ' .
                     'Current version: %d, Expected version: %d',

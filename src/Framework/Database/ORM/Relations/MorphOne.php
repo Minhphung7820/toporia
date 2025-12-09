@@ -290,7 +290,7 @@ class MorphOne extends Relation
         // then match() will select the first one per parent based on orderBy
         // Create a new query without limit/offset to avoid modifying the original query
         $connection = $this->query->getConnection();
-        $eagerQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+        $eagerQuery = new QueryBuilder($connection);
 
         // Copy table
         $table = $this->query->getTable();
@@ -446,7 +446,7 @@ class MorphOne extends Relation
         // Create a clean query with table and selects from freshQuery
         $table = $freshQuery->getTable();
         $connection = $freshQuery->getConnection();
-        $cleanQuery = new \Toporia\Framework\Database\Query\QueryBuilder($connection);
+        $cleanQuery = new QueryBuilder($connection);
 
         if ($table !== null) {
             $cleanQuery->table($table);
