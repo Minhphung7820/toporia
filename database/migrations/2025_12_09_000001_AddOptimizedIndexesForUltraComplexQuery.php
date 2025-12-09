@@ -198,4 +198,3 @@ class AddOptimizedIndexesForUltraComplexQuery extends Migration
         });
     }
 }
-
