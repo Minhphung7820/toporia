@@ -65,19 +65,24 @@ final class RelationshipTestController extends BaseController
         // TEST 2: hasMany Relationship
         // ================================================================================
         // Country -> cities (hasMany)
-        // $results['test_2_has_many'] = [
-        //     'title' => 'hasMany: Countries with Cities',
-        //     'description' => 'Countries with their cities, ordered by population',
-        //     'data' => CountryModel::with(['cities' => function ($q) {
-        //         $q->orderBy('population', 'DESC')->limit(3);
-        //     }])
-        //         ->withCount('cities')
-        //         ->having('cities_count', '>', 0)
-        //         ->orderBy('cities_count', 'DESC')
-        //         ->limit(5)
-        //         ->get()
-        //         ->toArray()
-        // ];
+        $results['test_2_has_many'] = [
+            'title' => 'hasMany: Countries with Cities',
+            'description' => 'Countries with their cities, ordered by population',
+            'data' => CountryModel::with(['cities' => function ($q) {
+                $q->where('population', '>', 5000000)
+                    ->orderBy('population', 'DESC')
+                    ->limit(3);
+            }])
+                ->whereHas('cities', function ($q) {
+                    $q->where('population', '>', 10000000);
+                })
+                ->withCount('cities')
+                ->having('cities_count', '>', 0)
+                ->orderBy('cities_count', 'DESC')
+                ->limit(5)
+                ->get()
+                ->toArray()
+        ];
 
         // ================================================================================
         // TEST 3: belongsTo Relationship
@@ -122,7 +127,9 @@ final class RelationshipTestController extends BaseController
         // $results['test_5_nested_belongs_to'] = [
         //     'title' => 'Nested belongsTo: Authors with Country',
         //     'description' => 'Author -> City -> Country using nested belongsTo',
-        //     'data' => AuthorModel::with(['city.country'])
+        //     'data' => AuthorModel::with(['city.country' => function ($q) {
+        //         $q->select('id', 'name', 'code');
+        //     }])
         //         ->whereHas('city.country', function ($q) {
         //             $q->where('continent', 'Asia');
         //         })
@@ -137,24 +144,24 @@ final class RelationshipTestController extends BaseController
         // // TEST 6: hasManyThrough Relationship (Simple)
         // // ================================================================================
         // // City -> books through authors (hasManyThrough)
-        // $results['test_6_has_many_through_simple'] = [
-        //     'title' => 'hasManyThrough: City Books through Authors',
-        //     'description' => 'City -> Authors -> Books using hasManyThrough',
-        //     'data' => CityModel::with(['books' => function ($q) {
-        //         $q->where('is_available', true)
-        //             ->orderBy('rating', 'DESC')
-        //             ->limit(5);
-        //     }, 'country'])
-        //         ->whereHas('books', function ($q) {
-        //             $q->where('rating', '>=', 4.0);
-        //         })
-        //         ->withCount('books')
-        //         ->having('books_count', '>=', 3)
-        //         ->orderBy('books_count', 'DESC')
-        //         ->limit(10)
-        //         ->get()
-        //         ->toArray()
-        // ];
+        $results['test_6_has_many_through_simple'] = [
+            'title' => 'hasManyThrough: City Books through Authors',
+            'description' => 'City -> Authors -> Books using hasManyThrough',
+            'data' => CityModel::with(['books' => function ($q) {
+                $q->where('is_available', true)
+                    ->orderBy('rating', 'DESC')
+                    ->limit(5);
+            }, 'country'])
+                ->whereHas('books', function ($q) {
+                    $q->where('rating', '>=', 4.0);
+                })
+                ->withCount('books')
+                ->having('books_count', '>=', 3)
+                ->orderBy('books_count', 'DESC')
+                ->limit(10)
+                ->get()
+                ->toArray()
+        ];
 
         // // ================================================================================
         // // TEST 7: hasManyThrough Relationship (Complex)

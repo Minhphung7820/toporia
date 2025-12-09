@@ -177,7 +177,10 @@ class HasManyThrough extends Relation
                             $parts = explode('.', $col, 2);
                             $wrappedCol = $grammar->wrapTable($parts[0]) . '.' . $grammar->wrapColumn($parts[1]);
                         } else {
-                            $wrappedCol = $grammar->wrapColumn($col);
+                            // IMPORTANT: Qualify unqualified columns with related table to avoid ambiguity
+                            // Example: "rating" becomes "books.rating" when related table is "books"
+                            // This prevents "Column 'rating' in order clause is ambiguous" errors
+                            $wrappedCol = $grammar->wrapTable($relatedTable) . '.' . $grammar->wrapColumn($col);
                         }
                         $orderParts[] = "{$wrappedCol} {$dir}";
                     }
@@ -209,17 +212,24 @@ class HasManyThrough extends Relation
                             continue;
                         }
                     }
+
+                    // Qualify column if not already qualified to avoid ambiguity
+                    $column = $where['column'] ?? '';
+                    if (!empty($column) && !str_contains($column, '.')) {
+                        $column = "{$relatedTable}.{$column}";
+                    }
+
                     match ($where['type'] ?? '') {
                         'basic' => $baseQuery->where(
-                            $where['column'],
+                            $column,
                             $where['operator'] ?? '=',
                             $where['value'] ?? null,
                             $where['boolean'] ?? 'AND'
                         ),
-                        'Null' => $baseQuery->whereNull($where['column'], $where['boolean'] ?? 'AND'),
-                        'NotNull' => $baseQuery->whereNotNull($where['column'], $where['boolean'] ?? 'AND'),
-                        'In' => $baseQuery->whereIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
-                        'NotIn' => $baseQuery->whereNotIn($where['column'], $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'Null' => $baseQuery->whereNull($column, $where['boolean'] ?? 'AND'),
+                        'NotNull' => $baseQuery->whereNotNull($column, $where['boolean'] ?? 'AND'),
+                        'In' => $baseQuery->whereIn($column, $where['values'] ?? [], $where['boolean'] ?? 'AND'),
+                        'NotIn' => $baseQuery->whereNotIn($column, $where['values'] ?? [], $where['boolean'] ?? 'AND'),
                         'Raw' => $baseQuery->whereRaw(
                             $where['sql'] ?? '',
                             $where['bindings'] ?? [],
@@ -249,8 +259,19 @@ class HasManyThrough extends Relation
                     $baseQuery->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
                 } else {
                     $baseQuery->select($customColumns);
-                    // Always need through table key for matching
-                    $baseQuery->selectRaw("{$throughTable}.{$this->firstKey}");
+                    // Check if through key is already in custom columns to avoid duplicate
+                    $throughKeyColumn = "{$throughTable}.{$this->firstKey}";
+                    $hasKeyColumn = false;
+                    foreach ($customColumns as $col) {
+                        // Exact match or table-qualified match (authors.city_id)
+                        if ($col === $throughKeyColumn || $col === "{$throughTable}.`{$this->firstKey}`") {
+                            $hasKeyColumn = true;
+                            break;
+                        }
+                    }
+                    if (!$hasKeyColumn) {
+                        $baseQuery->selectRaw($throughKeyColumn);
+                    }
                 }
 
                 // Copy orderBy from constraint closure
@@ -359,11 +380,49 @@ class HasManyThrough extends Relation
                 Str::endsWith($col, '.' . $this->foreignKey)
         ]);
 
+        // Copy ORDER BY from original query (for window function support)
+        $customOrders = $originalQuery->getOrders();
+        if (!empty($customOrders)) {
+            foreach ($customOrders as $order) {
+                if (!isset($order['column'])) continue;
+                $tempQuery->orderBy($order['column'], $order['direction'] ?? 'ASC');
+            }
+        }
+
+        // Copy limit and offset for per-parent limiting with window functions
+        if ($originalQuery->getLimit() !== null) {
+            $tempQuery->limit($originalQuery->getLimit());
+        }
+        if ($originalQuery->getOffset() !== null) {
+            $tempQuery->offset($originalQuery->getOffset());
+        }
+
         // Restore the new query
         $this->query = $tempQuery;
 
         $this->query->whereIn("{$throughTable}.{$this->firstKey}", $keys);
-        $this->query->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
+
+        // Set SELECT columns - check if original query has custom select
+        $customColumns = $originalQuery->getColumns();
+        if ($this->shouldUseDefaultSelect($customColumns)) {
+            // No custom select - use default
+            $this->query->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
+        } else {
+            // Has custom select - use it and add through key if not already present
+            $this->query->select($customColumns);
+            $throughKeyColumn = "{$throughTable}.{$this->firstKey}";
+            $hasKeyColumn = false;
+            foreach ($customColumns as $col) {
+                // Exact match or table-qualified match (authors.city_id)
+                if ($col === $throughKeyColumn || $col === "{$throughTable}.`{$this->firstKey}`") {
+                    $hasKeyColumn = true;
+                    break;
+                }
+            }
+            if (!$hasKeyColumn) {
+                $this->query->selectRaw($throughKeyColumn);
+            }
+        }
 
         // Apply soft delete scope if related model uses soft deletes
         $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
@@ -1085,10 +1144,24 @@ class HasManyThrough extends Relation
 
     /**
      * Magic method to delegate calls to the underlying query builder.
+     *
+     * Auto-qualifies column names for WHERE methods to avoid ambiguity.
+     * HasManyThrough has JOIN with through table, so unqualified columns are ambiguous.
      */
     public function __call(string $method, array $parameters): mixed
     {
         if (method_exists($this->query, $method)) {
+            // Auto-qualify column names for WHERE methods to avoid ambiguity
+            $whereMethods = ['where', 'orWhere', 'whereColumn', 'orWhereColumn'];
+            if (in_array($method, $whereMethods) && !empty($parameters[0]) && is_string($parameters[0])) {
+                $column = $parameters[0];
+                // Only qualify if column is not already qualified (no dot)
+                if (!str_contains($column, '.')) {
+                    $relatedTable = $this->getRelatedTable();
+                    $parameters[0] = "{$relatedTable}.{$column}";
+                }
+            }
+
             $result = $this->query->{$method}(...$parameters);
 
             if ($result instanceof QueryBuilder) {

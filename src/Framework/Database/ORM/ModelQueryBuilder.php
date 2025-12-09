@@ -1162,8 +1162,10 @@ class ModelQueryBuilder extends QueryBuilder
         $relationQuery = $relationInstance->getQuery();
 
         // Apply callback constraints if provided
+        // IMPORTANT: Pass relationship instance instead of query builder
+        // This allows relationship-specific __call() methods to auto-qualify columns
         if ($callback !== null) {
-            $callback($relationQuery);
+            $callback($relationInstance);
         }
 
         // Build EXISTS subquery
@@ -1210,8 +1212,10 @@ class ModelQueryBuilder extends QueryBuilder
         $relationQuery = $relationInstance->getQuery();
 
         // Apply callback constraints if provided
+        // IMPORTANT: Pass relationship instance instead of query builder
+        // This allows relationship-specific __call() methods to auto-qualify columns
         if ($callback !== null) {
-            $callback($relationQuery);
+            $callback($relationInstance);
         }
 
         // Build COUNT subquery (only when count comparison is needed)
@@ -1969,8 +1973,10 @@ class ModelQueryBuilder extends QueryBuilder
         $relationQuery = $relationInstance->getQuery();
 
         // Apply callback constraints if provided
+        // IMPORTANT: Pass relationship instance instead of query builder
+        // This allows relationship-specific __call() methods to auto-qualify columns
         if ($callback !== null) {
-            $callback($relationQuery);
+            $callback($relationInstance);
         }
 
         // Build EXISTS subquery
@@ -2017,8 +2023,10 @@ class ModelQueryBuilder extends QueryBuilder
         $relationQuery = $relationInstance->getQuery();
 
         // Apply callback constraints if provided
+        // IMPORTANT: Pass relationship instance instead of query builder
+        // This allows relationship-specific __call() methods to auto-qualify columns
         if ($callback !== null) {
-            $callback($relationQuery);
+            $callback($relationInstance);
         }
 
         // Build COUNT subquery (only when count comparison is needed)
@@ -2140,6 +2148,9 @@ class ModelQueryBuilder extends QueryBuilder
             $relation instanceof MorphedByMany
         ) {
             return $this->buildPivotExistsSubquery($relation, $parentTable, $relationQuery);
+        } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\HasManyThrough) {
+            // HasManyThrough requires JOIN with through table
+            return $this->buildHasManyThroughExistsSubquery($relation, $parentTable, $relationQuery);
         } else {
             return $this->buildSimpleExistsSubquery($relation, $parentTable, $relationQuery);
         }
@@ -2333,6 +2344,83 @@ class ModelQueryBuilder extends QueryBuilder
 
             // Remove unnecessary parentheses and add relation constraints directly
             // Use bindings instead of inlining values for better plan cache optimization
+            $subquerySql .= " AND {$whereClause}";
+            $bindings = array_merge($bindings, $relationBindings);
+        }
+
+        // Add LIMIT 1 for maximum performance
+        $subquerySql .= " LIMIT 1";
+
+        return ['sql' => $subquerySql, 'bindings' => $bindings];
+    }
+
+    /**
+     * Build EXISTS subquery for HasManyThrough relationship.
+     *
+     * HasManyThrough requires JOIN with the through table (intermediate model).
+     * Example: City hasMany Books through Authors
+     * SQL: SELECT 1 FROM books INNER JOIN authors ON authors.id = books.author_id
+     *      WHERE authors.city_id = cities.id
+     *
+     * @param \Toporia\Framework\Database\ORM\Relations\HasManyThrough $relation Relation instance
+     * @param string $parentTable Parent table name (cities)
+     * @param \Toporia\Framework\Database\Query\QueryBuilder $relationQuery Relation query
+     * @return array<string, mixed> Array with 'sql' (string) and 'bindings' (array) keys
+     */
+    protected function buildHasManyThroughExistsSubquery($relation, string $parentTable, $relationQuery): array
+    {
+        // Get keys and tables from HasManyThrough relationship
+        // firstKey: foreign key on through table (authors.city_id)
+        // secondKey: foreign key on related table (books.author_id) - stored in $relation->getForeignKey()
+        // localKey: local key on parent table (cities.id)
+        // secondLocalKey: local key on through table (authors.id)
+        $firstKey = $this->getRelationProperty($relation, 'firstKey');
+        $secondKey = $relation->getForeignKey(); // foreign key on books table
+        $localKey = $relation->getLocalKey();
+        $secondLocalKey = $this->getRelationProperty($relation, 'secondLocalKey');
+
+        // Get table names
+        // relatedTable: final table (books)
+        // throughTable: intermediate table (authors)
+        $relatedTable = $relationQuery->getTable();
+        $throughTable = $this->getRelationProperty($relation, 'throughClass')::getTableName();
+
+        // Build EXISTS subquery with JOIN to through table
+        // SELECT 1 FROM books INNER JOIN authors ON authors.id = books.author_id
+        // WHERE authors.city_id = cities.id
+        $subquerySql = "SELECT 1 FROM {$relatedTable} " .
+            "INNER JOIN {$throughTable} ON {$throughTable}.{$secondLocalKey} = {$relatedTable}.{$secondKey} " .
+            "WHERE {$throughTable}.{$firstKey} = {$parentTable}.{$localKey}";
+
+        // Collect bindings
+        $bindings = [];
+
+        // Add relation constraints from callback
+        $relationSql = $relationQuery->toSql();
+        $relationBindings = $relationQuery->getBindings();
+
+        // Extract WHERE clause from relation query
+        $whereClause = $this->extractCompleteWhereClause($relationSql);
+
+        // Add WHERE constraints if present
+        if (!empty($whereClause)) {
+            // Qualify unqualified column names with related table to avoid ambiguity
+            // Pattern: (?<!\w\.) means "not preceded by word_char + dot"
+            $whereClause = preg_replace_callback(
+                '/(?<!\w\.)(\b\w+)\s+(=|!=|<>|>|<|>=|<=|LIKE|NOT\s+LIKE|IN|NOT\s+IN|IS|IS\s+NOT)\s+/i',
+                function ($matches) use ($relatedTable) {
+                    $column = $matches[1];
+                    $operator = $matches[2];
+                    // Skip SQL keywords
+                    $keywords = ['AND', 'OR', 'NOT', 'NULL', 'TRUE', 'FALSE', 'BETWEEN'];
+                    if (in_array(strtoupper($column), $keywords)) {
+                        return $matches[0];
+                    }
+                    return "{$relatedTable}.{$column} {$operator} ";
+                },
+                $whereClause
+            );
+
             $subquerySql .= " AND {$whereClause}";
             $bindings = array_merge($bindings, $relationBindings);
         }
@@ -2640,8 +2728,10 @@ class ModelQueryBuilder extends QueryBuilder
         $relationQuery = $relationInstance->getQuery();
 
         // Apply callback constraints if provided
+        // IMPORTANT: Pass relationship instance instead of query builder
+        // This allows relationship-specific __call() methods to auto-qualify columns
         if ($callback !== null) {
-            $callback($relationQuery);
+            $callback($relationInstance);
         }
 
         // Build NOT EXISTS subquery
@@ -2688,8 +2778,10 @@ class ModelQueryBuilder extends QueryBuilder
         $relationQuery = $relationInstance->getQuery();
 
         // Apply callback constraints if provided
+        // IMPORTANT: Pass relationship instance instead of query builder
+        // This allows relationship-specific __call() methods to auto-qualify columns
         if ($callback !== null) {
-            $callback($relationQuery);
+            $callback($relationInstance);
         }
 
         // Build COUNT subquery (only when count comparison is needed)
@@ -2752,8 +2844,10 @@ class ModelQueryBuilder extends QueryBuilder
         $relationQuery = $relationInstance->getQuery();
 
         // Apply callback constraints if provided
+        // IMPORTANT: Pass relationship instance instead of query builder
+        // This allows relationship-specific __call() methods to auto-qualify columns
         if ($callback !== null) {
-            $callback($relationQuery);
+            $callback($relationInstance);
         }
 
         // Build NOT EXISTS subquery
@@ -2800,8 +2894,10 @@ class ModelQueryBuilder extends QueryBuilder
         $relationQuery = $relationInstance->getQuery();
 
         // Apply callback constraints if provided
+        // IMPORTANT: Pass relationship instance instead of query builder
+        // This allows relationship-specific __call() methods to auto-qualify columns
         if ($callback !== null) {
-            $callback($relationQuery);
+            $callback($relationInstance);
         }
 
         // Build COUNT subquery (only when count comparison is needed)
@@ -3381,6 +3477,12 @@ class ModelQueryBuilder extends QueryBuilder
             return;
         }
 
+        // Special handling for HasManyThrough relationships (requires JOIN with through table)
+        if ($relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\HasManyThrough) {
+            $this->addHasManyThroughCountSelect($relationInstance, $relationName, $table, $relationQuery, $alias);
+            return;
+        }
+
         $foreignKey = $relationInstance->getForeignKey();
         $localKey = $relationInstance->getLocalKey();
         $relationTable = $relationQuery->getTable();
@@ -3696,6 +3798,91 @@ class ModelQueryBuilder extends QueryBuilder
             $boundWhereClause = preg_replace(
                 '/\b(id)\s+(IN\s*\(|=|>|<|>=|<=|!=|<>)/i',
                 "{$relatedAlias}.$1 $2",
+                $boundWhereClause
+            );
+
+            $subquery .= " AND ({$boundWhereClause})";
+        }
+
+        // Use alias if provided, otherwise use relation name
+        $columnAlias = $alias !== null ? $alias : "{$relation}_count";
+
+        // Ensure we select table.* along with the subquery (only once)
+        $columns = $this->getColumns();
+        if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+            $this->select("{$table}.*");
+        }
+
+        $this->selectRaw("({$subquery}) AS {$columnAlias}");
+    }
+
+    /**
+     * Add withCount subselect for HasManyThrough relationship.
+     *
+     * HasManyThrough requires JOIN with through table for correct COUNT.
+     * Example: City hasMany Books through Authors
+     * SQL: SELECT COUNT(*) FROM books INNER JOIN authors ON authors.id = books.author_id
+     *      WHERE authors.city_id = cities.id
+     *
+     * @param \Toporia\Framework\Database\ORM\Relations\HasManyThrough $relationInstance
+     * @param string $relation Relationship name
+     * @param string $table Parent table name
+     * @param QueryBuilder $relationQuery Relation query
+     * @param string|null $alias Optional column alias
+     * @return void
+     */
+    private function addHasManyThroughCountSelect(
+        $relationInstance,
+        string $relation,
+        string $table,
+        QueryBuilder $relationQuery,
+        ?string $alias = null
+    ): void {
+        // Get keys and tables from HasManyThrough relationship
+        $firstKey = $this->getRelationProperty($relationInstance, 'firstKey'); // authors.city_id
+        $secondKey = $relationInstance->getForeignKey(); // books.author_id
+        $localKey = $relationInstance->getLocalKey(); // cities.id
+        $secondLocalKey = $this->getRelationProperty($relationInstance, 'secondLocalKey'); // authors.id
+
+        // Get table names
+        $relatedTable = $relationQuery->getTable(); // books
+        $throughTable = $this->getRelationProperty($relationInstance, 'throughClass')::getTableName(); // authors
+
+        // Build COUNT subquery with JOIN to through table
+        // SELECT COUNT(*) FROM books INNER JOIN authors ON authors.id = books.author_id
+        // WHERE authors.city_id = cities.id
+        $subquery = "SELECT COUNT(*) FROM {$relatedTable} " .
+            "INNER JOIN {$throughTable} ON {$throughTable}.{$secondLocalKey} = {$relatedTable}.{$secondKey} " .
+            "WHERE {$throughTable}.{$firstKey} = {$table}.{$localKey}";
+
+        // Add relation query constraints if present
+        $relationSql = $relationQuery->toSql();
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|GROUP BY|HAVING|$)/s', $relationSql, $matches)) {
+            $whereClause = $matches[1];
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            $boundWhereClause = $whereClause;
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $boundWhereClause = preg_replace('/\?/', $quoted, $boundWhereClause, 1);
+            }
+
+            // Qualify unqualified column names with related table to avoid ambiguity
+            // Use negative lookbehind to match columns NOT preceded by "table_name."
+            // Pattern: (?<!\w\.) means "not preceded by word_char + dot"
+            $boundWhereClause = preg_replace_callback(
+                '/(?<!\w\.)(\b\w+)\s+(=|!=|<>|>|<|>=|<=|LIKE|NOT\s+LIKE|IN|NOT\s+IN|IS|IS\s+NOT)\s+/i',
+                function ($matches) use ($relatedTable) {
+                    $column = $matches[1];
+                    $operator = $matches[2];
+                    // Skip SQL keywords
+                    $keywords = ['AND', 'OR', 'NOT', 'NULL', 'TRUE', 'FALSE', 'BETWEEN'];
+                    if (in_array(strtoupper($column), $keywords)) {
+                        return $matches[0];
+                    }
+                    return "{$relatedTable}.{$column} {$operator} ";
+                },
                 $boundWhereClause
             );
 
