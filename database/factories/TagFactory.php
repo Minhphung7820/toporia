@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Infrastructure\Persistence\Models\TagModel;
-use Toporia\Framework\Testing\Factories\Factory;
+use Toporia\Framework\Database\Factories\Factory;
 
 /**
  * Tag Factory for testing.
