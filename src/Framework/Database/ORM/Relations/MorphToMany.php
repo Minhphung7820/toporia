@@ -237,6 +237,10 @@ class MorphToMany extends Relation
             $this->query->where("{$this->pivotTable}.{$this->foreignKey}", $this->parent->getAttribute($this->localKey));
         }
 
+        // FIXED: Apply pivot constraints AFTER pivot join is created
+        // This ensures wherePivot from relationship definition works correctly
+        $this->applyPivotConstraintsToQuery($this->query);
+
         // Apply soft delete scope if related model uses soft deletes
         $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
     }
@@ -777,26 +781,87 @@ class MorphToMany extends Relation
      */
     protected function matchOptimized(array $models, ModelCollection $results, string $relationName): array
     {
-        // Build dictionary: "type:id" => [related_models]
+        // FIXED: Process pivot data properly instead of leaving pivot_* attributes in models
+        // Build dictionary: "type:id" => [related_id => ['model' => model, 'pivot' => pivotData]]
         $dictionary = [];
         foreach ($results as $result) {
-            // Parent type/id should be available from the main query's SELECT
+            // Get pivot keys
             $pivotMorphType = $result->getAttribute("pivot_{$this->morphType}");
             $pivotForeignKey = $result->getAttribute("pivot_{$this->foreignKey}");
+            $pivotRelatedKey = $result->getAttribute("pivot_{$this->relatedPivotKey}");
 
-            if ($pivotMorphType !== null && $pivotForeignKey !== null) {
+            if ($pivotMorphType !== null && $pivotForeignKey !== null && $pivotRelatedKey !== null) {
                 $parentKey = "{$pivotMorphType}:{$pivotForeignKey}";
+                $relatedIdKey = (string) $pivotRelatedKey;
+
+                // Build pivot data if needed
+                $pivotData = null;
+                if ($this->shouldIncludePivot()) {
+                    $pivotData = [
+                        $this->morphType => $pivotMorphType,
+                        $this->foreignKey => $pivotForeignKey,
+                        $this->relatedPivotKey => $pivotRelatedKey,
+                    ];
+
+                    // Add other pivot columns
+                    foreach ($this->pivotColumns as $column) {
+                        if ($column !== $this->morphType && $column !== $this->foreignKey && $column !== $this->relatedPivotKey) {
+                            $pivotValue = $result->getAttribute("pivot_{$column}");
+                            if ($pivotValue !== null) {
+                                $pivotData[$column] = $pivotValue;
+                            }
+                        }
+                    }
+
+                    // Add timestamps if enabled
+                    if ($this->withTimestamps) {
+                        $createdAt = $result->getAttribute('pivot_created_at');
+                        $updatedAt = $result->getAttribute('pivot_updated_at');
+                        if ($createdAt !== null) {
+                            $pivotData['created_at'] = $createdAt;
+                        }
+                        if ($updatedAt !== null) {
+                            $pivotData['updated_at'] = $updatedAt;
+                        }
+                    }
+                }
+
                 if (!isset($dictionary[$parentKey])) {
                     $dictionary[$parentKey] = [];
                 }
-                $dictionary[$parentKey][] = $result;
+                $dictionary[$parentKey][$relatedIdKey] = [
+                    'model' => $result,
+                    'pivot' => $pivotData
+                ];
             }
+        }
+
+        // Remove pivot_* attributes from all result models
+        foreach ($results as $result) {
+            /** @var Model $result */
+            $this->removePivotAttributes($result);
         }
 
         // Match to parents
         foreach ($models as $model) {
             $key = get_class($model) . ':' . $model->getAttribute($this->localKey);
-            $matched = $dictionary[$key] ?? [];
+            $matched = [];
+
+            if (isset($dictionary[$key])) {
+                foreach ($dictionary[$key] as $relatedData) {
+                    // Clone the related model to avoid sharing pivot data
+                    $relatedModel = clone $relatedData['model'];
+
+                    // Attach pivot object if we have pivot data
+                    if ($relatedData['pivot'] !== null && $this->shouldIncludePivot()) {
+                        $pivotModel = $this->newPivot($relatedData['pivot'], true);
+                        $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
+                    }
+
+                    $matched[] = $relatedModel;
+                }
+            }
+
             $model->setRelation($relationName, new ModelCollection($matched));
         }
 
@@ -1310,9 +1375,39 @@ class MorphToMany extends Relation
         }
 
         $this->pivotWheres[] = ['column' => $column, 'operator' => $operator, 'value' => $value];
-        $this->applyPivotWhere($column, $operator, $value);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->applyPivotWhere($column, $operator, $value);
+        }
 
         return $this;
+    }
+
+    /**
+     * Check if pivot table has already been joined to the query.
+     *
+     * This is used to determine if wherePivot constraints can be applied immediately
+     * or if they need to be stored and applied later.
+     *
+     * @return bool True if pivot join exists, false otherwise
+     */
+    protected function hasPivotJoin(): bool
+    {
+        $joins = $this->query->getJoins();
+
+        if (empty($joins)) {
+            return false;
+        }
+
+        // Check if any join references the pivot table
+        foreach ($joins as $join) {
+            if (isset($join['table']) && $join['table'] === $this->pivotTable) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1337,7 +1432,11 @@ class MorphToMany extends Relation
     public function wherePivotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values];
-        $this->query->whereIn("{$this->pivotTable}.{$column}", $values);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereIn("{$this->pivotTable}.{$column}", $values);
+        }
 
         return $this;
     }
@@ -1348,7 +1447,11 @@ class MorphToMany extends Relation
     public function wherePivotNotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => true];
-        $this->query->whereNotIn("{$this->pivotTable}.{$column}", $values);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereNotIn("{$this->pivotTable}.{$column}", $values);
+        }
 
         return $this;
     }
@@ -1366,7 +1469,11 @@ class MorphToMany extends Relation
         [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
 
         $this->pivotWheres[] = compact('column', 'operator', 'value') + ['type' => 'or'];
-        $this->query->orWhere("{$this->pivotTable}.{$column}", $operator, $value);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orWhere("{$this->pivotTable}.{$column}", $operator, $value);
+        }
 
         return $this;
     }
@@ -1381,7 +1488,11 @@ class MorphToMany extends Relation
     public function orWherePivotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false, 'type' => 'or'];
-        $this->query->orWhereIn("{$this->pivotTable}.{$column}", $values);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orWhereIn("{$this->pivotTable}.{$column}", $values);
+        }
 
         return $this;
     }
@@ -1393,7 +1504,11 @@ class MorphToMany extends Relation
     {
         $direction = strtolower($direction);
         $this->pivotOrderBy[] = ['column' => $column, 'direction' => $direction];
-        $this->query->orderBy("{$this->pivotTable}.{$column}", $direction);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orderBy("{$this->pivotTable}.{$column}", $direction);
+        }
 
         return $this;
     }
@@ -1403,8 +1518,12 @@ class MorphToMany extends Relation
      */
     public function wherePivotDate(string $column, string $operator, string $value): static
     {
-        $this->query->whereRaw("DATE({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-        $this->pivotWheres[] = ['column' => "DATE({$column})", 'operator' => $operator, 'value' => $value];
+        $this->pivotWheres[] = ['column' => "DATE({$column})", 'operator' => $operator, 'value' => $value, 'type' => 'function'];
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereRaw("DATE({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+        }
 
         return $this;
     }
@@ -1414,8 +1533,12 @@ class MorphToMany extends Relation
      */
     public function wherePivotMonth(string $column, string $operator, int $value): static
     {
-        $this->query->whereRaw("MONTH({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-        $this->pivotWheres[] = ['column' => "MONTH({$column})", 'operator' => $operator, 'value' => $value];
+        $this->pivotWheres[] = ['column' => "MONTH({$column})", 'operator' => $operator, 'value' => $value, 'type' => 'function'];
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereRaw("MONTH({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+        }
 
         return $this;
     }
@@ -1425,8 +1548,12 @@ class MorphToMany extends Relation
      */
     public function wherePivotYear(string $column, string $operator, int $value): static
     {
-        $this->query->whereRaw("YEAR({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
-        $this->pivotWheres[] = ['column' => "YEAR({$column})", 'operator' => $operator, 'value' => $value];
+        $this->pivotWheres[] = ['column' => "YEAR({$column})", 'operator' => $operator, 'value' => $value, 'type' => 'function'];
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereRaw("YEAR({$this->pivotTable}.{$column}) {$operator} ?", [$value]);
+        }
 
         return $this;
     }

@@ -244,6 +244,10 @@ class MorphedByMany extends Relation
             $this->query->where("{$this->pivotTable}.{$this->parentPivotKey}", $this->parent->getAttribute($this->localKey));
         }
 
+        // FIXED: Apply pivot constraints AFTER pivot join is created
+        // This ensures wherePivot from relationship definition works correctly
+        $this->applyPivotConstraintsToQuery($this->query);
+
         // Apply soft delete scope if related model uses soft deletes
         $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
     }
@@ -773,7 +777,11 @@ class MorphedByMany extends Relation
         [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
 
         $this->pivotWheres[] = compact('column', 'operator', 'value');
-        $this->query->where($this->qualifyPivotColumn($column), $operator, $value);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->where($this->qualifyPivotColumn($column), $operator, $value);
+        }
 
         return $this;
     }
@@ -784,7 +792,11 @@ class MorphedByMany extends Relation
     public function wherePivotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false];
-        $this->query->whereIn($this->qualifyPivotColumn($column), $values);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereIn($this->qualifyPivotColumn($column), $values);
+        }
 
         return $this;
     }
@@ -795,7 +807,11 @@ class MorphedByMany extends Relation
     public function wherePivotNotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => true];
-        $this->query->whereNotIn($this->qualifyPivotColumn($column), $values);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereNotIn($this->qualifyPivotColumn($column), $values);
+        }
 
         return $this;
     }
@@ -813,7 +829,11 @@ class MorphedByMany extends Relation
         [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
 
         $this->pivotWheres[] = compact('column', 'operator', 'value') + ['type' => 'or'];
-        $this->query->orWhere($this->qualifyPivotColumn($column), $operator, $value);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orWhere($this->qualifyPivotColumn($column), $operator, $value);
+        }
 
         return $this;
     }
@@ -828,7 +848,11 @@ class MorphedByMany extends Relation
     public function orWherePivotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false, 'type' => 'or'];
-        $this->query->orWhereIn($this->qualifyPivotColumn($column), $values);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orWhereIn($this->qualifyPivotColumn($column), $values);
+        }
 
         return $this;
     }
@@ -840,7 +864,11 @@ class MorphedByMany extends Relation
     {
         $direction = strtolower($direction);
         $this->pivotOrderBy[] = compact('column', 'direction');
-        $this->query->orderBy($this->qualifyPivotColumn($column), $direction);
+
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orderBy($this->qualifyPivotColumn($column), $direction);
+        }
 
         return $this;
     }
@@ -931,9 +959,6 @@ class MorphedByMany extends Relation
      */
     protected function addPivotFunctionConstraint(string $function, string $column, string $operator, mixed $value): static
     {
-        $qualifiedColumn = $this->qualifyPivotColumn($column);
-        $this->query->whereRaw("{$function}({$qualifiedColumn}) {$operator} ?", [$value]);
-
         $this->pivotWheres[] = [
             'column' => "{$function}({$column})",
             'operator' => $operator,
@@ -941,7 +966,39 @@ class MorphedByMany extends Relation
             'type' => 'function'
         ];
 
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $qualifiedColumn = $this->qualifyPivotColumn($column);
+            $this->query->whereRaw("{$function}({$qualifiedColumn}) {$operator} ?", [$value]);
+        }
+
         return $this;
+    }
+
+    /**
+     * Check if pivot table has already been joined to the query.
+     *
+     * This is used to determine if wherePivot constraints can be applied immediately
+     * or if they need to be stored and applied later.
+     *
+     * @return bool True if pivot join exists, false otherwise
+     */
+    protected function hasPivotJoin(): bool
+    {
+        $joins = $this->query->getJoins();
+
+        if (empty($joins)) {
+            return false;
+        }
+
+        // Check if any join references the pivot table
+        foreach ($joins as $join) {
+            if (isset($join['table']) && $join['table'] === $this->pivotTable) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
