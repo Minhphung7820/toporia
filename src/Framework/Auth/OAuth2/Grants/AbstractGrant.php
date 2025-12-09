@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth\OAuth2\Grants;
 
-use Toporia\Framework\Auth\OAuth2\Contracts\{GrantInterface, TokenRepositoryInterface, UserProviderInterface};
+use Toporia\Framework\Auth\Contracts\UserProviderInterface;
+use Toporia\Framework\Auth\OAuth2\Contracts\{ClientInterface, GrantInterface, TokenRepositoryInterface};
 use Toporia\Framework\Http\Request;
 
 
@@ -33,8 +34,7 @@ abstract class AbstractGrant implements GrantInterface
     public function __construct(
         protected TokenRepositoryInterface $tokenRepository,
         protected ?UserProviderInterface $userProvider = null
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}
@@ -44,7 +44,7 @@ abstract class AbstractGrant implements GrantInterface
     /**
      * {@inheritdoc}
      */
-    abstract public function issueToken(Request $request, \Toporia\Framework\Auth\OAuth2\Contracts\ClientInterface $client): array;
+    abstract public function issueToken(Request $request, ClientInterface $client): array;
 
     /**
      * Validate required parameters for grant type.
@@ -93,4 +93,3 @@ abstract class AbstractGrant implements GrantInterface
         return is_array($scopes) ? $scopes : explode(' ', $scopes);
     }
 }
-

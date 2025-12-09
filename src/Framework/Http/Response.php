@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http;
 
 use Toporia\Framework\Http\Contracts\ResponseInterface;
+use Toporia\Framework\Support\Macroable;
 
 /**
  * Class Response
@@ -24,7 +25,7 @@ use Toporia\Framework\Http\Contracts\ResponseInterface;
  */
 class Response implements ResponseInterface
 {
-    use \Toporia\Framework\Support\Macroable;
+    use Macroable;
     /**
      * @var int HTTP status code.
      */

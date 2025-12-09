@@ -115,7 +115,7 @@ final class SendNotificationJob extends Job
     private function reconstructNotifiable(): NotifiableInterface
     {
         // Check if notifiable is an ORM Model
-        if (is_subclass_of($this->notifiableClass, \Toporia\Framework\Database\ORM\Model::class)) {
+        if (is_subclass_of($this->notifiableClass, Model::class)) {
             // Refetch from database for fresh data
             $id = $this->notifiableData['id'] ?? null;
 

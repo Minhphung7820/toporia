@@ -8,6 +8,7 @@ use Toporia\Framework\Auth\Passwords\Contracts\CanResetPasswordInterface;
 use Toporia\Framework\Auth\Passwords\Contracts\TokenRepositoryInterface;
 use Toporia\Framework\Database\Connection;
 use Toporia\Framework\Database\Query\QueryBuilder;
+use Toporia\Framework\DateTime\Chronos;
 use Toporia\Framework\Hashing\Contracts\HasherInterface;
 
 /**
@@ -170,7 +171,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
      */
     protected function tokenExpired(string $createdAt): bool
     {
-        $createdTime = \Toporia\Framework\DateTime\Chronos::parse($createdAt)->getTimestamp();
+        $createdTime = Chronos::parse($createdAt)->getTimestamp();
 
         return ($createdTime + $this->expires) < now()->getTimestamp();
     }

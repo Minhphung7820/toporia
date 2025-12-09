@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Toporia\Framework\Testing\Concerns;
 
 use Toporia\Framework\Foundation\Application;
+use Toporia\Framework\Foundation\Bootstrap\{BootProviders, HandleExceptions, RegisterFacades, RegisterProviders};
+use Toporia\Framework\Foundation\{LoadConfiguration, LoadEnvironmentVariables};
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Routing\Router;
 use Toporia\Framework\Testing\TestResponse;
@@ -31,9 +33,9 @@ trait InteractsWithHttp
     /**
      * Cached application instance to avoid re-bootstrapping
      *
-     * @var \Toporia\Framework\Foundation\Application|null
+     * @var Application|null
      */
-    private static ?\Toporia\Framework\Foundation\Application $cachedApp = null;
+    private static ?Application $cachedApp = null;
 
     /**
      * Make a GET request.
@@ -108,25 +110,25 @@ trait InteractsWithHttp
 
                 // Now bootstrap (this will load helpers, config, etc.)
                 // Load environment
-                \Toporia\Framework\Foundation\LoadEnvironmentVariables::bootstrap($basePath);
+                LoadEnvironmentVariables::bootstrap($basePath);
 
                 // Handle exceptions
-                \Toporia\Framework\Foundation\Bootstrap\HandleExceptions::bootstrap();
+                HandleExceptions::bootstrap();
 
                 // Load helpers (now $GLOBALS['app'] is set)
                 require $basePath . '/bootstrap/helpers.php';
 
                 // Load configuration
-                \Toporia\Framework\Foundation\LoadConfiguration::bootstrap($app);
+                LoadConfiguration::bootstrap($app);
 
                 // Register facades
-                \Toporia\Framework\Foundation\Bootstrap\RegisterFacades::bootstrap($app);
+                RegisterFacades::bootstrap($app);
 
                 // Register providers
-                \Toporia\Framework\Foundation\Bootstrap\RegisterProviders::bootstrap($app);
+                RegisterProviders::bootstrap($app);
 
                 // Boot providers (loads routes)
-                \Toporia\Framework\Foundation\Bootstrap\BootProviders::bootstrap($app);
+                BootProviders::bootstrap($app);
             }
 
             // Cache app instance for performance
@@ -177,7 +179,7 @@ trait InteractsWithHttp
         }
 
         // Capture request
-        $request = \Toporia\Framework\Http\Request::capture();
+        $request = Request::capture();
 
         // Get container from app
         $container = $app->getContainer();

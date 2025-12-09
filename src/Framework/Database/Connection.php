@@ -221,7 +221,7 @@ class Connection implements ConnectionInterface
         // Log query execution
         if ($startTime !== null) {
             $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
-            \Toporia\Framework\Database\Query\QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
+            QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
         }
 
         return $results;
@@ -692,7 +692,7 @@ class Connection implements ConnectionInterface
         // Log query execution (important for window functions, subqueries, etc.)
         if ($startTime !== null) {
             $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
-            \Toporia\Framework\Database\Query\QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
+            QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
         }
 
         return $results;
@@ -719,7 +719,7 @@ class Connection implements ConnectionInterface
         // Log query execution
         if ($startTime !== null) {
             $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
-            \Toporia\Framework\Database\Query\QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
+            QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
         }
 
         return $result ?: null;
@@ -746,7 +746,7 @@ class Connection implements ConnectionInterface
         // Log query execution (important for insert/update/delete operations)
         if ($startTime !== null) {
             $executionTime = (microtime(true) - $startTime) * 1000; // Convert to milliseconds
-            \Toporia\Framework\Database\Query\QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
+            QueryBuilder::logQueryDirectly($query, $bindings, $executionTime);
         }
 
         return $affected;

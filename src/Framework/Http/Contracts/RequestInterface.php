@@ -503,5 +503,5 @@ interface RequestInterface
      *
      * @return \Toporia\Framework\Session\Store|null Session store instance or null
      */
-    public function getSession(): ?\Toporia\Framework\Session\Store;
+    public function getSession(): ?Store;
 }

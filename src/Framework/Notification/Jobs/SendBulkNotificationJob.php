@@ -109,7 +109,7 @@ final class SendBulkNotificationJob extends Job
     private function reconstructNotifiable(array $data): mixed
     {
         // Check if notifiable is an ORM Model
-        if (is_subclass_of($this->notifiableClass, \Toporia\Framework\Database\ORM\Model::class)) {
+        if (is_subclass_of($this->notifiableClass, Model::class)) {
             // Refetch from database for fresh data
             $id = $data['id'] ?? null;
 

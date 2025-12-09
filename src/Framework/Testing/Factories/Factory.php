@@ -47,7 +47,7 @@ use Toporia\Framework\Database\ORM\Model;
  *
  * @link        https://github.com/Minhphung7820/toporia
  */
-abstract class Factory implements \Toporia\Framework\Database\Contracts\FactoryInterface
+abstract class Factory implements FactoryInterface
 {
     /**
      * Faker instance.

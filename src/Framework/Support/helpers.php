@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Toporia\Framework\Foundation\Application;
 use Toporia\Framework\Http\Contracts\{JsonResponseInterface, RedirectResponseInterface, ResponseFactoryInterface};
 use Toporia\Framework\Http\Exceptions\HttpException;
 use Toporia\Framework\Http\Request;
@@ -33,7 +34,7 @@ if (!function_exists('app')) {
      * @param \Toporia\Framework\Foundation\Application|null $instance Set application instance
      * @return mixed Application instance or resolved service
      */
-    function app(?string $abstract = null, ?\Toporia\Framework\Foundation\Application $instance = null): mixed
+    function app(?string $abstract = null, ?Application $instance = null): mixed
     {
         static $application = null;
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Queue;
 
 use Toporia\Framework\Database\Connection;
+use Toporia\Framework\Notification\Jobs\SendNotificationJob;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
 use Toporia\Framework\Queue\Job;
 
@@ -157,9 +158,9 @@ final class DatabaseQueue implements QueueInterface
             // Only allow specific Job classes - this is critical for security
             $job = @unserialize($record['payload'], [
                 'allowed_classes' => [
-                    \Toporia\Framework\Queue\Job::class,
-                    \Toporia\Framework\Queue\Contracts\JobInterface::class,
-                    \Toporia\Framework\Notification\Jobs\SendNotificationJob::class,
+                    Job::class,
+                    JobInterface::class,
+                    SendNotificationJob::class,
                     // Add other trusted Job classes here
                 ]
             ]);

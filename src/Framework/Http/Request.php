@@ -6,6 +6,7 @@ namespace Toporia\Framework\Http;
 
 use Toporia\Framework\Http\Contracts\RequestInterface;
 use Toporia\Framework\Session\Store;
+use Toporia\Framework\Support\Macroable;
 
 /**
  * Class Request
@@ -26,7 +27,7 @@ use Toporia\Framework\Session\Store;
  */
 final class Request implements RequestInterface
 {
-    use \Toporia\Framework\Support\Macroable;
+    use Macroable;
     /**
      * @var string HTTP method.
      */
@@ -65,7 +66,7 @@ final class Request implements RequestInterface
     /**
      * @var \Toporia\Framework\Session\Store|null Session store instance
      */
-    private ?\Toporia\Framework\Session\Store $session = null;
+    private ?Store $session = null;
 
     /**
      * @var array<string, mixed> Instance-level cache for nested value lookups
@@ -82,7 +83,7 @@ final class Request implements RequestInterface
      *
      * @param \Toporia\Framework\Session\Store|null $session Session store instance
      */
-    public function __construct(?\Toporia\Framework\Session\Store $session = null)
+    public function __construct(?Store $session = null)
     {
         $this->session = $session;
     }
@@ -152,7 +153,7 @@ final class Request implements RequestInterface
      *
      * @return \Toporia\Framework\Session\Store|null Session store instance or null
      */
-    public function getSession(): ?\Toporia\Framework\Session\Store
+    public function getSession(): ?Store
     {
         return $this->session;
     }

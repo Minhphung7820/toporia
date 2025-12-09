@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Queue;
 
+use Toporia\Framework\Bus\Contracts\QueueableInterface;
 use Toporia\Framework\Queue\Contracts\JobInterface;
 use Toporia\Framework\Queue\Backoff\{BackoffStrategy, ConstantBackoff};
 use Toporia\Framework\Queue\Middleware\JobMiddleware;
@@ -26,7 +27,7 @@ use Toporia\Framework\Queue\Support\JobProgress;
  *
  * @link        https://github.com/Minhphung7820/toporia
  */
-abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\QueueableInterface
+abstract class Job implements JobInterface, QueueableInterface
 {
     protected string $id;
     protected string $queue = 'default';

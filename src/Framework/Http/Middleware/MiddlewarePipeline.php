@@ -187,7 +187,7 @@ final class MiddlewarePipeline
     private function needsParameters(string $middlewareClass): bool
     {
         // ThrottleRequests supports parameters
-        return $middlewareClass === \Toporia\Framework\Http\Middleware\ThrottleRequests::class
+        return $middlewareClass === ThrottleRequests::class
             || str_ends_with($middlewareClass, 'ThrottleRequests');
     }
 

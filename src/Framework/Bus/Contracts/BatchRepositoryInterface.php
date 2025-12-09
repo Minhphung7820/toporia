@@ -40,7 +40,7 @@ interface BatchRepositoryInterface
      * @param string $batchId Batch ID
      * @return \Toporia\Framework\Bus\Batch|null
      */
-    public function find(string $batchId): ?\Toporia\Framework\Bus\Batch;
+    public function find(string $batchId): ?Batch;
 
     /**
      * Update a batch.

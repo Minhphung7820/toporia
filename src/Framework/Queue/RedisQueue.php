@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Toporia\Framework\Queue;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Notification\Jobs\SendNotificationJob;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
+use Toporia\Framework\Queue\Job;
 
 /**
  * Class RedisQueue
@@ -270,9 +272,9 @@ final class RedisQueue implements Contracts\QueueInterface
         // Only allow specific Job classes - this is critical for security
         $job = @unserialize($payload, [
             'allowed_classes' => [
-                \Toporia\Framework\Queue\Job::class,
-                \Toporia\Framework\Queue\Contracts\JobInterface::class,
-                \Toporia\Framework\Notification\Jobs\SendNotificationJob::class,
+                Job::class,
+                JobInterface::class,
+                SendNotificationJob::class,
                 // Add other trusted Job classes here
             ]
         ]);

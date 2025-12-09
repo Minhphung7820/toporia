@@ -169,7 +169,7 @@ final class AuthManager implements AuthManagerInterface
      *
      * @return \Toporia\Framework\Auth\Authenticatable|null
      */
-    public function user(): ?\Toporia\Framework\Auth\Authenticatable
+    public function user(): ?Authenticatable
     {
         return $this->guard()->user();
     }
