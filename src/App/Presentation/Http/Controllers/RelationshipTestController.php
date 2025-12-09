@@ -526,6 +526,7 @@ final class RelationshipTestController extends BaseController
             'books_categories' => BookModel::with(['categories' => function ($q) {
                 $q->wherePivot('is_primary', true)
                     ->orderByPivot('order', 'ASC')
+                    ->orderBy('categories.name', 'ASC')
                     ->limit(4);
             }, 'author', 'publisher'])
                 ->whereHas('categories', function ($q) {
