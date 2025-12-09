@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Toporia\Framework\Testing\Concerns;
 
 use Toporia\Framework\Foundation\Application;
+use Toporia\Framework\Http\Request;
+use Toporia\Framework\Routing\Router;
 use Toporia\Framework\Testing\TestResponse;
 
 
@@ -182,10 +184,10 @@ trait InteractsWithHttp
 
         // Bind request to container so Router can access it
         $container->instance('request', $request);
-        $container->instance(\Toporia\Framework\Http\Request::class, $request);
+        $container->instance(Request::class, $request);
 
         // Get router (it's singleton, created during route loading)
-        $router = $container->make(\Toporia\Framework\Routing\Router::class);
+        $router = $container->make(Router::class);
 
         // Update router's request using reflection (router is singleton with old Request)
         $routerReflection = new \ReflectionClass($router);

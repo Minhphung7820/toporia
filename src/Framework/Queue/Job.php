@@ -7,6 +7,7 @@ namespace Toporia\Framework\Queue;
 use Toporia\Framework\Queue\Contracts\JobInterface;
 use Toporia\Framework\Queue\Backoff\{BackoffStrategy, ConstantBackoff};
 use Toporia\Framework\Queue\Middleware\JobMiddleware;
+use Toporia\Framework\Queue\Support\JobProgress;
 
 
 /**
@@ -536,8 +537,8 @@ abstract class Job implements JobInterface, \Toporia\Framework\Bus\Contracts\Que
         }
 
         // Try to get JobProgress from container
-        if (function_exists('app') && app()->has(\Toporia\Framework\Queue\Support\JobProgress::class)) {
-            $progressTracker = app()->get(\Toporia\Framework\Queue\Support\JobProgress::class);
+        if (function_exists('app') && app()->has(JobProgress::class)) {
+            $progressTracker = app()->get(JobProgress::class);
             $progressTracker->set($this->id, $progress, $message);
         }
     }

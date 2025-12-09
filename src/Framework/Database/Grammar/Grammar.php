@@ -208,7 +208,7 @@ abstract class Grammar implements GrammarInterface
      *
      * Performance: O(m) where m = number of conditions in JOIN
      */
-    protected function compileJoinClause(\Toporia\Framework\Database\Query\JoinClause $join): string
+    protected function compileJoinClause(JoinClause $join): string
     {
         $type = $join->getType();
         $tableName = $join->getTable();

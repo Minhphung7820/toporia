@@ -6,6 +6,7 @@ namespace Toporia\Framework\Testing\Factories;
 
 use Faker\Generator;
 use Closure;
+use Toporia\Framework\Database\Contracts\FactoryInterface;
 use Toporia\Framework\Database\ORM\Model;
 
 /**
@@ -240,7 +241,7 @@ abstract class Factory implements \Toporia\Framework\Database\Contracts\FactoryI
      * @param array $attributes Additional attributes
      * @return static
      */
-    public function has(\Toporia\Framework\Database\Contracts\FactoryInterface $factory, string $relationship, int $count = 1, array $attributes = []): static
+    public function has(FactoryInterface $factory, string $relationship, int $count = 1, array $attributes = []): static
     {
         $this->has[$relationship] = [$factory, $count, $attributes];
         return $this;
@@ -457,7 +458,7 @@ abstract class Factory implements \Toporia\Framework\Database\Contracts\FactoryI
      * @param \Toporia\Framework\Database\ORM\Model $model
      * @return void
      */
-    protected function createRelationships(\Toporia\Framework\Database\ORM\Model $model): void
+    protected function createRelationships(Model $model): void
     {
         foreach ($this->has as $relationship => [$factory, $count, $attributes]) {
             $relatedModels = $factory->createMany($count, $attributes);

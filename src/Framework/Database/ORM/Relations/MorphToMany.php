@@ -1021,7 +1021,7 @@ class MorphToMany extends Relation
      * @param \Toporia\Framework\Database\ORM\Model $model Model instance to clean
      * @return void
      */
-    protected function removePivotAttributes(\Toporia\Framework\Database\ORM\Model $model): void
+    protected function removePivotAttributes(Model $model): void
     {
         // Use Model's protected method to remove attributes efficiently
         // This avoids reflection overhead and is much faster

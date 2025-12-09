@@ -6,6 +6,7 @@ namespace Toporia\Framework\Http;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Http\Contracts\RequestInterface;
+use Toporia\Framework\Http\Request;
 use Toporia\Framework\Routing\Contracts\RouterInterface;
 
 
@@ -65,7 +66,7 @@ class Kernel
     {
         // Bind the request to container so Router can access it
         $this->container->instance(RequestInterface::class, $request);
-        $this->container->instance(\Toporia\Framework\Http\Request::class, $request);
+        $this->container->instance(Request::class, $request);
 
         // In future: Run global middleware here
         // For now, delegate directly to router

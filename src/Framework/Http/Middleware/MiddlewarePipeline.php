@@ -8,6 +8,7 @@ use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\Http\Middleware\ThrottleRequests;
+use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
 
 /**
  * Class MiddlewarePipeline
@@ -200,7 +201,7 @@ final class MiddlewarePipeline
     private function instantiateWithParameters(string $middlewareClass, string|array $parameters): MiddlewareInterface
     {
         // Get base rate limiter from container
-        $limiter = $this->container->get(\Toporia\Framework\RateLimit\Contracts\RateLimiterInterface::class);
+        $limiter = $this->container->get(RateLimiterInterface::class);
 
         // Handle ThrottleRequests parameters
         if (

@@ -211,7 +211,7 @@ class Connection implements ConnectionInterface
     {
         // Log query if query logging is enabled
         $startTime = null;
-        if (\Toporia\Framework\Database\Query\QueryBuilder::isQueryLogEnabled()) {
+        if (QueryBuilder::isQueryLogEnabled()) {
             $startTime = microtime(true);
         }
 
@@ -682,7 +682,7 @@ class Connection implements ConnectionInterface
     {
         // Log query if query logging is enabled
         $startTime = null;
-        if (\Toporia\Framework\Database\Query\QueryBuilder::isQueryLogEnabled()) {
+        if (QueryBuilder::isQueryLogEnabled()) {
             $startTime = microtime(true);
         }
 
@@ -709,7 +709,7 @@ class Connection implements ConnectionInterface
     {
         // Log query if query logging is enabled
         $startTime = null;
-        if (\Toporia\Framework\Database\Query\QueryBuilder::isQueryLogEnabled()) {
+        if (QueryBuilder::isQueryLogEnabled()) {
             $startTime = microtime(true);
         }
 
@@ -736,7 +736,7 @@ class Connection implements ConnectionInterface
     {
         // Log query if query logging is enabled
         $startTime = null;
-        if (\Toporia\Framework\Database\Query\QueryBuilder::isQueryLogEnabled()) {
+        if (QueryBuilder::isQueryLogEnabled()) {
             $startTime = microtime(true);
         }
 

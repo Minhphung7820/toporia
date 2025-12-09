@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM;
 
 use Toporia\Framework\Database\Contracts\{ConnectionInterface, ModelInterface, RelationInterface};
+use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
 use Toporia\Framework\Database\ORM\{ModelCollection, Relations};
 use Toporia\Framework\Observer\Traits\Observable;
@@ -495,7 +496,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
     protected static function resolveConnection(string $name): ConnectionInterface
     {
         // Get DatabaseManager from container
-        $manager = container(\Toporia\Framework\Database\DatabaseManager::class);
+        $manager = container(DatabaseManager::class);
         $proxy = $manager->connection($name);
         return $proxy->getConnection();
     }

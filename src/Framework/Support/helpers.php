@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Toporia\Framework\Http\Contracts\{JsonResponseInterface, RedirectResponseInterface};
+use Toporia\Framework\Http\Contracts\{JsonResponseInterface, RedirectResponseInterface, ResponseFactoryInterface};
 use Toporia\Framework\Http\Exceptions\HttpException;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Support\HigherOrderTapProxy;
@@ -85,7 +85,7 @@ if (!function_exists('response')) {
      */
     function response(mixed $content = null, int $status = 200, array $headers = []): mixed
     {
-        $factory = app()->make(\Toporia\Framework\Http\Contracts\ResponseFactoryInterface::class);
+        $factory = app()->make(ResponseFactoryInterface::class);
 
         if (func_num_args() === 0) {
             return $factory;

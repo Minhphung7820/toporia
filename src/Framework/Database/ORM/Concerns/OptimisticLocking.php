@@ -228,7 +228,7 @@ trait OptimisticLocking
         for ($attempt = 0; $attempt <= $maxRetries; $attempt++) {
             try {
                 return $this->saveWithOptimisticLock();
-            } catch (\Toporia\Framework\Database\ORM\Exceptions\StaleObjectException $e) {
+            } catch (StaleObjectException $e) {
                 if ($attempt >= $maxRetries) {
                     throw $e;
                 }

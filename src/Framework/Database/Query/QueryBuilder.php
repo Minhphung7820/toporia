@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\Query;
 
 use Toporia\Framework\Database\Contracts\{ConnectionInterface, QueryBuilderInterface};
+use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\Query\{Expression, RowCollection};
 use Toporia\Framework\Database\DatabaseCollection;
 use Toporia\Framework\Support\Collection\LazyCollection;
@@ -4290,7 +4291,7 @@ class QueryBuilder implements QueryBuilderInterface
     public function onConnection(string $connectionName): self
     {
         // Get DatabaseManager from container
-        $manager = container(\Toporia\Framework\Database\DatabaseManager::class);
+        $manager = container(DatabaseManager::class);
         $proxy = $manager->connection($connectionName);
         $newConnection = $proxy->getConnection();
 

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Validation\Rules;
 
+use Toporia\Framework\Container\Container;
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Validation\Contracts\DataAwareRuleInterface;
 use Toporia\Framework\Validation\Contracts\RuleInterface;
 use Toporia\Framework\Validation\ValidationAttribute;
 use Toporia\Framework\Validation\ValidationData;
+use Toporia\Framework\Validation\Validator;
 
 /**
  * Class Unique
@@ -209,16 +212,16 @@ final class Unique implements RuleInterface, DataAwareRuleInterface
     private function getConnection(): object
     {
         // Try to get from container or global
-        if (class_exists(\Toporia\Framework\Container\Container::class)) {
-            $container = \Toporia\Framework\Container\Container::getInstance();
-            if ($container->has(\Toporia\Framework\Database\Contracts\ConnectionInterface::class)) {
-                return $container->get(\Toporia\Framework\Database\Contracts\ConnectionInterface::class);
+        if (class_exists(Container::class)) {
+            $container = Container::getInstance();
+            if ($container->has(ConnectionInterface::class)) {
+                return $container->get(ConnectionInterface::class);
             }
         }
 
         // Fallback: use reflection to access Validator's protected static method
         try {
-            $method = new \ReflectionMethod(\Toporia\Framework\Validation\Validator::class, 'getConnection');
+            $method = new \ReflectionMethod(Validator::class, 'getConnection');
             return $method->invoke(null);
         } catch (\ReflectionException $e) {
             throw new \RuntimeException('Database connection not available: ' . $e->getMessage());

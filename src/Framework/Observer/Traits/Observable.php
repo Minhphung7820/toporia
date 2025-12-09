@@ -202,7 +202,7 @@ trait Observable
         }
 
         try {
-            $manager = container(\Toporia\Framework\Observer\Contracts\ObserverManagerInterface::class);
+            $manager = container(ObserverManagerInterface::class);
             $observableClass = static::class;
 
             // Get all observers for this class

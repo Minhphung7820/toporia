@@ -6,6 +6,9 @@ namespace Toporia\Framework\Webhook\Providers;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
+use Toporia\Framework\Http\Contracts\HttpClientInterface;
+use Toporia\Framework\Log\Contracts\LoggerInterface;
+use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
 use Toporia\Framework\Webhook\{WebhookDispatcher, WebhookReceiver, WebhookManager, SignatureGenerator};
 use Toporia\Framework\Webhook\Contracts\{WebhookDispatcherInterface, WebhookReceiverInterface, SignatureGeneratorInterface};
 
@@ -45,13 +48,13 @@ final class WebhookServiceProvider extends ServiceProvider
         // Register webhook dispatcher
         $container->singleton(WebhookDispatcherInterface::class, function ($c) {
             return new WebhookDispatcher(
-                $c->get(\Toporia\Framework\Http\Contracts\HttpClientInterface::class),
+                $c->get(HttpClientInterface::class),
                 $c->get(SignatureGeneratorInterface::class),
-                $c->has(\Toporia\Framework\Queue\Contracts\QueueManagerInterface::class)
-                    ? $c->get(\Toporia\Framework\Queue\Contracts\QueueManagerInterface::class)
+                $c->has(QueueManagerInterface::class)
+                    ? $c->get(QueueManagerInterface::class)
                     : null,
-                $c->has(\Toporia\Framework\Log\Contracts\LoggerInterface::class)
-                    ? $c->get(\Toporia\Framework\Log\Contracts\LoggerInterface::class)
+                $c->has(LoggerInterface::class)
+                    ? $c->get(LoggerInterface::class)
                     : null
             );
         });
@@ -60,8 +63,8 @@ final class WebhookServiceProvider extends ServiceProvider
         $container->singleton(WebhookReceiverInterface::class, function ($c) {
             return new WebhookReceiver(
                 $c->get(SignatureGeneratorInterface::class),
-                $c->has(\Toporia\Framework\Log\Contracts\LoggerInterface::class)
-                    ? $c->get(\Toporia\Framework\Log\Contracts\LoggerInterface::class)
+                $c->has(LoggerInterface::class)
+                    ? $c->get(LoggerInterface::class)
                     : null
             );
         });

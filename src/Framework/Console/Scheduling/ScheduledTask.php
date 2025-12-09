@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Console\Scheduling;
 
-use Toporia\Framework\Console\Scheduling\Support\CronExpression;
+use Toporia\Framework\Console\Scheduling\Support\{CronExpression, MaintenanceMode};
 
 /**
  * Class ScheduledTask
@@ -481,7 +481,7 @@ final class ScheduledTask
 
         // Check maintenance mode (if enabled)
         if ($this->skipMaintenanceMode) {
-            if (\Toporia\Framework\Console\Scheduling\Support\MaintenanceMode::isDown($basePath)) {
+            if (MaintenanceMode::isDown($basePath)) {
                 return false;
             }
         }
