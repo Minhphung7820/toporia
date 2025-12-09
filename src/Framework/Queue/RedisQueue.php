@@ -305,18 +305,6 @@ final class RedisQueue implements Contracts\QueueInterface
         $queueKey = $this->getQueueKey($queue);
         $currentTime = now()->getTimestamp();
 
-        // Get all jobs with score <= current time
-        // ZRANGEBYSCORE is O(log N + k) where k = returned elements
-        $jobIds = $this->redis->zRangeByScore(
-            $delayedKey,
-            '-inf',
-            (string) $currentTime
-        );
-
-        if (empty($jobIds)) {
-            return;
-        }
-
         // Use Lua script for atomic migration (no race conditions)
         // Lua script executes atomically on Redis server
         // Performance: Single round-trip for entire migration
@@ -325,8 +313,13 @@ local delayed_key = KEYS[1]
 local queue_key = KEYS[2]
 local current_time = ARGV[1]
 
--- Get ready jobs
+-- Get ready jobs (current_time is string, Redis will convert automatically)
 local job_ids = redis.call('ZRANGEBYSCORE', delayed_key, '-inf', current_time)
+
+-- If no jobs ready, return early
+if #job_ids == 0 then
+    return 0
+end
 
 -- Migrate each job atomically
 for i, job_id in ipairs(job_ids) do
@@ -338,7 +331,8 @@ return #job_ids
 LUA;
 
         // Execute Lua script atomically
-        $this->redis->eval($script, [$delayedKey, $queueKey, $currentTime], 2);
+        // CRITICAL: Convert $currentTime to string for Redis ZRANGEBYSCORE
+        $this->redis->eval($script, [$delayedKey, $queueKey, (string) $currentTime], 2);
     }
 
     /**
