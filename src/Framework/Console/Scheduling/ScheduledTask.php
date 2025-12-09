@@ -147,6 +147,10 @@ final class ScheduledTask
     public function dailyAt(string $time): self
     {
         [$hour, $minute] = explode(':', $time);
+        // BUGFIX: Remove leading zeros to ensure valid cron expression
+        // '00' becomes '0', '05' becomes '5', '14' stays '14'
+        $hour = ltrim($hour, '0') ?: '0';
+        $minute = ltrim($minute, '0') ?: '0';
         return $this->cron("{$minute} {$hour} * * *");
     }
 
