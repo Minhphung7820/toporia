@@ -208,5 +208,16 @@ final class ScheduleServiceProvider extends ServiceProvider
             ->onSuccess(fn() => $logTask('complex_success'))
             ->priority(50)
             ->description('Test: Complex multi-feature task');
+
+        // ========================================================================
+        // PRODUCTION SCHEDULED TASKS
+        // ========================================================================
+
+        // Order tracking consumer - runs every minute
+        $scheduler->command('order:track')
+            ->everyMinute()
+            ->withoutOverlapping(120) // Prevent overlapping (expires after 2 hours)
+            ->runInBackground() // Run in background to not block other tasks
+            ->description('Consume order tracking events from Kafka');
     }
 }

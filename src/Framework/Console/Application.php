@@ -145,6 +145,163 @@ final class Application
   }
 
   /**
+   * Call a console command programmatically (like Artisan::call in Laravel)
+   *
+   * Usage:
+   *   $exitCode = $console->call('migrate');
+   *   $exitCode = $console->call('cache:clear', ['--force' => true]);
+   *   $exitCode = $console->call('user:create', ['name' => 'John', '--admin' => true]);
+   *
+   * @param string $commandName Command name (e.g., 'migrate', 'cache:clear')
+   * @param array<string, mixed> $parameters Arguments and options
+   * @param OutputInterface|null $output Custom output (null = use default)
+   * @return int Exit code (0 = success, non-zero = error)
+   */
+  public function call(string $commandName, array $parameters = [], ?OutputInterface $output = null): int
+  {
+    // Check if command exists
+    if (!$this->loader->has($commandName)) {
+      throw new \InvalidArgumentException("Command not found: {$commandName}");
+    }
+
+    // Build argv array from parameters
+    $argv = [$_SERVER['PHP_SELF'] ?? 'console', $commandName];
+
+    foreach ($parameters as $key => $value) {
+      if (is_int($key)) {
+        // Positional argument
+        $argv[] = (string) $value;
+      } elseif (str_starts_with($key, '--')) {
+        // Long option
+        if (is_bool($value)) {
+          if ($value) {
+            $argv[] = $key;
+          }
+        } else {
+          $argv[] = "{$key}={$value}";
+        }
+      } elseif (str_starts_with($key, '-')) {
+        // Short option
+        $argv[] = $key;
+        if (!is_bool($value)) {
+          $argv[] = (string) $value;
+        }
+      } else {
+        // Named argument
+        $argv[] = (string) $value;
+      }
+    }
+
+    // Parse input from constructed argv
+    $this->input = Input::fromArgv($argv);
+
+    // Set output (use custom or default)
+    $originalOutput = $this->output;
+    if ($output !== null) {
+      $this->output = $output;
+    }
+
+    try {
+      // Execute command
+      $exitCode = $this->executeCommand($commandName);
+    } finally {
+      // Restore original output
+      $this->output = $originalOutput;
+    }
+
+    return $exitCode;
+  }
+
+  /**
+   * Call a console command and get the output as string
+   *
+   * Usage:
+   *   $output = $console->callSilent('route:list');
+   *   echo $output; // Shows the route list
+   *
+   * @param string $commandName Command name
+   * @param array<string, mixed> $parameters Arguments and options
+   * @return string Command output
+   */
+  public function callSilent(string $commandName, array $parameters = []): string
+  {
+    // Create a buffer output to capture the output
+    $buffer = '';
+
+    $output = new class($buffer) implements OutputInterface {
+      private string $buffer = '';
+
+      public function __construct(string &$buffer)
+      {
+        $this->buffer = &$buffer;
+      }
+
+      public function write(string $message, bool $newline = false): void
+      {
+        $this->buffer .= $message;
+        if ($newline) {
+          $this->buffer .= PHP_EOL;
+        }
+      }
+
+      public function writeln(string $message = ''): void
+      {
+        $this->write($message, true);
+      }
+
+      public function newLine(int $count = 1): void
+      {
+        $this->buffer .= str_repeat(PHP_EOL, $count);
+      }
+
+      public function info(string $message): void
+      {
+        $this->writeln("[INFO] {$message}");
+      }
+
+      public function success(string $message): void
+      {
+        $this->writeln("[SUCCESS] {$message}");
+      }
+
+      public function warning(string $message): void
+      {
+        $this->writeln("[WARNING] {$message}");
+      }
+
+      public function error(string $message): void
+      {
+        $this->writeln("[ERROR] {$message}");
+      }
+
+      public function table(array $headers, array $rows): void
+      {
+        // Simple table implementation for buffer
+        $this->writeln(implode(' | ', $headers));
+        foreach ($rows as $row) {
+          $this->writeln(implode(' | ', $row));
+        }
+      }
+
+      public function line(string $char = '-', int $length = 80): void
+      {
+        $this->writeln(str_repeat($char, $length));
+      }
+
+      public function getBuffer(): string
+      {
+        return $this->buffer;
+      }
+    };
+
+    // Call command with buffer output
+    $this->call($commandName, $parameters, $output);
+
+    // Return captured output
+    return $output->getBuffer();
+  }
+
+  /**
    * Execute a registered command (LAZY - instantiates here)
    *
    * @param string $commandName
