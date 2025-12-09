@@ -539,24 +539,24 @@ final class RelationshipTestController extends BaseController
                 ->toArray(),
 
             // Users with roles and permissions
-            'users_roles_permissions' => UserModel::with([
-                'roles' => function ($q) {
-                    $q->where('roles.is_active', true)
-                        ->orderBy('level', 'DESC');
-                },
-                'roles.permissions' => function ($q) {
-                    $q->where('permissions.is_active', true)
-                        ->orderBy('resource', 'ASC');
-                }
-            ])
-                ->whereHas('roles', function ($q) {
-                    $q->where('level', '>=', 5);
-                })
-                ->withCount('roles')
-                ->having('roles_count', '>', 0)
-                ->limit(10)
-                ->get()
-                ->toArray(),
+            // 'users_roles_permissions' => UserModel::with([
+            //     'roles' => function ($q) {
+            //         $q->where('roles.is_active', true)
+            //             ->orderBy('level', 'DESC');
+            //     },
+            //     'roles.permissions' => function ($q) {
+            //         $q->where('permissions.is_active', true)
+            //             ->orderBy('resource', 'ASC');
+            //     }
+            // ])
+            //     ->whereHas('roles', function ($q) {
+            //         $q->where('level', '>=', 5);
+            //     })
+            //     ->withCount('roles')
+            //     ->having('roles_count', '>', 0)
+            //     ->limit(10)
+            //     ->get()
+            //     ->toArray(),
         ];
         $queries = QB::getQueryLog();
         return response()->json([
