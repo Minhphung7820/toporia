@@ -17,6 +17,7 @@ use Toporia\Framework\Database\ORM\Relations\MorphOne;
 use Toporia\Framework\Database\ORM\Relations\MorphTo;
 use Toporia\Framework\Database\ORM\Relations\MorphToMany;
 use Toporia\Framework\Database\ORM\Relations\MorphedByMany;
+use Toporia\Framework\Database\ORM\Relations\Relation;
 use Toporia\Framework\Support\Collection\LazyCollection;
 use Toporia\Framework\Support\Pagination\CursorPaginator;
 use Toporia\Framework\Support\Pagination\Paginator;
@@ -749,7 +750,7 @@ class ModelQueryBuilder extends QueryBuilder
                 $relatedKey = $getPrimaryKey();
 
                 // Resolve morph type alias using global morph map
-                $morphTypeValue = \Toporia\Framework\Database\ORM\Relations\Relation::getMorphAlias($type);
+                $morphTypeValue = Relation::getMorphAlias($type);
 
                 // Build final EXISTS clause directly without derived table
                 // This is more efficient and allows better index utilization
@@ -928,7 +929,7 @@ class ModelQueryBuilder extends QueryBuilder
             $relatedKey = $getPrimaryKey();
 
             // Resolve morph type alias using global morph map
-            $morphTypeValue = \Toporia\Framework\Database\ORM\Relations\Relation::getMorphAlias($type);
+            $morphTypeValue = Relation::getMorphAlias($type);
 
             // Build NOT EXISTS directly without derived table (optimal)
             // SQL: NOT EXISTS (SELECT 1 FROM related_table WHERE related.id = parent.morph_id AND parent.morph_type = ?)
@@ -3324,7 +3325,7 @@ class ModelQueryBuilder extends QueryBuilder
             $relatedKey = $getPrimaryKey();
 
             // Resolve morph type alias using global morph map
-            $morphTypeValue = \Toporia\Framework\Database\ORM\Relations\Relation::getMorphAlias($type);
+            $morphTypeValue = Relation::getMorphAlias($type);
 
             // Build the aggregate expression
             if ($function === 'COUNT') {
@@ -4930,7 +4931,7 @@ class ModelQueryBuilder extends QueryBuilder
         $modelClass = $this->modelClass;
         $eagerLoad = $this->getEagerLoad();
 
-        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () use ($modelClass, $eagerLoad) {
+        return LazyCollection::make(function () use ($modelClass, $eagerLoad) {
             // Use cursor to stream results
             foreach (parent::cursor() as $row) {
                 // Hydrate row into Model instance
@@ -4991,7 +4992,7 @@ class ModelQueryBuilder extends QueryBuilder
         $modelClass = $this->modelClass;
         $eagerLoad = $this->getEagerLoad();
 
-        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () use ($modelClass, $chunkSize, $eagerLoad) {
+        return LazyCollection::make(function () use ($modelClass, $chunkSize, $eagerLoad) {
             // Use lazy() generator which handles chunking
             foreach (parent::lazy($chunkSize) as $row) {
                 // Hydrate row into Model instance

@@ -171,7 +171,7 @@ final class RuleManager
         }
 
         // Wrap callable in Rule object
-        return new class($rule, $parameters, $ruleName) implements \Toporia\Framework\Validation\Contracts\RuleInterface {
+        return new class($rule, $parameters, $ruleName) implements RuleInterface {
             /**
              * @var callable Validation callback
              */
@@ -217,7 +217,7 @@ final class RuleManager
     {
         // Built-in rules are handled by Validator directly
         // Return a marker rule that signals Validator to use built-in method
-        return new class($ruleName, $parameters) implements \Toporia\Framework\Validation\Contracts\RuleInterface {
+        return new class($ruleName, $parameters) implements RuleInterface {
             public function __construct(
                 public readonly string $ruleName,
                 public readonly array $parameters

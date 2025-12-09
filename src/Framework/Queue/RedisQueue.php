@@ -576,9 +576,11 @@ LUA;
                     $reservedKey = $this->getReservedKey($queue);
 
                     // Check if job exists in any structure
-                    if ($this->redis->lPos($queueKey, $jobId) !== false ||
+                    if (
+                        $this->redis->lPos($queueKey, $jobId) !== false ||
                         $this->redis->zScore($delayedKey, $jobId) !== false ||
-                        $this->redis->zScore($reservedKey, $jobId) !== false) {
+                        $this->redis->zScore($reservedKey, $jobId) !== false
+                    ) {
                         $exists = true;
                         break;
                     }

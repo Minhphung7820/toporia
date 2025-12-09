@@ -205,7 +205,7 @@ final class MiddlewarePipeline
 
         // Handle ThrottleRequests parameters
         if (
-            $middlewareClass === \Toporia\Framework\Http\Middleware\ThrottleRequests::class
+            $middlewareClass === ThrottleRequests::class
             || str_ends_with($middlewareClass, 'ThrottleRequests')
         ) {
             return $this->instantiateThrottleRequests($limiter, $parameters);
@@ -224,7 +224,7 @@ final class MiddlewarePipeline
      * @return \Toporia\Framework\Http\Middleware\ThrottleRequests
      */
     private function instantiateThrottleRequests(
-        \Toporia\Framework\RateLimit\Contracts\RateLimiterInterface $limiter,
+        RateLimiterInterface $limiter,
         string|array $parameters
     ): ThrottleRequests {
         // If parameters is a string, it's a named limiter

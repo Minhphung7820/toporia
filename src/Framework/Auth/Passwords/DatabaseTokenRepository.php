@@ -192,7 +192,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
             return false;
         }
 
-        $createdTime = \Toporia\Framework\DateTime\Chronos::parse($record['created_at'])->getTimestamp();
+        $createdTime = Chronos::parse($record['created_at'])->getTimestamp();
 
         return ($createdTime + $this->throttle) > now()->getTimestamp();
     }
