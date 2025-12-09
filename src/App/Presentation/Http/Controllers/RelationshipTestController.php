@@ -520,11 +520,13 @@ final class RelationshipTestController extends BaseController
      */
     public function testBelongsToMany(Request $request)
     {
+        QB::enableQueryLog();
         $data = [
             // Books with categories
             'books_categories' => BookModel::with(['categories' => function ($q) {
                 $q->wherePivot('is_primary', true)
-                    ->orderByPivot('order', 'ASC');
+                    ->orderByPivot('order', 'ASC')
+                    ->limit(4);
             }, 'author', 'publisher'])
                 ->whereHas('categories', function ($q) {
                     $q->where('categories.is_active', true);
@@ -549,17 +551,24 @@ final class RelationshipTestController extends BaseController
                 ->whereHas('roles', function ($q) {
                     $q->where('level', '>=', 5);
                 })
-                ->withCount(['roles', 'roles.permissions'])
+                ->withCount('roles')
                 ->having('roles_count', '>', 0)
                 ->limit(10)
                 ->get()
                 ->toArray(),
         ];
-
+        $queries = QB::getQueryLog();
         return response()->json([
             'success' => true,
             'title' => 'belongsToMany: Complex pivot constraints',
-            'data' => $data
+            'data' => $data,
+            'queries' => array_map(function ($q) {
+                return [
+                    'sql' => $q['query'],
+                    'bindings' => $q['bindings'],
+                    'time' => $q['time'] ?? 0
+                ];
+            }, $queries)
         ]);
     }
 }
