@@ -914,7 +914,7 @@ class HasManyThrough extends Relation
         ?string $path = null,
         ?string $baseUrl = null,
         string $cursorName = 'cursor'
-    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+    ): CursorPaginator {
         // Validate parameters
         if ($perPage < 1) {
             throw new \InvalidArgumentException('Per page must be at least 1');
@@ -953,7 +953,7 @@ class HasManyThrough extends Relation
 
         // Performance: Fetch one extra item to determine if there are more pages
         $items = $query->limit($perPage + 1)->get();
-        $rows = $items instanceof \Toporia\Framework\Database\Query\RowCollection ? $items->toArray() : $items;
+        $rows = $items instanceof RowCollection ? $items->toArray() : $items;
         $models = $this->relatedClass::hydrate($rows);
 
         // Determine if there are more pages

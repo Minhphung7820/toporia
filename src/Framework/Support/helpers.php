@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Toporia\Framework\Http\Contracts\{JsonResponseInterface, RedirectResponseInterface};
 use Toporia\Framework\Http\Exceptions\HttpException;
+use Toporia\Framework\Http\Request;
 use Toporia\Framework\Support\HigherOrderTapProxy;
 use Toporia\Framework\Support\Optional;
 
@@ -102,7 +104,7 @@ if (!function_exists('json_response')) {
      * @param array<string, string> $headers Response headers
      * @return \Toporia\Framework\Http\Contracts\JsonResponseInterface
      */
-    function json_response(mixed $data = null, int $status = 200, array $headers = []): \Toporia\Framework\Http\Contracts\JsonResponseInterface
+    function json_response(mixed $data = null, int $status = 200, array $headers = []): JsonResponseInterface
     {
         return response()->json($data, $status, $headers);
     }
@@ -117,7 +119,7 @@ if (!function_exists('redirect')) {
      * @param array<string, string> $headers Response headers
      * @return \Toporia\Framework\Http\Contracts\RedirectResponseInterface
      */
-    function redirect(string $to, int $status = 302, array $headers = []): \Toporia\Framework\Http\Contracts\RedirectResponseInterface
+    function redirect(string $to, int $status = 302, array $headers = []): RedirectResponseInterface
     {
         return response()->redirectTo($to, $status, $headers);
     }
@@ -129,9 +131,9 @@ if (!function_exists('request')) {
      *
      * @return \Toporia\Framework\Http\Request
      */
-    function request(): \Toporia\Framework\Http\Request
+    function request(): Request
     {
-        return app()->make(\Toporia\Framework\Http\Request::class);
+        return app()->make(Request::class);
     }
 }
 

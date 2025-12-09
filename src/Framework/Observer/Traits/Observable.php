@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Observer\Traits;
 
+use Toporia\Framework\Observer\AbstractObserver;
 use Toporia\Framework\Observer\Contracts\{ObservableInterface, ObserverInterface, ObserverManagerInterface};
 
 
@@ -49,7 +50,7 @@ trait Observable
         $priority = 0; // Default priority
 
         // Extract priority if observer has getPriority method (AbstractObserver)
-        if ($observer instanceof \Toporia\Framework\Observer\AbstractObserver) {
+        if ($observer instanceof AbstractObserver) {
             $priority = $observer->getPriority();
         }
 

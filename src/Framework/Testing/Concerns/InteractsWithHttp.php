@@ -96,7 +96,7 @@ trait InteractsWithHttp
             $app = $this->getContainer();
 
             // If container is not Application instance, bootstrap
-            if (!$app instanceof \Toporia\Framework\Foundation\Application) {
+            if (!$app instanceof Application) {
                 // Create app instance manually to set global before bootstrap
                 $basePath = dirname(__DIR__, 4);
                 $app = new Application($basePath);

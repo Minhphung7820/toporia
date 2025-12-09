@@ -6,6 +6,7 @@ namespace Toporia\Framework\Testing\Factories;
 
 use Faker\Generator;
 use Closure;
+use Toporia\Framework\Database\ORM\Model;
 
 /**
  * Abstract Factory Base Class
@@ -286,7 +287,7 @@ abstract class Factory implements \Toporia\Framework\Database\Contracts\FactoryI
      * @param array $attributes Override attributes.
      * @return \Toporia\Framework\Database\ORM\Model Model instance.
      */
-    public function make(array $attributes = []): \Toporia\Framework\Database\ORM\Model
+    public function make(array $attributes = []): Model
     {
         if (empty($this->model)) {
             throw new \RuntimeException('Factory model property must be set.');
@@ -295,7 +296,7 @@ abstract class Factory implements \Toporia\Framework\Database\Contracts\FactoryI
         $attributes = $this->getAttributes($attributes);
         $model = $this->createModel($attributes);
 
-        if (!($model instanceof \Toporia\Framework\Database\ORM\Model)) {
+        if (!($model instanceof Model)) {
             throw new \RuntimeException('Factory createModel must return a Model instance.');
         }
 
@@ -315,7 +316,7 @@ abstract class Factory implements \Toporia\Framework\Database\Contracts\FactoryI
      * @param array $attributes Override attributes.
      * @return \Toporia\Framework\Database\ORM\Model Model instance.
      */
-    public function create(array $attributes = []): \Toporia\Framework\Database\ORM\Model
+    public function create(array $attributes = []): Model
     {
         $model = $this->make($attributes);
         $model->save();
@@ -543,7 +544,7 @@ abstract class Factory implements \Toporia\Framework\Database\Contracts\FactoryI
      * @param array $attributes Model attributes.
      * @return \Toporia\Framework\Database\ORM\Model Model instance.
      */
-    protected function createModel(array $attributes): \Toporia\Framework\Database\ORM\Model
+    protected function createModel(array $attributes): Model
     {
         if (empty($this->model)) {
             throw new \RuntimeException('Factory model property must be set.');

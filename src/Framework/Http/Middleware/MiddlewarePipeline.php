@@ -225,7 +225,7 @@ final class MiddlewarePipeline
     private function instantiateThrottleRequests(
         \Toporia\Framework\RateLimit\Contracts\RateLimiterInterface $limiter,
         string|array $parameters
-    ): \Toporia\Framework\Http\Middleware\ThrottleRequests {
+    ): ThrottleRequests {
         // If parameters is a string, it's a named limiter
         if (is_string($parameters)) {
             return new ThrottleRequests(

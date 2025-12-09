@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Socialite\Contracts;
 
 use Toporia\Framework\Http\Request;
+use Toporia\Framework\Socialite\User;
 
 /**
  * Interface ProviderInterface
@@ -37,7 +38,7 @@ interface ProviderInterface
      * @param Request $request HTTP request with OAuth callback data
      * @return \Toporia\Framework\Socialite\User User data
      */
-    public function user(Request $request): \Toporia\Framework\Socialite\User;
+    public function user(Request $request): User;
 
     /**
      * Get access token from callback.
@@ -53,6 +54,6 @@ interface ProviderInterface
      * @param string $token Access token
      * @return \Toporia\Framework\Socialite\User User data
      */
-    public function getUserFromToken(string $token): \Toporia\Framework\Socialite\User;
+    public function getUserFromToken(string $token): User;
 }
 

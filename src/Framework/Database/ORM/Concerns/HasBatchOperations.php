@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\ORM\Concerns;
 
+use Toporia\Framework\Database\Contracts\ConnectionInterface;
 use Toporia\Framework\Database\Query\QueryBuilder;
 
 
@@ -300,6 +301,6 @@ trait HasBatchOperations
      *
      * @return \Toporia\Framework\Database\Contracts\ConnectionInterface
      */
-    abstract protected static function getConnection(): \Toporia\Framework\Database\Contracts\ConnectionInterface;
+    abstract protected static function getConnection(): ConnectionInterface;
 }
 

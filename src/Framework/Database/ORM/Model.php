@@ -10,6 +10,9 @@ use Toporia\Framework\Database\ORM\{ModelCollection, Relations};
 use Toporia\Framework\Observer\Traits\Observable;
 use Toporia\Framework\Observer\Contracts\ObservableInterface;
 use Toporia\Framework\Database\ORM\Concerns\HasObservers;
+use Toporia\Framework\Support\Collection\LazyCollection;
+use Toporia\Framework\Support\Pagination\CursorPaginator;
+use Toporia\Framework\Support\Pagination\Paginator;
 use Toporia\Framework\Support\Str;
 
 
@@ -769,7 +772,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      * $lastPage = $products->lastPage();
      * $hasMore = $products->hasMorePages();
      */
-    public static function paginate(int $perPage = 15, int $page = 1, ?string $path = null, ?string $baseUrl = null): \Toporia\Framework\Support\Pagination\Paginator
+    public static function paginate(int $perPage = 15, int $page = 1, ?string $path = null, ?string $baseUrl = null): Paginator
     {
         return static::query()->paginate($perPage, $page, $path, $baseUrl);
     }
@@ -820,7 +823,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
         int $perPage = 15,
         ?array $options = null,
         ?array $options2 = null
-    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+    ): CursorPaginator {
         return static::query()->cursorPaginate($perPage, $options, $options2);
     }
 
@@ -1797,8 +1800,10 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
                     $typeName = $returnType->getName();
 
                     // Check if it's a relationship type
-                    if ($typeName === RelationInterface::class ||
-                        is_subclass_of($typeName, RelationInterface::class)) {
+                    if (
+                        $typeName === RelationInterface::class ||
+                        is_subclass_of($typeName, RelationInterface::class)
+                    ) {
                         throw new \RuntimeException(
                             sprintf(
                                 'Attempted to lazy load [%s] on model [%s] but lazy loading is disabled. ' .
@@ -2017,7 +2022,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      *
      * @return \Toporia\Framework\Support\Collection\LazyCollection<int, static>
      */
-    public static function lazyCollection(): \Toporia\Framework\Support\Collection\LazyCollection
+    public static function lazyCollection(): LazyCollection
     {
         return static::query()->toLazyCollection();
     }
@@ -2039,7 +2044,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      * @param int $chunkSize Number of records to fetch per database query (default: 1000)
      * @return \Toporia\Framework\Support\Collection\LazyCollection<int, static>
      */
-    public static function lazyCollectionByChunk(int $chunkSize = 1000): \Toporia\Framework\Support\Collection\LazyCollection
+    public static function lazyCollectionByChunk(int $chunkSize = 1000): LazyCollection
     {
         return static::query()->toLazyCollectionByChunk($chunkSize);
     }

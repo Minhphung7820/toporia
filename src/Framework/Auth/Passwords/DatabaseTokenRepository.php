@@ -7,6 +7,7 @@ namespace Toporia\Framework\Auth\Passwords;
 use Toporia\Framework\Auth\Passwords\Contracts\CanResetPasswordInterface;
 use Toporia\Framework\Auth\Passwords\Contracts\TokenRepositoryInterface;
 use Toporia\Framework\Database\Connection;
+use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Hashing\Contracts\HasherInterface;
 
 /**
@@ -225,7 +226,7 @@ class DatabaseTokenRepository implements TokenRepositoryInterface
      *
      * @return \Toporia\Framework\Database\Query\QueryBuilder
      */
-    protected function getTable(): \Toporia\Framework\Database\Query\QueryBuilder
+    protected function getTable(): QueryBuilder
     {
         return $this->connection->table($this->table);
     }

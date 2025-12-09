@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Queue;
 
 use Toporia\Framework\Queue\Contracts\Dispatcher;
+use Toporia\Framework\Queue\Job;
 
 /**
  * Class PendingDispatch
@@ -58,7 +59,7 @@ final class PendingDispatch
         $this->queue = $queue;
 
         // Also update the job's queue property for consistency
-        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+        if ($this->job instanceof Job) {
             $this->job->onQueue($queue);
         }
 
@@ -77,7 +78,7 @@ final class PendingDispatch
 
         // CRITICAL: Also update the job's delay property
         // This ensures the delay is preserved when the job is serialized
-        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+        if ($this->job instanceof Job) {
             $this->job->delay($seconds);
         }
 
@@ -93,7 +94,7 @@ final class PendingDispatch
     public function priority(int $priority): self
     {
         // Apply priority directly to job (no need to store in PendingDispatch)
-        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+        if ($this->job instanceof Job) {
             $this->job->priority($priority);
         }
         return $this;
@@ -109,7 +110,7 @@ final class PendingDispatch
     {
         $tags = is_array($tags) ? $tags : [$tags];
         $this->tags = array_merge($this->tags, $tags);
-        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+        if ($this->job instanceof Job) {
             $this->job->tag($tags);
         }
         return $this;
@@ -124,7 +125,7 @@ final class PendingDispatch
      */
     public function unique(string $uniqueId, int $for = 3600): self
     {
-        if ($this->job instanceof \Toporia\Framework\Queue\Job) {
+        if ($this->job instanceof Job) {
             $this->job->unique($uniqueId, $for);
         }
         return $this;

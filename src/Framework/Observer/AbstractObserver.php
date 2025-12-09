@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Observer;
 
+use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Observer\Contracts\{ObservableInterface, ObserverInterface};
 
 
@@ -308,6 +309,6 @@ abstract class AbstractObserver implements ObserverInterface
      */
     protected function isModel(ObservableInterface $observable): bool
     {
-        return $observable instanceof \Toporia\Framework\Database\ORM\Model;
+        return $observable instanceof Model;
     }
 }

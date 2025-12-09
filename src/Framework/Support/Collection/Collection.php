@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Support\Collection;
 
+use Toporia\Framework\Support\Collection\LazyCollection;
 use Toporia\Framework\Support\Contracts\CollectionInterface;
 use Toporia\Framework\Support\Macroable;
 use Toporia\Framework\Support\Pagination\Paginator;
@@ -1431,7 +1432,7 @@ class Collection implements CollectionInterface, \JsonSerializable
      * @param string|null $path Base URL path for pagination links
      * @return \Toporia\Framework\Support\Pagination\Paginator<TValue>
      */
-    public function paginate(int $perPage = 15, int $page = 1, ?string $path = null): \Toporia\Framework\Support\Pagination\Paginator
+    public function paginate(int $perPage = 15, int $page = 1, ?string $path = null): Paginator
     {
         // Validate parameters
         if ($perPage < 1) {
@@ -1669,9 +1670,9 @@ class Collection implements CollectionInterface, \JsonSerializable
         return new static($groups);
     }
 
-    public function toLazy(): \Toporia\Framework\Support\Collection\LazyCollection
+    public function toLazy(): LazyCollection
     {
-        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () {
+        return LazyCollection::make(function () {
             foreach ($this->items as $item) {
                 yield $item;
             }

@@ -6,6 +6,7 @@ namespace Toporia\Framework\Error;
 
 use Toporia\Framework\Error\Contracts\ErrorRendererInterface;
 use Toporia\Framework\Http\Exceptions\HttpException;
+use Toporia\Framework\Http\ValidationException;
 use Throwable;
 
 /**
@@ -66,7 +67,7 @@ final class JsonErrorRenderer implements ErrorRendererInterface
     private function formatException(Throwable $exception): array
     {
         // Handle ValidationException specially
-        if ($exception instanceof \Toporia\Framework\Http\ValidationException) {
+        if ($exception instanceof ValidationException) {
             return $exception->toArray();
         }
 
@@ -142,7 +143,7 @@ final class JsonErrorRenderer implements ErrorRendererInterface
         }
 
         // ValidationException returns 422
-        if ($exception instanceof \Toporia\Framework\Http\ValidationException) {
+        if ($exception instanceof ValidationException) {
             return 422;
         }
 

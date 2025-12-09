@@ -9,6 +9,7 @@ use Toporia\Framework\Support\ColoredLogger;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
 use Toporia\Framework\Queue\Exceptions\{RateLimitExceededException, JobAlreadyRunningException, JobTimeoutException};
 use Toporia\Framework\Queue\Events\{JobQueued, JobProcessing, JobProcessed, JobFailed, JobTimedOut, JobRetrying, WorkerStopping};
+use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Queue\Middleware\EnsureUnique;
 use Toporia\Framework\Queue\Support\{JobCancellation, JobMetrics, QueueMetrics};
 use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
@@ -382,12 +383,12 @@ final class Worker
         // Get job middleware (if job supports it)
         // Only Job class has middleware() method
         $middleware = [];
-        if ($job instanceof \Toporia\Framework\Queue\Job) {
+        if ($job instanceof Job) {
             $middleware = $job->middleware();
         }
 
         // Auto-apply EnsureUnique middleware if job has uniqueId
-        if ($job instanceof \Toporia\Framework\Queue\Job && $job->getUniqueId() !== null) {
+        if ($job instanceof Job && $job->getUniqueId() !== null) {
             if ($this->container && $this->container->has('cache')) {
                 $cache = $this->container->get('cache');
                 $ensureUnique = new EnsureUnique($cache);

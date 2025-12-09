@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database;
 
-use Toporia\Framework\Database\Contracts\ConnectionInterface;
+use Toporia\Framework\Database\Contracts\{ConnectionInterface, GrammarInterface};
 use Toporia\Framework\Database\Query\QueryBuilder;
 
 /**
@@ -152,7 +152,7 @@ class ConnectionProxy implements ConnectionInterface
     /**
      * {@inheritdoc}
      */
-    public function getGrammar(): \Toporia\Framework\Database\Contracts\GrammarInterface
+    public function getGrammar(): GrammarInterface
     {
         return $this->connection->getGrammar();
     }
@@ -219,7 +219,7 @@ class ConnectionProxy implements ConnectionInterface
      *
      * Performance: Connection is cached, Grammar is cached per connection
      */
-    public function table(string $table): \Toporia\Framework\Database\Query\QueryBuilder
+    public function table(string $table): QueryBuilder
     {
         // Delegate to underlying connection
         return $this->connection->table($table);

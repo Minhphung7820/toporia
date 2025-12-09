@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Notification\Jobs;
 
+use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Notification\Contracts\NotificationInterface;
 
@@ -180,7 +181,7 @@ final class SendBulkNotificationJob extends Job
     private static function serializeNotifiable(mixed $notifiable): array
     {
         // For ORM models, just store ID
-        if ($notifiable instanceof \Toporia\Framework\Database\ORM\Model) {
+        if ($notifiable instanceof Model) {
             return ['id' => $notifiable->id];
         }
 

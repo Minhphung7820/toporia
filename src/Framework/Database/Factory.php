@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database;
 
-use Toporia\Framework\Database\Contracts\FactoryInterface;
-use Toporia\Framework\Database\Contracts\FakerProviderInterface;
+use Toporia\Framework\Database\Contracts\{ConnectionInterface, FactoryInterface, FakerProviderInterface};
+use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\Factory\Concerns\{HasRelations, HasStates, HasSequences};
 use Toporia\Framework\Database\ORM\Model;
 use Faker\Generator;
@@ -413,7 +413,7 @@ abstract class Factory implements FactoryInterface
      * @param class-string<T> $modelClass
      * @return \Toporia\Framework\Database\Contracts\ConnectionInterface
      */
-    protected static function resolveConnection(string $modelClass): \Toporia\Framework\Database\Contracts\ConnectionInterface
+    protected static function resolveConnection(string $modelClass): ConnectionInterface
     {
         // Try to get connection from model's query builder
         if (method_exists($modelClass, 'query')) {
@@ -430,7 +430,7 @@ abstract class Factory implements FactoryInterface
         // Fallback: get from DatabaseManager
         if (function_exists('app') && app()->has('db')) {
             $db = app()->get('db');
-            if ($db instanceof \Toporia\Framework\Database\DatabaseManager) {
+            if ($db instanceof DatabaseManager) {
                 return $db->connection();
             }
         }

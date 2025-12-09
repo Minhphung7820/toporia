@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Console\Scheduling;
 
+use Toporia\Framework\Console\Application;
 use Toporia\Framework\Console\Scheduling\Contracts\MutexInterface;
+use Toporia\Framework\Console\Scheduling\Support\{HttpPing, TaskHistory};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Mail\Contracts\MailManagerInterface;
 use Toporia\Framework\Mail\Message;
 
 /**
@@ -139,7 +142,7 @@ final class Scheduler
             }
 
             // Get console application
-            $console = $this->container->get(\Toporia\Framework\Console\Application::class);
+            $console = $this->container->get(Application::class);
 
             // Build arguments array
             $arguments = [$command];
@@ -357,7 +360,7 @@ final class Scheduler
         $taskId = $task->getTaskId();
 
         // Record task start in history
-        \Toporia\Framework\Console\Scheduling\Support\TaskHistory::recordStart($taskId);
+        TaskHistory::recordStart($taskId);
 
         // Get HTTP client for ping (if available)
         $httpClient = $this->container?->has('http.client')
@@ -388,7 +391,7 @@ final class Scheduler
         try {
             // HTTP ping before execution
             if ($pingUrl = $task->getPingBeforeUrl()) {
-                \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
+                HttpPing::send($pingUrl, [
                     'task' => $task->getDescription(),
                     'event' => 'before',
                     'time' => now()->toDateTimeString()
@@ -460,7 +463,7 @@ final class Scheduler
 
             // HTTP ping on success
             if ($success && $pingUrl = $task->getPingSuccessUrl()) {
-                \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
+                HttpPing::send($pingUrl, [
                     'task' => $task->getDescription(),
                     'event' => 'success',
                     'time' => now()->toDateTimeString()
@@ -479,7 +482,7 @@ final class Scheduler
 
             // HTTP ping after execution
             if ($pingUrl = $task->getPingAfterUrl()) {
-                \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
+                HttpPing::send($pingUrl, [
                     'task' => $task->getDescription(),
                     'event' => 'after',
                     'success' => $success,
@@ -497,7 +500,7 @@ final class Scheduler
 
             // HTTP ping on failure
             if ($pingUrl = $task->getPingFailureUrl()) {
-                \Toporia\Framework\Console\Scheduling\Support\HttpPing::send($pingUrl, [
+                HttpPing::send($pingUrl, [
                     'task' => $task->getDescription(),
                     'event' => 'failure',
                     'error' => $e->getMessage(),
@@ -518,7 +521,7 @@ final class Scheduler
             }
 
             // Record task finish in history
-            \Toporia\Framework\Console\Scheduling\Support\TaskHistory::recordFinish(
+            TaskHistory::recordFinish(
                 $taskId,
                 $success,
                 $exception?->getMessage()
@@ -671,9 +674,9 @@ final class Scheduler
         $body .= "Output:\n{$output}";
 
         // Try to use MailManager if available (Clean Architecture - DIP)
-        if ($this->container && $this->container->has(\Toporia\Framework\Mail\Contracts\MailManagerInterface::class)) {
+        if ($this->container && $this->container->has(MailManagerInterface::class)) {
             try {
-                $mailer = $this->container->get(\Toporia\Framework\Mail\Contracts\MailManagerInterface::class);
+                $mailer = $this->container->get(MailManagerInterface::class);
                 $message = new Message();
                 $message->to($email)
                     ->subject($subject)

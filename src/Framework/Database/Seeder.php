@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database;
 
-use Toporia\Framework\Database\Contracts\SeederInterface;
-use Toporia\Framework\Database\Contracts\FactoryInterface;
+use Toporia\Framework\Database\Contracts\{ConnectionInterface, FactoryInterface, SeederInterface};
 use Toporia\Framework\Database\DatabaseManager;
 use Toporia\Framework\Database\ORM\Model;
 
@@ -368,7 +367,7 @@ abstract class Seeder implements SeederInterface
      *
      * @return \Toporia\Framework\Database\Contracts\ConnectionInterface
      */
-    protected function getConnection(): \Toporia\Framework\Database\Contracts\ConnectionInterface
+    protected function getConnection(): ConnectionInterface
     {
         return $this->db->connection($this->connection);
     }

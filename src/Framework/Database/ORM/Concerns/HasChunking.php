@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM\Concerns;
 
 use Toporia\Framework\Database\ORM\ModelCollection;
+use Toporia\Framework\Database\Query\QueryBuilder;
 use Generator;
 
 
@@ -372,7 +373,7 @@ trait HasChunking
      *
      * @return \Toporia\Framework\Database\Query\QueryBuilder
      */
-    abstract public static function query(): \Toporia\Framework\Database\Query\QueryBuilder;
+    abstract public static function query(): QueryBuilder;
 
     /**
      * Get the primary key value.

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection, MorphPivot, Pivot};
-use Toporia\Framework\Database\Query\{QueryBuilder, RowCollection};
+use Toporia\Framework\Database\Query\{Expression, QueryBuilder, RowCollection};
 use Toporia\Framework\Support\Str;
 
 /**
@@ -336,7 +336,7 @@ class MorphToMany extends Relation
                         // Nested WHERE closure - recurse
                         if ($type === 'nested' && isset($whereClause['query'])) {
                             $nestedQueryBuilder = $whereClause['query'];
-                            if ($nestedQueryBuilder instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                            if ($nestedQueryBuilder instanceof QueryBuilder) {
                                 $extractValues($nestedQueryBuilder->getWheres());
                             }
                         }
@@ -370,7 +370,7 @@ class MorphToMany extends Relation
                         return false;
                     }
                     $nestedQuery = $where['query'];
-                    if (!($nestedQuery instanceof \Toporia\Framework\Database\Query\QueryBuilder)) {
+                    if (!($nestedQuery instanceof QueryBuilder)) {
                         return false;
                     }
                     // Check if nested query contains morphType and foreignKey constraints
@@ -396,7 +396,7 @@ class MorphToMany extends Relation
                         // Also check deeper nested (OR clauses)
                         if ($type === 'nested' && isset($nestedWhere['query'])) {
                             $deepQuery = $nestedWhere['query'];
-                            if ($deepQuery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+                            if ($deepQuery instanceof QueryBuilder) {
                                 foreach ($deepQuery->getWheres() as $deepWhere) {
                                     $deepType = strtolower($deepWhere['type'] ?? '');
                                     $deepColumn = $deepWhere['column'] ?? '';
@@ -579,7 +579,7 @@ class MorphToMany extends Relation
         // Check if we already have pivot columns in select
         $hasPivotColumns = false;
         foreach ($currentColumns as $col) {
-            if ($col instanceof \Toporia\Framework\Database\Query\Expression) {
+            if ($col instanceof Expression) {
                 $colStr = (string) $col;
                 if (str_contains($colStr, 'pivot_') || str_contains($colStr, $this->pivotTable)) {
                     $hasPivotColumns = true;
@@ -594,7 +594,7 @@ class MorphToMany extends Relation
         }
 
         // Check if we have custom select (filter out Expression objects - those are pivot columns)
-        $tableColumns = array_filter($currentColumns, fn($col) => !($col instanceof \Toporia\Framework\Database\Query\Expression));
+        $tableColumns = array_filter($currentColumns, fn($col) => !($col instanceof Expression));
         $hasCustomSelect = !empty($tableColumns) && !in_array('*', $tableColumns, true);
 
         if ($hasCustomSelect) {

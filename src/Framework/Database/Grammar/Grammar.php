@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\Grammar;
 
 use Toporia\Framework\Database\Contracts\GrammarInterface;
-use Toporia\Framework\Database\Query\QueryBuilder;
+use Toporia\Framework\Database\Query\{Expression, JoinClause, QueryBuilder};
 
 /**
  * Abstract Grammar Base Class
@@ -144,7 +144,7 @@ abstract class Grammar implements GrammarInterface
         return implode(', ', array_map(
             function ($col) {
                 // Don't wrap Expression objects (raw SQL)
-                if ($col instanceof \Toporia\Framework\Database\Query\Expression) {
+                if ($col instanceof Expression) {
                     return (string) $col;
                 }
                 return $this->wrapColumn($col);
@@ -175,7 +175,7 @@ abstract class Grammar implements GrammarInterface
         $compiled = [];
         foreach ($joins as $join) {
             // Complex JOIN with JoinClause object
-            if ($join instanceof \Toporia\Framework\Database\Query\JoinClause) {
+            if ($join instanceof JoinClause) {
                 $compiled[] = $this->compileJoinClause($join);
             }
             // Simple JOIN with array (backward compatibility)
@@ -392,7 +392,7 @@ abstract class Grammar implements GrammarInterface
         $subquery = $where['query'];
 
         // Handle QueryBuilder instance (from whereIn with closure)
-        if ($subquery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+        if ($subquery instanceof QueryBuilder) {
             // Validate subquery has table before compiling
             if (empty($subquery->getTable())) {
                 throw new \InvalidArgumentException(
@@ -436,7 +436,7 @@ abstract class Grammar implements GrammarInterface
         $subquery = $where['query'];
 
         // Handle QueryBuilder instance (from whereNotIn with closure)
-        if ($subquery instanceof \Toporia\Framework\Database\Query\QueryBuilder) {
+        if ($subquery instanceof QueryBuilder) {
             // Validate subquery has table before compiling
             if (empty($subquery->getTable())) {
                 throw new \InvalidArgumentException(
@@ -845,7 +845,7 @@ abstract class Grammar implements GrammarInterface
     {
         // Convert Expression objects to strings for hashing
         $columns = array_map(
-            fn($col) => $col instanceof \Toporia\Framework\Database\Query\Expression ? (string) $col : $col,
+            fn($col) => $col instanceof Expression ? (string) $col : $col,
             $query->getColumns()
         );
 

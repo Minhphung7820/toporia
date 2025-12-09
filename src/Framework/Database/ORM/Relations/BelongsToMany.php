@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\ORM\{Model, ModelCollection, Pivot};
-use Toporia\Framework\Database\Query\QueryBuilder;
+use Toporia\Framework\Database\Query\{Expression, QueryBuilder, RowCollection};
 use Toporia\Framework\Support\Pagination\CursorPaginator;
 use Toporia\Framework\Support\Str;
 
@@ -815,7 +815,7 @@ class BelongsToMany extends Relation
         // Check if we already have pivot columns in select
         $hasPivotColumns = false;
         foreach ($currentColumns as $col) {
-            if ($col instanceof \Toporia\Framework\Database\Query\Expression) {
+            if ($col instanceof Expression) {
                 $colStr = (string) $col;
                 if (str_contains($colStr, 'pivot_') || str_contains($colStr, $this->pivotTable)) {
                     $hasPivotColumns = true;
@@ -1346,7 +1346,7 @@ class BelongsToMany extends Relation
      * @param \Toporia\Framework\Database\ORM\Model $model Model instance to clean
      * @return void
      */
-    protected function removePivotAttributes(\Toporia\Framework\Database\ORM\Model $model): void
+    protected function removePivotAttributes(Model $model): void
     {
         // Use Model's protected method to remove attributes efficiently
         // This avoids reflection overhead and is much faster
@@ -2351,7 +2351,7 @@ class BelongsToMany extends Relation
      * Performance: O(1) - Direct instantiation, zero reflection overhead
      * Clean Architecture: Factory Method + Setter pattern for extensibility
      */
-    public function newEagerInstance(\Toporia\Framework\Database\Query\QueryBuilder $freshQuery): static
+    public function newEagerInstance(QueryBuilder $freshQuery): static
     {
         // Create a dummy parent without ID to avoid parent-specific constraints
         $dummyParent = new ($this->parent::class)();
@@ -2703,7 +2703,7 @@ class BelongsToMany extends Relation
         ?string $path = null,
         ?string $baseUrl = null,
         string $cursorName = 'cursor'
-    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+    ): CursorPaginator {
         // Validate parameters
         if ($perPage < 1) {
             throw new \InvalidArgumentException('Per page must be at least 1');
@@ -2742,7 +2742,7 @@ class BelongsToMany extends Relation
 
         // Performance: Fetch one extra item to determine if there are more pages
         $items = $query->limit($perPage + 1)->get();
-        $rows = $items instanceof \Toporia\Framework\Database\Query\RowCollection ? $items->toArray() : $items;
+        $rows = $items instanceof RowCollection ? $items->toArray() : $items;
         $models = $this->relatedClass::hydrate($rows);
 
         // Determine if there are more pages

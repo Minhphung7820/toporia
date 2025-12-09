@@ -7,6 +7,7 @@ namespace Toporia\Framework\Container;
 use Closure;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException};
+use Toporia\Framework\Http\FormRequest;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionFunction;
@@ -235,7 +236,7 @@ final class Container implements ContainerInterface
             $this->fireResolvingCallbacks($abstract, $instance);
 
             // Auto-validate FormRequest instances
-            if ($instance instanceof \Toporia\Framework\Http\FormRequest) {
+            if ($instance instanceof FormRequest) {
                 $instance->validate();
             }
 

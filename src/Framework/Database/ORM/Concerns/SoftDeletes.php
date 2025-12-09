@@ -211,7 +211,7 @@ trait SoftDeletes
      *
      * @return \Toporia\Framework\Database\ORM\ModelQueryBuilder
      */
-    public static function withTrashed(): \Toporia\Framework\Database\ORM\ModelQueryBuilder
+    public static function withTrashed(): ModelQueryBuilder
     {
         // Always use queryWithoutSoftDeleteScope to avoid static method call issues
         return static::queryWithoutSoftDeleteScope();
@@ -224,7 +224,7 @@ trait SoftDeletes
      *
      * @return \Toporia\Framework\Database\ORM\ModelQueryBuilder
      */
-    protected static function queryWithoutSoftDeleteScope(): \Toporia\Framework\Database\ORM\ModelQueryBuilder
+    protected static function queryWithoutSoftDeleteScope(): ModelQueryBuilder
     {
         // Create ModelQueryBuilder with skipGlobalScopes flag
         $connection = static::getConnection();
@@ -245,7 +245,7 @@ trait SoftDeletes
      *
      * @return \Toporia\Framework\Database\ORM\ModelQueryBuilder
      */
-    public static function onlyTrashed(): \Toporia\Framework\Database\ORM\ModelQueryBuilder
+    public static function onlyTrashed(): ModelQueryBuilder
     {
         return static::withTrashed()->whereNotNull(static::$deletedAtColumn);
     }

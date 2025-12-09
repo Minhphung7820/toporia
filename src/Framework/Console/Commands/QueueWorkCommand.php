@@ -7,6 +7,7 @@ namespace Toporia\Framework\Console\Commands;
 use Toporia\Framework\Console\Command;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
+use Toporia\Framework\Queue\RabbitMQQueue;
 use Toporia\Framework\Queue\Worker;
 
 /**
@@ -55,7 +56,7 @@ final class QueueWorkCommand extends Command
 
             // Optimize sleep for RabbitMQ (faster polling)
             // RabbitMQ basic_get is fast, so we can reduce sleep time
-            if ($queue instanceof \Toporia\Framework\Queue\RabbitMQQueue) {
+            if ($queue instanceof RabbitMQQueue) {
                 // RabbitMQ is fast, use shorter sleep if not explicitly set
                 if (!$this->hasOption('sleep')) {
                     $sleep = 0; // No sleep for RabbitMQ - basic_get is instant

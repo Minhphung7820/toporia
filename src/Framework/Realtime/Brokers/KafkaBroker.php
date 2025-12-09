@@ -7,7 +7,7 @@ namespace Toporia\Framework\Realtime\Brokers;
 use Toporia\Framework\Realtime\Contracts\{BrokerInterface, HealthCheckableInterface, HealthCheckResult, MessageInterface};
 use Toporia\Framework\Realtime\{Message, RealtimeManager};
 use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
-use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyFactory;
+use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\{GroupedTopicStrategy, TopicStrategyFactory};
 use Toporia\Framework\Realtime\Brokers\Kafka\Client\{KafkaClientFactory, KafkaClientInterface, KafkaMessage};
 use Toporia\Framework\Realtime\Exceptions\{BrokerException, BrokerTemporaryException};
 
@@ -291,7 +291,7 @@ final class KafkaBroker implements BrokerInterface, HealthCheckableInterface
 
         $partitionCount = (int) ($this->config['default_partitions'] ?? 10);
 
-        if ($this->topicStrategy instanceof \Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\GroupedTopicStrategy) {
+        if ($this->topicStrategy instanceof GroupedTopicStrategy) {
             $partitionCount = $this->topicStrategy->getPartitionCount($channel);
         }
 

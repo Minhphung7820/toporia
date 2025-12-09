@@ -7,6 +7,8 @@ namespace Toporia\Framework\Database\Query;
 use Toporia\Framework\Database\Contracts\{ConnectionInterface, QueryBuilderInterface};
 use Toporia\Framework\Database\Query\{Expression, RowCollection};
 use Toporia\Framework\Database\DatabaseCollection;
+use Toporia\Framework\Support\Collection\LazyCollection;
+use Toporia\Framework\Support\Macroable;
 use Toporia\Framework\Support\Pagination\CursorPaginator;
 use Toporia\Framework\Support\Pagination\Paginator;
 
@@ -30,7 +32,7 @@ use Toporia\Framework\Support\Pagination\Paginator;
  */
 class QueryBuilder implements QueryBuilderInterface
 {
-    use \Toporia\Framework\Support\Macroable;
+    use Macroable;
     use Concerns\BuildsWhereClausesAdvanced;
     use Concerns\BuildsWhereClausesExtended;
     use Concerns\BuildsSubqueries;
@@ -1919,9 +1921,9 @@ class QueryBuilder implements QueryBuilderInterface
      *
      * @return \Toporia\Framework\Support\Collection\LazyCollection<int, array<string, mixed>>
      */
-    public function toLazyCollection(): \Toporia\Framework\Support\Collection\LazyCollection
+    public function toLazyCollection(): LazyCollection
     {
-        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () {
+        return LazyCollection::make(function () {
             yield from $this->cursor();
         });
     }
@@ -1949,9 +1951,9 @@ class QueryBuilder implements QueryBuilderInterface
      * @param int $chunkSize Number of records to fetch per database query (default: 1000)
      * @return \Toporia\Framework\Support\Collection\LazyCollection<int, array<string, mixed>>
      */
-    public function toLazyCollectionByChunk(int $chunkSize = 1000): \Toporia\Framework\Support\Collection\LazyCollection
+    public function toLazyCollectionByChunk(int $chunkSize = 1000): LazyCollection
     {
-        return \Toporia\Framework\Support\Collection\LazyCollection::make(function () use ($chunkSize) {
+        return LazyCollection::make(function () use ($chunkSize) {
             yield from $this->lazy($chunkSize);
         });
     }
@@ -3887,7 +3889,7 @@ class QueryBuilder implements QueryBuilderInterface
      * $total = $paginator->total();
      * $hasMore = $paginator->hasMorePages();
      */
-    public function paginate(int $perPage = 15, int $page = 1, ?string $path = null): \Toporia\Framework\Support\Pagination\Paginator
+    public function paginate(int $perPage = 15, int $page = 1, ?string $path = null): Paginator
     {
         // Validate parameters
         if ($perPage < 1) {
@@ -3957,7 +3959,7 @@ class QueryBuilder implements QueryBuilderInterface
         int $perPage = 15,
         ?array $options = null,
         ?array $options2 = null
-    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+    ): CursorPaginator {
         // Normalize options (support both formats)
         if ($options2 !== null) {
             $options = array_merge($options ?? [], $options2);

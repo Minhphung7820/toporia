@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Database\ORM\Relations;
 
 use Toporia\Framework\Database\Contracts\RelationInterface;
+use Toporia\Framework\Database\ORM\ModelQueryBuilder;
 use Toporia\Framework\Database\Query\QueryBuilder;
 use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Support\Str;
@@ -820,7 +821,7 @@ abstract class Relation implements RelationInterface
         // If ModelQueryBuilder with skipGlobalScopes = true, don't apply SoftDeletes scope
         // Use public method to avoid reflection overhead (O(1) instead of O(n) reflection calls)
         if (
-            $query instanceof \Toporia\Framework\Database\ORM\ModelQueryBuilder
+            $query instanceof ModelQueryBuilder
             && $query->isSkippingGlobalScopes()
         ) {
             return; // Skip applying SoftDeletes scope when withTrashed() is used

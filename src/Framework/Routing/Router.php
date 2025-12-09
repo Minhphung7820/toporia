@@ -6,6 +6,7 @@ namespace Toporia\Framework\Routing;
 
 use Toporia\Framework\Routing\Contracts\{RouteCollectionInterface, RouteInterface, RouterInterface};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Http\Contracts\{JsonResponseInterface, RedirectResponseInterface, ResponseInterface, StreamedResponseInterface};
 use Toporia\Framework\Http\Exceptions\{NotFoundHttpException, MethodNotAllowedHttpException};
 use Toporia\Framework\Http\Middleware\MiddlewarePipeline;
 use Toporia\Framework\Http\{Request, Response};
@@ -380,13 +381,13 @@ final class Router implements RouterInterface
      */
     private function sendResponse(mixed $result): void
     {
-        if ($result instanceof \Toporia\Framework\Http\Contracts\JsonResponseInterface) {
+        if ($result instanceof JsonResponseInterface) {
             $result->sendResponse();
-        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\RedirectResponseInterface) {
+        } elseif ($result instanceof RedirectResponseInterface) {
             $result->sendResponse();
-        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\StreamedResponseInterface) {
+        } elseif ($result instanceof StreamedResponseInterface) {
             $result->sendContent();
-        } elseif ($result instanceof \Toporia\Framework\Http\Contracts\ResponseInterface) {
+        } elseif ($result instanceof ResponseInterface) {
             $result->send($result->getContent());
         } elseif (is_string($result)) {
             $this->response->html($result);

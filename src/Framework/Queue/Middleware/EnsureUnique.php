@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Queue\Middleware;
 
 use Toporia\Framework\Queue\Contracts\JobInterface;
+use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Cache\Contracts\CacheInterface;
 use Toporia\Framework\Queue\Exceptions\JobAlreadyRunningException;
 
@@ -42,7 +43,7 @@ final class EnsureUnique implements JobMiddleware
     public function handle(JobInterface $job, callable $next): mixed
     {
         // Only Job class supports unique constraints
-        if (!$job instanceof \Toporia\Framework\Queue\Job) {
+        if (!$job instanceof Job) {
             return $next($job);
         }
 

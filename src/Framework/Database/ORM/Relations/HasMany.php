@@ -979,7 +979,7 @@ class HasMany extends Relation
         ?string $path = null,
         ?string $baseUrl = null,
         string $cursorName = 'cursor'
-    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+    ): CursorPaginator {
         // Validate parameters
         if ($perPage < 1) {
             throw new \InvalidArgumentException('Per page must be at least 1');

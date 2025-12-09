@@ -6,6 +6,7 @@ namespace Toporia\Framework\Queue;
 
 use Toporia\Framework\Database\Connection;
 use Toporia\Framework\Queue\Contracts\{JobInterface, QueueInterface};
+use Toporia\Framework\Queue\Job;
 
 /**
  * Class DatabaseQueue
@@ -60,7 +61,7 @@ final class DatabaseQueue implements QueueInterface
 
         // Get priority if job supports it
         $priority = 0;
-        if ($job instanceof \Toporia\Framework\Queue\Job) {
+        if ($job instanceof Job) {
             $priority = $job->getPriority();
         }
 
@@ -90,7 +91,7 @@ final class DatabaseQueue implements QueueInterface
 
         // Get priority if job supports it
         $priority = 0;
-        if ($job instanceof \Toporia\Framework\Queue\Job) {
+        if ($job instanceof Job) {
             $priority = $job->getPriority();
         }
 
@@ -164,7 +165,7 @@ final class DatabaseQueue implements QueueInterface
             ]);
 
             // Validate that unserialized object is a valid job
-            if (!$job instanceof \Toporia\Framework\Queue\Contracts\JobInterface) {
+            if (!$job instanceof JobInterface) {
                 throw new \RuntimeException(
                     sprintf('Invalid job payload: expected JobInterface, got %s', gettype($job))
                 );

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Database\Grammar;
 
-use Toporia\Framework\Database\Query\QueryBuilder;
+use Toporia\Framework\Database\Query\{Expression, QueryBuilder};
 
 /**
  * SQLite Grammar Implementation
@@ -214,7 +214,7 @@ class SQLiteGrammar extends Grammar
             $wrappedColumn = $this->wrapColumn($column);
 
             // Support Expression objects from DB::raw() (like Laravel)
-            if ($value instanceof \Toporia\Framework\Database\Query\Expression) {
+            if ($value instanceof Expression) {
                 $sets[] = "{$wrappedColumn} = " . (string) $value;
             } else {
                 $sets[] = "{$wrappedColumn} = ?";

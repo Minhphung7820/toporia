@@ -7,6 +7,7 @@ namespace Toporia\Framework\Database\ORM\Concerns;
 use Toporia\Framework\Database\ORM\Model;
 use Toporia\Framework\Database\ORM\ModelCollection;
 use Toporia\Framework\Database\ORM\Exceptions\RelationNotFoundException;
+use Toporia\Framework\Database\ORM\Relations\{BelongsTo, HasOne, HasOneThrough, MorphOne, MorphTo};
 use Toporia\Framework\Database\Contracts\RelationInterface;
 
 /**
@@ -397,7 +398,7 @@ trait HasEagerLoading
 
         // MorphTo has special handling - it does its own matching in getEager()
         // This follows Laravel's architecture where MorphTo creates fresh queries per morph type
-        if ($eagerRelation instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+        if ($eagerRelation instanceof MorphTo) {
             // Store relation name before calling getEager (needed for matchToMorphParents)
             $eagerRelation->match($modelsArray, new ModelCollection([]), $relationName);
 
@@ -532,11 +533,11 @@ trait HasEagerLoading
         // Single model relations (return null when empty)
         // These represent one-to-one or many-to-one relationships
         if (
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsTo ||
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\HasOne ||
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo ||
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphOne ||
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\HasOneThrough
+            $relation instanceof BelongsTo ||
+            $relation instanceof HasOne ||
+            $relation instanceof MorphTo ||
+            $relation instanceof MorphOne ||
+            $relation instanceof HasOneThrough
         ) {
             return null;
         }

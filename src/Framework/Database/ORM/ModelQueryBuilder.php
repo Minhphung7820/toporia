@@ -11,8 +11,13 @@ use Toporia\Framework\Database\Contracts\RelationInterface;
 use Toporia\Framework\Database\DatabaseCollection;
 use Toporia\Framework\Database\ORM\Relations\BelongsTo;
 use Toporia\Framework\Database\ORM\Relations\BelongsToMany;
+use Toporia\Framework\Database\ORM\Relations\HasManyThrough;
+use Toporia\Framework\Database\ORM\Relations\MorphMany;
+use Toporia\Framework\Database\ORM\Relations\MorphOne;
+use Toporia\Framework\Database\ORM\Relations\MorphTo;
 use Toporia\Framework\Database\ORM\Relations\MorphToMany;
 use Toporia\Framework\Database\ORM\Relations\MorphedByMany;
+use Toporia\Framework\Support\Collection\LazyCollection;
 use Toporia\Framework\Support\Pagination\CursorPaginator;
 use Toporia\Framework\Support\Pagination\Paginator;
 
@@ -166,7 +171,7 @@ class ModelQueryBuilder extends QueryBuilder
      * @param string|null $path Base URL path for pagination links
      * @return \Toporia\Framework\Support\Pagination\Paginator<TModel>
      */
-    public function paginate(int $perPage = 15, int $page = 1, ?string $path = null, ?string $baseUrl = null): \Toporia\Framework\Support\Pagination\Paginator
+    public function paginate(int $perPage = 15, int $page = 1, ?string $path = null, ?string $baseUrl = null): Paginator
     {
         // Validate parameters
         if ($perPage < 1) {
@@ -249,7 +254,7 @@ class ModelQueryBuilder extends QueryBuilder
         int $perPage = 15,
         ?array $options = null,
         ?array $options2 = null
-    ): \Toporia\Framework\Support\Pagination\CursorPaginator {
+    ): CursorPaginator {
         // Normalize options (support both formats)
         if ($options2 !== null) {
             $options = array_merge($options ?? [], $options2);
@@ -698,7 +703,7 @@ class ModelQueryBuilder extends QueryBuilder
         $relationInstance = $model->$relation();
 
         // Must be a MorphTo relationship
-        if (!$relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+        if (!$relationInstance instanceof MorphTo) {
             throw new \InvalidArgumentException(
                 "Relationship '{$relation}' must be a MorphTo relationship for hasMorph/whereHasMorph"
             );
@@ -897,7 +902,7 @@ class ModelQueryBuilder extends QueryBuilder
         $relationInstance = $model->$relation();
 
         // Must be a MorphTo relationship
-        if (!$relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+        if (!$relationInstance instanceof MorphTo) {
             throw new \InvalidArgumentException(
                 "Relationship '{$relation}' must be a MorphTo relationship for whereDoesntHaveMorph"
             );
@@ -2050,7 +2055,7 @@ class ModelQueryBuilder extends QueryBuilder
      */
     protected function buildPivotWhereHasSubquery($relation, string $parentTable, $relationQuery): string
     {
-        if ($relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany) {
+        if ($relation instanceof BelongsToMany) {
             // Get pivot table and keys for BelongsToMany
             $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
             $foreignPivotKey = $this->getRelationProperty($relation, 'foreignPivotKey');
@@ -2068,7 +2073,7 @@ class ModelQueryBuilder extends QueryBuilder
             $subquerySql = "SELECT COUNT(*) FROM {$pivotTable} " .
                 "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
                 "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
-        } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany) {
+        } elseif ($relation instanceof MorphToMany) {
             // Optimized MorphToMany query matching Laravel's structure
             // Laravel starts from related table (tags) and joins pivot (taggables)
             // This is more efficient when filtering by related table columns
@@ -2150,7 +2155,7 @@ class ModelQueryBuilder extends QueryBuilder
             $relation instanceof MorphedByMany
         ) {
             return $this->buildPivotExistsSubquery($relation, $parentTable, $relationQuery);
-        } elseif ($relation instanceof \Toporia\Framework\Database\ORM\Relations\HasManyThrough) {
+        } elseif ($relation instanceof HasManyThrough) {
             // HasManyThrough requires JOIN with through table
             return $this->buildHasManyThroughExistsSubquery($relation, $parentTable, $relationQuery);
         } else {
@@ -2182,8 +2187,8 @@ class ModelQueryBuilder extends QueryBuilder
         $fromClause = $parentTable === $relationTable ? "{$relationTable} AS {$relationAlias}" : $relationTable;
 
         // Check if this is a polymorphic relationship (MorphOne or MorphMany)
-        $isPolymorphic = $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphOne
-            || $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphMany;
+        $isPolymorphic = $relation instanceof MorphOne
+            || $relation instanceof MorphMany;
 
         // Collect bindings array
         $bindings = [];
@@ -2251,7 +2256,7 @@ class ModelQueryBuilder extends QueryBuilder
         // Collect bindings array
         $bindings = [];
 
-        if ($relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany) {
+        if ($relation instanceof BelongsToMany) {
             // Get pivot table and keys for BelongsToMany
             $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
             $foreignPivotKey = $this->getRelationProperty($relation, 'foreignPivotKey');
@@ -2520,8 +2525,8 @@ class ModelQueryBuilder extends QueryBuilder
     {
         // Handle different relationship types
         if (
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+            $relation instanceof BelongsToMany ||
+            $relation instanceof MorphToMany
         ) {
             return $this->buildPivotWhereHasSubquery($relation, $parentTable, $relationQuery);
         } else {
@@ -3257,7 +3262,7 @@ class ModelQueryBuilder extends QueryBuilder
         $relationInstance = $model->$relation();
 
         // Must be a MorphTo relationship
-        if (!$relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\MorphTo) {
+        if (!$relationInstance instanceof MorphTo) {
             throw new \InvalidArgumentException(
                 "Relationship '{$relation}' must be a MorphTo relationship for withCountMorph/withSumMorph"
             );
@@ -3480,7 +3485,7 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         // Special handling for HasManyThrough relationships (requires JOIN with through table)
-        if ($relationInstance instanceof \Toporia\Framework\Database\ORM\Relations\HasManyThrough) {
+        if ($relationInstance instanceof HasManyThrough) {
             $this->addHasManyThroughCountSelect($relationInstance, $relationName, $table, $relationQuery, $alias);
             return;
         }
@@ -4723,8 +4728,8 @@ class ModelQueryBuilder extends QueryBuilder
     {
         // Handle different relationship types
         if (
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\BelongsToMany ||
-            $relation instanceof \Toporia\Framework\Database\ORM\Relations\MorphToMany
+            $relation instanceof BelongsToMany ||
+            $relation instanceof MorphToMany
         ) {
             $subquerySql = $this->buildPivotWhereHasSubquery($relation, $parentTable, $relationQuery);
         } else {
@@ -4920,7 +4925,7 @@ class ModelQueryBuilder extends QueryBuilder
      *
      * @return \Toporia\Framework\Support\Collection\LazyCollection<int, TModel>
      */
-    public function toLazyCollection(): \Toporia\Framework\Support\Collection\LazyCollection
+    public function toLazyCollection(): LazyCollection
     {
         $modelClass = $this->modelClass;
         $eagerLoad = $this->getEagerLoad();
@@ -4981,7 +4986,7 @@ class ModelQueryBuilder extends QueryBuilder
      * @param int $chunkSize Number of records to fetch per database query (default: 1000)
      * @return \Toporia\Framework\Support\Collection\LazyCollection<int, TModel>
      */
-    public function toLazyCollectionByChunk(int $chunkSize = 1000): \Toporia\Framework\Support\Collection\LazyCollection
+    public function toLazyCollectionByChunk(int $chunkSize = 1000): LazyCollection
     {
         $modelClass = $this->modelClass;
         $eagerLoad = $this->getEagerLoad();
