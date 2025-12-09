@@ -286,12 +286,39 @@ class MorphedByMany extends Relation
                 $parentPivotKeyAlias = $grammar->wrapColumn("pivot_{$this->parentPivotKey}");
 
                 // Build ORDER BY clause
+                // IMPORTANT: When using pivot columns (orderByPivot), we need to reference them
+                // using their pivot aliases (e.g., toporia_base.pivot_order instead of pivot_table.order)
+                // because in the window function subquery, pivot columns are aliased as pivot_*
                 $orderParts = [];
                 if (!empty($orders)) {
                     foreach ($orders as $order) {
                         $col = $order['column'] ?? '';
                         $dir = strtoupper($order['direction'] ?? 'ASC');
-                        $wrappedCol = $grammar->wrapColumn($col);
+
+                        // Check if this is a pivot table column
+                        $isPivotColumn = false;
+                        $pivotColumnName = null;
+
+                        if (str_contains($col, '.')) {
+                            $parts = explode('.', $col, 2);
+                            $tableName = $parts[0];
+                            $columnName = $parts[1];
+
+                            // If column is from pivot table, use pivot alias
+                            if ($tableName === $this->pivotTable) {
+                                $isPivotColumn = true;
+                                $pivotColumnName = $columnName;
+                            }
+                        }
+
+                        if ($isPivotColumn) {
+                            // For pivot columns, reference using toporia_base.pivot_* alias
+                            $wrappedCol = 'toporia_base.' . $grammar->wrapColumn("pivot_{$pivotColumnName}");
+                        } else {
+                            // For regular columns, just wrap the column name
+                            $wrappedCol = $grammar->wrapColumn($col);
+                        }
+
                         $orderParts[] = "{$wrappedCol} {$dir}";
                     }
                 } else {

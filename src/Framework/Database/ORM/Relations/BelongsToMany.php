@@ -613,18 +613,45 @@ class BelongsToMany extends Relation
 
                 // Build ORDER BY clause for window function
                 // If no explicit orderBy, use primary key as default for consistent ordering
+                // IMPORTANT: When using pivot columns (orderByPivot), we need to reference them
+                // using their pivot aliases (e.g., toporia_base.pivot_order instead of book_category.order)
+                // because in the window function subquery, pivot columns are aliased as pivot_*
                 $orderParts = [];
                 if (!empty($orders)) {
                     foreach ($orders as $order) {
                         $col = $order['column'] ?? '';
                         $dir = strtoupper($order['direction'] ?? 'ASC');
-                        // Handle qualified column names (table.column)
+
+                        // Check if this is a pivot table column
+                        $isPivotColumn = false;
+                        $pivotColumnName = null;
+
                         if (str_contains($col, '.')) {
                             $parts = explode('.', $col, 2);
-                            $wrappedCol = $grammar->wrapTable($parts[0]) . '.' . $grammar->wrapColumn($parts[1]);
-                        } else {
-                            $wrappedCol = $grammar->wrapColumn($col);
+                            $tableName = $parts[0];
+                            $columnName = $parts[1];
+
+                            // If column is from pivot table, use pivot alias
+                            if ($tableName === $this->pivotTable) {
+                                $isPivotColumn = true;
+                                $pivotColumnName = $columnName;
+                            }
                         }
+
+                        if ($isPivotColumn) {
+                            // For pivot columns, reference using toporia_base.pivot_* alias
+                            // because baseQuery selects pivot columns as "pivot_{column_name}"
+                            $wrappedCol = 'toporia_base.' . $grammar->wrapColumn("pivot_{$pivotColumnName}");
+                        } else {
+                            // For regular columns, use table-qualified or unqualified name
+                            if (str_contains($col, '.')) {
+                                $parts = explode('.', $col, 2);
+                                $wrappedCol = $grammar->wrapTable($parts[0]) . '.' . $grammar->wrapColumn($parts[1]);
+                            } else {
+                                $wrappedCol = $grammar->wrapColumn($col);
+                            }
+                        }
+
                         $orderParts[] = "{$wrappedCol} {$dir}";
                     }
                 } else {
