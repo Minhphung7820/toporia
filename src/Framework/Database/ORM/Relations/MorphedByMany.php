@@ -461,8 +461,98 @@ class MorphedByMany extends Relation
             "{$this->pivotTable}.{$this->foreignKey}"
         );
 
-        // Filter by morph type and parent IDs
+        // Filter by morph type
         $this->query->where("{$this->pivotTable}.{$this->morphType}", $this->getMorphClass());
+
+        // CRITICAL FIX: Wrap existing WHERE conditions to handle OR operator precedence
+        // If user callback has OR conditions, we need to wrap them in parentheses
+        // Example: (is_active = 1 OR priority > 5) AND pivot.taggable_id IN (...)
+        $existingWheres = $this->query->getWheres();
+        if (!empty($existingWheres)) {
+            // Check if any existing WHERE uses OR operator
+            $hasOrOperator = false;
+            foreach ($existingWheres as $where) {
+                if (isset($where['boolean']) && strtoupper($where['boolean']) === 'OR') {
+                    $hasOrOperator = true;
+                    break;
+                }
+            }
+
+            if ($hasOrOperator) {
+                // Save existing wheres
+                $originalWheres = $existingWheres;
+
+                // Use reflection to clear existing wheres
+                $reflection = new \ReflectionClass($this->query);
+                $wheresProperty = $reflection->getProperty('wheres');
+                $wheresProperty->setAccessible(true);
+                $wheresProperty->setValue($this->query, []);
+                $wheresProperty->setAccessible(false);
+
+                // Also clear bindings for WHERE clause
+                $bindingsProperty = $reflection->getProperty('bindings');
+                $bindingsProperty->setAccessible(true);
+                $bindings = $bindingsProperty->getValue($this->query);
+                $whereBindings = $bindings['where'] ?? [];
+                $bindings['where'] = [];
+                $bindingsProperty->setValue($this->query, $bindings);
+                $bindingsProperty->setAccessible(false);
+
+                // Wrap existing conditions in nested WHERE
+                $this->query->where(function ($q) use ($originalWheres, $whereBindings) {
+                    // Track binding index
+                    $bindingIndex = 0;
+                    $isFirst = true;
+
+                    // Manually reconstruct WHERE conditions in nested closure
+                    foreach ($originalWheres as $where) {
+                        // Determine boolean operator
+                        $boolean = $isFirst ? 'AND' : ($where['boolean'] ?? 'AND');
+                        $useOr = !$isFirst && strtoupper($boolean) === 'OR';
+                        $isFirst = false;
+
+                        match ($where['type'] ?? '') {
+                            'basic' => $useOr
+                                ? $q->orWhere(
+                                    $where['column'],
+                                    $where['operator'] ?? '=',
+                                    $whereBindings[$bindingIndex++] ?? ($where['value'] ?? null)
+                                )
+                                : $q->where(
+                                    $where['column'],
+                                    $where['operator'] ?? '=',
+                                    $whereBindings[$bindingIndex++] ?? ($where['value'] ?? null)
+                                ),
+                            'Null' => $useOr ? $q->orWhereNull($where['column']) : $q->whereNull($where['column']),
+                            'NotNull' => $useOr ? $q->orWhereNotNull($where['column']) : $q->whereNotNull($where['column']),
+                            'In' => (function () use ($q, $where, &$whereBindings, &$bindingIndex, $useOr) {
+                                $values = $where['values'] ?? [];
+                                $count = count($values);
+                                $boundValues = array_slice($whereBindings, $bindingIndex, $count);
+                                $bindingIndex += $count;
+                                $useOr
+                                    ? $q->orWhereIn($where['column'], $boundValues ?: $values)
+                                    : $q->whereIn($where['column'], $boundValues ?: $values);
+                            })(),
+                            'NotIn' => (function () use ($q, $where, &$whereBindings, &$bindingIndex, $useOr) {
+                                $values = $where['values'] ?? [];
+                                $count = count($values);
+                                $boundValues = array_slice($whereBindings, $bindingIndex, $count);
+                                $bindingIndex += $count;
+                                $useOr
+                                    ? $q->orWhereNotIn($where['column'], $boundValues ?: $values)
+                                    : $q->whereNotIn($where['column'], $boundValues ?: $values);
+                            })(),
+                            'Raw' => $useOr
+                                ? $q->orWhereRaw($where['sql'] ?? '', $where['bindings'] ?? [])
+                                : $q->whereRaw($where['sql'] ?? '', $where['bindings'] ?? []),
+                            default => null
+                        };
+                    }
+                });
+            }
+        }
+
         $this->query->whereIn("{$this->pivotTable}.{$this->parentPivotKey}", array_unique($parentIds));
 
         // Select related table columns
