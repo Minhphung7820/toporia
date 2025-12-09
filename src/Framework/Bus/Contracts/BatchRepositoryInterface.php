@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Bus\Contracts;
 
+use Toporia\Framework\Bus\Batch;
+
 
 /**
  * Interface BatchRepositoryInterface
@@ -30,7 +32,7 @@ interface BatchRepositoryInterface
      * @param \Toporia\Framework\Bus\Batch $batch Batch instance
      * @return void
      */
-    public function store(\Toporia\Framework\Bus\Batch $batch): void;
+    public function store(Batch $batch): void;
 
     /**
      * Retrieve a batch by ID.
@@ -46,7 +48,7 @@ interface BatchRepositoryInterface
      * @param \Toporia\Framework\Bus\Batch $batch Batch instance
      * @return void
      */
-    public function update(\Toporia\Framework\Bus\Batch $batch): void;
+    public function update(Batch $batch): void;
 
     /**
      * Delete a batch.

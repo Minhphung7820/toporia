@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Testing\Concerns;
 
-use Toporia\Framework\Realtime\Contracts\BrokerInterface;
-use Toporia\Framework\Realtime\Contracts\TransportInterface;
-use Toporia\Framework\Realtime\Contracts\MessageInterface;
+use Toporia\Framework\Realtime\Contracts\{BrokerInterface, ConnectionInterface, MessageInterface, TransportInterface};
 use Toporia\Framework\Realtime\Message;
 
 
@@ -304,7 +302,7 @@ trait InteractsWithRealtime
                 $this->recordBroadcasted = $recordBroadcasted;
             }
 
-            public function send(\Toporia\Framework\Realtime\Contracts\ConnectionInterface $connection, MessageInterface $message): void
+            public function send(ConnectionInterface $connection, MessageInterface $message): void
             {
                 if ($this->fakeTransport) {
                     ($this->recordBroadcasted)(null, $message);
@@ -335,7 +333,7 @@ trait InteractsWithRealtime
                 return isset($this->mockConnections[$connectionId]);
             }
 
-            public function close(\Toporia\Framework\Realtime\Contracts\ConnectionInterface $connection, int $code = 1000, string $reason = ''): void
+            public function close(ConnectionInterface $connection, int $code = 1000, string $reason = ''): void
             {
                 // Mock close
             }

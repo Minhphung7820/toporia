@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Socialite\Models;
 
+use Toporia\Framework\Auth\Authenticatable;
 use Toporia\Framework\Database\ORM\Model;
 
 /**
@@ -51,7 +52,7 @@ final class SocialAccount extends Model
      */
     public function user()
     {
-        return $this->belongsTo(\Toporia\Framework\Auth\Authenticatable::class, 'user_id');
+        return $this->belongsTo(Authenticatable::class, 'user_id');
     }
 
     /**

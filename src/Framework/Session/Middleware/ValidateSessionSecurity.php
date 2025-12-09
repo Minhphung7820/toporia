@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Session\Middleware;
 
+use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Http\Contracts\MiddlewareInterface;
 use Toporia\Framework\Http\{Request, Response};
 use Toporia\Framework\Session\Security\SessionSecurity;
@@ -54,7 +55,7 @@ final class ValidateSessionSecurity implements MiddlewareInterface
      * @param \Toporia\Framework\Container\Contracts\ContainerInterface $container
      * @return self
      */
-    public static function fromContainer(\Toporia\Framework\Container\Contracts\ContainerInterface $container): self
+    public static function fromContainer(ContainerInterface $container): self
     {
         $session = $container->get('session');
         $config = $container->has('config')

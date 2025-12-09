@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Providers;
 
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Foundation\Application;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Support\Vite\Vite;
 
@@ -31,7 +32,7 @@ final class ViteServiceProvider extends ServiceProvider
         // Register Vite singleton
         $container->singleton(Vite::class, function ($c) {
             $config = $c->get('config')->get('vite', []);
-            $app = $c->get(\Toporia\Framework\Foundation\Application::class);
+            $app = $c->get(Application::class);
 
             // Resolve manifest path (support both absolute and relative paths)
             $manifestPath = $config['manifest_path'] ?? null;

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Http\Contracts;
 
+use Toporia\Framework\Session\Store;
+
 
 /**
  * Interface RequestInterface
@@ -494,7 +496,7 @@ interface RequestInterface
      * @param \Toporia\Framework\Session\Store $session Session store instance
      * @return self Fluent interface
      */
-    public function setSession(\Toporia\Framework\Session\Store $session): self;
+    public function setSession(Store $session): self;
 
     /**
      * Get the session instance for this request.

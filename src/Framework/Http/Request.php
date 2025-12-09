@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http;
 
 use Toporia\Framework\Http\Contracts\RequestInterface;
+use Toporia\Framework\Session\Store;
 
 /**
  * Class Request
@@ -140,7 +141,7 @@ final class Request implements RequestInterface
      * @param \Toporia\Framework\Session\Store $session Session store instance
      * @return self Fluent interface
      */
-    public function setSession(\Toporia\Framework\Session\Store $session): self
+    public function setSession(Store $session): self
     {
         $this->session = $session;
         return $this;

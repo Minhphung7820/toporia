@@ -6,7 +6,7 @@ namespace Toporia\Framework\Console\Commands;
 
 use Toporia\Framework\Console\Command;
 use Toporia\Framework\Database\DatabaseManager;
-use Toporia\Framework\Database\Schema\SchemaBuilder;
+use Toporia\Framework\Database\Schema\{Blueprint, SchemaBuilder};
 
 /**
  * Class MigrateAlterCommand
@@ -76,7 +76,7 @@ final class MigrateAlterCommand extends Command
             $dropForeign = $this->option('drop-foreign');
 
             // Build alterations
-            $schema->table($table, function (\Toporia\Framework\Database\Schema\Blueprint $blueprint) use (
+            $schema->table($table, function (Blueprint $blueprint) use (
                 $add, $drop, $modify, $rename,
                 $index, $unique, $foreign,
                 $dropIndex, $dropUnique, $dropForeign
@@ -150,7 +150,7 @@ final class MigrateAlterCommand extends Command
      *
      * Format: --add=name:type:length,email:string:255
      */
-    private function handleAddColumns(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $add): void
+    private function handleAddColumns(Blueprint $blueprint, string $add): void
     {
         $columns = explode(',', $add);
         foreach ($columns as $columnDef) {
@@ -180,7 +180,7 @@ final class MigrateAlterCommand extends Command
      *
      * Format: --drop=column1,column2
      */
-    private function handleDropColumns(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $drop): void
+    private function handleDropColumns(Blueprint $blueprint, string $drop): void
     {
         $columns = array_map('trim', explode(',', $drop));
         $blueprint->dropColumn($columns);
@@ -191,7 +191,7 @@ final class MigrateAlterCommand extends Command
      *
      * Format: --modify=name:type:length
      */
-    private function handleModifyColumns(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $modify): void
+    private function handleModifyColumns(Blueprint $blueprint, string $modify): void
     {
         $columns = explode(',', $modify);
         foreach ($columns as $columnDef) {
@@ -223,7 +223,7 @@ final class MigrateAlterCommand extends Command
      *
      * Format: --rename=old_name:new_name
      */
-    private function handleRenameColumns(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $rename): void
+    private function handleRenameColumns(Blueprint $blueprint, string $rename): void
     {
         $renames = explode(',', $rename);
         foreach ($renames as $renameDef) {
@@ -241,7 +241,7 @@ final class MigrateAlterCommand extends Command
      *
      * Format: --index=column1,column2
      */
-    private function handleAddIndexes(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $index): void
+    private function handleAddIndexes(Blueprint $blueprint, string $index): void
     {
         $indexes = explode(',', $index);
         foreach ($indexes as $indexDef) {
@@ -255,7 +255,7 @@ final class MigrateAlterCommand extends Command
      *
      * Format: --unique=column1,column2
      */
-    private function handleAddUnique(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $unique): void
+    private function handleAddUnique(Blueprint $blueprint, string $unique): void
     {
         $uniques = explode(',', $unique);
         foreach ($uniques as $uniqueDef) {
@@ -269,7 +269,7 @@ final class MigrateAlterCommand extends Command
      *
      * Format: --foreign=column:references:on_table:on_delete:on_update
      */
-    private function handleAddForeignKeys(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $foreign): void
+    private function handleAddForeignKeys(Blueprint $blueprint, string $foreign): void
     {
         $foreigns = explode(',', $foreign);
         foreach ($foreigns as $foreignDef) {
@@ -296,7 +296,7 @@ final class MigrateAlterCommand extends Command
     /**
      * Handle dropping indexes.
      */
-    private function handleDropIndexes(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $dropIndex): void
+    private function handleDropIndexes(Blueprint $blueprint, string $dropIndex): void
     {
         $indexes = array_map('trim', explode(',', $dropIndex));
         foreach ($indexes as $index) {
@@ -307,7 +307,7 @@ final class MigrateAlterCommand extends Command
     /**
      * Handle dropping unique indexes.
      */
-    private function handleDropUnique(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $dropUnique): void
+    private function handleDropUnique(Blueprint $blueprint, string $dropUnique): void
     {
         $uniques = array_map('trim', explode(',', $dropUnique));
         foreach ($uniques as $unique) {
@@ -318,7 +318,7 @@ final class MigrateAlterCommand extends Command
     /**
      * Handle dropping foreign keys.
      */
-    private function handleDropForeignKeys(\Toporia\Framework\Database\Schema\Blueprint $blueprint, string $dropForeign): void
+    private function handleDropForeignKeys(Blueprint $blueprint, string $dropForeign): void
     {
         $foreigns = array_map('trim', explode(',', $dropForeign));
         foreach ($foreigns as $foreign) {

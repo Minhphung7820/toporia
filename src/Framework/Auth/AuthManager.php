@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Toporia\Framework\Auth;
 
+use Toporia\Framework\Auth\Authenticatable;
 use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, GuardInterface};
 
 /**
@@ -200,7 +201,7 @@ final class AuthManager implements AuthManagerInterface
      * @param \Toporia\Framework\Auth\Authenticatable $user
      * @return void
      */
-    public function login(\Toporia\Framework\Auth\Authenticatable $user): void
+    public function login(Authenticatable $user): void
     {
         $this->guard()->login($user);
     }
