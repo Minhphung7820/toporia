@@ -156,7 +156,12 @@ class BelongsToMany extends Relation
         [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
 
         $this->pivotWheres[] = compact('column', 'operator', 'value');
-        $this->applyWhereToQuery($this->qualifyPivotColumn($column), $operator, $value);
+
+        // FIXED: Do NOT apply constraint immediately when defining relationship
+        // The pivot join may not exist yet if parent model doesn't exist (during relationship definition)
+        // Constraints will be applied later via applyPivotConstraintsToQuery() in eager loading
+        // This ensures pivot table is joined BEFORE applying WHERE constraints
+        // $this->applyWhereToQuery($this->qualifyPivotColumn($column), $operator, $value);
 
         return $this;
     }
@@ -403,6 +408,10 @@ class BelongsToMany extends Relation
             $this->query->selectRaw("{$this->pivotTable}.{$this->foreignPivotKey} as pivot_{$this->foreignPivotKey}");
             $this->query->selectRaw("{$this->pivotTable}.{$this->relatedPivotKey} as pivot_{$this->relatedPivotKey}");
         }
+
+        // Apply pivot constraints (wherePivot, wherePivotIn, etc.)
+        // FIXED: Apply constraints AFTER pivot join is created
+        $this->applyPivotConstraintsToQuery($this->query);
 
         // Apply soft delete scope if related model uses soft deletes
         $this->applySoftDeleteScope($this->query, $this->relatedClass, $relatedTable);
@@ -1128,23 +1137,91 @@ class BelongsToMany extends Relation
      */
     protected function matchOptimized(array $models, ModelCollection $results, string $relationName): array
     {
-        // Build dictionary: parent_id => [related_models]
+        // FIXED: Process pivot data properly instead of leaving pivot_* attributes in models
+        // Build dictionary: parent_id => [related_id => pivotData]
         $dictionary = [];
         foreach ($results as $result) {
-            // Parent ID should be available from the main query's SELECT
-            $parentId = $result->getAttribute("pivot_{$this->foreignPivotKey}");
-            if ($parentId !== null) {
-                if (!isset($dictionary[$parentId])) {
-                    $dictionary[$parentId] = [];
+            // Get pivot keys
+            $pivotForeignKey = $result->getAttribute("pivot_{$this->foreignPivotKey}");
+            $pivotRelatedKey = $result->getAttribute("pivot_{$this->relatedPivotKey}");
+
+            if ($pivotForeignKey !== null && $pivotRelatedKey !== null) {
+                $parentIdKey = (string) $pivotForeignKey;
+                $relatedIdKey = (string) $pivotRelatedKey;
+
+                // Build pivot data if needed
+                $pivotData = null;
+                if ($this->shouldIncludePivot()) {
+                    // Lazy load pivot columns only when withPivot('*') was used
+                    if ($this->withPivotAll) {
+                        $this->ensurePivotColumnsLoaded();
+                    }
+
+                    $pivotData = [
+                        $this->foreignPivotKey => $pivotForeignKey,
+                        $this->relatedPivotKey => $pivotRelatedKey,
+                    ];
+
+                    // Add other pivot columns
+                    foreach ($this->pivotColumns as $column) {
+                        if ($column !== $this->foreignPivotKey && $column !== $this->relatedPivotKey) {
+                            $pivotValue = $result->getAttribute("pivot_{$column}");
+                            if ($pivotValue !== null) {
+                                $pivotData[$column] = $pivotValue;
+                            }
+                        }
+                    }
+
+                    // Add timestamps if enabled
+                    if ($this->withTimestamps) {
+                        $createdAt = $result->getAttribute('pivot_created_at');
+                        $updatedAt = $result->getAttribute('pivot_updated_at');
+                        if ($createdAt !== null) {
+                            $pivotData['created_at'] = $createdAt;
+                        }
+                        if ($updatedAt !== null) {
+                            $pivotData['updated_at'] = $updatedAt;
+                        }
+                    }
                 }
-                $dictionary[$parentId][] = $result;
+
+                if (!isset($dictionary[$parentIdKey])) {
+                    $dictionary[$parentIdKey] = [];
+                }
+                $dictionary[$parentIdKey][$relatedIdKey] = [
+                    'model' => $result,
+                    'pivot' => $pivotData
+                ];
             }
+        }
+
+        // Remove pivot_* attributes from all result models
+        foreach ($results as $result) {
+            /** @var Model $result */
+            $this->removePivotAttributes($result);
         }
 
         // Match to parents
         foreach ($models as $model) {
             $parentId = $model->getAttribute($this->parentKey);
-            $matched = $dictionary[$parentId] ?? [];
+            $parentIdKey = (string) $parentId;
+            $matched = [];
+
+            if (isset($dictionary[$parentIdKey])) {
+                foreach ($dictionary[$parentIdKey] as $relatedData) {
+                    // Clone the related model to avoid sharing pivot data
+                    $relatedModel = clone $relatedData['model'];
+
+                    // Attach pivot object if we have pivot data
+                    if ($relatedData['pivot'] !== null && $this->shouldIncludePivot()) {
+                        $pivotModel = $this->newPivot($relatedData['pivot'], true);
+                        $relatedModel->setRelation($this->pivotAccessor, $pivotModel);
+                    }
+
+                    $matched[] = $relatedModel;
+                }
+            }
+
             $model->setRelation($relationName, new ModelCollection($matched));
         }
 

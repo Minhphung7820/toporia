@@ -524,7 +524,7 @@ final class RelationshipTestController extends BaseController
         $data = [
             // Books with categories
             'books_categories' => BookModel::with(['categories' => function ($q) {
-                $q
+                $q->wherePivot('order', '>', 0)
                     ->orderByPivot('order', 'ASC')
                     ->orderBy('categories.name', 'ASC')
                     ->limit(4);
