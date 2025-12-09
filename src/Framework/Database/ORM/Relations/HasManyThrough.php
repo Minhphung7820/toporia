@@ -322,7 +322,9 @@ class HasManyThrough extends Relation
         }
 
         // Fallback to standard query execution
-        $this->query->select("{$relatedTable}.*");
+        // CRITICAL FIX: Must SELECT through key for buildDictionary() to work
+        // Without through key, match() cannot group results by parent model
+        $this->query->select("{$relatedTable}.*", "{$throughTable}.{$this->firstKey}");
 
         $rowCollection = $this->query->get();
 

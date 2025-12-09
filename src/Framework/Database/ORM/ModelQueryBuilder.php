@@ -3951,6 +3951,12 @@ class ModelQueryBuilder extends QueryBuilder
             $relationQuery->whereNull("{$relationTable}.{$deletedAtColumn}");
         }
 
+        // Special handling for HasManyThrough relationships (requires through table JOIN)
+        if ($relationInstance instanceof HasManyThrough) {
+            $this->addHasManyThroughAggregateSelect($relationInstance, $relation, $column, $function, $table, $relationQuery);
+            return $this;
+        }
+
         // Special handling for BelongsToMany relationships (many-to-many through pivot table)
         if ($relationInstance instanceof BelongsToMany) {
             $this->addBelongsToManyAggregateSelect($relationInstance, $relation, $column, $function, $table, $relationQuery);
@@ -4005,6 +4011,104 @@ class ModelQueryBuilder extends QueryBuilder
         $this->selectRaw("({$subquery}) AS {$columnAlias}");
 
         return $this;
+    }
+
+    /**
+     * Add aggregate select for HasManyThrough relationships.
+     *
+     * HasManyThrough requires JOIN with the through table (intermediate model).
+     * Example: City hasMany Books through Authors
+     * - withAvg('books', 'rating') should aggregate books.rating
+     * - Join: books → authors → cities
+     * - SQL: SELECT AVG(books.rating) FROM books
+     *        INNER JOIN authors ON authors.id = books.author_id
+     *        WHERE authors.city_id = cities.id
+     *
+     * @param HasManyThrough $relationInstance The HasManyThrough relation instance
+     * @param string $relation The relation name (e.g., 'books')
+     * @param string $column The column to aggregate (e.g., 'rating')
+     * @param string $function The aggregate function (SUM, AVG, MIN, MAX)
+     * @param string $table The parent table name (e.g., 'cities')
+     * @param QueryBuilder $relationQuery The relation query builder
+     * @return void
+     */
+    private function addHasManyThroughAggregateSelect(
+        HasManyThrough $relationInstance,
+        string $relation,
+        string $column,
+        string $function,
+        string $table,
+        QueryBuilder $relationQuery
+    ): void {
+        // Get keys and tables from HasManyThrough relationship
+        // firstKey: foreign key on through table (authors.city_id)
+        // secondKey: foreign key on related table (books.author_id)
+        // localKey: local key on parent table (cities.id)
+        // secondLocalKey: local key on through table (authors.id)
+        $firstKey = $relationInstance->getFirstKey();
+        $secondKey = $relationInstance->getForeignKey();
+        $localKey = $relationInstance->getLocalKey();
+        $secondLocalKey = $relationInstance->getSecondLocalKey();
+
+        // Get table names
+        // relatedTable: final table (books)
+        // throughTable: intermediate table (authors)
+        $relatedTable = $relationQuery->getTable();
+        $throughTable = $relationInstance->getThroughClass()::getTableName();
+
+        // Qualify column name if not already qualified
+        $aggregateColumn = str_contains($column, '.') ? $column : "{$relatedTable}.{$column}";
+
+        // Build aggregate subquery with JOIN to through table
+        // SELECT AVG(books.rating) FROM books
+        // INNER JOIN authors ON authors.id = books.author_id
+        // WHERE authors.city_id = cities.id
+        $subquery = "SELECT {$function}({$aggregateColumn}) FROM {$relatedTable} " .
+            "INNER JOIN {$throughTable} ON {$throughTable}.{$secondLocalKey} = {$relatedTable}.{$secondKey} " .
+            "WHERE {$throughTable}.{$firstKey} = {$table}.{$localKey}";
+
+        // Add relation query constraints to subquery
+        $relationSql = $relationQuery->toSql();
+        if (preg_match('/WHERE (.+?)(?:ORDER BY|LIMIT|GROUP BY|HAVING|$)/s', $relationSql, $matches)) {
+            $whereClause = trim($matches[1]);
+
+            // Qualify unqualified column names with related table to avoid ambiguity
+            // Pattern: (?<!\w\.) means "not preceded by word_char + dot"
+            $whereClause = preg_replace_callback(
+                '/(?<!\w\.)(\b\w+)\s+(=|!=|<>|>|<|>=|<=|LIKE|NOT\s+LIKE|IN|NOT\s+IN|IS|IS\s+NOT)\s+/i',
+                function ($matches) use ($relatedTable) {
+                    $column = $matches[1];
+                    $operator = $matches[2];
+                    // Skip SQL keywords
+                    $keywords = ['AND', 'OR', 'NOT', 'NULL', 'TRUE', 'FALSE', 'BETWEEN'];
+                    if (in_array(strtoupper($column), $keywords)) {
+                        return $matches[0];
+                    }
+                    return "{$relatedTable}.{$column} {$operator} ";
+                },
+                $whereClause
+            );
+
+            // Replace placeholders with actual values (safely quoted)
+            $relationBindings = $relationQuery->getBindings();
+            foreach ($relationBindings as $binding) {
+                $quoted = $this->quoteValue($binding);
+                $whereClause = preg_replace('/\?/', $quoted, $whereClause, 1);
+            }
+
+            $subquery .= " AND ({$whereClause})";
+        }
+
+        $functionLower = strtolower($function);
+        $columnAlias = "{$relation}_{$functionLower}_{$column}";
+
+        // Ensure we select table.* along with the subquery (only once)
+        $columns = $this->getColumns();
+        if (empty($columns) || !in_array("{$table}.*", $columns, true)) {
+            $this->select("{$table}.*");
+        }
+
+        $this->selectRaw("({$subquery}) AS {$columnAlias}");
     }
 
     /**

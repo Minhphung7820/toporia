@@ -384,6 +384,7 @@ final class RelationshipTestController extends BaseController
      */
     public function testHasOne(Request $request)
     {
+        QB::enableQueryLog();
         $data = AuthorModel::with(['latestBook', 'bestsellerBook', 'city.country'])
             ->where('is_verified', true)
             ->whereHas('latestBook')
@@ -391,11 +392,18 @@ final class RelationshipTestController extends BaseController
             ->limit(20)
             ->get()
             ->toArray();
-
+        $queries = QB::getQueryLog();
         return response()->json([
             'success' => true,
             'title' => 'hasOne: Author with Latest & Bestseller Book',
-            'data' => $data
+            'data' => $data,
+            'queries' => array_map(function ($q) {
+                return [
+                    'sql' => $q['query'],
+                    'bindings' => $q['bindings'],
+                    'time' => $q['time'] ?? 0
+                ];
+            }, $queries)
         ]);
     }
 
@@ -406,9 +414,11 @@ final class RelationshipTestController extends BaseController
      */
     public function testHasMany(Request $request)
     {
+        QB::enableQueryLog();
         $data = AuthorModel::with(['books' => function ($q) {
             $q->where('is_available', true)
-                ->orderBy('published_year', 'DESC');
+                ->orderBy('published_year', 'DESC')
+                ->limit(15);
         }])
             ->withCount(['books' => function ($q) {
                 $q->where('is_available', true);
@@ -421,11 +431,18 @@ final class RelationshipTestController extends BaseController
             ->limit(15)
             ->get()
             ->toArray();
-
+        $queries = QB::getQueryLog();
         return response()->json([
             'success' => true,
             'title' => 'hasMany: Authors with Books (with aggregates)',
-            'data' => $data
+            'data' => $data,
+            'queries' => array_map(function ($q) {
+                return [
+                    'sql' => $q['query'],
+                    'bindings' => $q['bindings'],
+                    'time' => $q['time'] ?? 0
+                ];
+            }, $queries)
         ]);
     }
 
@@ -436,6 +453,7 @@ final class RelationshipTestController extends BaseController
      */
     public function testHasManyThrough(Request $request)
     {
+        QB::enableQueryLog();
         // Test multiple hasManyThrough relationships
         $data = [
             // City -> Books through Authors
@@ -477,11 +495,18 @@ final class RelationshipTestController extends BaseController
                 ->get()
                 ->toArray(),
         ];
-
+        $queries = QB::getQueryLog();
         return response()->json([
             'success' => true,
             'title' => 'hasManyThrough: Multiple complex examples',
-            'data' => $data
+            'data' => $data,
+            'queries' => array_map(function ($q) {
+                return [
+                    'sql' => $q['query'],
+                    'bindings' => $q['bindings'],
+                    'time' => $q['time'] ?? 0
+                ];
+            }, $queries)
         ]);
     }
 
