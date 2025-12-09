@@ -3163,6 +3163,17 @@ class QueryBuilder implements QueryBuilderInterface
         );
     }
 
+    /**
+     * Get bindings for a specific type.
+     *
+     * @param string $type Binding type (where, having, join, etc.)
+     * @return array Bindings array for the specified type
+     */
+    public function getBindingsByType(string $type): array
+    {
+        return $this->bindings[$type] ?? [];
+    }
+
 
     /**
      * Get the database connection.
@@ -4172,6 +4183,37 @@ class QueryBuilder implements QueryBuilderInterface
     public function getWheres(): array
     {
         return $this->wheres;
+    }
+
+    /**
+     * Set WHERE clauses.
+     *
+     * This method is used internally by relationships to manipulate WHERE conditions
+     * for complex query building scenarios (e.g., wrapping OR conditions in nested WHERE).
+     *
+     * @param array<array> $wheres WHERE clause array
+     * @return $this
+     */
+    public function setWheres(array $wheres): static
+    {
+        $this->wheres = $wheres;
+        return $this;
+    }
+
+    /**
+     * Set query bindings for a specific type.
+     *
+     * This method is used internally by relationships to manipulate bindings
+     * when reconstructing WHERE clauses.
+     *
+     * @param array $bindings Bindings array
+     * @param string $type Binding type (where, having, order, etc.)
+     * @return $this
+     */
+    public function setBindings(array $bindings, string $type = 'where'): static
+    {
+        $this->bindings[$type] = $bindings;
+        return $this;
     }
 
     /**

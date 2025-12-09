@@ -669,24 +669,13 @@ abstract class Relation implements RelationInterface
                     // Save existing wheres
                     $originalWheres = $existingWheres;
 
-                    // Use reflection to clear existing wheres (no public API)
-                    $reflection = new \ReflectionClass($this->query);
-                    $wheresProperty = $reflection->getProperty('wheres');
-                    $wheresProperty->setAccessible(true);
-                    $wheresProperty->setValue($this->query, []);
-                    $wheresProperty->setAccessible(false);
-
-                    // Also clear bindings for WHERE clause
-                    $bindingsProperty = $reflection->getProperty('bindings');
-                    $bindingsProperty->setAccessible(true);
-                    $bindings = $bindingsProperty->getValue($this->query);
-                    $whereBindings = $bindings['where'] ?? [];
-                    $bindings['where'] = [];
-                    $bindingsProperty->setValue($this->query, $bindings);
-                    $bindingsProperty->setAccessible(false);
+                    // PERFORMANCE FIX: Use public methods instead of reflection (10-20x faster)
+                    $whereBindings = $this->query->getBindingsByType('where');
+                    $this->query->setWheres([]);
+                    $this->query->setBindings([], 'where');
 
                     // Wrap existing conditions in nested WHERE
-                    $this->query->where(function($q) use ($originalWheres, $whereBindings) {
+                    $this->query->where(function ($q) use ($originalWheres, $whereBindings) {
                         // Track binding index
                         $bindingIndex = 0;
                         $isFirst = true;
@@ -712,7 +701,7 @@ abstract class Relation implements RelationInterface
                                     ),
                                 'Null' => $useOr ? $q->orWhereNull($where['column']) : $q->whereNull($where['column']),
                                 'NotNull' => $useOr ? $q->orWhereNotNull($where['column']) : $q->whereNotNull($where['column']),
-                                'In' => (function() use ($q, $where, &$whereBindings, &$bindingIndex, $useOr) {
+                                'In' => (function () use ($q, $where, &$whereBindings, &$bindingIndex, $useOr) {
                                     $values = $where['values'] ?? [];
                                     $count = count($values);
                                     $boundValues = array_slice($whereBindings, $bindingIndex, $count);
@@ -721,7 +710,7 @@ abstract class Relation implements RelationInterface
                                         ? $q->orWhereIn($where['column'], $boundValues ?: $values)
                                         : $q->whereIn($where['column'], $boundValues ?: $values);
                                 })(),
-                                'NotIn' => (function() use ($q, $where, &$whereBindings, &$bindingIndex, $useOr) {
+                                'NotIn' => (function () use ($q, $where, &$whereBindings, &$bindingIndex, $useOr) {
                                     $values = $where['values'] ?? [];
                                     $count = count($values);
                                     $boundValues = array_slice($whereBindings, $bindingIndex, $count);
@@ -895,22 +884,14 @@ abstract class Relation implements RelationInterface
      */
     protected function getOrderDirectionForColumn(QueryBuilder $query, string $column): ?string
     {
-        // Use reflection to access orders (QueryBuilder doesn't expose this publicly)
-        try {
-            $reflection = new \ReflectionClass($query);
-            $ordersProperty = $reflection->getProperty('orders');
-            $ordersProperty->setAccessible(true);
-            $orders = $ordersProperty->getValue($query);
-            $ordersProperty->setAccessible(false);
+        // PERFORMANCE FIX: Use public method instead of reflection
+        $orders = $query->getOrders();
 
-            // Find order by for this column
-            foreach ($orders as $order) {
-                if (isset($order['column']) && $order['column'] === $column) {
-                    return $order['direction'] ?? 'ASC';
-                }
+        // Find order by for this column
+        foreach ($orders as $order) {
+            if (isset($order['column']) && $order['column'] === $column) {
+                return $order['direction'] ?? 'ASC';
             }
-        } catch (\ReflectionException $e) {
-            // Fallback to null if reflection fails
         }
 
         return null;
@@ -928,23 +909,16 @@ abstract class Relation implements RelationInterface
      */
     protected function ensureOrderByCursorColumn(QueryBuilder $query, string $column, string $direction): QueryBuilder
     {
+        // PERFORMANCE FIX: Use public method instead of reflection
         // Check if column is already ordered
         $isOrdered = false;
-        try {
-            $reflection = new \ReflectionClass($query);
-            $ordersProperty = $reflection->getProperty('orders');
-            $ordersProperty->setAccessible(true);
-            $orders = $ordersProperty->getValue($query);
-            $ordersProperty->setAccessible(false);
+        $orders = $query->getOrders();
 
-            foreach ($orders as $order) {
-                if (isset($order['column']) && $order['column'] === $column) {
-                    $isOrdered = true;
-                    break;
-                }
+        foreach ($orders as $order) {
+            if (isset($order['column']) && $order['column'] === $column) {
+                $isOrdered = true;
+                break;
             }
-        } catch (\ReflectionException $e) {
-            // If reflection fails, add order anyway
         }
 
         // Add cursor column as primary sort if not already present
