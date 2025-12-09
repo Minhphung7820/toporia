@@ -157,11 +157,16 @@ class BelongsToMany extends Relation
 
         $this->pivotWheres[] = compact('column', 'operator', 'value');
 
-        // FIXED: Do NOT apply constraint immediately when defining relationship
-        // The pivot join may not exist yet if parent model doesn't exist (during relationship definition)
-        // Constraints will be applied later via applyPivotConstraintsToQuery() in eager loading
-        // This ensures pivot table is joined BEFORE applying WHERE constraints
-        // $this->applyWhereToQuery($this->qualifyPivotColumn($column), $operator, $value);
+        // FIXED: Only apply constraint immediately if pivot join already exists
+        // This handles two scenarios:
+        // 1. Relationship definition: pivot join doesn't exist yet → store constraint, apply later
+        // 2. Eager loading closure: pivot join exists → apply constraint immediately
+        if ($this->hasPivotJoin()) {
+            // Pivot table is already joined, safe to apply constraint now
+            $fullColumn = $this->ensurePivotColumnQualified($column);
+            $this->applyWhereToQueryBuilder($this->query, $fullColumn, $operator, $value);
+        }
+        // Otherwise, constraint will be applied later via applyPivotConstraintsToQuery()
 
         return $this;
     }
@@ -172,7 +177,11 @@ class BelongsToMany extends Relation
     public function wherePivotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false];
-        $this->query->whereIn($this->qualifyPivotColumn($column), $values);
+
+        // Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereIn($this->qualifyPivotColumn($column), $values);
+        }
 
         return $this;
     }
@@ -183,7 +192,11 @@ class BelongsToMany extends Relation
     public function wherePivotNotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => true];
-        $this->query->whereNotIn($this->qualifyPivotColumn($column), $values);
+
+        // Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->whereNotIn($this->qualifyPivotColumn($column), $values);
+        }
 
         return $this;
     }
@@ -201,7 +214,11 @@ class BelongsToMany extends Relation
         [$operator, $value] = $this->normalizeOperatorValue($operator, $value);
 
         $this->pivotWheres[] = compact('column', 'operator', 'value', 'type') + ['type' => 'or'];
-        $this->query->orWhere($this->qualifyPivotColumn($column), $operator, $value);
+
+        // Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orWhere($this->qualifyPivotColumn($column), $operator, $value);
+        }
 
         return $this;
     }
@@ -216,7 +233,11 @@ class BelongsToMany extends Relation
     public function orWherePivotIn(string $column, array $values): static
     {
         $this->pivotWhereIns[] = ['column' => $column, 'values' => $values, 'not' => false, 'type' => 'or'];
-        $this->query->orWhereIn($this->qualifyPivotColumn($column), $values);
+
+        // Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orWhereIn($this->qualifyPivotColumn($column), $values);
+        }
 
         return $this;
     }
@@ -228,7 +249,12 @@ class BelongsToMany extends Relation
     {
         $direction = strtolower($direction);
         $this->pivotOrderBy[] = compact('column', 'direction');
-        $this->query->orderBy($this->qualifyPivotColumn($column), $direction);
+
+        // orderBy can be applied anytime (doesn't require pivot join in WHERE clause)
+        // But to be safe, only apply if pivot join exists
+        if ($this->hasPivotJoin()) {
+            $this->query->orderBy($this->qualifyPivotColumn($column), $direction);
+        }
 
         return $this;
     }
@@ -296,9 +322,7 @@ class BelongsToMany extends Relation
         }
 
         $jsonValue = is_string($value) ? '"' . $value . '"' : json_encode($value);
-        $qualifiedColumn = $this->qualifyPivotColumn($column);
 
-        $this->query->whereRaw("JSON_CONTAINS({$qualifiedColumn}, ?, ?)", [$jsonValue, $path]);
         $this->pivotWheres[] = [
             'column' => $column,
             'function' => 'JSON_CONTAINS',
@@ -308,6 +332,12 @@ class BelongsToMany extends Relation
             'value' => 1,
             'type' => 'json'
         ];
+
+        // Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $qualifiedColumn = $this->qualifyPivotColumn($column);
+            $this->query->whereRaw("JSON_CONTAINS({$qualifiedColumn}, ?, ?)", [$jsonValue, $path]);
+        }
 
         return $this;
     }
@@ -339,9 +369,6 @@ class BelongsToMany extends Relation
             );
         }
 
-        $qualifiedColumn = $this->qualifyPivotColumn($column);
-
-        $this->query->whereRaw("JSON_LENGTH({$qualifiedColumn}, ?) {$operator} ?", [$path, $value]);
         $this->pivotWheres[] = [
             'column' => $column,
             'function' => 'JSON_LENGTH',
@@ -350,6 +377,12 @@ class BelongsToMany extends Relation
             'value' => $value,
             'type' => 'json'
         ];
+
+        // Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $qualifiedColumn = $this->qualifyPivotColumn($column);
+            $this->query->whereRaw("JSON_LENGTH({$qualifiedColumn}, ?) {$operator} ?", [$path, $value]);
+        }
 
         return $this;
     }
@@ -526,15 +559,18 @@ class BelongsToMany extends Relation
      */
     protected function addPivotFunctionConstraint(string $function, string $column, string $operator, mixed $value): static
     {
-        $qualifiedColumn = $this->qualifyPivotColumn($column);
-        $this->query->whereRaw("{$function}({$qualifiedColumn}) {$operator} ?", [$value]);
-
         $this->pivotWheres[] = [
             'column' => "{$function}({$column})",
             'operator' => $operator,
             'value' => $value,
             'type' => 'function'
         ];
+
+        // Only apply constraint immediately if pivot join already exists
+        if ($this->hasPivotJoin()) {
+            $qualifiedColumn = $this->qualifyPivotColumn($column);
+            $this->query->whereRaw("{$function}({$qualifiedColumn}) {$operator} ?", [$value]);
+        }
 
         return $this;
     }
@@ -1473,9 +1509,24 @@ class BelongsToMany extends Relation
             $column = $where['column'];
             $operator = $where['operator'];
             $value = $where['value'];
+            $type = $where['type'] ?? null;
 
-            // Handle function-based columns (DATE, MONTH, YEAR, TIME, etc.)
-            if (Str::contains($column, '(') && Str::contains($column, ')')) {
+            // Handle different constraint types
+            if ($type === 'json') {
+                // JSON constraints (JSON_CONTAINS, JSON_LENGTH)
+                $function = $where['function'] ?? null;
+                $qualifiedColumn = $this->ensurePivotColumnQualified($column);
+
+                if ($function === 'JSON_CONTAINS') {
+                    $jsonValue = $where['json_value'];
+                    $path = $where['path'] ?? '$';
+                    $query->whereRaw("JSON_CONTAINS({$qualifiedColumn}, ?, ?)", [$jsonValue, $path]);
+                } elseif ($function === 'JSON_LENGTH') {
+                    $path = $where['path'] ?? '$';
+                    $query->whereRaw("JSON_LENGTH({$qualifiedColumn}, ?) {$operator} ?", [$path, $value]);
+                }
+            } elseif ($type === 'function' || (Str::contains($column, '(') && Str::contains($column, ')'))) {
+                // Function-based constraints (DATE, MONTH, YEAR, TIME, etc.)
                 $this->applyFunctionBasedPivotConstraint($query, $column, $operator, $value);
             } else {
                 // Regular column - always qualify with pivot table name to avoid ambiguity
@@ -1517,6 +1568,32 @@ class BelongsToMany extends Relation
 
         // Already qualified with pivot table
         return $column;
+    }
+
+    /**
+     * Check if pivot table has already been joined to the query.
+     *
+     * This is used to determine if wherePivot constraints can be applied immediately
+     * or if they need to be stored and applied later.
+     *
+     * @return bool True if pivot join exists, false otherwise
+     */
+    protected function hasPivotJoin(): bool
+    {
+        $joins = $this->query->getJoins();
+
+        if (empty($joins)) {
+            return false;
+        }
+
+        // Check if any join references the pivot table
+        foreach ($joins as $join) {
+            if (isset($join['table']) && $join['table'] === $this->pivotTable) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
