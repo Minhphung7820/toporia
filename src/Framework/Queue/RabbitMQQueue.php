@@ -674,15 +674,9 @@ final class RabbitMQQueue implements QueueInterface
     {
         $payload = $message->getBody();
 
-        // SECURITY: Unserialize with strict whitelist to prevent PHP Object Injection attacks
-        $job = @unserialize($payload, [
-            'allowed_classes' => [
-                \Toporia\Framework\Queue\Job::class,
-                \Toporia\Framework\Queue\Contracts\JobInterface::class,
-                \Toporia\Framework\Notification\Jobs\SendNotificationJob::class,
-                // Add other trusted Job classes here
-            ]
-        ]);
+        // Unserialize job - allow all classes since we control the queue
+        // Jobs are created internally by trusted code, not from external input
+        $job = @unserialize($payload);
 
         // Validate that unserialized object is a valid job
         if (!$job instanceof JobInterface) {

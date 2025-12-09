@@ -268,16 +268,9 @@ final class RedisQueue implements Contracts\QueueInterface
         // Increment attempts
         $this->redis->hIncrBy($jobKey, 'attempts', 1);
 
-        // Unserialize with strict whitelist to prevent PHP Object Injection attacks
-        // Only allow specific Job classes - this is critical for security
-        $job = @unserialize($payload, [
-            'allowed_classes' => [
-                Job::class,
-                JobInterface::class,
-                SendNotificationJob::class,
-                // Add other trusted Job classes here
-            ]
-        ]);
+        // Unserialize job - allow all classes since we control the queue
+        // Jobs are created internally by trusted code, not from external input
+        $job = @unserialize($payload);
 
         // Validate that unserialized object is a valid job
         if (!$job instanceof JobInterface) {

@@ -12,10 +12,12 @@ declare(strict_types=1);
 
 use Toporia\Framework\Support\Accessors\Route;
 use Toporia\Framework\Http\Request;
+use Toporia\Framework\Bus\Bus;
 use App\Presentation\Http\Controllers\Api\AuthController;
 use App\Presentation\Http\Controllers\Api\CsrfCookieController;
 use App\Presentation\Http\Controllers\ProductController;
 use App\Presentation\Http\Controllers\RelationshipTestController;
+use App\Infrastructure\Jobs\SendEmailJob;
 
 // CSRF Cookie endpoint for SPA authentication (must be called before login/register)
 // CSRF cookie endpoint for SPA authentication
@@ -109,6 +111,24 @@ Route::get('/relationships/has-one', [RelationshipTestController::class, 'testHa
 Route::get('/relationships/has-many', [RelationshipTestController::class, 'testHasMany']);
 Route::get('/relationships/has-many-through', [RelationshipTestController::class, 'testHasManyThrough']);
 Route::get('/relationships/belongs-to-many', [RelationshipTestController::class, 'testBelongsToMany']);
+
+// Simple Queue + Mail Test
+Route::post('/send-email', function (Request $request) {
+    $to = $request->input('to', 'minhphung485@gmail.com');
+    $subject = $request->input('subject', 'Test Email from Toporia');
+    $message = $request->input('message', 'This is a test email sent via queue.');
+
+    // Dispatch job - automatically queued because it implements ShouldQueueInterface
+    $job = new SendEmailJob($to, $subject, $message);
+    Bus::dispatch($job);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Email queued successfully!',
+        'recipient' => $to,
+        'note' => 'Run "php console queue:work" to process the job'
+    ]);
+});
 
 // 404 Handler - Global handler for unmatched routes
 // This will be called automatically when no route matches the request

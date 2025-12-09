@@ -51,6 +51,7 @@ final class FrameworkServiceProvider extends ServiceProvider
             \Toporia\Framework\Providers\SessionServiceProvider::class,
             \Toporia\Framework\Providers\CacheServiceProvider::class,
             \Toporia\Framework\Providers\QueueServiceProvider::class,
+            \Toporia\Framework\Providers\BusServiceProvider::class,
             \Toporia\Framework\Providers\ScheduleServiceProvider::class,
             \Toporia\Framework\Providers\MailServiceProvider::class,
             \Toporia\Framework\Providers\HttpClientServiceProvider::class,

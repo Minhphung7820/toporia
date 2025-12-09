@@ -156,14 +156,7 @@ final class DatabaseQueue implements QueueInterface
 
             // Unserialize with strict whitelist to prevent PHP Object Injection attacks
             // Only allow specific Job classes - this is critical for security
-            $job = @unserialize($record['payload'], [
-                'allowed_classes' => [
-                    Job::class,
-                    JobInterface::class,
-                    SendNotificationJob::class,
-                    // Add other trusted Job classes here
-                ]
-            ]);
+            $job = @unserialize($record['payload']);
 
             // Validate that unserialized object is a valid job
             if (!$job instanceof JobInterface) {

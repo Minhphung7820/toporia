@@ -9,6 +9,7 @@ use Toporia\Framework\Bus\Contracts\ShouldQueueInterface;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Pipeline\Pipeline;
 use Toporia\Framework\Queue\Contracts\QueueManagerInterface;
+use Toporia\Framework\Support\Accessors\Log;
 
 /**
  * Command/Query/Job Dispatcher
@@ -64,8 +65,7 @@ final class Dispatcher implements DispatcherInterface
     public function __construct(
         private ContainerInterface $container,
         private ?QueueManagerInterface $queue = null
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}
@@ -181,16 +181,25 @@ final class Dispatcher implements DispatcherInterface
             throw new \RuntimeException('Queue is not configured');
         }
 
-        $queue = $command->getQueue() ?? 'default';
+        $commandClass = get_class($command);
+        Log::info("📦 Dispatcher::dispatchToQueue() - Dispatching {$commandClass} to queue");
+
+        $queueName = $command->getQueue() ?? 'default';
         $delay = $command->getDelay();
 
-        if ($delay > 0) {
-            $this->queue->later($command, $delay, $queue);
-        } else {
-            $this->queue->push($command, $queue);
-        }
+        // Get queue driver (QueueManager->driver() returns QueueInterface)
+        $queueDriver = method_exists($this->queue, 'driver')
+            ? $this->queue->driver()
+            : $this->queue;
 
-        return null;
+        $driverClass = get_class($queueDriver);
+        Log::info("🔧 Dispatcher::dispatchToQueue() - Using queue driver: {$driverClass}, queue name: {$queueName}, delay: {$delay}");
+
+        if ($delay > 0) {
+            return $queueDriver->later($command, $delay, $queueName);
+        } else {
+            return $queueDriver->push($command, $queueName);
+        }
     }
 
     /**
