@@ -19,7 +19,12 @@ class CityModel extends Model
     protected static string $table = 'cities';
     protected static string $primaryKey = 'id';
     protected static array $fillable = [
-        'country_id', 'name', 'population', 'is_capital', 'latitude', 'longitude'
+        'country_id',
+        'name',
+        'population',
+        'is_capital',
+        'latitude',
+        'longitude'
     ];
     protected static array $casts = [
         'country_id' => 'int',
@@ -58,7 +63,7 @@ class CityModel extends Model
             'author_id',    // Foreign key on books table
             'id',           // Local key on cities table
             'id'            // Local key on authors table
-        );
+        )->where('rating', '>', 4);
     }
 
     /**
@@ -71,4 +76,3 @@ class CityModel extends Model
             ->orderBy('rating', 'DESC');
     }
 }
-

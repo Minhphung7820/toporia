@@ -458,6 +458,10 @@ final class RelationshipTestController extends BaseController
         $data = [
             // City -> Books through Authors
             'city_books' => CityModel::with([
+                'books' => function ($q) {
+                    $q->orderBy('rating', 'ASC')
+                        ->limit(4);
+                },
                 'books.author',
                 'books.chapters' => function ($q) {
                     $q->orderBy('chapter_number', 'ASC')->limit(3);
@@ -478,8 +482,7 @@ final class RelationshipTestController extends BaseController
             // Country -> Authors through Cities
             'country_authors' => CountryModel::with([
                 'authors.books' => function ($q) {
-                    $q->where('is_bestseller', true)
-                        ->orderBy('rating', 'DESC')
+                    $q->select('id', 'author_id', 'title')
                         ->limit(3);
                 }
             ])
