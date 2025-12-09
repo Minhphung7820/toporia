@@ -286,54 +286,54 @@ final class RelationshipTestController extends BaseController
         // // ================================================================================
         // // TEST 11: Mixed Relationships Ultra Complex
         // // ================================================================================
+        $test_11_mixed_ultra_complex = CountryModel::with([
+            // hasMany
+            'cities' => function ($q) {
+                $q->where('is_capital', true)
+                    ->orWhere('population', '>', 5000000);
+            },
+            // hasManyThrough level 1
+            'cities.authors' => function ($q) {
+                $q->where('is_verified', true)
+                    ->where('rating', '>=', 4.0);
+            },
+            // hasMany through hasManyThrough
+            'cities.authors.books' => function ($q) {
+                $q->where('is_available', true)
+                    ->where('stock', '>', 0);
+            },
+            // belongsToMany through hasManyThrough
+            'cities.authors.books.categories' => function ($q) {
+                $q->wherePivot('is_primary', true);
+            },
+            // hasMany through multiple levels
+            'cities.authors.books.chapters' => function ($q) {
+                $q->where('is_free_preview', true)
+                    ->limit(2);
+            },
+            // hasMany
+            'publishers' => function ($q) {
+                $q->where('publishers.is_active', true);
+            },
+        ])
+            ->whereHas('cities.authors.books', function ($q) {
+                $q->where('rating', '>=', 4.5)
+                    ->where('reviews_count', '>', 100);
+            })
+            ->withCount([
+                'cities',
+                'authors',
+                'publishers'
+            ])
+            ->having('cities_count', '>=', 3)
+            ->having('authors_count', '>=', 10)
+            ->orderBy('authors_count', 'DESC')
+            ->limit(3)
+            ->get();
         $results['test_11_mixed_ultra_complex'] = [
             'title' => 'ULTRA COMPLEX: All relationship types combined',
             'description' => 'Combining hasMany, belongsTo, hasManyThrough, belongsToMany',
-            'data' => CountryModel::with([
-                // hasMany
-                'cities' => function ($q) {
-                    $q->where('is_capital', true)
-                        ->orWhere('population', '>', 5000000);
-                },
-                // hasManyThrough level 1
-                'cities.authors' => function ($q) {
-                    $q->where('is_verified', true)
-                        ->where('rating', '>=', 4.0);
-                },
-                // hasMany through hasManyThrough
-                'cities.authors.books' => function ($q) {
-                    $q->where('is_available', true)
-                        ->where('stock', '>', 0);
-                },
-                // belongsToMany through hasManyThrough
-                'cities.authors.books.categories' => function ($q) {
-                    $q->wherePivot('is_primary', true);
-                },
-                // hasMany through multiple levels
-                'cities.authors.books.chapters' => function ($q) {
-                    $q->where('is_free_preview', true)
-                        ->limit(2);
-                },
-                // hasMany
-                'publishers' => function ($q) {
-                    $q->where('publishers.is_active', true);
-                },
-            ])
-                ->whereHas('cities.authors.books', function ($q) {
-                    $q->where('rating', '>=', 4.5)
-                        ->where('reviews_count', '>', 100);
-                })
-                ->withCount([
-                    'cities',
-                    'authors',
-                    'publishers'
-                ])
-                ->having('cities_count', '>=', 3)
-                ->having('authors_count', '>=', 10)
-                ->orderBy('authors_count', 'DESC')
-                ->limit(3)
-                ->get()
-                ->toArray()
+            'data' => $test_11_mixed_ultra_complex->toArray()
         ];
 
         // // ================================================================================
