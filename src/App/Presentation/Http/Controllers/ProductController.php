@@ -2873,14 +2873,13 @@ final class ProductController extends BaseController
                     ->where('duration', '>', 60)
                     ->where('is_published', true);
             });
-        });
-
-        // FIXED: Only add WHERE clause if condition is true (avoid empty WHERE ())
-        if ($approvedOnly) {
-            $commentsWithOrConditions->where('is_approved', true);
-        }
-
-        $commentsWithOrConditions = $commentsWithOrConditions
+        })
+            // SAFE: Empty WHERE closures are now automatically skipped by QueryBuilder
+            ->where(function ($q) use ($approvedOnly) {
+                if ($approvedOnly) {
+                    $q->where('is_approved', true);
+                }
+            })
             ->with('commentable')
             ->orderBy('created_at', 'DESC')
             ->limit(15)

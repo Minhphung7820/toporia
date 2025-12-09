@@ -864,6 +864,14 @@ class QueryBuilder implements QueryBuilderInterface
         // Execute closure to build nested conditions
         $callback($query);
 
+        // PERFORMANCE & CORRECTNESS FIX: Skip empty nested WHERE clauses
+        // If closure didn't add any conditions, don't add empty WHERE ()
+        // This prevents SQL syntax errors like "WHERE () ORDER BY ..."
+        $nestedWheres = $query->getWheres();
+        if (empty($nestedWheres)) {
+            return $this; // Skip empty nested WHERE
+        }
+
         // Add the nested query to our wheres
         $this->wheres[] = [
             'type' => 'nested',
