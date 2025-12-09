@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Console\Commands;
 
 use Toporia\Framework\Console\Command;
-use Toporia\Framework\Search\Contracts\SearchIndexerInterface;
+use Toporia\Framework\Search\Contracts\{SearchableModelInterface, SearchIndexerInterface};
 use Toporia\Framework\Search\SearchManager;
 
 /**
@@ -45,7 +45,7 @@ final class ReindexSearchCommand extends Command
             return 1; // Exit code: failure
         }
 
-        if (!is_subclass_of($modelClass, \Toporia\Framework\Search\Contracts\SearchableModelInterface::class)) {
+        if (!is_subclass_of($modelClass, SearchableModelInterface::class)) {
             $this->error("Model {$modelClass} must implement SearchableModelInterface.");
             return 1; // Exit code: failure
         }
