@@ -119,8 +119,7 @@ Route::post('/send-email', function (Request $request) {
     $message = $request->input('message', 'This is a test email sent via queue.');
 
     // Dispatch job - automatically queued because it implements ShouldQueueInterface
-    $job = new SendEmailJob($to, $subject, $message);
-    Bus::dispatch($job);
+    SendEmailJob::dispatch($to, $subject, $message);
 
     return response()->json([
         'success' => true,

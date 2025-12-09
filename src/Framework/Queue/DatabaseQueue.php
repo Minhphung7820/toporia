@@ -76,7 +76,7 @@ final class DatabaseQueue implements QueueInterface
             $job->getId(),
             $queue,
             serialize($job),
-            0,
+            $job->attempts(), // Store current attempts count for monitoring
             now()->getTimestamp(),
             now()->getTimestamp(),
             $priority
@@ -105,7 +105,7 @@ final class DatabaseQueue implements QueueInterface
             $job->getId(),
             $queue,
             serialize($job),
-            0,
+            $job->attempts(), // Store current attempts count for monitoring
             now()->getTimestamp() + $delay,
             now()->getTimestamp(),
             $priority

@@ -13,6 +13,7 @@ use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Queue\Middleware\EnsureUnique;
 use Toporia\Framework\Queue\Support\{JobCancellation, JobMetrics, QueueMetrics};
 use Toporia\Framework\Events\Contracts\EventDispatcherInterface;
+use Toporia\Framework\Queue\RedisQueue;
 
 /**
  * Class Worker
@@ -87,6 +88,11 @@ final class Worker
      */
     public function work(string|array $queues = 'default'): void
     {
+        // Disable output buffering for real-time logs
+        if (ob_get_level()) {
+            ob_end_flush();
+        }
+
         // Normalize to array
         $queueArray = is_array($queues) ? $queues : [$queues];
 
@@ -258,22 +264,38 @@ final class Worker
                 $this->logger->error("Job exceeded max attempts: {$job->getId()}");
                 $job->failed($e);
 
-                if ($this->queue instanceof DatabaseQueue) {
+                // Store failed job in both Database and Redis queues
+                if ($this->queue instanceof DatabaseQueue || $this->queue instanceof RedisQueue) {
                     $this->queue->storeFailed($job, $e);
                 }
             }
         } catch (RateLimitExceededException $e) {
+            // Clear alarm before retry
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+
             // Rate limit exceeded - release back to queue with delay
             $retryAfter = $e->getRetryAfter();
             $this->logger->warning("Job rate limited: {$job->getId()}. Retrying in {$retryAfter}s");
             $this->dispatchEvent(new JobRetrying($job, $job->attempts(), $retryAfter, $e));
             $this->queue->later($job, $retryAfter, $job->getQueue());
         } catch (JobAlreadyRunningException $e) {
+            // Clear alarm before retry
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+
             // Job already running - release back to queue with delay
             $this->logger->warning("Job already running: {$job->getId()}. Retrying in 60s");
             $this->dispatchEvent(new JobRetrying($job, $job->attempts(), 60, $e));
             $this->queue->later($job, 60, $job->getQueue());
         } catch (\Throwable $e) {
+            // CRITICAL: Clear alarm first to prevent timeout during retry
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+
             $this->logger->error("Job failed: {$job->getId()} - {$e->getMessage()}");
 
             // Check if we should retry
@@ -296,12 +318,17 @@ final class Worker
                 $this->logger->error("Job exceeded max attempts: {$job->getId()}");
                 $job->failed($e);
 
-                // Store in failed jobs table if using DatabaseQueue
-                if ($this->queue instanceof DatabaseQueue) {
+                // Store in failed jobs table if using DatabaseQueue or RedisQueue
+                if ($this->queue instanceof DatabaseQueue || $this->queue instanceof RedisQueue) {
                     $this->queue->storeFailed($job, $e);
                 }
             }
         } finally {
+            // Ensure alarm is always cleared, even if exception occurred
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+
             // Record metrics
             $this->recordMetrics($job, $success, $startTime, $startMemory);
         }

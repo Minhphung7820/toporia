@@ -181,9 +181,6 @@ final class Dispatcher implements DispatcherInterface
             throw new \RuntimeException('Queue is not configured');
         }
 
-        $commandClass = get_class($command);
-        Log::info("📦 Dispatcher::dispatchToQueue() - Dispatching {$commandClass} to queue");
-
         $queueName = $command->getQueue() ?? 'default';
         $delay = $command->getDelay();
 
@@ -191,9 +188,6 @@ final class Dispatcher implements DispatcherInterface
         $queueDriver = method_exists($this->queue, 'driver')
             ? $this->queue->driver()
             : $this->queue;
-
-        $driverClass = get_class($queueDriver);
-        Log::info("🔧 Dispatcher::dispatchToQueue() - Using queue driver: {$driverClass}, queue name: {$queueName}, delay: {$delay}");
 
         if ($delay > 0) {
             return $queueDriver->later($command, $delay, $queueName);

@@ -9,7 +9,10 @@ use Toporia\Framework\Mail\Contracts\MessageInterface;
 /**
  * Class AbstractTransport
  *
- * Base class for mail transports providing message validation, retry logic, logging hooks, and rate limiting support.
+ * Base class for mail transports providing message validation, logging hooks, and rate limiting support.
+ *
+ * Note: Retry logic is handled at the Job level, not at the Transport level.
+ * This ensures clean separation of concerns and prevents redundant retry attempts.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
@@ -23,16 +26,6 @@ use Toporia\Framework\Mail\Contracts\MessageInterface;
  */
 abstract class AbstractTransport implements TransportInterface
 {
-    /**
-     * @var int Maximum retry attempts.
-     */
-    protected int $maxRetries = 3;
-
-    /**
-     * @var int Retry delay in milliseconds.
-     */
-    protected int $retryDelay = 1000;
-
     /**
      * @var callable|null Logger callback.
      */
@@ -51,72 +44,52 @@ abstract class AbstractTransport implements TransportInterface
     }
 
     /**
-     * Set retry configuration.
-     *
-     * @param int $maxRetries Maximum retry attempts.
-     * @param int $retryDelay Delay between retries in milliseconds.
-     * @return $this
-     */
-    public function setRetry(int $maxRetries, int $retryDelay = 1000): self
-    {
-        $this->maxRetries = $maxRetries;
-        $this->retryDelay = $retryDelay;
-        return $this;
-    }
-
-    /**
      * {@inheritdoc}
      */
     public function send(MessageInterface $message): TransportResult
     {
         $this->validateMessage($message);
 
-        $lastException = null;
+        try {
+            $this->log('debug', 'Sending email', [
+                'transport' => $this->getName(),
+                'to' => $message->getTo(),
+                'subject' => $message->getSubject(),
+            ]);
 
-        for ($attempt = 1; $attempt <= $this->maxRetries; $attempt++) {
-            try {
-                $this->log('debug', 'Sending email', [
+            $result = $this->doSend($message);
+
+            if ($result->isSuccess()) {
+                $this->log('info', 'Email sent successfully', [
                     'transport' => $this->getName(),
-                    'attempt' => $attempt,
-                    'to' => $message->getTo(),
-                    'subject' => $message->getSubject(),
+                    'message_id' => $result->messageId,
                 ]);
-
-                $result = $this->doSend($message);
-
-                if ($result->isSuccess()) {
-                    $this->log('info', 'Email sent successfully', [
-                        'transport' => $this->getName(),
-                        'message_id' => $result->messageId,
-                    ]);
-                    return $result;
-                }
-
-                $lastException = new TransportException($result->error ?? 'Unknown error', $this->getName());
-            } catch (\Throwable $e) {
-                $lastException = $e;
-                $this->log('warning', 'Send attempt failed', [
-                    'transport' => $this->getName(),
-                    'attempt' => $attempt,
-                    'error' => $e->getMessage(),
-                ]);
-
-                if ($attempt < $this->maxRetries) {
-                    usleep($this->retryDelay * 1000 * $attempt); // Exponential backoff
-                }
+                return $result;
             }
+
+            // Result not successful, throw exception
+            throw new TransportException(
+                message: $result->error ?? 'Unknown error',
+                transport: $this->getName()
+            );
+        } catch (TransportException $e) {
+            $this->log('error', 'Email send failed', [
+                'transport' => $this->getName(),
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        } catch (\Throwable $e) {
+            $this->log('error', 'Email send failed', [
+                'transport' => $this->getName(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new TransportException(
+                message: 'Failed to send email: ' . $e->getMessage(),
+                transport: $this->getName(),
+                previous: $e
+            );
         }
-
-        $this->log('error', 'All send attempts failed', [
-            'transport' => $this->getName(),
-            'max_retries' => $this->maxRetries,
-        ]);
-
-        throw new TransportException(
-            message: 'Failed to send email after ' . $this->maxRetries . ' attempts',
-            transport: $this->getName(),
-            previous: $lastException instanceof \Throwable ? $lastException : null
-        );
     }
 
     /**

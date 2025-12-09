@@ -104,9 +104,9 @@ final class RedisQueue implements Contracts\QueueInterface
             $this->redis->select((int) $config['database']);
         }
 
-        // Set serialization mode (PHP native serialization)
-        // Performance: ~30% faster than JSON, preserves object types
-        $this->redis->setOption(\Redis::OPT_SERIALIZER, \Redis::SERIALIZER_PHP);
+        // Disable auto-serialization to prevent serializing primitive values
+        // We manually serialize only the job payload, not job IDs or attempts
+        $this->redis->setOption(\Redis::OPT_SERIALIZER, \Redis::SERIALIZER_NONE);
     }
 
     /**
@@ -172,14 +172,16 @@ final class RedisQueue implements Contracts\QueueInterface
         $jobId = $job->getId();
         $queueKey = $this->getQueueKey($queue);
         $jobKey = $this->getJobKey($jobId);
+        $reservedKey = $this->getReservedKey($queue);
 
         // Use Redis pipeline for atomic operation (reduces round-trips)
-        // Performance: 5 commands in 1 network round-trip
+        // Performance: 6 commands in 1 network round-trip
         $this->redis->multi(\Redis::PIPELINE);
         $this->redis->hSet($jobKey, 'payload', serialize($job));
         $this->redis->hSet($jobKey, 'queue', $queue);
-        $this->redis->hSet($jobKey, 'attempts', 0);
+        $this->redis->hSet($jobKey, 'attempts', $job->attempts());
         $this->redis->hSet($jobKey, 'created_at', now()->getTimestamp());
+        $this->redis->zRem($reservedKey, $jobId); // Remove from reserved set if exists
         $this->redis->rPush($queueKey, $jobId);
         $this->redis->exec();
 
@@ -202,6 +204,7 @@ final class RedisQueue implements Contracts\QueueInterface
         $jobId = $job->getId();
         $delayedKey = $this->getDelayedKey($queue);
         $jobKey = $this->getJobKey($jobId);
+        $reservedKey = $this->getReservedKey($queue);
         $availableAt = now()->getTimestamp() + $delay;
 
         // Store job payload and add to delayed sorted set
@@ -209,9 +212,10 @@ final class RedisQueue implements Contracts\QueueInterface
         $this->redis->multi(\Redis::PIPELINE);
         $this->redis->hSet($jobKey, 'payload', serialize($job));
         $this->redis->hSet($jobKey, 'queue', $queue);
-        $this->redis->hSet($jobKey, 'attempts', 0);
+        $this->redis->hSet($jobKey, 'attempts', $job->attempts());
         $this->redis->hSet($jobKey, 'created_at', now()->getTimestamp());
         $this->redis->hSet($jobKey, 'available_at', $availableAt);
+        $this->redis->zRem($reservedKey, $jobId); // Remove from reserved set if exists
         $this->redis->zAdd($delayedKey, $availableAt, $jobId);
         $this->redis->exec();
 
@@ -265,8 +269,10 @@ final class RedisQueue implements Contracts\QueueInterface
         $reservedKey = $this->getReservedKey($queue);
         $this->redis->zAdd($reservedKey, now()->getTimestamp() + 3600, $jobId); // 1 hour timeout
 
-        // Increment attempts
-        $this->redis->hIncrBy($jobKey, 'attempts', 1);
+        // NOTE: DO NOT increment attempts here!
+        // Attempts are incremented by Worker.processJob() to ensure consistency
+        // across all queue drivers (DatabaseQueue, RabbitMQQueue, etc.)
+        // Incrementing here would cause double increment (once here, once in Worker)
 
         // Unserialize job - allow all classes since we control the queue
         // Jobs are created internally by trusted code, not from external input
