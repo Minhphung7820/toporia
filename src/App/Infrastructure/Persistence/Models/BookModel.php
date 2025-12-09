@@ -20,9 +20,19 @@ class BookModel extends Model
     protected static string $table = 'books';
     protected static string $primaryKey = 'id';
     protected static array $fillable = [
-        'author_id', 'publisher_id', 'title', 'isbn', 'description',
-        'pages_count', 'price', 'published_year', 'stock', 'rating',
-        'reviews_count', 'is_bestseller', 'is_available'
+        'author_id',
+        'publisher_id',
+        'title',
+        'isbn',
+        'description',
+        'pages_count',
+        'price',
+        'published_year',
+        'stock',
+        'rating',
+        'reviews_count',
+        'is_bestseller',
+        'is_available'
     ];
     protected static array $casts = [
         'author_id' => 'int',
@@ -75,7 +85,8 @@ class BookModel extends Model
             'book_id',
             'category_id'
         )->withPivot('is_primary', 'order')
-          ->withTimestamps();
+            ->wherePivot('is_primary', true)
+            ->withTimestamps();
     }
 
     /**
@@ -93,4 +104,3 @@ class BookModel extends Model
         );
     }
 }
-
