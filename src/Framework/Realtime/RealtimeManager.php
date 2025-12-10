@@ -7,6 +7,8 @@ namespace Toporia\Framework\Realtime;
 use Toporia\Framework\Realtime\Contracts\{BrokerInterface, ChannelInterface, ConnectionInterface, RealtimeManagerInterface, TransportInterface};
 use Toporia\Framework\Realtime\Exceptions\{BrokerException, ChannelException, RateLimitException};
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Realtime\ChannelRoute;
+use Toporia\Framework\Realtime\Middleware;
 
 /**
  * Class RealtimeManager
@@ -424,12 +426,51 @@ final class RealtimeManager implements RealtimeManagerInterface
     /**
      * Get channel authorizer callback.
      *
+     * Returns a callback that executes middleware + channel authorization.
+     *
      * @param string $channelName
      * @return callable|null
      */
     private function getChannelAuthorizer(string $channelName): ?callable
     {
-        // Check for pattern-based authorizers
+        // Try to find channel route definition from routes/channels.php
+        $channelDefinition = ChannelRoute::match($channelName);
+
+        if ($channelDefinition === null) {
+            // No route defined - check legacy config-based authorizers (backward compatibility)
+            return $this->getLegacyAuthorizer($channelName);
+        }
+
+        // Return authorizer that executes middleware + callback
+        return function (ConnectionInterface $connection) use ($channelDefinition, $channelName) {
+            $middleware = $channelDefinition['middleware'] ?? [];
+            $callback = $channelDefinition['callback'];
+            $params = $channelDefinition['params'] ?? [];
+
+            // Execute middleware pipeline
+            $middlewarePipeline = new Middleware\ChannelMiddlewarePipeline($this->container);
+
+            return $middlewarePipeline->execute(
+                $middleware,
+                $connection,
+                $channelName,
+                function ($conn, $channel) use ($callback, $params) {
+                    // Execute final authorization callback with extracted params
+                    return (bool) $callback($conn, ...array_values($params));
+                }
+            );
+        };
+    }
+
+    /**
+     * Get legacy authorizer from config (backward compatibility).
+     *
+     * @param string $channelName
+     * @return callable|null
+     */
+    private function getLegacyAuthorizer(string $channelName): ?callable
+    {
+        // Check for pattern-based authorizers in config
         $authorizers = $this->config['authorizers'] ?? [];
 
         foreach ($authorizers as $pattern => $callback) {
@@ -442,7 +483,7 @@ final class RealtimeManager implements RealtimeManagerInterface
     }
 
     /**
-     * Check if channel name matches pattern.
+     * Check if channel name matches pattern (legacy support).
      *
      * @param string $channelName
      * @param string $pattern

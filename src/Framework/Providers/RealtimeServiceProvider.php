@@ -46,6 +46,50 @@ final class RealtimeServiceProvider extends ServiceProvider
     }
 
     /**
+     * Bootstrap realtime services.
+     *
+     * Loads channel route definitions from routes/channels.php
+     *
+     * @param ContainerInterface $container
+     * @return void
+     */
+    public function boot(ContainerInterface $container): void
+    {
+        $this->loadChannelRoutes($container);
+    }
+
+    /**
+     * Load channel route definitions.
+     *
+     * @param ContainerInterface $container
+     * @return void
+     */
+    private function loadChannelRoutes(ContainerInterface $container): void
+    {
+        $channelRoutesPath = $this->getBasePath() . '/routes/channels.php';
+
+        if (file_exists($channelRoutesPath)) {
+            require_once $channelRoutesPath;
+        }
+    }
+
+    /**
+     * Get application base path.
+     *
+     * @return string
+     */
+    private function getBasePath(): string
+    {
+        // Try to get base path from container
+        if ($this->container !== null && $this->container->has('path.base')) {
+            return $this->container->get('path.base');
+        }
+
+        // Fallback: assume standard structure
+        return dirname(__DIR__, 3);
+    }
+
+    /**
      * Get default realtime configuration.
      *
      * @return array

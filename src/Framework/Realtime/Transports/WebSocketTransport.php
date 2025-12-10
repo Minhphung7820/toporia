@@ -100,18 +100,19 @@ final class WebSocketTransport implements TransportInterface
 
         $this->server = new \Swoole\WebSocket\Server($host, $port);
 
-        // Performance optimization settings
+        // Performance optimization settings (OPTIMIZED for production)
         $this->server->set([
-            'worker_num' => swoole_cpu_num() * 2,      // Auto-scale workers
+            'worker_num' => $this->config['worker_num'] ?? swoole_cpu_num() * 2,
             'max_request' => 0,                        // No worker restart limit
-            'max_conn' => 10000,                       // Max connections
+            'max_conn' => $this->config['max_connections'] ?? 50000, // Increased from 10K to 50K
             'heartbeat_check_interval' => 30,          // Check every 30s
             'heartbeat_idle_time' => 120,              // Close idle after 2min
-            'package_max_length' => 2 * 1024 * 1024,   // 2MB max message
+            'package_max_length' => 256 * 1024,        // 256KB (reduced from 2MB for security)
             'buffer_output_size' => 32 * 1024 * 1024,  // 32MB output buffer
             'open_tcp_nodelay' => true,                // Disable Nagle (low latency)
             'open_http2_protocol' => false,            // WebSocket only
             'enable_coroutine' => true,                // Enable coroutines
+            'max_coroutine' => 100000,                 // Support high concurrency
         ]);
 
         // SSL/TLS support

@@ -70,6 +70,10 @@ return [
             'ssl' => env('REALTIME_WS_SSL', false),
             'cert' => env('REALTIME_WS_CERT'),
             'key' => env('REALTIME_WS_KEY'),
+
+            // Performance settings
+            'max_connections' => (int) env('REALTIME_MAX_CONNECTIONS', 10000),
+            'worker_num' => (int) env('REALTIME_WORKER_NUM', 0), // 0 = auto (CPU * 2)
         ],
 
         'sse' => [
@@ -213,40 +217,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Channel Authorization
+    | Channel Authorization (Legacy - Use routes/channels.php Instead)
     |--------------------------------------------------------------------------
     |
-    | Define authorization callbacks for channel patterns.
-    | Callbacks receive (ConnectionInterface $connection, string $channel)
+    | DEPRECATED: Define channel authorization in routes/channels.php instead.
+    | This config is kept for backward compatibility only.
     |
-    | Example:
-    | 'private-chat.*' => function($connection, $channel) {
-    |     $chatId = str_replace('private-chat.', '', $channel);
-    |     return ChatRoom::find($chatId)->hasUser($connection->getUserId());
-    | },
+    | New way (routes/channels.php):
+    |   ChannelRoute::channel('user.{userId}', function($conn, $userId) {
+    |       return $conn->getUserId() === (int) $userId;
+    |   })->middleware(['auth']);
     |
     */
     'authorizers' => [
-        // Public channels - no auth required
-        'public.*' => fn() => true,
-        'news' => fn() => true,
-        'announcements' => fn() => true,
-
-        // Private channels - require authentication
-        'private-*' => function ($connection, $channel) {
-            return $connection->isAuthenticated();
-        },
-
-        // User-specific channels
-        'user.*' => function ($connection, $channel) {
-            $userId = str_replace('user.', '', $channel);
-            return $connection->getUserId() == $userId;
-        },
-
-        // Presence channels - require authentication
-        'presence-*' => function ($connection, $channel) {
-            return $connection->isAuthenticated();
-        },
+        // Legacy authorizers (will be used only if routes/channels.php doesn't define the channel)
     ],
 
     /*
@@ -269,9 +253,22 @@ return [
     |
     | Protect against message flooding.
     |
+    | NOTE: This is CHANNEL-level rate limiting.
+    | For CONNECTION-level rate limiting, use RateLimitMiddleware in routes/channels.php.
+    |
     */
     'rate_limit' => [
         'enabled' => env('REALTIME_RATE_LIMIT', true),
         'messages_per_minute' => env('REALTIME_RATE_LIMIT_MESSAGES', 60),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Input Validation
+    |--------------------------------------------------------------------------
+    |
+    | Enable input validation for channel names and events.
+    |
+    */
+    'validate_input' => env('REALTIME_VALIDATE_INPUT', true),
 ];
