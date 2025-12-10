@@ -7,6 +7,10 @@ declare(strict_types=1);
  */
 
 return [
+    // Enable/disable search functionality globally
+    // Set SEARCH_ENABLED=false to disable when Elasticsearch is unavailable
+    'enabled' => env('SEARCH_ENABLED', true),
+
     'default' => env('SEARCH_DRIVER', 'elasticsearch'),
 
     'connections' => [

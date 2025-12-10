@@ -145,8 +145,50 @@ if (!function_exists('config')) {
      */
     function config(string $key, mixed $default = null): mixed
     {
-        // Future: Implement configuration service
-        return $default;
+        // Load config file directly if app() not available yet
+        static $configs = [];
+        static $envLoaded = false;
+
+        // Ensure env is loaded before loading config files (they use env())
+        if (!$envLoaded) {
+            $basePath = dirname(__DIR__);
+            // Use framework's built-in env loader
+            if (class_exists(\Toporia\Framework\Foundation\LoadEnvironmentVariables::class)) {
+                \Toporia\Framework\Foundation\LoadEnvironmentVariables::bootstrap($basePath);
+            }
+            $envLoaded = true;
+        }
+
+        // Parse key: 'realtime.default_broker' -> file='realtime', key='default_broker'
+        $parts = explode('.', $key, 2);
+        $file = $parts[0];
+        $configKey = $parts[1] ?? null;
+
+        // Load config file if not cached
+        if (!isset($configs[$file])) {
+            $configPath = dirname(__DIR__) . '/config/' . $file . '.php';
+            if (file_exists($configPath)) {
+                $configs[$file] = require $configPath;
+            } else {
+                $configs[$file] = [];
+            }
+        }
+
+        // Return full config or nested key
+        if ($configKey === null) {
+            return $configs[$file] ?: $default;
+        }
+
+        // Support nested keys like 'database.connections.mysql'
+        $value = $configs[$file];
+        foreach (explode('.', $configKey) as $segment) {
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
+                return $default;
+            }
+            $value = $value[$segment];
+        }
+
+        return $value;
     }
 }
 

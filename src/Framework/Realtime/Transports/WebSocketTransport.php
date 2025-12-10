@@ -300,8 +300,8 @@ final class WebSocketTransport implements TransportInterface
         });
 
         // Inter-worker communication for multi-worker broadcast
-        $this->server->on('pipeMessage', function ($server, $srcWorkerId, $message) {
-            // Received broadcast message from another worker (Worker #0)
+        $this->server->on('pipeMessage', function ($server, $_srcWorkerId, $message) {
+            // Received broadcast message from Worker #0 (Redis subscription handler)
             // Broadcast to all connections in THIS worker
             foreach ($server->connections as $fd) {
                 if ($server->isEstablished($fd)) {
@@ -439,7 +439,12 @@ final class WebSocketTransport implements TransportInterface
             $json = $message->toJson();
 
             // Get worker count from server settings
+            // Note: setting['worker_num'] may be 0 if auto-configured, need to get actual count
             $workerNum = $server->setting['worker_num'] ?? 1;
+            if ($workerNum <= 0) {
+                // Auto-configured: Swoole defaults to swoole_cpu_num() when worker_num=0
+                $workerNum = swoole_cpu_num();
+            }
 
             // Broadcast to connections in Worker #0 (current worker)
             foreach ($server->connections as $fd) {

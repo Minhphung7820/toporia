@@ -84,8 +84,19 @@ final class SearchServiceProvider extends ServiceProvider
 
     public function boot(ContainerInterface $container): void
     {
+        // Check if search is enabled
+        if (!config('search.enabled', true)) {
+            return;
+        }
+
         // Warm up default indices if configured
-        $manager = $container->get(SearchManager::class);
-        $manager->ensureIndices();
+        // Wrapped in try-catch for graceful degradation when Elasticsearch is unavailable
+        try {
+            $manager = $container->get(SearchManager::class);
+            $manager->ensureIndices();
+        } catch (\Throwable $e) {
+            // Elasticsearch unavailable - silently ignore
+            // App continues to work without search functionality
+        }
     }
 }
