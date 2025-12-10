@@ -827,5 +827,4 @@ final class SocketIOGateway implements TransportInterface
 
         return $result;
     }
-
 }
