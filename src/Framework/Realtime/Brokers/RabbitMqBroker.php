@@ -8,6 +8,7 @@ use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
+use Toporia\Framework\DateTime\Chronos;
 use Toporia\Framework\Realtime\Contracts\{BrokerInterface, HealthCheckableInterface, HealthCheckResult, MessageInterface};
 use Toporia\Framework\Realtime\Exceptions\{BrokerException, BrokerTemporaryException};
 use Toporia\Framework\Realtime\{Message, RealtimeManager};
@@ -123,7 +124,7 @@ final class RabbitMqBroker implements BrokerInterface, HealthCheckableInterface
         $msg = new AMQPMessage($payload, [
             'content_type' => 'application/json',
             'delivery_mode' => $this->persistentMessages ? AMQPMessage::DELIVERY_MODE_PERSISTENT : AMQPMessage::DELIVERY_MODE_NON_PERSISTENT,
-            'timestamp' => now()->getTimestamp(),
+            'timestamp' => Chronos::now()->getTimestamp(),
         ]);
 
         try {

@@ -56,7 +56,7 @@ final class RealtimePublishCommand extends Command
             $realtimeConfig['default_broker'] = $driver;
 
             $manager = app()->has(RealtimeManager::class)
-                ? app()->get(RealtimeManager::class)
+                ? app()->make(RealtimeManager::class)
                 : new RealtimeManager($realtimeConfig);
 
             // Get the broker and publish
@@ -79,7 +79,6 @@ final class RealtimePublishCommand extends Command
             $this->info("  Event: {$event}");
             $this->info("  Driver: {$driver}");
             $this->info("  Data: " . json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-
         } catch (BrokerException $e) {
             $this->error("Broker error: {$e->getMessage()}");
             $context = $e->getContext();
