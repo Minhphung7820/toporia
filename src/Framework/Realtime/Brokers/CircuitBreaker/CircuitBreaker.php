@@ -67,7 +67,6 @@ final class CircuitBreaker
             $result = $action();
             $this->recordSuccess();
             return $result;
-
         } catch (\Throwable $e) {
             $this->recordFailure();
             throw $e;
@@ -260,4 +259,3 @@ final class CircuitBreaker
         return $this->state === CircuitBreakerState::CLOSED;
     }
 }
-

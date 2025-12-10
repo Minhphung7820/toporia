@@ -239,4 +239,3 @@ final class BrokerMetrics
         unset(self::$metrics[$broker]);
     }
 }
-

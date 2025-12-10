@@ -225,4 +225,3 @@ final class BrokerConnectionPool implements ConnectionPoolInterface
      */
     private function __clone() {}
 }
-

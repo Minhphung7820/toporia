@@ -60,4 +60,3 @@ interface ConnectionPoolInterface
      */
     public function getStats(): array;
 }
-

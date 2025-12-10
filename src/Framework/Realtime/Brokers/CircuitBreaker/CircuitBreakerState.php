@@ -25,4 +25,3 @@ enum CircuitBreakerState: string
     case OPEN = 'open';             // Too many failures, reject requests
     case HALF_OPEN = 'half_open';   // Testing if service recovered
 }
-

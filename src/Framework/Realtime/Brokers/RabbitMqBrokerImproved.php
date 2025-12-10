@@ -97,7 +97,6 @@ final class RabbitMqBrokerImproved implements BrokerInterface, HealthCheckableIn
 
             $this->connected = true;
             BrokerMetrics::recordConnectionEvent('rabbitmq', 'connect');
-
         } catch (\Throwable $e) {
             BrokerMetrics::recordConnectionEvent('rabbitmq', 'connect_failed');
             throw BrokerException::connectionFailed('rabbitmq', $e->getMessage(), $e);
@@ -220,8 +219,11 @@ final class RabbitMqBrokerImproved implements BrokerInterface, HealthCheckableIn
             } catch (\Throwable $e) {
                 $retryCount++;
                 if ($retryCount >= $maxRetries) {
-                    throw BrokerException::connectionFailed('rabbitmq',
-                        "Failed after {$maxRetries} retries: {$e->getMessage()}", $e);
+                    throw BrokerException::connectionFailed(
+                        'rabbitmq',
+                        "Failed after {$maxRetries} retries: {$e->getMessage()}",
+                        $e
+                    );
                 }
 
                 $delay = (int) pow(2, $retryCount);
@@ -291,7 +293,6 @@ final class RabbitMqBrokerImproved implements BrokerInterface, HealthCheckableIn
 
             $duration = (microtime(true) - $startTime) * 1000;
             BrokerMetrics::recordPublish('rabbitmq', $channel, $duration, true);
-
         } catch (\Throwable $e) {
             $duration = (microtime(true) - $startTime) * 1000;
             BrokerMetrics::recordPublish('rabbitmq', $channel, $duration, false);
@@ -368,7 +369,6 @@ final class RabbitMqBrokerImproved implements BrokerInterface, HealthCheckableIn
                         $this->performHealthCheck();
                         $lastHealthCheck = $now;
                     }
-
                 } catch (AMQPTimeoutException) {
                     // Normal timeout - check health
                     $now = time();
@@ -377,7 +377,6 @@ final class RabbitMqBrokerImproved implements BrokerInterface, HealthCheckableIn
                         $lastHealthCheck = $now;
                     }
                     continue;
-
                 } catch (\Throwable $e) {
                     error_log("RabbitMQ consume error: {$e->getMessage()}");
                     BrokerMetrics::recordError('rabbitmq', 'consume');
@@ -471,7 +470,6 @@ final class RabbitMqBrokerImproved implements BrokerInterface, HealthCheckableIn
 
             $duration = (microtime(true) - $startTime) * 1000;
             BrokerMetrics::recordConsume('rabbitmq', 1, $duration);
-
         } catch (\Throwable $e) {
             $duration = (microtime(true) - $startTime) * 1000;
             BrokerMetrics::recordConsume('rabbitmq', 0, $duration);
@@ -721,4 +719,3 @@ final class RabbitMqBrokerImproved implements BrokerInterface, HealthCheckableIn
         $this->disconnect();
     }
 }
-

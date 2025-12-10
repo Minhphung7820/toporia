@@ -82,7 +82,6 @@ final class KafkaBrokerImproved implements BrokerInterface, HealthCheckableInter
 
             $this->connected = true;
             BrokerMetrics::recordConnectionEvent('kafka', 'connect');
-
         } catch (\Throwable $e) {
             BrokerMetrics::recordConnectionEvent('kafka', 'connect_failed');
             throw BrokerException::connectionFailed('kafka', $e->getMessage(), $e);
@@ -112,7 +111,6 @@ final class KafkaBrokerImproved implements BrokerInterface, HealthCheckableInter
 
             $duration = (microtime(true) - $startTime) * 1000;
             BrokerMetrics::recordPublish('kafka', $channel, $duration, true);
-
         } catch (BrokerException $e) {
             $duration = (microtime(true) - $startTime) * 1000;
             BrokerMetrics::recordPublish('kafka', $channel, $duration, false);
@@ -227,7 +225,6 @@ final class KafkaBrokerImproved implements BrokerInterface, HealthCheckableInter
 
             $duration = (microtime(true) - $startTime) * 1000;
             BrokerMetrics::recordConsume('kafka', 1, $duration);
-
         } catch (\Throwable $e) {
             $duration = (microtime(true) - $startTime) * 1000;
             BrokerMetrics::recordConsume('kafka', 0, $duration);
@@ -464,4 +461,3 @@ final class KafkaBrokerImproved implements BrokerInterface, HealthCheckableInter
         $this->disconnect();
     }
 }
-
