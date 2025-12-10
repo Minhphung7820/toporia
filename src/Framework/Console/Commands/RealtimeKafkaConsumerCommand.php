@@ -24,11 +24,12 @@ use Toporia\Framework\Support\Collection\Collection;
  * - Memory-efficient message processing
  *
  * Usage:
- *   php console realtime:kafka:consume
- *   php console realtime:kafka:consume --broker=kafka
- *   php console realtime:kafka:consume --channels=user.1,user.2,public.news
- *   php console realtime:kafka:consume --batch-size=100 --timeout=1000
- *   php console realtime:kafka:consume --max-messages=10000
+ *   php console realtime:kafka                              # Subscribe to default topic (realtime)
+ *   php console realtime:kafka --all                        # Subscribe to default topic
+ *   php console realtime:kafka --topic=my-topic             # Subscribe to specific topic
+ *   php console realtime:kafka --channels=user.1,user.2     # Subscribe to specific channels
+ *   php console realtime:kafka --batch-size=100 --timeout=1000
+ *   php console realtime:kafka --max-messages=10000
  *
  * Options:
  *   --broker=name          Kafka broker name from config (default: kafka)
@@ -68,7 +69,7 @@ use Toporia\Framework\Support\Collection\Collection;
  */
 final class RealtimeKafkaConsumerCommand extends AbstractBatchKafkaConsumer implements BatchingMessagesHandlerInterface
 {
-    protected string $signature = 'realtime:kafka:consume {--broker=kafka} {--channels=*} {--batch-size=100} {--timeout=1000} {--max-messages=0} {--stop-when-empty} {--dlq-enabled}';
+    protected string $signature = 'realtime:kafka {--broker=kafka} {--channels=*} {--topic=} {--all} {--batch-size=100} {--timeout=1000} {--max-messages=0} {--stop-when-empty} {--dlq-enabled}';
 
     protected string $description = 'Consume messages from Kafka for realtime communication';
 
@@ -154,14 +155,31 @@ final class RealtimeKafkaConsumerCommand extends AbstractBatchKafkaConsumer impl
     public function handle(): int
     {
         try {
+            // Check for --all flag or --topic option
+            $subscribeAll = $this->option('all', false);
+            $topicOption = $this->option('topic');
+
             // Parse channels
             $channelsOption = $this->option('channels', []);
             $this->channels = $this->parseChannels($channelsOption);
 
-            if (empty($this->channels)) {
-                $this->warn('No channels specified. Use --channels=channel1,channel2');
-                $this->warn('Example: --channels=user.1,public.news,presence-chat');
-                return 1;
+            // Determine subscription mode
+            if (empty($this->channels) && !$topicOption && !$subscribeAll) {
+                $this->info('No channels specified. Using default topic.');
+                $this->info('');
+                $this->info('Usage options:');
+                $this->info('  --all                    Subscribe to default topic (realtime)');
+                $this->info('  --topic=my-topic         Subscribe to specific topic');
+                $this->info('  --channels=ch1,ch2       Subscribe to specific channels');
+                $this->info('');
+                $this->info('Running with default topic...');
+                $subscribeAll = true;
+            }
+
+            // Use default topic if --all or no channels
+            if ($subscribeAll || ($topicOption && empty($this->channels))) {
+                $defaultTopic = $topicOption ?? config('realtime.brokers.kafka.default_topic', 'realtime');
+                $this->channels = [$defaultTopic];
             }
 
             // Initialize DLQ if enabled

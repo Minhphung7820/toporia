@@ -28,6 +28,7 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
     private \Redis $redis;
     private \Redis $subscriber;
     private array $subscriptions = [];
+    private array $patternSubscriptions = [];
     private bool $connected = false;
     private bool $consuming = false;
 
@@ -49,10 +50,13 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
         $this->subscriber = new \Redis();
 
         // Connect to Redis
+        // Note: read_timeout is always 0 (infinite) for subscriber to prevent
+        // "read error on connection" during blocking SUBSCRIBE
         $this->connect(
             $config['host'] ?? '127.0.0.1',
             (int) ($config['port'] ?? 6379),
-            (float) ($config['timeout'] ?? 2.0)
+            (float) ($config['timeout'] ?? 2.0),
+            0.0 // Always 0 (infinite) for subscriber - DO NOT use config['read_timeout']
         );
 
         // Authenticate if password provided
@@ -79,14 +83,23 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
      *
      * @param string $host
      * @param int $port
-     * @param float $timeout
+     * @param float $timeout Connection timeout
+     * @param float $readTimeout Read timeout (0 = infinite, needed for subscriber blocking)
      * @return void
      */
-    private function connect(string $host, int $port, float $timeout): void
+    private function connect(string $host, int $port, float $timeout, float $readTimeout = 0.0): void
     {
         try {
+            // Publisher connection - normal timeout
             $this->redis->connect($host, $port, $timeout);
+
+            // Subscriber connection
             $this->subscriber->connect($host, $port, $timeout);
+
+            // Set read timeout for subscriber AFTER connect
+            // Use very large value (24 hours = 86400 seconds) instead of -1 or 0
+            // Some phpredis versions don't support -1 or 0 for infinite
+            $this->subscriber->setOption(\Redis::OPT_READ_TIMEOUT, 86400.0);
         } catch (\RedisException $e) {
             throw BrokerException::connectionFailed('redis', "{$host}:{$port} - {$e->getMessage()}", $e);
         }
@@ -135,6 +148,36 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
     }
 
     /**
+     * Subscribe to channels using pattern matching (PSUBSCRIBE).
+     *
+     * Supports Redis pattern syntax:
+     * - '*' matches any characters
+     * - '?' matches single character
+     * - '[abc]' matches a, b, or c
+     *
+     * Examples:
+     * - 'realtime:*' - all realtime channels
+     * - 'realtime:user.*' - all user channels
+     * - 'realtime:presence-*' - all presence channels
+     *
+     * @param string $pattern Pattern to match (without 'realtime:' prefix)
+     * @param callable $callback Callback receives (MessageInterface $message, string $channel)
+     * @return void
+     */
+    public function psubscribe(string $pattern, callable $callback): void
+    {
+        if (!$this->connected) {
+            throw BrokerException::notConnected('redis');
+        }
+
+        // Add 'realtime:' prefix to pattern
+        $redisPattern = "realtime:{$pattern}";
+
+        // Store pattern subscription
+        $this->patternSubscriptions[$redisPattern] = $callback;
+    }
+
+    /**
      * Start consuming messages from subscribed channels.
      *
      * This method is called by the Redis consumer command.
@@ -161,6 +204,13 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
      */
     public function consume(int $timeoutMs = 1000, int $batchSize = 100): void
     {
+        // Check if we have pattern subscriptions (PSUBSCRIBE)
+        if (!empty($this->patternSubscriptions)) {
+            $this->consumePatterns();
+            return;
+        }
+
+        // Check if we have regular subscriptions
         if (empty($this->subscriptions)) {
             return; // No subscriptions
         }
@@ -226,6 +276,55 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
     }
 
     /**
+     * Consume messages using pattern subscriptions (PSUBSCRIBE).
+     *
+     * This allows subscribing to multiple channels using wildcards:
+     * - 'realtime:*' - all realtime channels
+     * - 'realtime:user.*' - all user channels
+     *
+     * @return void
+     */
+    private function consumePatterns(): void
+    {
+        $this->consuming = true;
+
+        $patterns = array_keys($this->patternSubscriptions);
+
+        if (empty($patterns)) {
+            return;
+        }
+
+        // Use PSUBSCRIBE for pattern matching
+        $this->subscriber->psubscribe($patterns, function ($redis, $pattern, $redisChannel, $payload) {
+            // Check if we should stop
+            if (!$this->consuming) {
+                return false;
+            }
+
+            $callback = $this->patternSubscriptions[$pattern] ?? null;
+
+            if (!$callback) {
+                return true; // Continue but skip
+            }
+
+            try {
+                // Decode message
+                $message = \Toporia\Framework\Realtime\Message::fromJson($payload);
+
+                // Extract channel name (remove "realtime:" prefix)
+                $channel = str_replace('realtime:', '', $redisChannel);
+
+                // Call callback with message and channel
+                $callback($message, $channel);
+            } catch (\Throwable $e) {
+                error_log("Redis psubscriber error on {$redisChannel} (pattern: {$pattern}): {$e->getMessage()}");
+            }
+
+            return true; // Continue consuming
+        });
+    }
+
+    /**
      * Stop consuming messages.
      *
      * Unsubscribes from all channels to exit the blocking subscribe() call.
@@ -239,6 +338,16 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
     public function stopConsuming(): void
     {
         $this->consuming = false;
+
+        // Unsubscribe from pattern subscriptions
+        if (!empty($this->patternSubscriptions)) {
+            $patterns = array_keys($this->patternSubscriptions);
+            try {
+                $this->subscriber->punsubscribe($patterns);
+            } catch (\Throwable $e) {
+                error_log("Error punsubscribing from Redis: {$e->getMessage()}");
+            }
+        }
 
         // Unsubscribe from all channels to exit blocking subscribe()
         // This will cause subscribe() callback to return false and exit

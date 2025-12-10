@@ -22,11 +22,12 @@ use Toporia\Framework\Realtime\Contracts\{MessageInterface, RealtimeManagerInter
  * - Batch message processing
  *
  * Usage:
- *   php console realtime:redis:consume
- *   php console realtime:redis:consume --broker=redis
- *   php console realtime:redis:consume --channels=user.1,user.2,public.news
- *   php console realtime:redis:consume --timeout=1000
- *   php console realtime:redis:consume --max-messages=10000
+ *   php console realtime:redis                           # Subscribe to ALL channels (default)
+ *   php console realtime:redis --all                     # Explicitly subscribe to all channels
+ *   php console realtime:redis --pattern=user.*          # Subscribe using pattern
+ *   php console realtime:redis --channels=ch1,ch2        # Subscribe to specific channels
+ *   php console realtime:redis --timeout=1000
+ *   php console realtime:redis --max-messages=10000
  *
  * Options:
  *   --broker=name          Redis broker name from config (default: redis)
@@ -64,7 +65,7 @@ use Toporia\Framework\Realtime\Contracts\{MessageInterface, RealtimeManagerInter
  */
 final class RealtimeRedisConsumerCommand extends AbstractBrokerConsumerCommand
 {
-    protected string $signature = 'realtime:redis:consume {--broker=redis} {--channels=*} {--timeout=1000} {--max-messages=0} {--stop-when-empty}';
+    protected string $signature = 'realtime:redis {--broker=redis} {--channels=*} {--pattern=*} {--all} {--timeout=1000} {--max-messages=0} {--stop-when-empty}';
 
     protected string $description = 'Consume messages from Redis Pub/Sub for realtime communication';
 
@@ -72,6 +73,16 @@ final class RealtimeRedisConsumerCommand extends AbstractBrokerConsumerCommand
      * @var array<string> Channels to subscribe to
      */
     private array $channels = [];
+
+    /**
+     * @var string|null Pattern for PSUBSCRIBE (wildcard subscription)
+     */
+    private ?string $pattern = null;
+
+    /**
+     * @var bool Whether to subscribe to all channels
+     */
+    private bool $subscribeAll = false;
 
     /**
      * @var int Processed message count
@@ -104,14 +115,33 @@ final class RealtimeRedisConsumerCommand extends AbstractBrokerConsumerCommand
         try {
             $this->startTime = microtime(true);
 
+            // Check for --all flag first
+            $this->subscribeAll = $this->option('all', false);
+
+            // Parse pattern (for PSUBSCRIBE)
+            $patternOption = $this->option('pattern', '*');
+            if ($patternOption && $patternOption !== '*') {
+                $this->pattern = $patternOption;
+            }
+
             // Parse channels
             $channelsOption = $this->option('channels', []);
             $this->channels = $this->parseChannels($channelsOption);
 
-            if (empty($this->channels)) {
-                $this->warn('No channels specified. Use --channels=channel1,channel2');
-                $this->warn('Example: --channels=user.1,public.news,presence-chat');
-                return 1;
+            // Determine subscription mode
+            $subscriptionMode = $this->determineSubscriptionMode();
+
+            if ($subscriptionMode === 'none') {
+                $this->info('No channels specified. Using --all to subscribe to ALL channels.');
+                $this->info('');
+                $this->info('Usage options:');
+                $this->info('  --all                    Subscribe to all channels (pattern: *)');
+                $this->info('  --pattern=user.*         Subscribe using pattern (PSUBSCRIBE)');
+                $this->info('  --channels=ch1,ch2       Subscribe to specific channels');
+                $this->info('');
+                $this->info('Running with --all mode...');
+                $this->subscribeAll = true;
+                $subscriptionMode = 'all';
             }
 
             // Get broker
@@ -122,10 +152,19 @@ final class RealtimeRedisConsumerCommand extends AbstractBrokerConsumerCommand
                 return 1;
             }
 
+            // Build subscription info for header
+            $subscriptionInfo = match ($subscriptionMode) {
+                'all' => '* (all channels)',
+                'pattern' => "pattern: {$this->pattern}",
+                'channels' => implode(', ', $this->channels),
+                default => 'unknown',
+            };
+
             // Display header
             $this->displayHeader('Realtime Redis Consumer', [
                 'broker' => $this->getBrokerName(),
-                'channels' => implode(', ', $this->channels),
+                'mode' => $subscriptionMode,
+                'subscription' => $subscriptionInfo,
                 'timeout' => $this->option('timeout', 1000) . 'ms',
             ]);
 
@@ -134,13 +173,8 @@ final class RealtimeRedisConsumerCommand extends AbstractBrokerConsumerCommand
                 $broker->stopConsuming();
             });
 
-            // Subscribe to all channels
-            foreach ($this->channels as $channel) {
-                $broker->subscribe($channel, function (MessageInterface $message) use ($channel) {
-                    $this->handleMessage($channel, $message);
-                });
-                $this->line("Subscribed to channel: <info>{$channel}</info>");
-            }
+            // Subscribe based on mode
+            $this->setupSubscriptions($broker, $subscriptionMode);
 
             // Start consuming
             $timeout = (int) $this->option('timeout', 1000);
@@ -164,6 +198,66 @@ final class RealtimeRedisConsumerCommand extends AbstractBrokerConsumerCommand
             }
 
             return 1;
+        }
+    }
+
+    /**
+     * Determine subscription mode based on options.
+     *
+     * @return string 'all', 'pattern', 'channels', or 'none'
+     */
+    private function determineSubscriptionMode(): string
+    {
+        if ($this->subscribeAll) {
+            return 'all';
+        }
+
+        if ($this->pattern !== null) {
+            return 'pattern';
+        }
+
+        if (!empty($this->channels)) {
+            return 'channels';
+        }
+
+        return 'none';
+    }
+
+    /**
+     * Setup subscriptions based on mode.
+     *
+     * @param RedisBroker $broker Broker instance
+     * @param string $mode Subscription mode
+     * @return void
+     */
+    private function setupSubscriptions(RedisBroker $broker, string $mode): void
+    {
+        $callback = function (MessageInterface $message, string $channel) {
+            $this->handleMessage($channel, $message);
+        };
+
+        switch ($mode) {
+            case 'all':
+                // Subscribe to all channels using pattern *
+                $broker->psubscribe('*', $callback);
+                $this->line("Subscribed to pattern: <info>*</info> (all channels)");
+                break;
+
+            case 'pattern':
+                // Subscribe using custom pattern
+                $broker->psubscribe($this->pattern, $callback);
+                $this->line("Subscribed to pattern: <info>{$this->pattern}</info>");
+                break;
+
+            case 'channels':
+                // Subscribe to specific channels
+                foreach ($this->channels as $channel) {
+                    $broker->subscribe($channel, function (MessageInterface $message) use ($channel) {
+                        $this->handleMessage($channel, $message);
+                    });
+                    $this->line("Subscribed to channel: <info>{$channel}</info>");
+                }
+                break;
         }
     }
 

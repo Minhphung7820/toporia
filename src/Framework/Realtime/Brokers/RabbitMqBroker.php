@@ -147,6 +147,33 @@ final class RabbitMqBroker implements BrokerInterface, HealthCheckableInterface
     }
 
     /**
+     * Subscribe using a routing key pattern.
+     *
+     * RabbitMQ topic exchange supports wildcards:
+     * - '#' matches zero or more words (e.g., 'realtime.#' matches all realtime channels)
+     * - '*' matches exactly one word (e.g., 'realtime.user.*' matches realtime.user.1, realtime.user.2)
+     *
+     * @param string $routingKeyPattern Routing key pattern (e.g., '#' for all, 'user.*' for user channels)
+     * @param callable $callback Callback receives (MessageInterface $message, string $channel)
+     * @return void
+     */
+    public function subscribeWithRoutingKey(string $routingKeyPattern, callable $callback): void
+    {
+        $this->ensureConnection();
+
+        // Format routing key (add prefix if needed)
+        $formattedKey = $this->formatRoutingKey($routingKeyPattern);
+        $queue = $this->getQueueName();
+
+        // Bind queue with pattern
+        $this->channel?->queue_bind($queue, $this->exchange, $formattedKey);
+
+        // Store subscription with pattern key
+        $this->subscriptions['__pattern__' . $routingKeyPattern] = $callback;
+        $this->routingMap[$formattedKey] = '__pattern__' . $routingKeyPattern;
+    }
+
+    /**
      * Consume messages from RabbitMQ queue.
      */
     public function consume(int $timeoutMs = 1000, int $batchSize = 100): void

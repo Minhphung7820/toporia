@@ -292,7 +292,147 @@ final class WebSocketTransport implements TransportInterface
         // Worker started (coroutine context)
         $this->server->on('workerStart', function ($server, $workerId) {
             echo "Worker #{$workerId} started\n";
+
+            // Start Redis subscription in coroutine (only in worker 0 to avoid duplicate messages)
+            if ($workerId === 0) {
+                $this->startRedisBrokerSubscription($server);
+            }
         });
+    }
+
+    /**
+     * Start Redis broker subscription using Swoole coroutine.
+     *
+     * This allows the WebSocket server to receive messages from PHP-FPM
+     * via Redis Pub/Sub without blocking the event loop.
+     *
+     * @param \Swoole\WebSocket\Server $server
+     * @return void
+     */
+    private function startRedisBrokerSubscription(\Swoole\WebSocket\Server $server): void
+    {
+        // Load broker config lazily (inside Swoole context where config is available)
+        $brokerName = config('realtime.default_broker') ?: env('REALTIME_BROKER');
+
+        if (!$brokerName || $brokerName !== 'redis') {
+            echo "Broker: " . ($brokerName ?: 'none') . " (Redis subscription disabled)\n";
+            return;
+        }
+
+        // Load Redis broker config
+        $brokerConfig = config('realtime.brokers.redis', []);
+
+        // Start subscription in a coroutine using Swoole\Coroutine\Client for raw Redis protocol
+        \Swoole\Coroutine::create(function () use ($server, $brokerConfig) {
+            $host = $brokerConfig['host'] ?? env('REDIS_HOST', '127.0.0.1');
+            $port = (int) ($brokerConfig['port'] ?? env('REDIS_PORT', 6379));
+            $password = $brokerConfig['password'] ?? env('REDIS_PASSWORD');
+
+            echo "[Redis Broker] Connecting to {$host}:{$port}...\n";
+
+            $client = new \Swoole\Coroutine\Client(SWOOLE_SOCK_TCP);
+            $client->set([
+                'open_eof_check' => false,
+                'package_max_length' => 1024 * 1024,
+            ]);
+
+            if (!$client->connect($host, $port, 5.0)) {
+                echo "[Redis Broker] Failed to connect: {$client->errMsg}\n";
+                return;
+            }
+
+            // Authenticate if password is set
+            if ($password && $password !== 'null') {
+                $authCmd = "*2\r\n\$4\r\nAUTH\r\n\$" . strlen($password) . "\r\n{$password}\r\n";
+                $client->send($authCmd);
+                $authResponse = $client->recv(5.0);
+                if (!str_starts_with($authResponse, '+OK')) {
+                    echo "[Redis Broker] Authentication failed: {$authResponse}\n";
+                    $client->close();
+                    return;
+                }
+            }
+
+            // Send PSUBSCRIBE command
+            $pattern = 'realtime:*';
+            $psubscribeCmd = "*2\r\n\$10\r\nPSUBSCRIBE\r\n\$" . strlen($pattern) . "\r\n{$pattern}\r\n";
+            $client->send($psubscribeCmd);
+
+            echo "[Redis Broker] Connected and subscribed to pattern: {$pattern}\n";
+
+            // Read subscription confirmation
+            $confirmation = $client->recv(5.0);
+            if ($confirmation) {
+                echo "[Redis Broker] Subscription confirmed\n";
+            }
+
+            // Main loop - receive messages
+            while (true) {
+                $response = $client->recv(86400.0); // Long timeout for blocking receive
+
+                if ($response === false || $response === '') {
+                    echo "[Redis Broker] Connection lost, reconnecting...\n";
+                    break;
+                }
+
+                // Parse RESP protocol message
+                $this->handleRedisMessage($response, $server);
+            }
+
+            $client->close();
+        });
+    }
+
+    /**
+     * Parse and handle Redis RESP protocol message from PSUBSCRIBE.
+     *
+     * @param string $response Raw Redis RESP response
+     * @param \Swoole\WebSocket\Server $server
+     * @return void
+     */
+    private function handleRedisMessage(string $response, \Swoole\WebSocket\Server $server): void
+    {
+        // Parse RESP array response for pmessage
+        // Format: *4\r\n$8\r\npmessage\r\n$patternLen\r\npattern\r\n$channelLen\r\nchannel\r\n$msgLen\r\nmessage\r\n
+        $lines = explode("\r\n", $response);
+
+        // Find pmessage in response
+        $pmessageIdx = array_search('pmessage', $lines);
+        if ($pmessageIdx === false) {
+            return; // Not a pmessage
+        }
+
+        // After pmessage, we have: $patternLen, pattern, $channelLen, channel, $msgLen, message
+        // So pattern is at pmessageIdx + 2, channel is at pmessageIdx + 4, message is at pmessageIdx + 6
+        $channel = $lines[$pmessageIdx + 4] ?? '';
+        $messageJson = $lines[$pmessageIdx + 6] ?? '';
+
+        if (!$channel || !$messageJson) {
+            return;
+        }
+
+        try {
+            $messageData = json_decode($messageJson, true);
+
+            if (!$messageData) {
+                return;
+            }
+
+            // Extract channel name (remove 'realtime:' prefix)
+            $channelName = str_replace('realtime:', '', $channel);
+            $event = $messageData['event'] ?? 'message';
+            $data = $messageData['data'] ?? [];
+
+            echo "[Redis] {$channelName}: {$event}\n";
+
+            // Broadcast to all subscribed WebSocket clients
+            $channelObj = $this->manager->channel($channelName);
+            $message = Message::event($channelName, $event, $data);
+            $channelObj->broadcast($message);
+
+        } catch (\Throwable $e) {
+            echo "[Redis] Error: {$e->getMessage()}\n";
+        }
     }
 
     /**

@@ -25,11 +25,12 @@ use Toporia\Framework\Support\Collection\Collection;
  * - Durable message queues (guaranteed delivery)
  *
  * Usage:
- *   php console realtime:rabbitmq:consume
- *   php console realtime:rabbitmq:consume --broker=rabbitmq
- *   php console realtime:rabbitmq:consume --channels=user.1,user.2,public.news
- *   php console realtime:rabbitmq:consume --batch-size=100 --timeout=1000
- *   php console realtime:rabbitmq:consume --max-messages=10000
+ *   php console realtime:rabbitmq                           # Subscribe to all channels (routing key: #)
+ *   php console realtime:rabbitmq --all                     # Subscribe to all channels
+ *   php console realtime:rabbitmq --routing-key=user.*      # Subscribe using routing key pattern
+ *   php console realtime:rabbitmq --channels=ch1,ch2        # Subscribe to specific channels
+ *   php console realtime:rabbitmq --batch-size=100 --timeout=1000
+ *   php console realtime:rabbitmq --max-messages=10000
  *
  * Options:
  *   --broker=name          RabbitMQ broker name from config (default: rabbitmq)
@@ -70,7 +71,7 @@ use Toporia\Framework\Support\Collection\Collection;
  */
 final class RealtimeRabbitMqConsumerCommand extends AbstractBatchRabbitMqConsumer implements BatchingMessagesHandlerInterface
 {
-    protected string $signature = 'realtime:rabbitmq:consume {--broker=rabbitmq} {--channels=*} {--batch-size=100} {--timeout=1000} {--max-messages=0} {--stop-when-empty}';
+    protected string $signature = 'realtime:rabbitmq {--broker=rabbitmq} {--channels=*} {--routing-key=} {--all} {--batch-size=100} {--timeout=1000} {--max-messages=0} {--stop-when-empty}';
 
     protected string $description = 'Consume messages from RabbitMQ for realtime communication';
 
@@ -121,19 +122,40 @@ final class RealtimeRabbitMqConsumerCommand extends AbstractBatchRabbitMqConsume
     }
 
     /**
+     * @var string|null Routing key for wildcard subscription
+     */
+    private ?string $routingKey = null;
+
+    /**
      * {@inheritdoc}
      */
     public function handle(): int
     {
         try {
+            // Check for --all flag or --routing-key option
+            $subscribeAll = $this->option('all', false);
+            $this->routingKey = $this->option('routing-key');
+
             // Parse channels
             $channelsOption = $this->option('channels', []);
             $this->channels = $this->parseChannels($channelsOption);
 
-            if (empty($this->channels)) {
-                $this->warn('No channels specified. Use --channels=channel1,channel2');
-                $this->warn('Example: --channels=user.1,public.news,presence-chat');
-                return 1;
+            // Determine subscription mode
+            if (empty($this->channels) && !$this->routingKey && !$subscribeAll) {
+                $this->info('No channels specified. Using wildcard routing key (#) to subscribe to ALL channels.');
+                $this->info('');
+                $this->info('Usage options:');
+                $this->info('  --all                    Subscribe to all channels (routing key: #)');
+                $this->info('  --routing-key=user.*     Subscribe using routing key pattern');
+                $this->info('  --channels=ch1,ch2       Subscribe to specific channels');
+                $this->info('');
+                $this->info('Running with --all mode...');
+                $subscribeAll = true;
+            }
+
+            // Use wildcard routing key if --all
+            if ($subscribeAll && empty($this->channels)) {
+                $this->routingKey = '#'; // RabbitMQ wildcard for all
             }
 
             // Override parent handle to customize for multiple channels
@@ -166,10 +188,16 @@ final class RealtimeRabbitMqConsumerCommand extends AbstractBatchRabbitMqConsume
         $batchSize = $this->getBatchSizeLimit();
         $timeout = (int) $this->option('timeout', 1000);
 
+        // Build subscription info
+        $subscriptionInfo = $this->routingKey
+            ? "routing key: {$this->routingKey}"
+            : implode(', ', $this->channels);
+
         // Display header
         $this->displayHeader('Realtime Batch Consumer', [
             'broker' => $this->getBrokerName(),
-            'channels' => implode(', ', $this->channels),
+            'mode' => $this->routingKey ? 'routing-key' : 'channels',
+            'subscription' => $subscriptionInfo,
             'batch_size' => $batchSize,
         ]);
 
@@ -178,21 +206,31 @@ final class RealtimeRabbitMqConsumerCommand extends AbstractBatchRabbitMqConsume
             $broker->stopConsuming();
         });
 
-        // Subscribe to all channels
-        foreach ($this->channels as $channel) {
-            $broker->subscribe($channel, function (MessageInterface $message) use ($channel) {
+        // Subscribe based on mode
+        if ($this->routingKey) {
+            // Use routing key pattern subscription
+            $broker->subscribeWithRoutingKey($this->routingKey, function (MessageInterface $message, string $channel) {
                 // Messages will be collected in batches
-                // This callback is called by RabbitMqBroker's consume loop
             });
-            $this->line("Subscribed to channel: <info>{$channel}</info>");
+            $this->line("Subscribed with routing key: <info>{$this->routingKey}</info>");
+        } else {
+            // Subscribe to specific channels
+            foreach ($this->channels as $channel) {
+                $broker->subscribe($channel, function (MessageInterface $message) use ($channel) {
+                    // Messages will be collected in batches
+                    // This callback is called by RabbitMqBroker's consume loop
+                });
+                $this->line("Subscribed to channel: <info>{$channel}</info>");
+            }
         }
 
         // Start consuming
+        $channelsOrKey = $this->routingKey ? [$this->routingKey] : $this->channels;
         $maxMessages = (int) $this->option('max-messages', 0);
         if ($maxMessages > 0) {
-            $this->consumeBatchesWithLimit($broker, $this->channels, $timeout, $batchSize, $maxMessages);
+            $this->consumeBatchesWithLimit($broker, $channelsOrKey, $timeout, $batchSize, $maxMessages);
         } else {
-            $this->consumeBatches($broker, $this->channels, $timeout, $batchSize);
+            $this->consumeBatches($broker, $channelsOrKey, $timeout, $batchSize);
         }
 
         // Display summary
