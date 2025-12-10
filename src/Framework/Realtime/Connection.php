@@ -175,4 +175,71 @@ final class Connection implements ConnectionInterface
     {
         $this->id = $id;
     }
+
+    /**
+     * Check if connection has a specific role.
+     *
+     * @param string $role Role name
+     * @return bool
+     */
+    public function hasRole(string $role): bool
+    {
+        $roles = $this->get('roles', []);
+        return is_array($roles) && in_array($role, $roles, true);
+    }
+
+    /**
+     * Check if connection has any of the specified roles.
+     *
+     * @param array<string> $roles Role names
+     * @return bool
+     */
+    public function hasAnyRole(array $roles): bool
+    {
+        $userRoles = $this->get('roles', []);
+
+        if (!is_array($userRoles)) {
+            return false;
+        }
+
+        return !empty(array_intersect($roles, $userRoles));
+    }
+
+    /**
+     * Check if connection has all of the specified roles.
+     *
+     * @param array<string> $roles Role names
+     * @return bool
+     */
+    public function hasAllRoles(array $roles): bool
+    {
+        $userRoles = $this->get('roles', []);
+
+        if (!is_array($userRoles)) {
+            return false;
+        }
+
+        return count(array_intersect($roles, $userRoles)) === count($roles);
+    }
+
+    /**
+     * Get username.
+     *
+     * @return string|null
+     */
+    public function getUsername(): ?string
+    {
+        return $this->get('username');
+    }
+
+    /**
+     * Get roles.
+     *
+     * @return array<string>
+     */
+    public function getRoles(): array
+    {
+        $roles = $this->get('roles', []);
+        return is_array($roles) ? $roles : [];
+    }
 }

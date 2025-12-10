@@ -6,6 +6,7 @@ namespace Toporia\Framework\Realtime\Transports;
 
 use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterface, MessageInterface, RealtimeManagerInterface};
 use Toporia\Framework\Realtime\{Connection, Message};
+use Toporia\Framework\Realtime\Auth\ConnectionAuthenticator;
 
 /**
  * Class WebSocketTransport
@@ -31,10 +32,12 @@ final class WebSocketTransport implements TransportInterface
     /**
      * @param array $config Configuration
      * @param RealtimeManagerInterface $manager Realtime manager
+     * @param ConnectionAuthenticator|null $authenticator Connection authenticator
      */
     public function __construct(
         private readonly array $config,
-        private readonly RealtimeManagerInterface $manager
+        private readonly RealtimeManagerInterface $manager,
+        private readonly ?ConnectionAuthenticator $authenticator = null
     ) {}
 
     /**
@@ -150,15 +153,37 @@ final class WebSocketTransport implements TransportInterface
     {
         // Connection opened
         $this->server->on('open', function ($server, $request) {
+            // 1. Try to authenticate connection
+            $authData = $this->authenticator?->authenticateFromRequest($request);
+
+            // 2. Check if authentication is required on connect
+            $requireAuth = $this->config['require_auth'] ?? false;
+
+            if ($requireAuth && $authData === null) {
+                // Reject unauthenticated connections if required
+                $server->close($request->fd, 4401, 'Authentication required');
+                error_log("[{$request->fd}] Rejected: Authentication required");
+                return;
+            }
+
+            // 3. Create connection with authentication data
             $connection = new Connection($request->fd, [
                 'ip' => $request->server['remote_addr'] ?? null,
                 'user_agent' => $request->header['user-agent'] ?? null,
+                'user_id' => $authData['user_id'] ?? null,
+                'username' => $authData['username'] ?? null,
+                'roles' => $authData['roles'] ?? [],
+                'authenticated_at' => $authData['authenticated_at'] ?? null,
             ]);
 
             $this->connections[$request->fd] = $connection;
             $this->manager->addConnection($connection);
 
-            echo "[{$request->fd}] Connected from {$request->server['remote_addr']}\n";
+            if ($authData) {
+                echo "[{$request->fd}] Connected: user_id={$authData['user_id']}\n";
+            } else {
+                echo "[{$request->fd}] Connected: anonymous (IP: {$request->server['remote_addr']})\n";
+            }
         });
 
         // Message received
@@ -214,7 +239,20 @@ final class WebSocketTransport implements TransportInterface
      */
     private function handleMessage(ConnectionInterface $connection, MessageInterface $message): void
     {
-        match ($message->getType()) {
+        $type = $message->getType();
+
+        // Check if authentication is required for operations (except 'auth' and 'ping')
+        if (!in_array($type, ['auth', 'ping'], true)) {
+            $requireAuthForSubscribe = $this->config['require_auth_for_subscribe'] ?? true;
+
+            if ($requireAuthForSubscribe && $connection->getUserId() === null) {
+                $this->send($connection, Message::error('Authentication required. Please authenticate first.', 401));
+                return;
+            }
+        }
+
+        match ($type) {
+            'auth' => $this->handleAuth($connection, $message),
             'subscribe' => $this->handleSubscribe($connection, $message),
             'unsubscribe' => $this->handleUnsubscribe($connection, $message),
             'event' => $this->handleEvent($connection, $message),
@@ -320,6 +358,55 @@ final class WebSocketTransport implements TransportInterface
         // Broadcast to channel (excluding sender)
         $channel = $this->manager->channel($channelName);
         $channel->broadcast($message, $connection);
+    }
+
+    /**
+     * Handle authentication request (two-step auth).
+     *
+     * Allows clients to authenticate after connection.
+     *
+     * @param ConnectionInterface $connection
+     * @param MessageInterface $message
+     * @return void
+     */
+    private function handleAuth(ConnectionInterface $connection, MessageInterface $message): void
+    {
+        // Check if already authenticated
+        if ($connection->getUserId() !== null) {
+            $this->send($connection, Message::error('Already authenticated', 400));
+            return;
+        }
+
+        // Get token from message data
+        $token = $message->getData()['token'] ?? null;
+
+        if (!$token) {
+            $this->send($connection, Message::error('Token required', 400));
+            return;
+        }
+
+        // Authenticate using token
+        $authData = $this->authenticator?->authenticateToken($token);
+
+        if ($authData === null) {
+            $this->send($connection, Message::error('Invalid token', 401));
+            return;
+        }
+
+        // Update connection with authentication data
+        $connection->set('user_id', $authData['user_id']);
+        $connection->set('username', $authData['username']);
+        $connection->set('roles', $authData['roles']);
+        $connection->set('authenticated_at', $authData['authenticated_at']);
+
+        // Send success response
+        $this->send($connection, Message::create('auth_success', null, 'Authenticated successfully', [
+            'user_id' => $authData['user_id'],
+            'username' => $authData['username'],
+            'roles' => $authData['roles'],
+        ]));
+
+        echo "[{$connection->getId()}] Authenticated: user_id={$authData['user_id']}\n";
     }
 
     /**

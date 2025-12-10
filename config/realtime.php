@@ -74,6 +74,10 @@ return [
             // Performance settings
             'max_connections' => (int) env('REALTIME_MAX_CONNECTIONS', 10000),
             'worker_num' => (int) env('REALTIME_WORKER_NUM', 0), // 0 = auto (CPU * 2)
+
+            // Authentication settings
+            'require_auth' => env('REALTIME_REQUIRE_AUTH', false), // Reject unauthenticated connections on connect?
+            'require_auth_for_subscribe' => env('REALTIME_REQUIRE_AUTH_SUBSCRIBE', true), // Require auth before subscribing?
         ],
 
         'sse' => [

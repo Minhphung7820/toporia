@@ -9,6 +9,7 @@ use Toporia\Framework\Realtime\Exceptions\{BrokerException, ChannelException, Ra
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Realtime\ChannelRoute;
 use Toporia\Framework\Realtime\Middleware;
+use Toporia\Framework\Realtime\Auth;
 
 /**
  * Class RealtimeManager
@@ -381,9 +382,19 @@ final class RealtimeManager implements RealtimeManagerInterface
         $config = $this->config['transports'][$name] ?? [];
         $driver = $config['driver'] ?? $name;
 
+        // Get ConnectionAuthenticator from container if available
+        $authenticator = null;
+        if ($this->container !== null && $this->container->has(Auth\ConnectionAuthenticator::class)) {
+            try {
+                $authenticator = $this->container->get(Auth\ConnectionAuthenticator::class);
+            } catch (\Throwable $e) {
+                // Authenticator not available, continue without it
+            }
+        }
+
         return match ($driver) {
             'memory' => new Transports\MemoryTransport($this),
-            'websocket' => new Transports\WebSocketTransport($config, $this),
+            'websocket' => new Transports\WebSocketTransport($config, $this, $authenticator),
             'sse' => new Transports\SseTransport($config, $this),
             'longpolling' => new Transports\LongPollingTransport($config, $this),
             'socketio' => new Transports\SocketIOGateway($config, $this),

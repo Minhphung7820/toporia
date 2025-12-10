@@ -8,6 +8,7 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Realtime\RealtimeManager;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
+use Toporia\Framework\Realtime\Auth\ConnectionAuthenticator;
 
 /**
  * Class RealtimeServiceProvider
@@ -27,10 +28,32 @@ use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
 final class RealtimeServiceProvider extends ServiceProvider
 {
     /**
+     * Container instance.
+     *
+     * @var ContainerInterface|null
+     */
+    protected ?ContainerInterface $container = null;
+
+    /**
      * {@inheritdoc}
      */
     public function register(ContainerInterface $container): void
     {
+        $this->container = $container;
+        // Register ConnectionAuthenticator
+        $container->singleton(ConnectionAuthenticator::class, function ($c) {
+            // Try to get session manager (optional dependency)
+            $session = null;
+            if ($c->has('session')) {
+                try {
+                    $session = $c->get('session');
+                } catch (\Throwable $e) {
+                    // Session not available, continue without it
+                }
+            }
+            return new ConnectionAuthenticator($session);
+        });
+
         // Register RealtimeManager
         $container->singleton(RealtimeManager::class, function ($c) {
             $config = $c->has('config')
