@@ -6,6 +6,7 @@ namespace Toporia\Framework\Realtime\Transports;
 
 use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterface, MessageInterface, RealtimeManagerInterface};
 use Toporia\Framework\Realtime\{Connection, Message};
+use Toporia\Framework\Realtime\Subscriptions\BrokerSubscriptionFactory;
 
 /**
  * Class SocketIOGateway
@@ -29,6 +30,7 @@ final class SocketIOGateway implements TransportInterface
     private array $namespaces = [];
     private array $rooms = [];
     private bool $running = false;
+    private int $workerNum = 1;
 
     // Socket.IO packet types
     private const PACKET_CONNECT = 0;
@@ -123,17 +125,29 @@ final class SocketIOGateway implements TransportInterface
 
         $this->server = new \Swoole\WebSocket\Server($host, $port);
 
+        // Calculate worker count
+        $configWorkerNum = $this->config['worker_num'] ?? 0;
+        $workerNum = $configWorkerNum > 0 ? $configWorkerNum : swoole_cpu_num();
+        $this->workerNum = $workerNum;
+
         // Performance optimization
         $this->server->set([
-            'worker_num' => swoole_cpu_num() * 2,
+            'worker_num' => $workerNum,
             'max_request' => 0,
-            'max_conn' => 8000,
+            'max_conn' => $this->config['max_connections'] ?? 50000,
             'heartbeat_check_interval' => 25,  // Socket.IO ping interval
             'heartbeat_idle_time' => 60,        // 60s timeout
             'package_max_length' => 4 * 1024 * 1024, // 4MB
+            'buffer_output_size' => 32 * 1024 * 1024,  // 32MB output buffer
             'open_tcp_nodelay' => true,
             'enable_coroutine' => true,
+            'max_coroutine' => 100000,
+            'socket_buffer_size' => 8 * 1024 * 1024,   // 8MB socket buffer
+            'send_yield' => true,
+            'dispatch_mode' => 2,  // Fixed mode - same connection always goes to same worker
         ]);
+
+        echo "Workers: {$workerNum}, Max connections: " . ($this->config['max_connections'] ?? 50000) . "\n";
 
         // SSL support
         if ($this->config['ssl'] ?? false) {
@@ -160,6 +174,48 @@ final class SocketIOGateway implements TransportInterface
             $this->server->shutdown();
             $this->running = false;
         }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getConnectionCount(): int
+    {
+        return count($this->connections);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function hasConnection(string $connectionId): bool
+    {
+        return isset($this->connections[$connectionId]);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function close(ConnectionInterface $connection, int $code = 1000, string $reason = ''): void
+    {
+        if (!$this->server) {
+            return;
+        }
+
+        $fd = (int) $connection->getResource();
+
+        if ($this->server->isEstablished($fd)) {
+            $this->server->close($fd, $code, $reason);
+        }
+
+        unset($this->connections[$fd]);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getName(): string
+    {
+        return 'socketio';
     }
 
     /**
@@ -232,15 +288,86 @@ final class SocketIOGateway implements TransportInterface
         $this->server->on('workerStart', function ($server, $workerId) {
             echo "Socket.IO Worker #{$workerId} started\n";
 
-            // Subscribe to broker
-            if ($broker = $this->manager->broker()) {
-                \Swoole\Coroutine::create(function () use ($broker) {
-                    $broker->subscribe('*', function ($message) {
-                        $this->broadcast($message);
-                    });
-                });
+            // Start broker subscription in Worker #0 only to avoid duplicate messages
+            if ($workerId === 0) {
+                $this->startBrokerSubscription($server);
             }
         });
+
+        // Inter-worker communication for multi-worker broadcast
+        $this->server->on('pipeMessage', function ($server, $_srcWorkerId, $message) {
+            // Received broadcast message from Worker #0 (broker subscription handler)
+            // Broadcast to all connections in THIS worker using Socket.IO format
+            foreach ($server->connections as $fd) {
+                if ($server->isEstablished($fd)) {
+                    $server->push($fd, $message, WEBSOCKET_OPCODE_TEXT);
+                }
+            }
+        });
+    }
+
+    /**
+     * Start broker subscription based on configuration.
+     *
+     * Uses Strategy/Factory pattern for extensibility.
+     *
+     * @param \Swoole\WebSocket\Server $server
+     * @return void
+     */
+    private function startBrokerSubscription(\Swoole\WebSocket\Server $server): void
+    {
+        $brokerName = config('realtime.default_broker') ?: env('REALTIME_BROKER');
+
+        if (!$brokerName) {
+            echo "Broker: none (single server mode)\n";
+            return;
+        }
+
+        echo "Broker: {$brokerName}\n";
+
+        // Create factory with broker configs
+        $factory = BrokerSubscriptionFactory::createWithDefaults([
+            'redis' => config('realtime.brokers.redis', []),
+            'rabbitmq' => config('realtime.brokers.rabbitmq', []),
+        ]);
+
+        // Get strategy for configured broker
+        $strategy = $factory->create($brokerName);
+
+        if ($strategy === null) {
+            $available = implode(', ', $factory->getAvailableStrategies());
+            echo "Broker '{$brokerName}' not supported for Socket.IO gateway (available: {$available})\n";
+            return;
+        }
+
+        // Message handler callback - broadcasts to all workers using Socket.IO format
+        $messageHandler = function (string $channelName, string $event, array $data) use ($server): void {
+            // Create Socket.IO formatted packet
+            $packet = $this->createSocketIOPacket(
+                type: self::PACKET_EVENT,
+                namespace: '/',
+                data: [$event, array_merge($data, ['channel' => $channelName])]
+            );
+            $eioPacket = self::EIO_MESSAGE . $packet;
+
+            // Broadcast to connections in Worker #0 (current worker)
+            foreach ($server->connections as $fd) {
+                if ($server->isEstablished($fd)) {
+                    $server->push($fd, $eioPacket, WEBSOCKET_OPCODE_TEXT);
+                }
+            }
+
+            // Send message to all OTHER workers via pipe for them to broadcast
+            for ($workerId = 1; $workerId < $this->workerNum; $workerId++) {
+                $server->sendMessage($eioPacket, $workerId);
+            }
+        };
+
+        // Is running callback
+        $isRunning = fn(): bool => $this->running;
+
+        // Start subscription using strategy
+        $strategy->subscribe($server, $messageHandler, $isRunning);
     }
 
     /**
