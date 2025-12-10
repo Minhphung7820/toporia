@@ -390,7 +390,7 @@ final class SocketIOGateway implements TransportInterface
             self::EIO_MESSAGE => $this->handleSocketIOPacket($connection, $payload),
             self::EIO_PING => $this->sendPong($connection),
             self::EIO_CLOSE => $this->handleDisconnect($connection),
-            default => null // Ignore unknown packets
+            default => null
         };
     }
 
@@ -403,7 +403,8 @@ final class SocketIOGateway implements TransportInterface
      */
     private function handleSocketIOPacket(ConnectionInterface $connection, string $payload): void
     {
-        if (empty($payload)) {
+        // Note: '0' is a valid CONNECT packet, so don't use empty() which returns true for '0'
+        if ($payload === '') {
             return;
         }
 
@@ -799,25 +800,28 @@ final class SocketIOGateway implements TransportInterface
 
         $remaining = substr($packet, 1);
 
-        // Parse namespace
-        if (str_contains($remaining, ',')) {
-            [$namespace, $remaining] = explode(',', $remaining, 2);
-            if (str_starts_with($namespace, '/')) {
-                $result['namespace'] = $namespace;
+        // Parse namespace - only if namespace comes before data
+        // Namespace format: /custom-ns,data or just data
+        if (str_starts_with($remaining, '/')) {
+            $commaPos = strpos($remaining, ',');
+            if ($commaPos !== false) {
+                $result['namespace'] = substr($remaining, 0, $commaPos);
+                $remaining = substr($remaining, $commaPos + 1);
             }
         }
 
-        // Parse ack ID (if numeric)
-        if (!empty($remaining) && is_numeric($remaining[0])) {
+        // Parse ack ID (if numeric and before data)
+        // AckId is digits before [ or {
+        if ($remaining !== '' && ctype_digit($remaining[0])) {
             $ackIdEnd = strcspn($remaining, '[{');
-            if ($ackIdEnd > 0) {
+            if ($ackIdEnd > 0 && $ackIdEnd < strlen($remaining)) {
                 $result['ackId'] = substr($remaining, 0, $ackIdEnd);
                 $remaining = substr($remaining, $ackIdEnd);
             }
         }
 
         // Parse data (JSON)
-        if (!empty($remaining)) {
+        if ($remaining !== '') {
             try {
                 $result['data'] = json_decode($remaining, true, 512, JSON_THROW_ON_ERROR);
             } catch (\JsonException $e) {
