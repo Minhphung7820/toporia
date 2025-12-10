@@ -423,15 +423,25 @@ final class WebSocketTransport implements TransportInterface
             $event = $messageData['event'] ?? 'message';
             $data = $messageData['data'] ?? [];
 
-            echo "[Redis] {$channelName}: {$event}\n";
-
-            // Broadcast to all subscribed WebSocket clients
+            // Get channel object to find subscribers
             $channelObj = $this->manager->channel($channelName);
             $message = Message::event($channelName, $event, $data);
-            $channelObj->broadcast($message);
+            $json = $message->toJson();
+
+            // Get subscribers from channel and send directly via THIS transport's server
+            // This is critical: we must use $server (the running Swoole instance),
+            // not channel->broadcast() which may use a different transport instance
+            $subscribers = $channelObj->getSubscribers();
+
+            foreach ($subscribers as $connection) {
+                $fd = (int) $connection->getResource();
+                if ($server->isEstablished($fd)) {
+                    $server->push($fd, $json, WEBSOCKET_OPCODE_TEXT);
+                }
+            }
 
         } catch (\Throwable $e) {
-            echo "[Redis] Error: {$e->getMessage()}\n";
+            error_log("[Redis] Error: {$e->getMessage()}");
         }
     }
 
@@ -448,7 +458,11 @@ final class WebSocketTransport implements TransportInterface
 
         // Check if authentication is required for operations (except 'auth' and 'ping')
         if (!in_array($type, ['auth', 'ping'], true)) {
-            $requireAuthForSubscribe = $this->config['require_auth_for_subscribe'] ?? true;
+            // Check config - prefer explicit false from env
+            $envValue = env('REALTIME_REQUIRE_AUTH_SUBSCRIBE');
+            $requireAuthForSubscribe = $envValue === false || $envValue === 'false'
+                ? false
+                : ($this->config['require_auth_for_subscribe'] ?? true);
 
             if ($requireAuthForSubscribe && $connection->getUserId() === null) {
                 $this->send($connection, Message::error('Authentication required. Please authenticate first.', 401));
