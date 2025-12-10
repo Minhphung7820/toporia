@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime;
 
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
+use Toporia\Framework\DateTime\Chronos;
 
 /**
  * Class Message
@@ -35,7 +36,8 @@ final class Message implements MessageInterface
         ?int $timestamp = null
     ) {
         $this->id = $id ?? uniqid('msg_', true);
-        $this->timestamp = $timestamp ?? now()->getTimestamp();
+        // Use Chronos directly instead of now() helper for better standalone usage
+        $this->timestamp = $timestamp ?? Chronos::now()->getTimestamp();
     }
 
     /**
