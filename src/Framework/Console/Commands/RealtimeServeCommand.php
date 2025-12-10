@@ -134,27 +134,23 @@ final class RealtimeServeCommand extends Command
     /**
      * Register signal handlers for graceful shutdown.
      *
+     * Note: For Swoole WebSocket server, signals are handled internally by Swoole.
+     * This method sets up pcntl signals for non-Swoole transports or as fallback.
+     * Swoole handles SIGTERM/SIGINT automatically and will trigger shutdown.
+     *
      * @param mixed $transport Transport instance
      * @return void
      */
     private function registerSignalHandlers($transport): void
     {
-        if (!function_exists('pcntl_signal')) {
-            return; // pcntl not available
-        }
+        // For Swoole: signals are handled in workerStart event
+        // Swoole automatically handles SIGTERM/SIGINT for graceful shutdown
+        // No need to register pcntl_signal as it conflicts with Swoole's event loop
 
-        // Handle SIGINT (Ctrl+C)
-        pcntl_signal(SIGINT, function () use ($transport) {
-            $this->warn("\nReceived shutdown signal, stopping server...");
-            $transport->stop();
-            exit(0);
-        });
-
-        // Handle SIGTERM
-        pcntl_signal(SIGTERM, function () use ($transport) {
-            $this->warn("\nReceived termination signal, stopping server...");
-            $transport->stop();
-            exit(0);
-        });
+        // Display shutdown instructions
+        $this->line('');
+        $this->info('Press Ctrl+C to stop the server');
+        $this->line('Or run: php console realtime:stop');
+        $this->line('');
     }
 }

@@ -28,6 +28,7 @@ final class WebSocketTransport implements TransportInterface
     private ?\Swoole\WebSocket\Server $server = null;
     private array $connections = [];
     private bool $running = false;
+    private int $workerNum = 1;
 
     /**
      * @param array $config Configuration
@@ -103,20 +104,34 @@ final class WebSocketTransport implements TransportInterface
 
         $this->server = new \Swoole\WebSocket\Server($host, $port);
 
+        // Calculate worker count
+        // For WebSocket: use CPU count (not *2) for optimal I/O performance
+        // 0 means auto-detect, which Swoole will use swoole_cpu_num()
+        $configWorkerNum = $this->config['worker_num'] ?? 0;
+        $workerNum = $configWorkerNum > 0 ? $configWorkerNum : swoole_cpu_num();
+
         // Performance optimization settings (OPTIMIZED for production)
         $this->server->set([
-            'worker_num' => $this->config['worker_num'] ?? swoole_cpu_num() * 2,
-            'max_request' => 0,                        // No worker restart limit
-            'max_conn' => $this->config['max_connections'] ?? 50000, // Increased from 10K to 50K
+            'worker_num' => $workerNum,
+            'max_request' => 0,                        // No worker restart limit (long-lived connections)
+            'max_conn' => $this->config['max_connections'] ?? 50000,
             'heartbeat_check_interval' => 30,          // Check every 30s
             'heartbeat_idle_time' => 120,              // Close idle after 2min
-            'package_max_length' => 256 * 1024,        // 256KB (reduced from 2MB for security)
+            'package_max_length' => 256 * 1024,        // 256KB max message size
             'buffer_output_size' => 32 * 1024 * 1024,  // 32MB output buffer
-            'open_tcp_nodelay' => true,                // Disable Nagle (low latency)
+            'open_tcp_nodelay' => true,                // Disable Nagle for low latency
             'open_http2_protocol' => false,            // WebSocket only
-            'enable_coroutine' => true,                // Enable coroutines
-            'max_coroutine' => 100000,                 // Support high concurrency
+            'enable_coroutine' => true,                // Enable coroutines for async I/O
+            'max_coroutine' => 100000,                 // High concurrency support
+            'socket_buffer_size' => 8 * 1024 * 1024,   // 8MB socket buffer
+            'send_yield' => true,                      // Yield when send buffer is full (prevents blocking)
+            'dispatch_mode' => 2,                      // Fixed mode - same connection always goes to same worker
         ]);
+
+        // Store worker count for use in handleRedisMessage
+        $this->workerNum = $workerNum;
+
+        echo "Workers: {$workerNum}, Max connections: " . ($this->config['max_connections'] ?? 50000) . "\n";
 
         // SSL/TLS support
         if ($this->config['ssl'] ?? false) {
@@ -317,6 +332,11 @@ final class WebSocketTransport implements TransportInterface
      * This allows the WebSocket server to receive messages from PHP-FPM
      * via Redis Pub/Sub without blocking the event loop.
      *
+     * Features:
+     * - Auto-reconnect with exponential backoff (1s -> 2s -> 4s -> ... -> 30s max)
+     * - Graceful error handling
+     * - Production-ready reliability
+     *
      * @param \Swoole\WebSocket\Server $server
      * @return void
      */
@@ -333,64 +353,100 @@ final class WebSocketTransport implements TransportInterface
         // Load Redis broker config
         $brokerConfig = config('realtime.brokers.redis', []);
 
-        // Start subscription in a coroutine using Swoole\Coroutine\Client for raw Redis protocol
+        // Start subscription in a coroutine with auto-reconnect
         \Swoole\Coroutine::create(function () use ($server, $brokerConfig) {
             $host = $brokerConfig['host'] ?? env('REDIS_HOST', '127.0.0.1');
             $port = (int) ($brokerConfig['port'] ?? env('REDIS_PORT', 6379));
             $password = $brokerConfig['password'] ?? env('REDIS_PASSWORD');
-
-            echo "[Redis Broker] Connecting to {$host}:{$port}...\n";
-
-            $client = new \Swoole\Coroutine\Client(SWOOLE_SOCK_TCP);
-            $client->set([
-                'open_eof_check' => false,
-                'package_max_length' => 1024 * 1024,
-            ]);
-
-            if (!$client->connect($host, $port, 5.0)) {
-                echo "[Redis Broker] Failed to connect: {$client->errMsg}\n";
-                return;
-            }
-
-            // Authenticate if password is set
-            if ($password && $password !== 'null') {
-                $authCmd = "*2\r\n\$4\r\nAUTH\r\n\$" . strlen($password) . "\r\n{$password}\r\n";
-                $client->send($authCmd);
-                $authResponse = $client->recv(5.0);
-                if (!str_starts_with($authResponse, '+OK')) {
-                    echo "[Redis Broker] Authentication failed: {$authResponse}\n";
-                    $client->close();
-                    return;
-                }
-            }
-
-            // Send PSUBSCRIBE command
             $pattern = 'realtime:*';
-            $psubscribeCmd = "*2\r\n\$10\r\nPSUBSCRIBE\r\n\$" . strlen($pattern) . "\r\n{$pattern}\r\n";
-            $client->send($psubscribeCmd);
 
-            echo "[Redis Broker] Connected and subscribed to pattern: {$pattern}\n";
+            // Exponential backoff settings
+            $baseDelay = 1.0;      // Start with 1 second
+            $maxDelay = 30.0;      // Max 30 seconds between retries
+            $currentDelay = $baseDelay;
+            $consecutiveFailures = 0;
 
-            // Read subscription confirmation
-            $confirmation = $client->recv(5.0);
-            if ($confirmation) {
-                echo "[Redis Broker] Subscription confirmed\n";
-            }
+            // Auto-reconnect loop
+            while ($this->running) {
+                echo "[Redis Broker] Connecting to {$host}:{$port}...\n";
 
-            // Main loop - receive messages
-            while (true) {
-                $response = $client->recv(86400.0); // Long timeout for blocking receive
+                $client = new \Swoole\Coroutine\Client(SWOOLE_SOCK_TCP);
+                $client->set([
+                    'open_eof_check' => false,
+                    'package_max_length' => 1024 * 1024,
+                ]);
 
-                if ($response === false || $response === '') {
-                    echo "[Redis Broker] Connection lost, reconnecting...\n";
-                    break;
+                // Try to connect
+                if (!$client->connect($host, $port, 5.0)) {
+                    $consecutiveFailures++;
+                    echo "[Redis Broker] Failed to connect: {$client->errMsg} (attempt #{$consecutiveFailures})\n";
+
+                    // Exponential backoff
+                    $currentDelay = min($baseDelay * pow(2, $consecutiveFailures - 1), $maxDelay);
+                    echo "[Redis Broker] Retrying in {$currentDelay}s...\n";
+                    \Swoole\Coroutine::sleep($currentDelay);
+                    continue;
                 }
 
-                // Parse RESP protocol message
-                $this->handleRedisMessage($response, $server);
+                // Authenticate if password is set
+                if ($password && $password !== 'null') {
+                    $authCmd = "*2\r\n\$4\r\nAUTH\r\n\$" . strlen($password) . "\r\n{$password}\r\n";
+                    $client->send($authCmd);
+                    $authResponse = $client->recv(5.0);
+                    if (!$authResponse || !str_starts_with($authResponse, '+OK')) {
+                        echo "[Redis Broker] Authentication failed: {$authResponse}\n";
+                        $client->close();
+
+                        $consecutiveFailures++;
+                        $currentDelay = min($baseDelay * pow(2, $consecutiveFailures - 1), $maxDelay);
+                        \Swoole\Coroutine::sleep($currentDelay);
+                        continue;
+                    }
+                }
+
+                // Send PSUBSCRIBE command
+                $psubscribeCmd = "*2\r\n\$10\r\nPSUBSCRIBE\r\n\$" . strlen($pattern) . "\r\n{$pattern}\r\n";
+                $client->send($psubscribeCmd);
+
+                // Read subscription confirmation
+                $confirmation = $client->recv(5.0);
+                if (!$confirmation) {
+                    echo "[Redis Broker] Failed to subscribe\n";
+                    $client->close();
+
+                    $consecutiveFailures++;
+                    $currentDelay = min($baseDelay * pow(2, $consecutiveFailures - 1), $maxDelay);
+                    \Swoole\Coroutine::sleep($currentDelay);
+                    continue;
+                }
+
+                // Reset backoff on successful connection
+                $consecutiveFailures = 0;
+                $currentDelay = $baseDelay;
+                echo "[Redis Broker] Connected and subscribed to pattern: {$pattern}\n";
+
+                // Main loop - receive messages
+                while ($this->running) {
+                    $response = $client->recv(86400.0); // Long timeout for blocking receive
+
+                    if ($response === false || $response === '') {
+                        echo "[Redis Broker] Connection lost, reconnecting...\n";
+                        break; // Break inner loop to reconnect
+                    }
+
+                    // Parse RESP protocol message
+                    $this->handleRedisMessage($response, $server);
+                }
+
+                $client->close();
+
+                // Small delay before reconnect attempt
+                if ($this->running) {
+                    \Swoole\Coroutine::sleep(1.0);
+                }
             }
 
-            $client->close();
+            echo "[Redis Broker] Subscription stopped\n";
         });
     }
 
@@ -434,17 +490,9 @@ final class WebSocketTransport implements TransportInterface
             $event = $messageData['event'] ?? 'message';
             $data = $messageData['data'] ?? [];
 
-            // Create message
+            // Create message and serialize once
             $message = Message::event($channelName, $event, $data);
             $json = $message->toJson();
-
-            // Get worker count from server settings
-            // Note: setting['worker_num'] may be 0 if auto-configured, need to get actual count
-            $workerNum = $server->setting['worker_num'] ?? 1;
-            if ($workerNum <= 0) {
-                // Auto-configured: Swoole defaults to swoole_cpu_num() when worker_num=0
-                $workerNum = swoole_cpu_num();
-            }
 
             // Broadcast to connections in Worker #0 (current worker)
             foreach ($server->connections as $fd) {
@@ -455,7 +503,8 @@ final class WebSocketTransport implements TransportInterface
 
             // Send message to all OTHER workers via pipe for them to broadcast
             // Worker #0 handles Redis, but connections may be in workers #1, #2, #3...
-            for ($workerId = 1; $workerId < $workerNum; $workerId++) {
+            // Use stored workerNum from start() to avoid recalculating
+            for ($workerId = 1; $workerId < $this->workerNum; $workerId++) {
                 $server->sendMessage($json, $workerId);
             }
 

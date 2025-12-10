@@ -143,6 +143,7 @@ final class ConsoleServiceProvider extends ServiceProvider
 
       // Realtime commands
       'realtime:serve' => \Toporia\Framework\Console\Commands\RealtimeServeCommand::class,
+      'realtime:stop' => \Toporia\Framework\Console\Commands\RealtimeStopCommand::class,
       'realtime:kafka' => \Toporia\Framework\Console\Commands\RealtimeKafkaConsumerCommand::class,
       'realtime:redis' => \Toporia\Framework\Console\Commands\RealtimeRedisConsumerCommand::class,
       'realtime:rabbitmq' => \Toporia\Framework\Console\Commands\RealtimeRabbitMqConsumerCommand::class,
