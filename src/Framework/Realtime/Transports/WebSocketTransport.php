@@ -351,6 +351,7 @@ final class WebSocketTransport implements TransportInterface
         $factory = BrokerSubscriptionFactory::createWithDefaults([
             'redis' => config('realtime.brokers.redis', []),
             'rabbitmq' => config('realtime.brokers.rabbitmq', []),
+            'kafka' => config('realtime.brokers.kafka', []),
         ]);
 
         // Get strategy for configured broker

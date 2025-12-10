@@ -92,10 +92,29 @@ final class RdKafkaClient implements KafkaClientInterface
 
         $brokerList = implode(',', $this->brokers);
 
+        // Error callback to suppress verbose rdkafka logs
+        $errorCallback = function ($kafka, $err, $reason): void {
+            // Only log actual errors, not warnings
+            if ($err !== RD_KAFKA_RESP_ERR__TRANSPORT && $err !== RD_KAFKA_RESP_ERR_NO_ERROR) {
+                error_log("[Kafka] Error {$err}: {$reason}");
+            }
+        };
+
+        // Log callback to suppress verbose logs (level 0-6)
+        $logCallback = function ($kafka, $level, $facility, $message): void {
+            // Only log errors (level <= 3), suppress info/debug
+            if ($level <= 3) {
+                error_log("[Kafka:{$facility}] {$message}");
+            }
+        };
+
         // Initialize producer
         $producerConf = new \RdKafka\Conf();
         $producerConf->set('bootstrap.servers', $brokerList);
         $producerConf->set('metadata.broker.list', $brokerList);
+        $producerConf->set('log_level', '3'); // Only errors
+        $producerConf->setErrorCb($errorCallback);
+        $producerConf->setLogCb($logCallback);
 
         foreach ($this->producerConfig as $key => $value) {
             $producerConf->set($key, (string) $value);
@@ -111,6 +130,9 @@ final class RdKafkaClient implements KafkaClientInterface
         $consumerConf->set('group.id', $this->consumerGroup);
         $consumerConf->set('enable.auto.commit', $this->manualCommit ? 'false' : 'true');
         $consumerConf->set('auto.offset.reset', 'earliest');
+        $consumerConf->set('log_level', '3'); // Only errors
+        $consumerConf->setErrorCb($errorCallback);
+        $consumerConf->setLogCb($logCallback);
 
         foreach ($this->consumerConfig as $key => $value) {
             $consumerConf->set($key, (string) $value);

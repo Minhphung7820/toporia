@@ -40,6 +40,7 @@ final class BrokerSubscriptionFactory
         // Register default strategies
         $factory->register(new RedisBrokerSubscriptionStrategy($config['redis'] ?? []));
         $factory->register(new RabbitMqBrokerSubscriptionStrategy($config['rabbitmq'] ?? []));
+        $factory->register(new KafkaBrokerSubscriptionStrategy($config['kafka'] ?? []));
 
         return $factory;
     }
