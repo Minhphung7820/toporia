@@ -85,12 +85,6 @@ return [
             'path' => env('REALTIME_SSE_PATH', '/realtime/sse'),
         ],
 
-        'longpolling' => [
-            'driver' => 'longpolling',
-            'path' => env('REALTIME_POLLING_PATH', '/realtime/poll'),
-            'timeout' => env('REALTIME_POLLING_TIMEOUT', 30), // seconds
-        ],
-
         'socketio' => [
             'driver' => 'socketio',
             'host' => env('REALTIME_SOCKETIO_HOST', '0.0.0.0'),

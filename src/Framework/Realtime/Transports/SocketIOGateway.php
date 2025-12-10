@@ -169,11 +169,6 @@ final class SocketIOGateway implements TransportInterface
      */
     private function registerEventHandlers(): void
     {
-        // HTTP request handler (for Engine.IO polling fallback)
-        $this->server->on('request', function ($request, $response) {
-            $this->handleHTTPRequest($request, $response);
-        });
-
         // WebSocket connection opened
         $this->server->on('open', function ($server, $request) {
             // Send Engine.IO handshake
@@ -706,28 +701,4 @@ final class SocketIOGateway implements TransportInterface
         return $result;
     }
 
-    /**
-     * Handle HTTP request (Engine.IO polling fallback).
-     *
-     * @param mixed $request
-     * @param mixed $response
-     * @return void
-     */
-    private function handleHTTPRequest($request, $response): void
-    {
-        // Basic CORS headers
-        $response->header('Access-Control-Allow-Origin', '*');
-        $response->header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        $response->header('Access-Control-Allow-Headers', 'Content-Type');
-
-        if ($request->server['request_method'] === 'OPTIONS') {
-            $response->status(204);
-            $response->end();
-            return;
-        }
-
-        // Socket.IO polling not implemented yet (WebSocket only for now)
-        $response->status(400);
-        $response->end(json_encode(['error' => 'Polling transport not supported. Use WebSocket.']));
-    }
 }
