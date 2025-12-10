@@ -40,12 +40,18 @@ final class SmtpTransport extends AbstractTransport
     private array $capabilities = [];
 
     /**
+     * @var bool Enable debug logging.
+     */
+    private bool $debug = false;
+
+    /**
      * @param string $host SMTP host.
      * @param int $port SMTP port (25, 465, 587).
      * @param string|null $username Auth username.
      * @param string|null $password Auth password.
      * @param string $encryption Encryption type (tls, ssl, or empty).
      * @param int $timeout Connection timeout in seconds.
+     * @param bool $debug Enable debug logging.
      */
     public function __construct(
         private readonly string $host,
@@ -53,8 +59,11 @@ final class SmtpTransport extends AbstractTransport
         private readonly ?string $username = null,
         private readonly ?string $password = null,
         private readonly string $encryption = 'tls',
-        private readonly int $timeout = 30
-    ) {}
+        private readonly int $timeout = 30,
+        bool $debug = false
+    ) {
+        $this->debug = $debug;
+    }
 
     /**
      * Create from config array.
@@ -70,7 +79,8 @@ final class SmtpTransport extends AbstractTransport
             username: $config['username'] ?? null,
             password: $config['password'] ?? null,
             encryption: $config['encryption'] ?? 'tls',
-            timeout: (int) ($config['timeout'] ?? 30)
+            timeout: (int) ($config['timeout'] ?? 30),
+            debug: (bool) ($config['debug'] ?? false)
         );
     }
 
@@ -206,6 +216,14 @@ final class SmtpTransport extends AbstractTransport
 
         $this->parseCapabilities($response);
 
+        if ($this->debug) {
+            $this->log('debug', 'SMTP capabilities detected', [
+                'capabilities' => $this->capabilities,
+                'has_auth_login' => in_array('AUTH LOGIN', $this->capabilities, true),
+                'has_auth_plain' => in_array('AUTH PLAIN', $this->capabilities, true),
+            ]);
+        }
+
         // STARTTLS if needed
         if ($this->encryption === 'tls' && in_array('STARTTLS', $this->capabilities, true)) {
             $response = $this->sendCommand('STARTTLS');
@@ -234,7 +252,17 @@ final class SmtpTransport extends AbstractTransport
     private function authenticate(): void
     {
         if ($this->username === null || $this->password === null) {
+            if ($this->debug) {
+                $this->log('debug', 'Skipping authentication (no credentials)', []);
+            }
             return;
+        }
+
+        if ($this->debug) {
+            $this->log('debug', 'Starting authentication', [
+                'username' => $this->username,
+                'has_password' => !empty($this->password),
+            ]);
         }
 
         // Try AUTH LOGIN first (most common)
@@ -249,8 +277,17 @@ final class SmtpTransport extends AbstractTransport
             return;
         }
 
-        // No supported auth mechanism
-        throw TransportException::authenticationFailed('smtp');
+        // No supported auth mechanism - provide detailed error
+        $capsString = empty($this->capabilities)
+            ? 'No capabilities detected'
+            : implode(', ', $this->capabilities);
+
+        throw new TransportException(
+            "SMTP server does not support AUTH LOGIN or AUTH PLAIN. " .
+                "Server capabilities: [{$capsString}]. " .
+                "Supported auth methods: LOGIN, PLAIN",
+            'smtp'
+        );
     }
 
     /**
@@ -262,17 +299,27 @@ final class SmtpTransport extends AbstractTransport
     {
         $response = $this->sendCommand('AUTH LOGIN');
         if (!str_starts_with($response, '334')) {
-            throw TransportException::authenticationFailed('smtp');
+            throw new TransportException(
+                "AUTH LOGIN command rejected. Server response: {$response}",
+                'smtp'
+            );
         }
 
         $response = $this->sendCommand(base64_encode($this->username));
         if (!str_starts_with($response, '334')) {
-            throw TransportException::authenticationFailed('smtp');
+            throw new TransportException(
+                "AUTH LOGIN username rejected. Check MAIL_USERNAME in .env. Server response: {$response}",
+                'smtp'
+            );
         }
 
         $response = $this->sendCommand(base64_encode($this->password));
         if (!$this->isSuccessResponse($response)) {
-            throw TransportException::authenticationFailed('smtp');
+            throw new TransportException(
+                "AUTH LOGIN password rejected. For Gmail, use App Password (16 chars, no spaces). " .
+                    "Server response: {$response}",
+                'smtp'
+            );
         }
     }
 
@@ -287,7 +334,11 @@ final class SmtpTransport extends AbstractTransport
         $response = $this->sendCommand("AUTH PLAIN {$auth}");
 
         if (!$this->isSuccessResponse($response)) {
-            throw TransportException::authenticationFailed('smtp');
+            throw new TransportException(
+                "AUTH PLAIN rejected. Check credentials in .env. " .
+                    "For Gmail, use App Password. Server response: {$response}",
+                'smtp'
+            );
         }
     }
 
@@ -381,6 +432,9 @@ final class SmtpTransport extends AbstractTransport
     /**
      * Parse server capabilities from EHLO response.
      *
+     * CRITICAL FIX: Properly parse AUTH methods to support both "AUTH LOGIN PLAIN" and "AUTH=LOGIN" formats.
+     * Previous bug: stored "AUTH LOGIN PLAIN" as single string, causing in_array('AUTH LOGIN') to fail.
+     *
      * @param string $response EHLO response.
      */
     private function parseCapabilities(string $response): void
@@ -391,7 +445,23 @@ final class SmtpTransport extends AbstractTransport
         foreach ($lines as $line) {
             // Skip the first line (greeting)
             if (preg_match('/^250[- ](.+)$/i', trim($line), $matches)) {
-                $this->capabilities[] = strtoupper(trim($matches[1]));
+                $cap = strtoupper(trim($matches[1]));
+
+                // Special handling for AUTH capabilities
+                // Gmail returns: "250-AUTH LOGIN PLAIN" or "250-AUTH=LOGIN"
+                if (str_starts_with($cap, 'AUTH ') || str_starts_with($cap, 'AUTH=')) {
+                    // Extract auth methods: "AUTH LOGIN PLAIN" → ["LOGIN", "PLAIN"]
+                    $authPart = preg_replace('/^AUTH[= ]/', '', $cap);
+                    $methods = preg_split('/\s+/', $authPart, -1, PREG_SPLIT_NO_EMPTY);
+
+                    foreach ($methods as $method) {
+                        // Support both formats for compatibility
+                        $this->capabilities[] = "AUTH {$method}";
+                        $this->capabilities[] = "AUTH={$method}";
+                    }
+                } else {
+                    $this->capabilities[] = $cap;
+                }
             }
         }
     }
@@ -453,6 +523,41 @@ final class SmtpTransport extends AbstractTransport
 
         $this->connected = false;
         $this->capabilities = [];
+    }
+
+    /**
+     * Enable or disable debug mode.
+     *
+     * @param bool $enabled Enable debug logging.
+     * @return $this
+     */
+    public function setDebug(bool $enabled): self
+    {
+        $this->debug = $enabled;
+        return $this;
+    }
+
+    /**
+     * Get current capabilities.
+     *
+     * @return array<string>
+     */
+    public function getCapabilities(): array
+    {
+        return $this->capabilities;
+    }
+
+    /**
+     * Log debug message if debug mode is enabled.
+     *
+     * @param string $message Log message.
+     * @param array<string, mixed> $context Context data.
+     */
+    private function debugLog(string $message, array $context = []): void
+    {
+        if ($this->debug) {
+            $this->log('debug', $message, $context);
+        }
     }
 
     /**
