@@ -1360,6 +1360,59 @@ if (!function_exists('DB')) {
     }
 }
 
+// ============================================================================
+// Hash/Security Helpers
+// ============================================================================
+
+if (!function_exists('bcrypt')) {
+    /**
+     * Hash the given value using Bcrypt.
+     *
+     * Uses PASSWORD_BCRYPT algorithm with automatic salt generation.
+     * Default cost: 10 (can be configured in hashing config).
+     *
+     * Performance:
+     * - O(1) service lookup (cached)
+     * - ~50-100ms per hash (intentionally slow for security)
+     *
+     * Security:
+     * - Bcrypt automatically handles salt generation
+     * - Uses Blowfish cipher (adaptive hash function)
+     * - Cost factor increases computation time exponentially
+     *
+     * @param string $value Plain text value to hash
+     * @param array<string, mixed> $options Hashing options (e.g., ['rounds' => 12])
+     * @return string Hashed value (60 characters)
+     *
+     * @example
+     * // Hash password
+     * $hash = bcrypt('secret123');
+     *
+     * // Hash with custom rounds
+     * $hash = bcrypt('secret123', ['rounds' => 12]); // More secure but slower
+     *
+     * // Verify later
+     * if (Hash::check('secret123', $hash)) {
+     *     // Password correct
+     * }
+     */
+    function bcrypt(string $value, array $options = []): string
+    {
+        // Try to use Hash facade if container is available
+        try {
+            if (function_exists('app') && app()->has('hash')) {
+                return app()->make('hash')->make($value, $options);
+            }
+        } catch (\Throwable $e) {
+            // Fallback to direct password_hash
+        }
+
+        // Fallback: Use native PHP password_hash
+        $cost = $options['rounds'] ?? $options['cost'] ?? 10;
+        return password_hash($value, PASSWORD_BCRYPT, ['cost' => $cost]);
+    }
+}
+
 if (!function_exists('response')) {
     /**
      * Return a new response from the application.
