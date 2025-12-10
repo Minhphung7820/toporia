@@ -249,16 +249,16 @@ final class RateLimiterFactory
             $redis = new Redis();
             $redis->connect(
                 $config['host'] ?? '127.0.0.1',
-                $config['port'] ?? 6379,
-                $config['timeout'] ?? 2.0
+                (int) ($config['port'] ?? 6379),
+                (float) ($config['timeout'] ?? 2.0)
             );
 
-            if (isset($config['password']) && $config['password'] !== null) {
+            if (isset($config['password']) && $config['password'] !== null && $config['password'] !== '') {
                 $redis->auth($config['password']);
             }
 
             if (isset($config['database'])) {
-                $redis->select($config['database']);
+                $redis->select((int) $config['database']);
             }
 
             return $redis;
