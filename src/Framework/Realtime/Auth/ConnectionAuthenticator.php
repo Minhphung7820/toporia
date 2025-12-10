@@ -9,17 +9,21 @@ namespace Toporia\Framework\Realtime\Auth;
  *
  * Authenticates WebSocket connections using JWT tokens or session cookies.
  *
- * Supports multiple authentication methods:
- * 1. JWT from query string: ws://host:6001?token=xxx
- * 2. JWT from Authorization header: Authorization: Bearer xxx
- * 3. Session from cookie: Cookie: session_id=xxx
+ * Authentication Methods:
+ * 1. WebSocket Handshake (during connection):
+ *    - JWT from query string: ws://host:6001?token=xxx
+ *    - JWT from Authorization header
+ *    - Session from cookie
+ *
+ * 2. WebSocket Message (after connection):
+ *    - Send auth message: {"type": "auth", "data": {"token": "xxx"}}
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
- * @version     1.0.0
+ * @version     2.0.0
  * @package     toporia/framework
- * @subpackage  Realtime
+ * @subpackage  Realtime\Auth
  * @since       2025-01-10
  *
  * @link        https://github.com/Minhphung7820/toporia
@@ -34,35 +38,54 @@ final class ConnectionAuthenticator
     ) {}
 
     /**
-     * Authenticate connection from Swoole HTTP request.
+     * Authenticate from WebSocket handshake metadata.
      *
-     * Tries multiple authentication methods in order:
-     * 1. JWT from query string (?token=xxx)
-     * 2. JWT from Authorization header
-     * 3. Session from cookie
+     * This extracts auth data from the initial WebSocket upgrade request.
+     * Swoole provides handshake data as arrays, not HTTP request objects.
+     *
+     * @param array $metadata Handshake metadata (query params, headers, cookies)
+     * @return array{user_id: int, username: string|null, roles: array<string>, authenticated_at: int}|null
+     */
+    public function authenticateFromHandshake(array $metadata): ?array
+    {
+        // Method 1: JWT from query string (?token=xxx)
+        if ($token = $metadata['query']['token'] ?? $metadata['get']['token'] ?? null) {
+            return $this->authenticateJWT($token);
+        }
+
+        // Method 2: JWT from Authorization header
+        if ($auth = $metadata['headers']['authorization'] ?? $metadata['header']['authorization'] ?? null) {
+            $token = str_replace('Bearer ', '', $auth);
+            return $this->authenticateJWT($token);
+        }
+
+        // Method 3: Session from cookie
+        if ($sessionId = $metadata['cookies']['session_id'] ?? $metadata['cookie']['session_id'] ?? null) {
+            return $this->authenticateSession($sessionId);
+        }
+
+        return null;
+    }
+
+    /**
+     * Authenticate from Swoole HTTP Request during WebSocket upgrade.
+     *
+     * WebSocket connections start with an HTTP upgrade handshake.
+     * This method extracts auth data from that handshake request.
      *
      * @param \Swoole\Http\Request $request Swoole request object
      * @return array{user_id: int, username: string|null, roles: array<string>, authenticated_at: int}|null
      */
     public function authenticateFromRequest(\Swoole\Http\Request $request): ?array
     {
-        // Method 1: JWT from query string (ws://host:6001?token=xxx)
-        if ($token = $request->get['token'] ?? null) {
-            return $this->authenticateJWT($token);
-        }
+        // Convert Swoole request to metadata array
+        $metadata = [
+            'get' => $request->get ?? [],
+            'header' => $request->header ?? [],
+            'cookie' => $request->cookie ?? [],
+        ];
 
-        // Method 2: JWT from Authorization header (WebSocket headers during handshake)
-        if ($auth = $request->header['authorization'] ?? null) {
-            $token = str_replace('Bearer ', '', $auth);
-            return $this->authenticateJWT($token);
-        }
-
-        // Method 3: Session from cookie
-        if ($sessionId = $request->cookie['session_id'] ?? null) {
-            return $this->authenticateSession($sessionId);
-        }
-
-        return null;
+        return $this->authenticateFromHandshake($metadata);
     }
 
     /**
@@ -148,9 +171,14 @@ final class ConnectionAuthenticator
     }
 
     /**
-     * Authenticate from token string (used in 'auth' message).
+     * Authenticate from token string.
      *
-     * @param string $token Token string
+     * Used for two-step authentication via WebSocket message:
+     * 1. Client connects without auth
+     * 2. Client sends: {"type": "auth", "data": {"token": "xxx"}}
+     * 3. Server calls this method to authenticate
+     *
+     * @param string $token Token string (JWT)
      * @return array{user_id: int, username: string|null, roles: array<string>, authenticated_at: int}|null
      */
     public function authenticateToken(string $token): ?array

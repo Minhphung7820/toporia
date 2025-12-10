@@ -6,7 +6,12 @@ declare(strict_types=1);
  * Realtime Configuration
  *
  * Multi-transport and multi-broker realtime communication system.
- * Supports: WebSocket, SSE, Long-polling, Redis Pub/Sub, RabbitMQ, NATS
+ * Supports: WebSocket, Socket.IO, Redis Pub/Sub, RabbitMQ, Kafka, NATS
+ *
+ * Architecture:
+ * - Transports: WebSocket/Socket.IO servers (bidirectional, standalone)
+ * - Brokers: Message brokers for multi-server scaling (Redis, Kafka, RabbitMQ)
+ * - SSE: Moved to Http layer (see Toporia\Framework\Http\Sse\SseController)
  *
  * Performance Tips:
  * - Use WebSocket for best latency (<5ms)
@@ -22,12 +27,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | Default transport for client-server communication.
-    | Options: 'memory', 'websocket', 'sse', 'longpolling'
+    | Options: 'memory', 'websocket', 'socketio'
     |
     | - memory: In-memory (testing only)
-    | - websocket: WebSocket via Swoole/RoadRunner (production)
-    | - sse: Server-Sent Events (notifications)
-    | - longpolling: HTTP fallback (legacy browsers)
+    | - websocket: Native WebSocket via Swoole (production, fastest)
+    | - socketio: Socket.IO v4 compatible (production, more features)
+    |
+    | Note: SSE is NOT a transport - it's an HTTP streaming controller.
+    | Use Toporia\Framework\Http\Sse\SseController for SSE.
     |
     */
     'default_transport' => env('REALTIME_TRANSPORT', 'memory'),
@@ -78,11 +85,6 @@ return [
             // Authentication settings
             'require_auth' => env('REALTIME_REQUIRE_AUTH', false), // Reject unauthenticated connections on connect?
             'require_auth_for_subscribe' => env('REALTIME_REQUIRE_AUTH_SUBSCRIBE', true), // Require auth before subscribing?
-        ],
-
-        'sse' => [
-            'driver' => 'sse',
-            'path' => env('REALTIME_SSE_PATH', '/realtime/sse'),
         ],
 
         'socketio' => [

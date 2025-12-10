@@ -525,12 +525,11 @@ final class RealtimeManager implements RealtimeManagerInterface
         return match ($driver) {
             'memory' => new Transports\MemoryTransport($this),
             'websocket' => new Transports\WebSocketTransport($config, $this, $authenticator),
-            'sse' => new Transports\SseTransport($config, $this),
-            'longpolling' => new Transports\LongPollingTransport($config, $this),
             'socketio' => new Transports\SocketIOGateway($config, $this),
             default => throw new \InvalidArgumentException(
                 "Unsupported transport driver: {$driver}. " .
-                    "Supported drivers: memory, websocket, sse, longpolling, socketio"
+                    "Supported drivers: memory, websocket, socketio. " .
+                    "Note: SSE is not a transport - use Toporia\\Framework\\Http\\Sse\\SseController instead."
             )
         };
     }
