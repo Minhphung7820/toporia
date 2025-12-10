@@ -103,15 +103,21 @@ return [
     */
     'brokers' => [
         'redis' => [
-            'driver' => 'redis',
+            'driver' => 'redis', // or 'redis-improved' for enhanced version
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'port' => env('REDIS_PORT', 6379),
             'password' => env('REDIS_PASSWORD'),
             'database' => env('REDIS_DB', 0),
+            'timeout' => env('REDIS_TIMEOUT', 2.0),
+            'read_timeout' => env('REDIS_READ_TIMEOUT', 5.0),
+            'write_timeout' => env('REDIS_WRITE_TIMEOUT', 2.0),
+            // Circuit breaker settings (for improved version)
+            'circuit_breaker_threshold' => env('REDIS_CB_THRESHOLD', 5),
+            'circuit_breaker_timeout' => env('REDIS_CB_TIMEOUT', 60),
         ],
 
         'rabbitmq' => [
-            'driver' => 'rabbitmq',
+            'driver' => 'rabbitmq', // or 'rabbitmq-improved' for enhanced version
             'host' => env('RABBITMQ_HOST', '127.0.0.1'),
             'port' => env('RABBITMQ_PORT', 5672),
             'user' => env('RABBITMQ_USER', 'guest'),
@@ -127,6 +133,11 @@ return [
             'queue_auto_delete' => env('RABBITMQ_QUEUE_AUTO_DELETE', true),
             'prefetch_count' => env('RABBITMQ_PREFETCH_COUNT', 50),
             'persistent_messages' => env('RABBITMQ_PERSISTENT_MESSAGES', true),
+            // Channel pool settings (for improved version)
+            'max_channels' => env('RABBITMQ_MAX_CHANNELS', 10),
+            // Circuit breaker settings (for improved version)
+            'circuit_breaker_threshold' => env('RABBITMQ_CB_THRESHOLD', 5),
+            'circuit_breaker_timeout' => env('RABBITMQ_CB_TIMEOUT', 60),
         ],
 
         'nats' => [
@@ -140,11 +151,15 @@ return [
         ],
 
         'kafka' => [
-            'driver' => 'kafka',
+            'driver' => 'kafka', // or 'kafka-improved' for enhanced version
             'client' => env('KAFKA_CLIENT', 'auto'), // php, rdkafka, auto (auto = prefer rdkafka)
             'brokers' => explode(',', env('KAFKA_BROKERS', 'localhost:9092')),
             'topic_prefix' => env('KAFKA_TOPIC_PREFIX', 'realtime'),
             'consumer_group' => env('KAFKA_CONSUMER_GROUP', 'realtime-servers'),
+
+            // Circuit breaker settings (for improved version)
+            'circuit_breaker_threshold' => env('KAFKA_CB_THRESHOLD', 5),
+            'circuit_breaker_timeout' => env('KAFKA_CB_TIMEOUT', 60),
 
             // Topic Strategy: 'one-per-channel' (legacy) or 'grouped' (recommended)
             'topic_strategy' => env('KAFKA_TOPIC_STRATEGY', 'grouped'),

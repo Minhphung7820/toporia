@@ -404,12 +404,19 @@ final class RealtimeManager implements RealtimeManagerInterface
         $driver = $config['driver'] ?? $name;
 
         return match ($driver) {
+            // Legacy brokers (v1)
             'redis' => new Brokers\RedisBroker($config, $this),
             'kafka' => new Brokers\KafkaBroker($config, $this),
             'rabbitmq' => new Brokers\RabbitMqBroker($config, $this),
+
+            // Improved brokers (v2) - Production-ready with connection pooling, circuit breaker, metrics
+            'redis-improved' => new Brokers\RedisBrokerImproved($config, $this),
+            'kafka-improved' => new Brokers\KafkaBrokerImproved($config, $this),
+            'rabbitmq-improved' => new Brokers\RabbitMqBrokerImproved($config, $this),
+
             default => throw new \InvalidArgumentException(
                 "Unsupported broker driver: {$driver}. " .
-                    "Supported drivers: redis, kafka, rabbitmq."
+                    "Supported drivers: redis, kafka, rabbitmq (legacy) or redis-improved, kafka-improved, rabbitmq-improved (v2)"
             )
         };
     }
