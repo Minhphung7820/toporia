@@ -27,15 +27,12 @@ final class ChannelMiddlewarePipeline
     /**
      * Built-in middleware aliases.
      *
-     * These are framework-provided middleware for common use cases.
+     * Framework core does NOT provide built-in middleware.
+     * All middleware are application-specific and should be registered in config.
      *
      * @var array<string, string>
      */
-    private const BUILTIN_MIDDLEWARE = [
-        'auth' => AuthMiddleware::class,
-        'role' => RoleMiddleware::class,
-        'ratelimit' => RateLimitMiddleware::class,
-    ];
+    private const BUILTIN_MIDDLEWARE = [];
 
     /**
      * Custom middleware registry (programmatically registered).

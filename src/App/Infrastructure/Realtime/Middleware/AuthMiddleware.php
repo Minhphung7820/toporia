@@ -2,24 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Realtime\Middleware;
+namespace App\Infrastructure\Realtime\Middleware;
 
+use Toporia\Framework\Realtime\Middleware\ChannelMiddlewareInterface;
 use Toporia\Framework\Realtime\Contracts\ConnectionInterface;
 
 /**
  * Authentication Middleware
  *
- * Ensures that the connection is authenticated before allowing channel subscription.
+ * Kiểm tra xem connection đã authenticated chưa.
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
- * @copyright   Copyright (c) 2025 Toporia Framework
- * @license     MIT
- * @version     1.0.0
- * @package     toporia/framework
- * @subpackage  Realtime
- * @since       2025-01-10
- *
- * @link        https://github.com/Minhphung7820/toporia
+ * @package App\Infrastructure\Realtime\Middleware
  */
 final class AuthMiddleware implements ChannelMiddlewareInterface
 {
@@ -38,3 +31,4 @@ final class AuthMiddleware implements ChannelMiddlewareInterface
         return $next($connection, $channelName);
     }
 }
+

@@ -2,26 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Realtime\Middleware;
+namespace App\Infrastructure\Realtime\Middleware;
 
+use Toporia\Framework\Realtime\Middleware\ChannelMiddlewareInterface;
 use Toporia\Framework\Realtime\Contracts\ConnectionInterface;
 
 /**
  * Role Middleware
  *
- * Checks if connection has required role(s).
+ * Kiểm tra xem connection có required role(s) không.
  *
  * Usage: 'role:admin' or 'role:admin,moderator'
  *
- * @author      Phungtruong7820 <minhphung485@gmail.com>
- * @copyright   Copyright (c) 2025 Toporia Framework
- * @license     MIT
- * @version     1.0.0
- * @package     toporia/framework
- * @subpackage  Realtime
- * @since       2025-01-10
- *
- * @link        https://github.com/Minhphung7820/toporia
+ * @package App\Infrastructure\Realtime\Middleware
  */
 final class RoleMiddleware implements ChannelMiddlewareInterface
 {

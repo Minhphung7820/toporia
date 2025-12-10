@@ -299,7 +299,11 @@ return [
     |
     */
     'channel_middleware' => [
-        // Custom middleware aliases (business logic)
+        // Common middleware (application-level)
+        'auth' => App\Infrastructure\Realtime\Middleware\AuthMiddleware::class,
+        'role' => App\Infrastructure\Realtime\Middleware\RoleMiddleware::class,
+
+        // Business logic middleware
         'premium' => App\Infrastructure\Realtime\Middleware\PremiumMiddleware::class,
         'verified' => App\Infrastructure\Realtime\Middleware\VerifiedMiddleware::class,
         'team' => App\Infrastructure\Realtime\Middleware\TeamMemberMiddleware::class,
