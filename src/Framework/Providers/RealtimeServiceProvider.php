@@ -56,8 +56,10 @@ final class RealtimeServiceProvider extends ServiceProvider
 
         // Register RealtimeManager
         $container->singleton(RealtimeManager::class, function ($c) {
-            $config = $c->has('config')
-                ? $c->get('config')->get('realtime', [])
+            // Use config() helper which is globally available after bootstrap
+            // This ensures env() values are properly loaded
+            $config = function_exists('config')
+                ? config('realtime', $this->getDefaultConfig())
                 : $this->getDefaultConfig();
 
             return new RealtimeManager($config, $c);

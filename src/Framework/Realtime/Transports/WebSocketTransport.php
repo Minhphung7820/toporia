@@ -298,6 +298,17 @@ final class WebSocketTransport implements TransportInterface
                 $this->startRedisBrokerSubscription($server);
             }
         });
+
+        // Inter-worker communication for multi-worker broadcast
+        $this->server->on('pipeMessage', function ($server, $srcWorkerId, $message) {
+            // Received broadcast message from another worker (Worker #0)
+            // Broadcast to all connections in THIS worker
+            foreach ($server->connections as $fd) {
+                if ($server->isEstablished($fd)) {
+                    $server->push($fd, $message, WEBSOCKET_OPCODE_TEXT);
+                }
+            }
+        });
     }
 
     /**
@@ -423,21 +434,24 @@ final class WebSocketTransport implements TransportInterface
             $event = $messageData['event'] ?? 'message';
             $data = $messageData['data'] ?? [];
 
-            // Get channel object to find subscribers
-            $channelObj = $this->manager->channel($channelName);
+            // Create message
             $message = Message::event($channelName, $event, $data);
             $json = $message->toJson();
 
-            // Get subscribers from channel and send directly via THIS transport's server
-            // This is critical: we must use $server (the running Swoole instance),
-            // not channel->broadcast() which may use a different transport instance
-            $subscribers = $channelObj->getSubscribers();
+            // Get worker count from server settings
+            $workerNum = $server->setting['worker_num'] ?? 1;
 
-            foreach ($subscribers as $connection) {
-                $fd = (int) $connection->getResource();
+            // Broadcast to connections in Worker #0 (current worker)
+            foreach ($server->connections as $fd) {
                 if ($server->isEstablished($fd)) {
                     $server->push($fd, $json, WEBSOCKET_OPCODE_TEXT);
                 }
+            }
+
+            // Send message to all OTHER workers via pipe for them to broadcast
+            // Worker #0 handles Redis, but connections may be in workers #1, #2, #3...
+            for ($workerId = 1; $workerId < $workerNum; $workerId++) {
+                $server->sendMessage($json, $workerId);
             }
 
         } catch (\Throwable $e) {
