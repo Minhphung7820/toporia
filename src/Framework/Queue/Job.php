@@ -161,6 +161,21 @@ abstract class Job implements JobInterface, QueueableInterface
     }
 
     /**
+     * Decrement the number of attempts.
+     *
+     * Used when job needs to be retried without counting as a failed attempt.
+     * Examples: RateLimitException, JobAlreadyRunning
+     *
+     * @return void
+     */
+    public function decrementAttempts(): void
+    {
+        if ($this->attempts > 0) {
+            $this->attempts--;
+        }
+    }
+
+    /**
      * Handle job failure
      * Override to implement custom failure handling
      *

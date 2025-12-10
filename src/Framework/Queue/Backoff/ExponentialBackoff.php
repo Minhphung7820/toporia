@@ -40,10 +40,14 @@ final class ExponentialBackoff implements BackoffStrategy
     /**
      * @param int $base Base delay in seconds (default: 2)
      * @param int $max Maximum delay cap in seconds (default: 300 = 5 minutes)
+     * @param bool $jitter Add random jitter to prevent thundering herd (default: true)
+     * @param float $jitterFactor Jitter factor 0.0-1.0 (default: 0.2 = ±20%)
      */
     public function __construct(
         private int $base = 2,
-        private int $max = 300
+        private int $max = 300,
+        private bool $jitter = true,
+        private float $jitterFactor = 0.2
     ) {}
 
     /**
@@ -92,6 +96,18 @@ final class ExponentialBackoff implements BackoffStrategy
 
         // Cap at maximum to prevent infinite delays
         // Example: 125 seconds capped at max=60 → 60 seconds
-        return min($delay, $this->max);
+        $delay = min($delay, $this->max);
+
+        // Add jitter to prevent thundering herd effect
+        // When multiple jobs fail at the same time, they won't all retry simultaneously
+        if ($this->jitter && $delay > 0) {
+            $jitterAmount = (int) ($delay * $this->jitterFactor);
+            $delay += rand(-$jitterAmount, $jitterAmount);
+
+            // Ensure delay is at least 1 second
+            $delay = max(1, $delay);
+        }
+
+        return $delay;
     }
 }

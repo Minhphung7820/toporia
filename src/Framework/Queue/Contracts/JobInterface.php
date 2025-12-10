@@ -61,6 +61,16 @@ interface JobInterface
     public function incrementAttempts(): void;
 
     /**
+     * Decrement the attempt counter
+     *
+     * Used when job needs to be retried without counting as a failed attempt
+     * (e.g., RateLimitException, JobAlreadyRunning)
+     *
+     * @return void
+     */
+    public function decrementAttempts(): void;
+
+    /**
      * Handle a job failure
      *
      * @param \Throwable $exception

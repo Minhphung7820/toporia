@@ -327,9 +327,13 @@ final class Worker
                 pcntl_alarm(0);
             }
 
+            // CRITICAL: Rate limit is NOT a job failure, decrement attempts
+            // Job should not lose an attempt due to external rate limiting
+            $job->decrementAttempts();
+
             // Rate limit exceeded - release back to queue with delay
             $retryAfter = $e->getRetryAfter();
-            $this->logger->warning("Job rate limited: {$job->getId()}. Retrying in {$retryAfter}s");
+            $this->logger->warning("🚦 Job rate limited: {$job->getId()}. Retrying in {$retryAfter}s (attempts not counted)");
             $this->dispatchEvent(new JobRetrying($job, $job->attempts(), $retryAfter, $e));
             $this->queue->later($job, $retryAfter, $job->getQueue());
         } catch (JobAlreadyRunningException $e) {
@@ -338,8 +342,12 @@ final class Worker
                 pcntl_alarm(0);
             }
 
+            // CRITICAL: Job already running is NOT a failure, decrement attempts
+            // Job should not lose an attempt due to concurrent execution
+            $job->decrementAttempts();
+
             // Job already running - release back to queue with delay
-            $this->logger->warning("Job already running: {$job->getId()}. Retrying in 60s");
+            $this->logger->warning("🔒 Job already running: {$job->getId()}. Retrying in 60s (attempts not counted)");
             $this->dispatchEvent(new JobRetrying($job, $job->attempts(), 60, $e));
             $this->queue->later($job, 60, $job->getQueue());
         } catch (\Throwable $e) {
@@ -360,15 +368,36 @@ final class Worker
             $this->dispatchEvent(new JobFailed($job, $e, $job->attempts(), $willRetry));
 
             if ($willRetry) {
-                // Calculate backoff delay
+                // Calculate backoff delay AFTER attempts increment
                 $delay = $job->getBackoffDelay();
+                $nextAttempt = $job->attempts() + 1;
+                $maxAttempts = $job->getMaxAttempts();
+
                 $this->dispatchEvent(new JobRetrying($job, $job->attempts(), $delay, $e));
 
                 if ($delay > 0) {
-                    $this->logger->warning("Retrying job: {$job->getId()} in {$delay}s (attempt {$job->attempts()})");
+                    $this->logger->warning(
+                        "⏱️  Retrying job: {$job->getId()} in {$delay}s " .
+                        "(attempt {$nextAttempt}/{$maxAttempts}, current attempts: {$job->attempts()})"
+                    );
+
+                    // Force flush retry message
+                    if (function_exists('flush')) {
+                        flush();
+                    }
+
                     $this->queue->later($job, $delay, $job->getQueue());
                 } else {
-                    $this->logger->warning("Retrying job: {$job->getId()} immediately (attempt {$job->attempts()})");
+                    $this->logger->warning(
+                        "⚡ Retrying job: {$job->getId()} immediately " .
+                        "(attempt {$nextAttempt}/{$maxAttempts}, current attempts: {$job->attempts()})"
+                    );
+
+                    // Force flush immediate retry message
+                    if (function_exists('flush')) {
+                        flush();
+                    }
+
                     $this->queue->push($job, $job->getQueue());
                 }
             } else {
