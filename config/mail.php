@@ -38,7 +38,7 @@ return [
             'encryption' => env('MAIL_ENCRYPTION', 'tls'),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => 30,
+            'timeout' => (int) env('MAIL_TIMEOUT', 60), // Increased from 30s to 60s for Gmail/external SMTP
         ],
 
         'sendmail' => [
