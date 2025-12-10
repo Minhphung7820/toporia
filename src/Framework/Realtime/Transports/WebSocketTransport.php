@@ -292,16 +292,6 @@ final class WebSocketTransport implements TransportInterface
         // Worker started (coroutine context)
         $this->server->on('workerStart', function ($server, $workerId) {
             echo "Worker #{$workerId} started\n";
-
-            // Subscribe to broker if configured
-            if ($broker = $this->manager->broker()) {
-                // Subscribe in coroutine to avoid blocking
-                \Swoole\Coroutine::create(function () use ($broker) {
-                    $broker->subscribe('*', function ($message) {
-                        $this->broadcast($message);
-                    });
-                });
-            }
         });
     }
 
