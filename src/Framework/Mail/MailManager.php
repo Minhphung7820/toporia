@@ -8,6 +8,7 @@ use Toporia\Framework\Mail\Contracts\{MailManagerInterface, MailerInterface, Mes
 use Toporia\Framework\Mail\Transport\{
     TransportInterface,
     SmtpTransport,
+    SmtpConnectionPool,
     MailgunTransport,
     SesTransport,
     PostmarkTransport,
@@ -152,13 +153,14 @@ final class MailManager implements MailManagerInterface
     private function createTransport(string $type, array $config): TransportInterface
     {
         return match ($type) {
-            'smtp', 'mail' => new SmtpTransport(
+            'smtp', 'mail' => SmtpConnectionPool::get(
                 host: $config['host'] ?? 'localhost',
                 port: (int) ($config['port'] ?? 587),
+                username: $config['username'] ?? null,
+                password: $config['password'] ?? null,
                 encryption: $config['encryption'] ?? 'tls',
-                username: $config['username'] ?? '',
-                password: $config['password'] ?? '',
-                timeout: (int) ($config['timeout'] ?? 30)
+                timeout: (int) ($config['timeout'] ?? 30),
+                debug: (bool) ($config['debug'] ?? false)
             ),
             'mailgun' => new MailgunTransport(
                 apiKey: $config['secret'] ?? $config['api_key'] ?? '',

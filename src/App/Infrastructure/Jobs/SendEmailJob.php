@@ -6,6 +6,7 @@ namespace App\Infrastructure\Jobs;
 
 use App\Infrastructure\Mails\SimpleMail;
 use Toporia\Framework\Bus\Contracts\ShouldQueueInterface;
+use Toporia\Framework\Mail\Transport\TransportException;
 use Toporia\Framework\Queue\Backoff\ExponentialBackoff;
 use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Support\Accessors\Log;
@@ -38,22 +39,35 @@ final class SendEmailJob extends Job implements ShouldQueueInterface
 
     public function handle(): void
     {
+        $startTime = microtime(true);
         Log::info("Attemps: " . $this->attempts());
+
         try {
             $mail = new SimpleMail($this->subject, $this->message);
 
             // Send email using Mail accessor (framework convention)
             Mail::to($this->to)->send($mail);
 
-            Log::info("✅ SendEmailJob: Email sent to {$this->to} - {$this->subject}");
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            Log::info("✅ SendEmailJob: Email sent to {$this->to} - {$this->subject} ({$duration}ms)");
         } catch (\Throwable $e) {
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+
             // Log full exception details for debugging
             $errorDetails = [
                 'exception' => get_class($e),
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
+                'duration_ms' => $duration,
             ];
+
+            // Check if error is retryable
+            $isRetryable = true;
+            if ($e instanceof TransportException) {
+                $isRetryable = $e->isRetryable();
+                $errorDetails['retryable'] = $isRetryable;
+            }
 
             // Log previous exception (original error) if exists
             if ($e->getPrevious()) {
@@ -65,6 +79,17 @@ final class SendEmailJob extends Job implements ShouldQueueInterface
             }
 
             Log::error("❌ SendEmailJob error", $errorDetails);
+
+            // If error is NOT retryable (permanent failure), fail immediately
+            if (!$isRetryable) {
+                Log::warning("⚠️ Non-retryable error detected, failing immediately", [
+                    'to' => $this->to,
+                    'subject' => $this->subject,
+                ]);
+                $this->fail($e);  // Mark as failed without retries
+                return;
+            }
+
             throw $e;
         }
     }

@@ -50,6 +50,17 @@ final class SmtpTransport extends AbstractTransport
     private bool $debug = false;
 
     /**
+     * @var array<string, float> Performance metrics
+     */
+    private array $metrics = [
+        'total_sends' => 0,
+        'successful_sends' => 0,
+        'failed_sends' => 0,
+        'total_time_ms' => 0,
+        'avg_time_ms' => 0,
+    ];
+
+    /**
      * @param string $host SMTP host.
      * @param int $port SMTP port (25, 465, 587).
      * @param string|null $username Auth username.
@@ -120,6 +131,9 @@ final class SmtpTransport extends AbstractTransport
      */
     protected function doSend(MessageInterface $message): TransportResult
     {
+        $startTime = microtime(true);
+        $this->metrics['total_sends']++;
+
         try {
             $this->connect();
             $this->authenticate();
@@ -167,15 +181,41 @@ final class SmtpTransport extends AbstractTransport
             // Extract message ID from response
             $messageId = $this->extractMessageId($response) ?? uniqid('smtp_');
 
+            // Record success metrics
+            $duration = (microtime(true) - $startTime) * 1000;
+            $this->metrics['successful_sends']++;
+            $this->metrics['total_time_ms'] += $duration;
+            $this->metrics['avg_time_ms'] = $this->metrics['total_time_ms'] / $this->metrics['total_sends'];
+
+            if ($this->debug) {
+                $this->log('info', 'Email sent successfully', [
+                    'duration_ms' => round($duration, 2),
+                    'message_id' => $messageId,
+                ]);
+            }
+
             return TransportResult::success($messageId, [
                 'host' => $this->host,
                 'response' => $response,
+                'duration_ms' => round($duration, 2),
             ]);
         } catch (TransportException $e) {
+            // Record failure metrics
+            $duration = (microtime(true) - $startTime) * 1000;
+            $this->metrics['failed_sends']++;
+            $this->metrics['total_time_ms'] += $duration;
+            $this->metrics['avg_time_ms'] = $this->metrics['total_time_ms'] / $this->metrics['total_sends'];
+
             // On error, disconnect to ensure clean state for retry
             $this->disconnect();
             throw $e;
         } catch (\Throwable $e) {
+            // Record failure metrics
+            $duration = (microtime(true) - $startTime) * 1000;
+            $this->metrics['failed_sends']++;
+            $this->metrics['total_time_ms'] += $duration;
+            $this->metrics['avg_time_ms'] = $this->metrics['total_time_ms'] / $this->metrics['total_sends'];
+
             // On error, disconnect to ensure clean state for retry
             $this->disconnect();
             throw new TransportException($e->getMessage(), 'smtp', [], $e);
@@ -598,6 +638,30 @@ final class SmtpTransport extends AbstractTransport
     public function getCapabilities(): array
     {
         return $this->capabilities;
+    }
+
+    /**
+     * Get performance metrics.
+     *
+     * @return array<string, float>
+     */
+    public function getMetrics(): array
+    {
+        return $this->metrics;
+    }
+
+    /**
+     * Reset performance metrics.
+     */
+    public function resetMetrics(): void
+    {
+        $this->metrics = [
+            'total_sends' => 0,
+            'successful_sends' => 0,
+            'failed_sends' => 0,
+            'total_time_ms' => 0,
+            'avg_time_ms' => 0,
+        ];
     }
 
     /**

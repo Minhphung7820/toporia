@@ -22,6 +22,11 @@ namespace Toporia\Framework\Mail\Transport;
 class TransportException extends \RuntimeException
 {
     /**
+     * @var bool Whether this error is retryable (transient failure)
+     */
+    private bool $retryable = true;
+
+    /**
      * @param string $message Error message.
      * @param string $transport Transport name.
      * @param array<string, mixed> $context Additional context.
@@ -34,6 +39,9 @@ class TransportException extends \RuntimeException
         ?\Throwable $previous = null
     ) {
         parent::__construct($message, 0, $previous);
+
+        // Auto-detect if error is retryable based on message
+        $this->detectRetryability($message);
     }
 
     /**
@@ -102,9 +110,103 @@ class TransportException extends \RuntimeException
      */
     public static function authenticationFailed(string $transport): self
     {
-        return new self(
+        $exception = new self(
             message: 'Authentication failed',
             transport: $transport
         );
+        $exception->retryable = false;  // Auth errors usually not retryable
+
+        return $exception;
+    }
+
+    /**
+     * Check if this exception is retryable.
+     *
+     * Transient errors (network, timeout, rate limits) are retryable.
+     * Permanent errors (auth failed, invalid recipient) are not.
+     *
+     * @return bool
+     */
+    public function isRetryable(): bool
+    {
+        return $this->retryable;
+    }
+
+    /**
+     * Mark exception as not retryable.
+     *
+     * @return self
+     */
+    public function setNotRetryable(): self
+    {
+        $this->retryable = false;
+        return $this;
+    }
+
+    /**
+     * Mark exception as retryable.
+     *
+     * @return self
+     */
+    public function setRetryable(): self
+    {
+        $this->retryable = true;
+        return $this;
+    }
+
+    /**
+     * Auto-detect if error is retryable based on message/code.
+     *
+     * @param string $message Error message
+     */
+    private function detectRetryability(string $message): void
+    {
+        $message = strtolower($message);
+
+        // Permanent failures (NOT retryable)
+        $permanentPatterns = [
+            'authentication failed',
+            'invalid recipient',
+            'recipient rejected',
+            'sender rejected',
+            'mailbox unavailable',
+            '550',  // Mailbox unavailable
+            '551',  // User not local
+            '553',  // Mailbox name not allowed
+            '5.1.1', // Bad destination mailbox
+            '5.7.1', // Relay access denied
+        ];
+
+        foreach ($permanentPatterns as $pattern) {
+            if (str_contains($message, $pattern)) {
+                $this->retryable = false;
+                return;
+            }
+        }
+
+        // Transient failures (retryable)
+        $transientPatterns = [
+            'timeout',
+            'connection',
+            'network',
+            'rate limit',
+            'too many',
+            '421',  // Service not available
+            '450',  // Mailbox busy
+            '451',  // Local error
+            '452',  // Insufficient storage
+            '4.2.1', // Mailbox busy
+            '4.2.2', // Mailbox full
+        ];
+
+        foreach ($transientPatterns as $pattern) {
+            if (str_contains($message, $pattern)) {
+                $this->retryable = true;
+                return;
+            }
+        }
+
+        // Default: retryable
+        $this->retryable = true;
     }
 }
