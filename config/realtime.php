@@ -275,4 +275,37 @@ return [
     |
     */
     'validate_input' => env('REALTIME_VALIDATE_INPUT', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Channel Middleware
+    |--------------------------------------------------------------------------
+    |
+    | Register channel middleware aliases for use in routes/channels.php
+    |
+    | Built-in middleware:
+    | - 'auth' => AuthMiddleware::class (requires authentication)
+    | - 'role' => RoleMiddleware::class (requires specific role)
+    | - 'ratelimit' => RateLimitMiddleware::class (rate limiting)
+    |
+    | You can register custom middleware here:
+    | 'premium' => App\Realtime\Middleware\PremiumMiddleware::class
+    |
+    | Usage in routes/channels.php:
+    | ChannelRoute::channel('channel-name', fn($conn) => true)
+    |     ->middleware(['auth', 'premium']);
+    |
+    | NOTE: These middleware are ONLY for realtime channels, NOT for HTTP!
+    |
+    */
+    'channel_middleware' => [
+        // Custom middleware aliases (business logic)
+        'premium' => App\Infrastructure\Realtime\Middleware\PremiumMiddleware::class,
+        'verified' => App\Infrastructure\Realtime\Middleware\VerifiedMiddleware::class,
+        'team' => App\Infrastructure\Realtime\Middleware\TeamMemberMiddleware::class,
+
+        // Add your custom middleware here:
+        // 'admin' => App\Infrastructure\Realtime\Middleware\AdminMiddleware::class,
+        // 'subscription' => App\Infrastructure\Realtime\Middleware\ActiveSubscriptionMiddleware::class,
+    ],
 ];

@@ -38,4 +38,3 @@ final class AuthMiddleware implements ChannelMiddlewareInterface
         return $next($connection, $channelName);
     }
 }
-

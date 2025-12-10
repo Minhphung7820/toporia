@@ -115,7 +115,33 @@ ChannelRoute::channel('product.{productId}.updates', function (ConnectionInterfa
 })->middleware(['auth']);
 
 // ============================================================================
-// EXAMPLES - Different authorization patterns
+// CUSTOM MIDDLEWARE EXAMPLES
+// ============================================================================
+
+// Premium content - requires auth + premium subscription
+ChannelRoute::channel('premium-news', function (ConnectionInterface $connection) {
+    // Additional checks if needed
+    return true;
+})->middleware(['auth', 'premium']);
+
+// Team channels - requires auth + team membership
+ChannelRoute::channel('team.{teamId}.chat', function (ConnectionInterface $connection, string $teamId) {
+    // TeamMemberMiddleware already checked membership
+    return true;
+})->middleware(['auth', 'team']);
+
+// Verified users only
+ChannelRoute::channel('verified-users', function (ConnectionInterface $connection) {
+    return true;
+})->middleware(['auth', 'verified']);
+
+// Multiple custom middleware
+ChannelRoute::channel('premium-verified', function (ConnectionInterface $connection) {
+    return true;
+})->middleware(['auth', 'premium', 'verified']);
+
+// ============================================================================
+// MORE EXAMPLES - Different authorization patterns
 // ============================================================================
 
 /*

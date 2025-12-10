@@ -25,26 +25,37 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 final class ChannelMiddlewarePipeline
 {
     /**
-     * Default middleware aliases.
+     * Built-in middleware aliases.
+     *
+     * These are framework-provided middleware for common use cases.
      *
      * @var array<string, string>
      */
-    private const MIDDLEWARE_ALIASES = [
+    private const BUILTIN_MIDDLEWARE = [
         'auth' => AuthMiddleware::class,
         'role' => RoleMiddleware::class,
         'ratelimit' => RateLimitMiddleware::class,
     ];
 
     /**
-     * Custom middleware registry.
+     * Custom middleware registry (programmatically registered).
      *
      * @var array<string, string>
      */
     private static array $customMiddleware = [];
 
+    /**
+     * Config-based middleware aliases (loaded from config).
+     *
+     * @var array<string, string>|null
+     */
+    private ?array $configMiddleware = null;
+
     public function __construct(
         private readonly ?ContainerInterface $container = null
-    ) {}
+    ) {
+        $this->loadConfigMiddleware();
+    }
 
     /**
      * Register custom middleware alias.
@@ -145,24 +156,55 @@ final class ChannelMiddlewarePipeline
     }
 
     /**
+     * Load middleware from config.
+     *
+     * @return void
+     */
+    private function loadConfigMiddleware(): void
+    {
+        if ($this->container === null || !$this->container->has('config')) {
+            $this->configMiddleware = [];
+            return;
+        }
+
+        try {
+            $config = $this->container->get('config');
+            $this->configMiddleware = $config->get('realtime.channel_middleware', []);
+        } catch (\Throwable $e) {
+            $this->configMiddleware = [];
+        }
+    }
+
+    /**
      * Resolve middleware class from alias.
+     *
+     * Priority:
+     * 1. Config-based middleware (config/realtime.php)
+     * 2. Programmatically registered (ChannelMiddlewarePipeline::register())
+     * 3. Built-in middleware (auth, role, ratelimit)
+     * 4. Assume full class name
      *
      * @param string $alias Middleware alias
      * @return string Middleware class name
      */
     private function resolveClass(string $alias): string
     {
-        // Check custom middleware first
+        // 1. Check config-based middleware (highest priority)
+        if ($this->configMiddleware !== null && isset($this->configMiddleware[$alias])) {
+            return $this->configMiddleware[$alias];
+        }
+
+        // 2. Check programmatically registered middleware
         if (isset(self::$customMiddleware[$alias])) {
             return self::$customMiddleware[$alias];
         }
 
-        // Check default aliases
-        if (isset(self::MIDDLEWARE_ALIASES[$alias])) {
-            return self::MIDDLEWARE_ALIASES[$alias];
+        // 3. Check built-in middleware
+        if (isset(self::BUILTIN_MIDDLEWARE[$alias])) {
+            return self::BUILTIN_MIDDLEWARE[$alias];
         }
 
-        // Assume it's a full class name
+        // 4. Assume it's a full class name
         return $alias;
     }
 
@@ -192,13 +234,27 @@ final class ChannelMiddlewarePipeline
     }
 
     /**
-     * Get all registered middleware (built-in + custom).
+     * Get all registered middleware (built-in + programmatic + config).
      *
      * @return array<string, string>
      */
-    public static function getRegisteredMiddleware(): array
+    public function getRegisteredMiddleware(): array
     {
-        return array_merge(self::MIDDLEWARE_ALIASES, self::$customMiddleware);
+        return array_merge(
+            self::BUILTIN_MIDDLEWARE,
+            self::$customMiddleware,
+            $this->configMiddleware ?? []
+        );
+    }
+
+    /**
+     * Get built-in middleware.
+     *
+     * @return array<string, string>
+     */
+    public static function getBuiltinMiddleware(): array
+    {
+        return self::BUILTIN_MIDDLEWARE;
     }
 
     /**
@@ -211,4 +267,3 @@ final class ChannelMiddlewarePipeline
         self::$customMiddleware = [];
     }
 }
-
