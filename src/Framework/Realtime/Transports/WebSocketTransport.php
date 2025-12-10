@@ -7,6 +7,7 @@ namespace Toporia\Framework\Realtime\Transports;
 use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterface, MessageInterface, RealtimeManagerInterface};
 use Toporia\Framework\Realtime\{Connection, Message};
 use Toporia\Framework\Realtime\Auth\ConnectionAuthenticator;
+use Toporia\Framework\Realtime\Subscriptions\BrokerSubscriptionFactory;
 
 /**
  * Class WebSocketTransport
@@ -329,6 +330,7 @@ final class WebSocketTransport implements TransportInterface
     /**
      * Start broker subscription based on configuration.
      *
+     * Uses Strategy/Factory pattern for extensibility.
      * Automatically detects which broker is configured and starts the appropriate subscription.
      *
      * @param \Swoole\WebSocket\Server $server
@@ -345,175 +347,23 @@ final class WebSocketTransport implements TransportInterface
 
         echo "Broker: {$brokerName}\n";
 
-        switch ($brokerName) {
-            case 'redis':
-                $this->startRedisBrokerSubscription($server);
-                break;
-            case 'rabbitmq':
-                $this->startRabbitMqBrokerSubscription($server);
-                break;
-            default:
-                echo "Broker '{$brokerName}' not supported for WebSocket transport (use redis or rabbitmq)\n";
-        }
-    }
+        // Create factory with broker configs
+        $factory = BrokerSubscriptionFactory::createWithDefaults([
+            'redis' => config('realtime.brokers.redis', []),
+            'rabbitmq' => config('realtime.brokers.rabbitmq', []),
+        ]);
 
-    /**
-     * Start Redis broker subscription using Swoole coroutine.
-     *
-     * This allows the WebSocket server to receive messages from PHP-FPM
-     * via Redis Pub/Sub without blocking the event loop.
-     *
-     * Features:
-     * - Auto-reconnect with exponential backoff (1s -> 2s -> 4s -> ... -> 30s max)
-     * - Graceful error handling
-     * - Production-ready reliability
-     *
-     * @param \Swoole\WebSocket\Server $server
-     * @return void
-     */
-    private function startRedisBrokerSubscription(\Swoole\WebSocket\Server $server): void
-    {
-        // Load Redis broker config
-        $brokerConfig = config('realtime.brokers.redis', []);
+        // Get strategy for configured broker
+        $strategy = $factory->create($brokerName);
 
-        // Start subscription in a coroutine with auto-reconnect
-        \Swoole\Coroutine::create(function () use ($server, $brokerConfig) {
-            $host = $brokerConfig['host'] ?? env('REDIS_HOST', '127.0.0.1');
-            $port = (int) ($brokerConfig['port'] ?? env('REDIS_PORT', 6379));
-            $password = $brokerConfig['password'] ?? env('REDIS_PASSWORD');
-            $pattern = 'realtime:*';
-
-            // Exponential backoff settings
-            $baseDelay = 1.0;      // Start with 1 second
-            $maxDelay = 30.0;      // Max 30 seconds between retries
-            $currentDelay = $baseDelay;
-            $consecutiveFailures = 0;
-
-            // Auto-reconnect loop
-            while ($this->running) {
-                echo "[Redis Broker] Connecting to {$host}:{$port}...\n";
-
-                $client = new \Swoole\Coroutine\Client(SWOOLE_SOCK_TCP);
-                $client->set([
-                    'open_eof_check' => false,
-                    'package_max_length' => 1024 * 1024,
-                ]);
-
-                // Try to connect
-                if (!$client->connect($host, $port, 5.0)) {
-                    $consecutiveFailures++;
-                    echo "[Redis Broker] Failed to connect: {$client->errMsg} (attempt #{$consecutiveFailures})\n";
-
-                    // Exponential backoff
-                    $currentDelay = min($baseDelay * pow(2, $consecutiveFailures - 1), $maxDelay);
-                    echo "[Redis Broker] Retrying in {$currentDelay}s...\n";
-                    \Swoole\Coroutine::sleep($currentDelay);
-                    continue;
-                }
-
-                // Authenticate if password is set
-                if ($password && $password !== 'null') {
-                    $authCmd = "*2\r\n\$4\r\nAUTH\r\n\$" . strlen($password) . "\r\n{$password}\r\n";
-                    $client->send($authCmd);
-                    $authResponse = $client->recv(5.0);
-                    if (!$authResponse || !str_starts_with($authResponse, '+OK')) {
-                        echo "[Redis Broker] Authentication failed: {$authResponse}\n";
-                        $client->close();
-
-                        $consecutiveFailures++;
-                        $currentDelay = min($baseDelay * pow(2, $consecutiveFailures - 1), $maxDelay);
-                        \Swoole\Coroutine::sleep($currentDelay);
-                        continue;
-                    }
-                }
-
-                // Send PSUBSCRIBE command
-                $psubscribeCmd = "*2\r\n\$10\r\nPSUBSCRIBE\r\n\$" . strlen($pattern) . "\r\n{$pattern}\r\n";
-                $client->send($psubscribeCmd);
-
-                // Read subscription confirmation
-                $confirmation = $client->recv(5.0);
-                if (!$confirmation) {
-                    echo "[Redis Broker] Failed to subscribe\n";
-                    $client->close();
-
-                    $consecutiveFailures++;
-                    $currentDelay = min($baseDelay * pow(2, $consecutiveFailures - 1), $maxDelay);
-                    \Swoole\Coroutine::sleep($currentDelay);
-                    continue;
-                }
-
-                // Reset backoff on successful connection
-                $consecutiveFailures = 0;
-                $currentDelay = $baseDelay;
-                echo "[Redis Broker] Connected and subscribed to pattern: {$pattern}\n";
-
-                // Main loop - receive messages
-                while ($this->running) {
-                    $response = $client->recv(86400.0); // Long timeout for blocking receive
-
-                    if ($response === false || $response === '') {
-                        echo "[Redis Broker] Connection lost, reconnecting...\n";
-                        break; // Break inner loop to reconnect
-                    }
-
-                    // Parse RESP protocol message
-                    $this->handleRedisMessage($response, $server);
-                }
-
-                $client->close();
-
-                // Small delay before reconnect attempt
-                if ($this->running) {
-                    \Swoole\Coroutine::sleep(1.0);
-                }
-            }
-
-            echo "[Redis Broker] Subscription stopped\n";
-        });
-    }
-
-    /**
-     * Parse and handle Redis RESP protocol message from PSUBSCRIBE.
-     *
-     * @param string $response Raw Redis RESP response
-     * @param \Swoole\WebSocket\Server $server
-     * @return void
-     */
-    private function handleRedisMessage(string $response, \Swoole\WebSocket\Server $server): void
-    {
-        // Parse RESP array response for pmessage
-        // Format: *4\r\n$8\r\npmessage\r\n$patternLen\r\npattern\r\n$channelLen\r\nchannel\r\n$msgLen\r\nmessage\r\n
-        $lines = explode("\r\n", $response);
-
-        // Find pmessage in response
-        $pmessageIdx = array_search('pmessage', $lines);
-        if ($pmessageIdx === false) {
-            return; // Not a pmessage
-        }
-
-        // After pmessage, we have: $patternLen, pattern, $channelLen, channel, $msgLen, message
-        // So pattern is at pmessageIdx + 2, channel is at pmessageIdx + 4, message is at pmessageIdx + 6
-        $channel = $lines[$pmessageIdx + 4] ?? '';
-        $messageJson = $lines[$pmessageIdx + 6] ?? '';
-
-        if (!$channel || !$messageJson) {
+        if ($strategy === null) {
+            $available = implode(', ', $factory->getAvailableStrategies());
+            echo "Broker '{$brokerName}' not supported for WebSocket transport (available: {$available})\n";
             return;
         }
 
-        try {
-            $messageData = json_decode($messageJson, true);
-
-            if (!$messageData) {
-                return;
-            }
-
-            // Extract channel name (remove 'realtime:' prefix)
-            $channelName = str_replace('realtime:', '', $channel);
-            $event = $messageData['event'] ?? 'message';
-            $data = $messageData['data'] ?? [];
-
-            // Create message and serialize once
+        // Message handler callback - broadcasts to all workers
+        $messageHandler = function (string $channelName, string $event, array $data) use ($server): void {
             $message = Message::event($channelName, $event, $data);
             $json = $message->toJson();
 
@@ -525,208 +375,16 @@ final class WebSocketTransport implements TransportInterface
             }
 
             // Send message to all OTHER workers via pipe for them to broadcast
-            // Worker #0 handles Redis, but connections may be in workers #1, #2, #3...
-            // Use stored workerNum from start() to avoid recalculating
             for ($workerId = 1; $workerId < $this->workerNum; $workerId++) {
                 $server->sendMessage($json, $workerId);
             }
-        } catch (\Throwable $e) {
-            error_log("[Redis] Error: {$e->getMessage()}");
-        }
-    }
+        };
 
-    /**
-     * Start RabbitMQ broker subscription using Swoole coroutine.
-     *
-     * Uses PhpAmqpLib with non-blocking wait to receive messages from PHP-FPM
-     * via RabbitMQ without blocking Swoole's event loop.
-     *
-     * Features:
-     * - Auto-reconnect with exponential backoff (1s -> 2s -> 4s -> ... -> 30s max)
-     * - Non-blocking message consumption with periodic yield
-     * - Graceful error handling
-     * - Production-ready reliability
-     *
-     * @param \Swoole\WebSocket\Server $server
-     * @return void
-     */
-    private function startRabbitMqBrokerSubscription(\Swoole\WebSocket\Server $server): void
-    {
-        // Load RabbitMQ broker config
-        $brokerConfig = config('realtime.brokers.rabbitmq', []);
+        // Is running callback
+        $isRunning = fn(): bool => $this->running;
 
-        // Start subscription in a coroutine with auto-reconnect
-        \Swoole\Coroutine::create(function () use ($server, $brokerConfig) {
-            $host = $brokerConfig['host'] ?? env('RABBITMQ_HOST', '127.0.0.1');
-            $port = (int) ($brokerConfig['port'] ?? env('RABBITMQ_PORT', 5672));
-            $user = $brokerConfig['user'] ?? env('RABBITMQ_USER', 'guest');
-            $password = $brokerConfig['password'] ?? env('RABBITMQ_PASSWORD', 'guest');
-            $vhost = $brokerConfig['vhost'] ?? env('RABBITMQ_VHOST', '/');
-            $exchange = $brokerConfig['exchange'] ?? 'realtime';
-            $exchangeType = $brokerConfig['exchange_type'] ?? 'topic';
-
-            // Exponential backoff settings
-            $baseDelay = 1.0;
-            $maxDelay = 30.0;
-            $currentDelay = $baseDelay;
-            $consecutiveFailures = 0;
-
-            // Auto-reconnect loop
-            while ($this->running) {
-                $connection = null;
-                $channel = null;
-
-                try {
-                    echo "[RabbitMQ Broker] Connecting to {$host}:{$port}...\n";
-
-                    // Create connection using PhpAmqpLib
-                    $connection = new \PhpAmqpLib\Connection\AMQPStreamConnection(
-                        $host,
-                        $port,
-                        $user,
-                        $password,
-                        $vhost,
-                        false,    // insist
-                        'AMQPLAIN', // login_method
-                        null,     // login_response
-                        'en_US',  // locale
-                        3.0,      // connection_timeout
-                        3.0,      // read_write_timeout
-                        null,     // context
-                        false,    // keepalive
-                        60        // heartbeat
-                    );
-
-                    $channel = $connection->channel();
-
-                    // Declare exchange
-                    $channel->exchange_declare(
-                        $exchange,
-                        $exchangeType,
-                        false,  // passive
-                        true,   // durable
-                        false   // auto_delete
-                    );
-
-                    // Declare exclusive queue for this WebSocket server
-                    [$queueName] = $channel->queue_declare(
-                        '',     // Let RabbitMQ generate name
-                        false,  // passive
-                        false,  // durable
-                        true,   // exclusive
-                        true    // auto_delete
-                    );
-
-                    // Bind queue to receive all messages (using # wildcard)
-                    $channel->queue_bind($queueName, $exchange, '#');
-
-                    // Set prefetch count for performance
-                    $channel->basic_qos(null, 100, null);
-
-                    // Set up consumer callback
-                    $channel->basic_consume(
-                        $queueName,
-                        '',     // consumer_tag
-                        false,  // no_local
-                        true,   // no_ack (auto-ack for simplicity)
-                        false,  // exclusive
-                        false,  // nowait
-                        function (\PhpAmqpLib\Message\AMQPMessage $message) use ($server) {
-                            $this->handleRabbitMqMessage($message, $server);
-                        }
-                    );
-
-                    // Reset backoff on successful connection
-                    $consecutiveFailures = 0;
-                    $currentDelay = $baseDelay;
-                    echo "[RabbitMQ Broker] Connected and consuming from exchange: {$exchange}\n";
-
-                    // Non-blocking consume loop
-                    while ($this->running && $channel->is_consuming()) {
-                        try {
-                            // Non-blocking wait with short timeout
-                            $channel->wait(null, true, 0.1);
-                        } catch (\PhpAmqpLib\Exception\AMQPTimeoutException $e) {
-                            // Expected timeout, yield to Swoole event loop
-                            \Swoole\Coroutine::sleep(0.01);
-                            continue;
-                        }
-
-                        // Yield to allow other coroutines to run
-                        \Swoole\Coroutine::sleep(0.001);
-                    }
-                } catch (\Throwable $e) {
-                    $consecutiveFailures++;
-                    echo "[RabbitMQ Broker] Error: {$e->getMessage()} (attempt #{$consecutiveFailures})\n";
-
-                    // Exponential backoff
-                    $currentDelay = min($baseDelay * pow(2, $consecutiveFailures - 1), $maxDelay);
-                    echo "[RabbitMQ Broker] Retrying in {$currentDelay}s...\n";
-                } finally {
-                    // Clean up
-                    try {
-                        $channel?->close();
-                    } catch (\Throwable $e) {
-                        // Ignore close errors
-                    }
-                    try {
-                        $connection?->close();
-                    } catch (\Throwable $e) {
-                        // Ignore close errors
-                    }
-                }
-
-                // Wait before reconnect
-                if ($this->running) {
-                    \Swoole\Coroutine::sleep($currentDelay);
-                }
-            }
-
-            echo "[RabbitMQ Broker] Subscription stopped\n";
-        });
-    }
-
-    /**
-     * Handle incoming message from RabbitMQ.
-     *
-     * @param \PhpAmqpLib\Message\AMQPMessage $message
-     * @param \Swoole\WebSocket\Server $server
-     * @return void
-     */
-    private function handleRabbitMqMessage(\PhpAmqpLib\Message\AMQPMessage $message, \Swoole\WebSocket\Server $server): void
-    {
-        try {
-            $routingKey = $message->getRoutingKey();
-            $payload = $message->getBody();
-
-            $messageData = json_decode($payload, true);
-            if (!$messageData) {
-                return;
-            }
-
-            // Convert routing key to channel name (. -> :)
-            $channelName = str_replace('.', ':', $routingKey);
-            $event = $messageData['event'] ?? 'message';
-            $data = $messageData['data'] ?? [];
-
-            // Create message and serialize once
-            $wsMessage = Message::event($channelName, $event, $data);
-            $json = $wsMessage->toJson();
-
-            // Broadcast to connections in Worker #0 (current worker)
-            foreach ($server->connections as $fd) {
-                if ($server->isEstablished($fd)) {
-                    $server->push($fd, $json, WEBSOCKET_OPCODE_TEXT);
-                }
-            }
-
-            // Send message to all OTHER workers via pipe for them to broadcast
-            for ($workerId = 1; $workerId < $this->workerNum; $workerId++) {
-                $server->sendMessage($json, $workerId);
-            }
-        } catch (\Throwable $e) {
-            error_log("[RabbitMQ] Error: {$e->getMessage()}");
-        }
+        // Start subscription using strategy
+        $strategy->subscribe($server, $messageHandler, $isRunning);
     }
 
     /**
