@@ -46,8 +46,9 @@ class ToporiaRealtime {
         this.rooms = new Set();
         this.listeners = new Map();
         this.connected = false;
+        this._pendingConnectedCallbacks = [];
 
-        // Default options
+        // Default options - autoConnect: false to allow registering listeners first
         this.options = {
             transports: ['websocket', 'polling'],
             reconnection: true,
@@ -55,6 +56,7 @@ class ToporiaRealtime {
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             timeout: 20000,
+            autoConnect: false,  // Don't connect automatically
             ...options
         };
 
@@ -79,24 +81,24 @@ class ToporiaRealtime {
             // Rejoin rooms after reconnection
             this.rejoinRooms();
 
-            this.emit('connected', { id: this.socket.id });
+            this._triggerLocal('connected', { id: this.socket.id });
         });
 
         this.socket.on('disconnect', (reason) => {
             this.connected = false;
             console.log('[Toporia Realtime] Disconnected:', reason);
-            this.emit('disconnected', { reason });
+            this._triggerLocal('disconnected', { reason });
         });
 
         this.socket.on('connect_error', (error) => {
             console.error('[Toporia Realtime] Connection error:', error);
-            this.emit('error', { error: error.message });
+            this._triggerLocal('error', { error: error.message });
         });
 
         // Reconnection events
         this.socket.on('reconnect', (attempt) => {
             console.log('[Toporia Realtime] Reconnected after', attempt, 'attempts');
-            this.emit('reconnected', { attempt });
+            this._triggerLocal('reconnected', { attempt });
         });
 
         this.socket.on('reconnect_attempt', (attempt) => {
@@ -109,7 +111,39 @@ class ToporiaRealtime {
 
         this.socket.on('reconnect_failed', () => {
             console.error('[Toporia Realtime] Reconnection failed');
-            this.emit('reconnect_failed', {});
+            this._triggerLocal('reconnect_failed', {});
+        });
+    }
+
+    /**
+     * Connect to the server.
+     * Call this after registering event listeners.
+     *
+     * @returns {this}
+     */
+    connect() {
+        if (!this.socket.connected) {
+            this.socket.connect();
+        }
+        return this;
+    }
+
+    /**
+     * Trigger local event listeners (internal use only).
+     * This method calls registered callbacks without sending to server.
+     *
+     * @param {string} event Event name
+     * @param {*} data Event data
+     * @private
+     */
+    _triggerLocal(event, data) {
+        const handlers = this.listeners.get(event) || [];
+        handlers.forEach(handler => {
+            try {
+                handler(data);
+            } catch (err) {
+                console.error(`[Toporia Realtime] Error in ${event} handler:`, err);
+            }
         });
     }
 

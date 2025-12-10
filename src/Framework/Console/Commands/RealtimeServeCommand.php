@@ -104,31 +104,25 @@ final class RealtimeServeCommand extends Command
     /**
      * Start broker subscription to receive messages from other servers.
      *
-     * NOTE: Redis SUBSCRIBE/PSUBSCRIBE is blocking and incompatible with Swoole's event loop.
-     * For proper Redis integration with Swoole, use Swoole\Coroutine\Redis instead.
-     *
-     * Current workaround: Log warning and skip broker subscription.
-     * The WebSocket server will only receive direct broadcasts, not broker messages.
+     * NOTE: Broker subscription is now handled internally by each transport
+     * using Swoole coroutines (WebSocketTransport, SocketIOGateway).
+     * This method only displays info about the configured broker.
      *
      * @param mixed $transport Transport instance
      * @return void
      */
     private function startBrokerSubscription($transport): void
     {
-        $brokerName = config('realtime.default_broker');
+        $brokerName = config('realtime.default_broker') ?: env('REALTIME_BROKER');
 
-        if ($brokerName === null) {
+        if (!$brokerName) {
             $this->line('Broker: none (single server mode)');
             return;
         }
 
-        // TODO: Implement Swoole\Coroutine\Redis for async subscription
-        // For now, warn the user that broker subscription is not yet supported
-        $this->warn("Broker '{$brokerName}' configured but not integrated with Swoole WebSocket.");
-        $this->warn('Redis SUBSCRIBE is blocking and incompatible with Swoole event loop.');
-        $this->warn('For testing, send notifications directly via WebSocket or disable broker.');
-        $this->line('');
-        $this->info('Tip: To test, temporarily set REALTIME_BROKER= (empty) in .env');
+        // Broker subscription is handled by the transport itself in workerStart event
+        // Just display info here
+        $this->line("Broker: {$brokerName} (subscription handled by transport)");
     }
 
     /**
