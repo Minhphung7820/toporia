@@ -35,6 +35,11 @@ final class SmtpTransport extends AbstractTransport
     private bool $connected = false;
 
     /**
+     * @var bool Whether authentication is completed.
+     */
+    private bool $authenticated = false;
+
+    /**
      * @var array<string> Server capabilities.
      */
     private array $capabilities = [];
@@ -123,6 +128,7 @@ final class SmtpTransport extends AbstractTransport
             $from = $message->getFrom();
             $response = $this->sendCommand("MAIL FROM:<{$from}>");
             if (!$this->isSuccessResponse($response)) {
+                $this->resetTransaction();  // Reset before returning
                 return TransportResult::failure("MAIL FROM rejected: {$response}");
             }
 
@@ -136,6 +142,7 @@ final class SmtpTransport extends AbstractTransport
             foreach ($recipients as $recipient) {
                 $response = $this->sendCommand("RCPT TO:<{$recipient}>");
                 if (!$this->isSuccessResponse($response)) {
+                    $this->resetTransaction();  // Reset before returning
                     return TransportResult::failure("RCPT TO rejected for {$recipient}: {$response}");
                 }
             }
@@ -143,6 +150,7 @@ final class SmtpTransport extends AbstractTransport
             // DATA
             $response = $this->sendCommand('DATA');
             if (!str_starts_with($response, '354')) {
+                $this->resetTransaction();  // Reset before returning
                 return TransportResult::failure("DATA rejected: {$response}");
             }
 
@@ -152,6 +160,7 @@ final class SmtpTransport extends AbstractTransport
             $response = $this->sendData($data);
 
             if (!$this->isSuccessResponse($response)) {
+                $this->resetTransaction();  // Reset before returning
                 return TransportResult::failure("Message rejected: {$response}");
             }
 
@@ -163,8 +172,12 @@ final class SmtpTransport extends AbstractTransport
                 'response' => $response,
             ]);
         } catch (TransportException $e) {
+            // On error, disconnect to ensure clean state for retry
+            $this->disconnect();
             throw $e;
         } catch (\Throwable $e) {
+            // On error, disconnect to ensure clean state for retry
+            $this->disconnect();
             throw new TransportException($e->getMessage(), 'smtp', [], $e);
         }
     }
@@ -251,6 +264,14 @@ final class SmtpTransport extends AbstractTransport
      */
     private function authenticate(): void
     {
+        // Skip if already authenticated (connection reuse)
+        if ($this->authenticated) {
+            if ($this->debug) {
+                $this->log('debug', 'Skipping authentication (already authenticated)', []);
+            }
+            return;
+        }
+
         if ($this->username === null || $this->password === null) {
             if ($this->debug) {
                 $this->log('debug', 'Skipping authentication (no credentials)', []);
@@ -268,12 +289,14 @@ final class SmtpTransport extends AbstractTransport
         // Try AUTH LOGIN first (most common)
         if (in_array('AUTH LOGIN', $this->capabilities, true) || in_array('AUTH=LOGIN', $this->capabilities, true)) {
             $this->authLogin();
+            $this->authenticated = true;  // Mark as authenticated
             return;
         }
 
         // Try AUTH PLAIN
         if (in_array('AUTH PLAIN', $this->capabilities, true) || in_array('AUTH=PLAIN', $this->capabilities, true)) {
             $this->authPlain();
+            $this->authenticated = true;  // Mark as authenticated
             return;
         }
 
@@ -506,6 +529,35 @@ final class SmtpTransport extends AbstractTransport
     }
 
     /**
+     * Reset current transaction state (RSET command).
+     *
+     * Sends RSET to abort current mail transaction and return to
+     * authenticated state, allowing new mail to be sent on same connection.
+     */
+    private function resetTransaction(): void
+    {
+        if (!$this->connected || $this->socket === null) {
+            return;
+        }
+
+        try {
+            $this->sendCommand('RSET');
+
+            if ($this->debug) {
+                $this->log('debug', 'Transaction reset (RSET)', []);
+            }
+        } catch (\Throwable $e) {
+            // If RSET fails, disconnect to force fresh connection
+            if ($this->debug) {
+                $this->log('debug', 'RSET failed, disconnecting', [
+                    'error' => $e->getMessage()
+                ]);
+            }
+            $this->disconnect();
+        }
+    }
+
+    /**
      * Disconnect from server.
      */
     public function disconnect(): void
@@ -522,6 +574,7 @@ final class SmtpTransport extends AbstractTransport
         }
 
         $this->connected = false;
+        $this->authenticated = false;  // Reset auth state
         $this->capabilities = [];
     }
 
