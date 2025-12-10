@@ -10,6 +10,11 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Realtime\ChannelRoute;
 use Toporia\Framework\Realtime\Middleware;
 use Toporia\Framework\Realtime\Auth;
+use Toporia\Framework\Realtime\RateLimiting\MultiLayerRateLimiter;
+use Toporia\Framework\Realtime\RateLimiting\RateLimiterFactory;
+use Toporia\Framework\Realtime\RateLimiting\RateLimiterInterface;
+use Toporia\Framework\Realtime\Security\DDoSProtection;
+use Toporia\Framework\Realtime\Metrics\MiddlewareMetrics;
 
 /**
  * Class RealtimeManager
@@ -50,8 +55,22 @@ final class RealtimeManager implements RealtimeManagerInterface
 
     private string $defaultTransport;
     private ?string $defaultBroker;
+
+    // Legacy rate limiter (v1) - kept for backward compatibility
     private ?RateLimiter $rateLimiter = null;
+
+    // New rate limiting system (v2)
+    private ?MultiLayerRateLimiter $multiLayerLimiter = null;
+    private ?RateLimiterInterface $channelLimiter = null;
+
+    // Security components (v2)
+    private ?DDoSProtection $ddosProtection = null;
+
+    // Metrics (v2)
+    private ?MiddlewareMetrics $metrics = null;
+
     private bool $validateInput = true;
+    private bool $useEnhancedPipeline = false;
 
     /**
      * @param array $config Realtime configuration
@@ -63,18 +82,121 @@ final class RealtimeManager implements RealtimeManagerInterface
     ) {
         $this->defaultTransport = $config['default_transport'] ?? 'memory';
         $this->defaultBroker = $config['default_broker'] ?? null;
+        $this->validateInput = (bool) ($config['validate_input'] ?? true);
+        $this->useEnhancedPipeline = (bool) ($config['use_enhanced_pipeline'] ?? true);
 
-        // Initialize rate limiter from config
-        $rateLimitConfig = $config['rate_limit'] ?? [];
-        if ($rateLimitConfig['enabled'] ?? false) {
+        // Initialize v2 components
+        $this->initializeRateLimiting();
+        $this->initializeSecurity();
+        $this->initializeMetrics();
+    }
+
+    /**
+     * Initialize v2 rate limiting system.
+     */
+    private function initializeRateLimiting(): void
+    {
+        // Load rate limiting config
+        $rateLimitConfig = $this->loadRateLimitConfig();
+
+        if (!($rateLimitConfig['enabled'] ?? true)) {
+            return;
+        }
+
+        // Create Redis connection if available
+        $redis = null;
+        if ($rateLimitConfig['redis']['enabled'] ?? true) {
+            $redis = RateLimiterFactory::createRedisConnection($rateLimitConfig['redis']);
+        }
+
+        // Create multi-layer rate limiter
+        $this->multiLayerLimiter = RateLimiterFactory::createMultiLayer(
+            $rateLimitConfig['layers'] ?? [],
+            $redis
+        );
+
+        // Create channel-specific rate limiter
+        $this->channelLimiter = RateLimiterFactory::create('channel', [
+            'algorithm' => $rateLimitConfig['default_algorithm'] ?? 'token_bucket',
+            'capacity' => $rateLimitConfig['rate_limiting']['connection_limit'] ?? 60,
+            'redis' => $redis,
+        ]);
+
+        // Legacy v1 rate limiter for backward compatibility
+        $legacyConfig = $this->config['rate_limit'] ?? [];
+        if ($legacyConfig['enabled'] ?? false) {
             $this->rateLimiter = new RateLimiter(
-                maxMessages: (int) ($rateLimitConfig['messages_per_minute'] ?? 60),
+                maxMessages: (int) ($legacyConfig['messages_per_minute'] ?? 60),
                 windowSeconds: 60,
                 enabled: true
             );
         }
+    }
 
-        $this->validateInput = (bool) ($config['validate_input'] ?? true);
+    /**
+     * Initialize security components.
+     */
+    private function initializeSecurity(): void
+    {
+        $rateLimitConfig = $this->loadRateLimitConfig();
+        $ddosConfig = $rateLimitConfig['ddos_protection'] ?? [];
+
+        if (!($ddosConfig['enabled'] ?? true)) {
+            return;
+        }
+
+        // Create Redis connection for distributed DDoS protection
+        $redis = null;
+        if ($rateLimitConfig['redis']['enabled'] ?? true) {
+            $redis = RateLimiterFactory::createRedisConnection($rateLimitConfig['redis']);
+        }
+
+        $this->ddosProtection = new DDoSProtection(
+            redis: $redis,
+            connectionThreshold: (int) ($ddosConfig['connection_threshold'] ?? 10),
+            connectionWindow: (int) ($ddosConfig['connection_window'] ?? 60),
+            blockDuration: (int) ($ddosConfig['block_duration'] ?? 3600),
+            enabled: true
+        );
+    }
+
+    /**
+     * Initialize metrics collection.
+     */
+    private function initializeMetrics(): void
+    {
+        $rateLimitConfig = $this->loadRateLimitConfig();
+
+        if (!($rateLimitConfig['metrics']['enabled'] ?? true)) {
+            return;
+        }
+
+        $this->metrics = new MiddlewareMetrics();
+    }
+
+    /**
+     * Load rate limiting configuration.
+     */
+    private function loadRateLimitConfig(): array
+    {
+        // Try to load from container config first
+        if ($this->container !== null && $this->container->has('config')) {
+            try {
+                $config = $this->container->get('config');
+                return $config->get('realtime-ratelimit', []);
+            } catch (\Throwable $e) {
+                // Fall through to config array
+            }
+        }
+
+        // Try to load from config file directly
+        $configFile = __DIR__ . '/../../../config/realtime-ratelimit.php';
+        if (file_exists($configFile)) {
+            return require $configFile;
+        }
+
+        // Fallback to basic config
+        return $this->config['rate_limiting'] ?? [];
     }
 
     /**
@@ -114,8 +236,16 @@ final class RealtimeManager implements RealtimeManagerInterface
             ChannelValidator::validateEvent($event);
         }
 
-        // Check rate limit
-        if ($this->rateLimiter !== null) {
+        // Check rate limit (v2 multi-layer or v1 legacy)
+        if ($this->channelLimiter !== null) {
+            try {
+                $this->channelLimiter->check("channel:{$channel}");
+            } catch (RateLimitException $e) {
+                error_log("Rate limit exceeded for channel {$channel}: {$e->getMessage()}");
+                throw $e;
+            }
+        } elseif ($this->rateLimiter !== null) {
+            // Fallback to legacy rate limiter
             $this->rateLimiter->check("channel:{$channel}");
         }
 
@@ -458,8 +588,16 @@ final class RealtimeManager implements RealtimeManagerInterface
             $callback = $channelDefinition['callback'];
             $params = $channelDefinition['params'] ?? [];
 
-            // Execute middleware pipeline
-            $middlewarePipeline = new Middleware\ChannelMiddlewarePipeline($this->container);
+            // Execute middleware pipeline (v2 enhanced or v1 basic)
+            if ($this->useEnhancedPipeline) {
+                $middlewarePipeline = new Middleware\EnhancedChannelMiddlewarePipeline(
+                    $this->container,
+                    $this->metrics,
+                    true // Enable caching
+                );
+            } else {
+                $middlewarePipeline = new Middleware\ChannelMiddlewarePipeline($this->container);
+            }
 
             return $middlewarePipeline->execute(
                 $middleware,
@@ -597,5 +735,45 @@ final class RealtimeManager implements RealtimeManagerInterface
     public function getConnections(): array
     {
         return array_values($this->connections);
+    }
+
+    /**
+     * Get multi-layer rate limiter (v2).
+     *
+     * @return MultiLayerRateLimiter|null
+     */
+    public function getMultiLayerLimiter(): ?MultiLayerRateLimiter
+    {
+        return $this->multiLayerLimiter;
+    }
+
+    /**
+     * Get DDoS protection instance (v2).
+     *
+     * @return DDoSProtection|null
+     */
+    public function getDDoSProtection(): ?DDoSProtection
+    {
+        return $this->ddosProtection;
+    }
+
+    /**
+     * Get middleware metrics (v2).
+     *
+     * @return MiddlewareMetrics|null
+     */
+    public function getMetrics(): ?MiddlewareMetrics
+    {
+        return $this->metrics;
+    }
+
+    /**
+     * Check if using enhanced pipeline (v2).
+     *
+     * @return bool
+     */
+    public function isUsingEnhancedPipeline(): bool
+    {
+        return $this->useEnhancedPipeline;
     }
 }

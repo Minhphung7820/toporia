@@ -153,6 +153,21 @@ final class WebSocketTransport implements TransportInterface
     {
         // Connection opened
         $this->server->on('open', function ($server, $request) {
+            $ipAddress = $request->server['remote_addr'] ?? 'unknown';
+
+            // 0. DDoS Protection Check (v2 - if enabled)
+            $ddosProtection = $this->manager->getDDoSProtection();
+            if ($ddosProtection !== null) {
+                if (!$ddosProtection->isAllowed($ipAddress)) {
+                    $server->close($request->fd, 4429, 'Too many connections - DDoS protection');
+                    error_log("[{$request->fd}] Blocked by DDoS protection: IP {$ipAddress}");
+                    return;
+                }
+
+                // Record this connection
+                $ddosProtection->recordConnection($ipAddress);
+            }
+
             // 1. Try to authenticate connection
             $authData = $this->authenticator?->authenticateFromRequest($request);
 
@@ -168,7 +183,8 @@ final class WebSocketTransport implements TransportInterface
 
             // 3. Create connection with authentication data
             $connection = new Connection($request->fd, [
-                'ip' => $request->server['remote_addr'] ?? null,
+                'ip_address' => $ipAddress,
+                'remote_address' => $ipAddress, // Alias for compatibility
                 'user_agent' => $request->header['user-agent'] ?? null,
                 'user_id' => $authData['user_id'] ?? null,
                 'username' => $authData['username'] ?? null,
@@ -180,9 +196,9 @@ final class WebSocketTransport implements TransportInterface
             $this->manager->addConnection($connection);
 
             if ($authData) {
-                echo "[{$request->fd}] Connected: user_id={$authData['user_id']}\n";
+                echo "[{$request->fd}] Connected: user_id={$authData['user_id']} IP={$ipAddress}\n";
             } else {
-                echo "[{$request->fd}] Connected: anonymous (IP: {$request->server['remote_addr']})\n";
+                echo "[{$request->fd}] Connected: anonymous (IP: {$ipAddress})\n";
             }
         });
 
@@ -193,6 +209,23 @@ final class WebSocketTransport implements TransportInterface
             }
 
             $connection = $this->connections[$frame->fd];
+
+            // Multi-layer rate limiting (v2 - if enabled)
+            $multiLayerLimiter = $this->manager->getMultiLayerLimiter();
+            if ($multiLayerLimiter !== null) {
+                try {
+                    $multiLayerLimiter->check($connection, null, 1);
+                } catch (\Toporia\Framework\Realtime\Exceptions\RateLimitException $e) {
+                    // Send rate limit error to client
+                    $errorMsg = Message::event(null, 'error', [
+                        'code' => 'rate_limit_exceeded',
+                        'message' => 'Rate limit exceeded',
+                        'retry_after' => $e->getRetryAfter(),
+                    ]);
+                    $server->push($frame->fd, $errorMsg->toJson());
+                    return;
+                }
+            }
 
             try {
                 $message = Message::fromJson($frame->data);

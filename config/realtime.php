@@ -283,22 +283,35 @@ return [
     |
     | Register channel middleware aliases for use in routes/channels.php
     |
-    | Built-in middleware:
+    | Built-in middleware (Framework v2.0):
     | - 'auth' => AuthMiddleware::class (requires authentication)
     | - 'role' => RoleMiddleware::class (requires specific role)
-    | - 'ratelimit' => RateLimitMiddleware::class (rate limiting)
+    | - 'ratelimit' => RateLimitMiddleware::class (multi-layer rate limiting)
+    | - 'security' => SecurityMiddleware::class (DDoS protection, IP filtering)
+    | - 'ip_whitelist' => IpWhitelistMiddleware::class (IP access control)
     |
     | You can register custom middleware here:
     | 'premium' => App\Realtime\Middleware\PremiumMiddleware::class
     |
     | Usage in routes/channels.php:
     | ChannelRoute::channel('channel-name', fn($conn) => true)
-    |     ->middleware(['auth', 'premium']);
+    |     ->middleware(['security', 'auth', 'ratelimit', 'premium']);
     |
     | NOTE: These middleware are ONLY for realtime channels, NOT for HTTP!
     |
+    | Recommended order:
+    | 1. security (DDoS, IP filtering)
+    | 2. ratelimit (rate limiting)
+    | 3. auth (authentication)
+    | 4. role/premium/team (authorization)
+    |
     */
     'channel_middleware' => [
+        // Framework security middleware (v2.0 - Enterprise Grade)
+        'security' => Toporia\Framework\Realtime\Middleware\SecurityMiddleware::class,
+        'ratelimit' => Toporia\Framework\Realtime\Middleware\RateLimitMiddleware::class,
+        'ip_whitelist' => Toporia\Framework\Realtime\Middleware\IpWhitelistMiddleware::class,
+
         // Common middleware (application-level)
         'auth' => App\Infrastructure\Realtime\Middleware\AuthMiddleware::class,
         'role' => App\Infrastructure\Realtime\Middleware\RoleMiddleware::class,
@@ -311,5 +324,40 @@ return [
         // Add your custom middleware here:
         // 'admin' => App\Infrastructure\Realtime\Middleware\AdminMiddleware::class,
         // 'subscription' => App\Infrastructure\Realtime\Middleware\ActiveSubscriptionMiddleware::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Enhanced Middleware Pipeline (v2.0)
+    |--------------------------------------------------------------------------
+    |
+    | Use EnhancedChannelMiddlewarePipeline for better performance:
+    | - Priority-based ordering
+    | - Result caching (5-10x faster)
+    | - Metrics collection
+    | - Circuit breaker integration
+    |
+    | Set to true to enable enhanced pipeline.
+    |
+    */
+    'use_enhanced_pipeline' => env('REALTIME_ENHANCED_PIPELINE', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rate Limiting Configuration
+    |--------------------------------------------------------------------------
+    |
+    | For detailed rate limiting configuration, see:
+    | config/realtime-ratelimit.php
+    |
+    | Quick settings here for backward compatibility.
+    |
+    */
+    'rate_limiting' => [
+        'enabled' => env('REALTIME_RATELIMIT_ENABLED', true),
+        'algorithm' => env('REALTIME_RATELIMIT_ALGORITHM', 'token_bucket'),
+        'connection_limit' => (int) env('REALTIME_RATELIMIT_CONNECTION_LIMIT', 60),
+        'ip_limit' => (int) env('REALTIME_RATELIMIT_IP_LIMIT', 100),
+        'user_limit' => (int) env('REALTIME_RATELIMIT_USER_LIMIT', 1000),
     ],
 ];
