@@ -145,6 +145,48 @@ final class WebSocketTransport implements TransportInterface
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function getConnectionCount(): int
+    {
+        return count($this->connections);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function hasConnection(string $connectionId): bool
+    {
+        return isset($this->connections[$connectionId]);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function close(ConnectionInterface $connection, int $code = 1000, string $reason = ''): void
+    {
+        if (!$this->server) {
+            return;
+        }
+
+        $fd = (int) $connection->getResource();
+
+        if ($this->server->isEstablished($fd)) {
+            $this->server->close($fd, $code, $reason);
+        }
+
+        unset($this->connections[$fd]);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getName(): string
+    {
+        return 'websocket';
+    }
+
+    /**
      * Register Swoole event handlers.
      *
      * @return void
