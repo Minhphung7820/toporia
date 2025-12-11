@@ -196,6 +196,23 @@ Route::post('/send-email', function (Request $request) {
     ]);
 });
 
+// =========================================================================
+// PARALLEL LOG JOB - Demonstrates Process::runTasks() in queue
+// =========================================================================
+Route::post('/parallel-log', function (Request $request) {
+    $jobId = $request->input('job_id', uniqid('parallel_'));
+
+    // Dispatch the parallel log job to queue
+    dispatch(new \App\Infrastructure\Jobs\ParallelLogJob($jobId));
+
+    return response()->json([
+        'success' => true,
+        'message' => 'ParallelLogJob queued successfully!',
+        'job_id' => $jobId,
+        'note' => 'Run "php console queue:work" to process. Check logs for parallel task output.'
+    ]);
+});
+
 // 404 Handler - Global handler for unmatched routes
 // This will be called automatically when no route matches the request
 Route::fallback(function () {

@@ -107,9 +107,13 @@ final class ProcessManager implements ProcessManagerInterface
      *
      * @param int $maxConcurrent
      * @return array
+     * @throws \RuntimeException If called from HTTP context
      */
     public function execute(int $maxConcurrent = 4): array
     {
+        // Guard against HTTP context - fork causes serious issues in web requests
+        $this->guardAgainstHttpContext();
+
         if (!ForkProcess::isSupported()) {
             // Fallback to synchronous execution
             return $this->runSynchronous();
@@ -170,30 +174,49 @@ final class ProcessManager implements ProcessManagerInterface
     /**
      * Wait for all processes to complete.
      * Performance: O(N) where N = number of processes
-     * Optimized: Non-blocking check first, then blocking wait only when needed
+     * Uses non-blocking wait with WNOHANG to prevent blocking issues.
      *
      * @return array
      */
     public function wait(): array
     {
-        // Wait for all remaining processes
+        // Wait for all remaining processes using non-blocking approach
         while (count($this->processes) > 0) {
+            // Dispatch pending signals
+            if (function_exists('pcntl_signal_dispatch')) {
+                pcntl_signal_dispatch();
+            }
+
+            // Check for shutdown
+            if ($this->shutdownRequested) {
+                $this->killAllChildren();
+                break;
+            }
+
             foreach ($this->processes as $pid => $process) {
-                // Non-blocking check first (fast path)
-                if (!$process->isRunning()) {
-                    // Process already finished - collect output immediately
-                    $exitCode = $process->wait();
-                    $output = $process->getOutput();
-                    $this->results[] = $output;
+                // Use pcntl_waitpid with WNOHANG for non-blocking check
+                $result = pcntl_waitpid($pid, $status, WNOHANG);
+
+                if ($result === $pid) {
+                    // Process finished - set exit code BEFORE calling wait()
+                    // This prevents wait() from calling pcntl_waitpid again (double-wait)
+                    $process->setExitCode(pcntl_wexitstatus($status));
+                    $process->wait(); // Now just collects output
+                    $this->results[] = $process->getOutput();
                     unset($this->processes[$pid]);
-                } else {
-                    // Process still running - do blocking wait for this one
-                    $exitCode = $process->wait();
-                    $output = $process->getOutput();
-                    $this->results[] = $output;
+                } elseif ($result === -1) {
+                    // Error or already reaped - set exit code and collect output
+                    $process->setExitCode(0);
+                    $process->wait();
+                    $this->results[] = $process->getOutput();
                     unset($this->processes[$pid]);
-                    break; // Break to restart loop and check others
                 }
+                // result === 0 means still running, continue
+            }
+
+            // Small delay to prevent busy-waiting
+            if (!empty($this->processes)) {
+                usleep(5000); // 5ms
             }
         }
 
@@ -210,14 +233,23 @@ final class ProcessManager implements ProcessManagerInterface
     private function collectFinishedProcesses(): void
     {
         foreach ($this->processes as $pid => $process) {
-            // Non-blocking check
-            if (!$process->isRunning()) {
-                // Process finished - collect output
-                $exitCode = $process->wait();
-                $output = $process->getOutput();
-                $this->results[] = $output;
+            // Use pcntl_waitpid with WNOHANG directly to avoid double-reap
+            $result = pcntl_waitpid($pid, $status, WNOHANG);
+
+            if ($result === $pid) {
+                // Process finished - set exit code and collect output
+                $process->setExitCode(pcntl_wexitstatus($status));
+                $process->wait(); // Just collects output now
+                $this->results[] = $process->getOutput();
+                unset($this->processes[$pid]);
+            } elseif ($result === -1) {
+                // Error or already reaped
+                $process->setExitCode(0);
+                $process->wait();
+                $this->results[] = $process->getOutput();
                 unset($this->processes[$pid]);
             }
+            // result === 0 means still running
         }
     }
 
@@ -315,15 +347,47 @@ final class ProcessManager implements ProcessManagerInterface
         // Handle SIGTERM (graceful shutdown)
         pcntl_signal(SIGTERM, function () {
             $this->shutdownRequested = true;
+            $this->killAllChildren();
         });
 
-        // Handle SIGINT (Ctrl+C)
+        // Handle SIGINT (Ctrl+C) - immediate cleanup
         pcntl_signal(SIGINT, function () {
             $this->shutdownRequested = true;
+            $this->killAllChildren();
         });
 
         // Enable signal dispatching
         pcntl_async_signals(true);
+    }
+
+    /**
+     * Kill all child processes immediately.
+     * Called from signal handler for fast cleanup.
+     *
+     * @return void
+     */
+    private function killAllChildren(): void
+    {
+        foreach ($this->processes as $pid => $process) {
+            if ($process->isRunning()) {
+                // Send SIGTERM first for graceful shutdown
+                posix_kill($pid, SIGTERM);
+            }
+        }
+
+        // Give children 100ms to cleanup
+        usleep(100000);
+
+        // Force kill any remaining
+        foreach ($this->processes as $pid => $process) {
+            if ($process->isRunning()) {
+                posix_kill($pid, SIGKILL);
+            }
+            // Reap zombie processes
+            pcntl_waitpid($pid, $status, WNOHANG);
+        }
+
+        $this->processes = [];
     }
 
     /**
@@ -359,20 +423,173 @@ final class ProcessManager implements ProcessManagerInterface
     /**
      * Run tasks in parallel with concurrency limit (convenience method).
      *
-     * @param array<callable> $tasks Array of callables to execute
+     * Supports both indexed and associative arrays:
+     * - Indexed: Results returned in same order
+     * - Associative: Results keyed by original keys
+     *
+     * @param array<string|int, callable> $tasks Array of callables to execute
      * @param int $maxConcurrent Maximum concurrent processes
-     * @return array Results in order of tasks
-     * @throws \RuntimeException If called from HTTP context
+     * @param float $timeout Maximum time in seconds (0 = no timeout)
+     * @return array<string|int, mixed> Results (preserves keys if associative)
+     * @throws \RuntimeException If called from HTTP context or timeout exceeded
      */
-    public function runTasks(array $tasks, int $maxConcurrent = 4): array
+    public function runTasks(array $tasks, int $maxConcurrent = 4, float $timeout = 30.0): array
     {
         $this->guardAgainstHttpContext();
+
+        // Check if tasks have string keys (associative array)
+        $keys = array_keys($tasks);
+        $hasStringKeys = $keys !== range(0, count($tasks) - 1);
 
         foreach ($tasks as $task) {
             $this->add($task);
         }
 
-        return $this->execute($maxConcurrent);
+        $results = $this->executeWithTimeout($maxConcurrent, $timeout);
+
+        // Restore original keys if associative
+        if ($hasStringKeys) {
+            $keyedResults = [];
+            foreach ($keys as $index => $key) {
+                $keyedResults[$key] = $results[$index] ?? null;
+            }
+            return $keyedResults;
+        }
+
+        return $results;
+    }
+
+    /**
+     * Execute with timeout support.
+     *
+     * @param int $maxConcurrent
+     * @param float $timeout Timeout in seconds (0 = no timeout)
+     * @return array
+     */
+    private function executeWithTimeout(int $maxConcurrent, float $timeout): array
+    {
+        if (!ForkProcess::isSupported()) {
+            return $this->runSynchronous();
+        }
+
+        $this->results = [];
+        $pendingCount = count($this->pending);
+        $processed = 0;
+        $startTime = microtime(true);
+
+        // Start all processes up to concurrency limit
+        while ($processed < $pendingCount) {
+            // Dispatch pending signals (critical for Ctrl+C)
+            if (function_exists('pcntl_signal_dispatch')) {
+                pcntl_signal_dispatch();
+            }
+
+            // Check for shutdown signal
+            if ($this->shutdownRequested) {
+                $this->killAllChildren();
+                break;
+            }
+
+            // Check timeout
+            if ($timeout > 0 && (microtime(true) - $startTime) > $timeout) {
+                $this->killAllChildren();
+                error_log("Process::runTasks timeout after {$timeout}s");
+                break;
+            }
+
+            // Start new processes up to limit
+            while (count($this->processes) < $maxConcurrent && $processed < $pendingCount) {
+                $task = $this->pending[$processed];
+                $process = $task['process'];
+
+                if (!$process->start()) {
+                    $processed++;
+                    continue;
+                }
+
+                $pid = $process->getPid();
+                if ($pid !== null) {
+                    $this->processes[$pid] = $process;
+                }
+                $processed++;
+            }
+
+            // If all tasks started, break immediately
+            if ($processed >= $pendingCount) {
+                break;
+            }
+
+            // Check for finished processes and start new ones
+            $this->collectFinishedProcesses();
+
+            // Small delay to prevent busy-waiting
+            usleep(1000); // 1ms
+        }
+
+        // Wait for remaining processes (with timeout)
+        $remainingTimeout = $timeout > 0 ? max(0, $timeout - (microtime(true) - $startTime)) : 0;
+        $this->waitWithTimeout($remainingTimeout);
+
+        // Clear pending tasks
+        $this->pending = [];
+
+        return $this->results;
+    }
+
+    /**
+     * Wait for processes with timeout.
+     *
+     * @param float $remainingTimeout Remaining timeout in seconds (0 = no timeout)
+     * @return void
+     */
+    private function waitWithTimeout(float $remainingTimeout): void
+    {
+        $startTime = microtime(true);
+
+        while (count($this->processes) > 0) {
+            // Dispatch pending signals (critical for Ctrl+C to work)
+            if (function_exists('pcntl_signal_dispatch')) {
+                pcntl_signal_dispatch();
+            }
+
+            // Check timeout
+            if ($remainingTimeout > 0 && (microtime(true) - $startTime) > $remainingTimeout) {
+                $this->killAllChildren();
+                break;
+            }
+
+            // Check for shutdown signal
+            if ($this->shutdownRequested) {
+                $this->killAllChildren();
+                break;
+            }
+
+            // Use pcntl_waitpid with WNOHANG for non-blocking check
+            foreach ($this->processes as $pid => $process) {
+                // Non-blocking wait check
+                $result = pcntl_waitpid($pid, $status, WNOHANG);
+
+                if ($result === $pid) {
+                    // Process finished - set exit code BEFORE calling wait()
+                    $process->setExitCode(pcntl_wexitstatus($status));
+                    $process->wait(); // Now just collects output
+                    $this->results[] = $process->getOutput();
+                    unset($this->processes[$pid]);
+                } elseif ($result === -1) {
+                    // Error or already reaped - set exit code and collect output
+                    $process->setExitCode(0);
+                    $process->wait();
+                    $this->results[] = $process->getOutput();
+                    unset($this->processes[$pid]);
+                }
+                // result === 0 means still running, continue
+            }
+
+            // Small delay to prevent busy-waiting, but allow signal dispatch
+            if (!empty($this->processes)) {
+                usleep(10000); // 10ms - longer delay, less CPU
+            }
+        }
     }
 
 

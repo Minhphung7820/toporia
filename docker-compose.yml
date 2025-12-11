@@ -19,6 +19,10 @@ services:
       - ./storage/cache:/var/www/html/storage/cache
       - ./storage/framework:/var/www/html/storage/framework
     environment:
+      # Host UID/GID for permission sync (fixes file permission issues)
+      HOST_UID: ${UID:-1000}
+      HOST_GID: ${GID:-1000}
+      # Application settings
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG: ${APP_DEBUG:-true}
       DB_HOST: mysql

@@ -1408,6 +1408,75 @@ if (!function_exists('chain')) {
 }
 
 // ============================================================================
+// Concurrency Helpers
+// ============================================================================
+
+if (!function_exists('concurrency')) {
+    /**
+     * Run tasks concurrently or get Concurrency instance.
+     *
+     * Usage:
+     * - concurrency($tasks) - Run tasks in parallel
+     * - concurrency()->defer($task) - Defer task
+     * - concurrency()->driver('sync') - Get specific driver
+     *
+     * @param array<string|int, callable>|null $tasks Tasks to run (null = get instance)
+     * @return array<string|int, mixed>|\Toporia\Framework\Process\Concurrency Results or instance
+     *
+     * @example
+     * // Run parallel tasks with named results
+     * $results = concurrency([
+     *     'users' => fn() => User::all(),
+     *     'posts' => fn() => Post::recent(),
+     * ]);
+     * // $results['users'], $results['posts']
+     *
+     * // Defer task to run after response
+     * concurrency()->defer(fn() => sendEmail());
+     */
+    function concurrency(?array $tasks = null): mixed
+    {
+        if ($tasks !== null) {
+            return \Toporia\Framework\Process\Concurrency::run($tasks);
+        }
+
+        // Return proxy object for fluent API
+        return new \Toporia\Framework\Process\ConcurrencyProxy();
+    }
+}
+
+if (!function_exists('defer')) {
+    /**
+     * Defer a task to run after the response is sent.
+     *
+     * Use this for non-critical tasks like:
+     * - Sending emails
+     * - Logging analytics
+     * - Cleanup operations
+     * - Cache warming
+     *
+     * @param callable $task Task to defer
+     * @return void
+     *
+     * @example
+     * // In a controller
+     * public function store(Request $request)
+     * {
+     *     $user = User::create($request->all());
+     *
+     *     // Defer email - response sent immediately
+     *     defer(fn() => Mail::send(new WelcomeEmail($user)));
+     *
+     *     return response()->json($user);
+     * }
+     */
+    function defer(callable $task): void
+    {
+        \Toporia\Framework\Process\Concurrency::defer($task);
+    }
+}
+
+// ============================================================================
 // Translation Helpers
 // ============================================================================
 

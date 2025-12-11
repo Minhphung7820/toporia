@@ -40,7 +40,12 @@ use Toporia\Framework\Process\Contracts\ProcessInterface;
  */
 final class ForkProcess implements ProcessInterface
 {
-    private static array $collected = []; // Track which PIDs have been collected
+    /**
+     * Track which PIDs have been collected to prevent double-collection.
+     * Limited to last 1000 PIDs to prevent memory leak.
+     * @var array<string, bool>
+     */
+    private static array $collected = [];
 
     private ?int $pid = null;
     private ?int $exitCode = null;
@@ -141,6 +146,7 @@ final class ForkProcess implements ProcessInterface
 
     /**
      * Wait for process to finish.
+     * If process was already reaped externally, just collect output.
      *
      * @return int Exit code
      */
@@ -151,10 +157,22 @@ final class ForkProcess implements ProcessInterface
         }
 
         if ($this->exitCode === null) {
-            // Process still running - do blocking wait
+            // Try non-blocking wait first to check if already reaped
             $status = 0;
-            pcntl_waitpid($this->pid, $status, 0);
-            $this->exitCode = pcntl_wexitstatus($status);
+            $result = pcntl_waitpid($this->pid, $status, WNOHANG);
+
+            if ($result === $this->pid) {
+                // Process finished, got status
+                $this->exitCode = pcntl_wexitstatus($status);
+            } elseif ($result === 0) {
+                // Still running - do blocking wait
+                pcntl_waitpid($this->pid, $status, 0);
+                $this->exitCode = pcntl_wexitstatus($status);
+            } else {
+                // result === -1: Already reaped or error
+                // Set exit code to 0 (assume success) since we can't get real status
+                $this->exitCode = 0;
+            }
         }
 
         // Always collect output (whether we just waited or it was already reaped)
@@ -181,6 +199,17 @@ final class ForkProcess implements ProcessInterface
     public function getExitCode(): ?int
     {
         return $this->exitCode;
+    }
+
+    /**
+     * Set exit code (used when process is reaped externally).
+     *
+     * @param int $exitCode
+     * @return void
+     */
+    public function setExitCode(int $exitCode): void
+    {
+        $this->exitCode = $exitCode;
     }
 
     /**
@@ -247,7 +276,7 @@ final class ForkProcess implements ProcessInterface
 
     /**
      * Collect output from child process via pipe.
-     * Performance: O(1) - single read operation
+     * Performance: O(1) - single read operation with timeout
      *
      * @return void
      */
@@ -269,14 +298,32 @@ final class ForkProcess implements ProcessInterface
         // Mark as collected IMMEDIATELY
         self::$collected[$pidKey] = true;
 
+        // Prevent memory leak: keep only last 1000 PIDs
+        if (count(self::$collected) > 1000) {
+            self::$collected = array_slice(self::$collected, -500, null, true);
+        }
+
         if (!isset($this->pipes[$this->pid])) {
             return;
         }
 
         $pipe = $this->pipes[$this->pid];
 
-        // Read all available data
+        // Read output - use blocking mode for simplicity and speed
+        // Child process has already exited, so data is ready
+        stream_set_blocking($pipe, true);
+
+        // Set read timeout (100ms should be enough for buffered data)
+        stream_set_timeout($pipe, 0, 100000);
+
+        // Read all available data at once
         $serialized = stream_get_contents($pipe);
+
+        // Check for timeout (shouldn't happen with exited process)
+        $meta = stream_get_meta_data($pipe);
+        if ($meta['timed_out']) {
+            error_log("Process output read timed out for PID: {$this->pid}");
+        }
 
         // Close and cleanup
         fclose($pipe);
@@ -284,7 +331,7 @@ final class ForkProcess implements ProcessInterface
 
         // Deserialize output
         // SECURITY: Restrict unserialize to prevent PHP Object Injection attacks
-        if ($serialized !== false && $serialized !== '') {
+        if ($serialized !== '') {
             try {
                 $this->output = unserialize($serialized, ['allowed_classes' => false]);
             } catch (\Throwable $e) {

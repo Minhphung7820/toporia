@@ -26,7 +26,7 @@ use Toporia\Framework\Process\Contracts\ProcessInterface;
  *
  * @method static ProcessManager manager() Get ProcessManager instance
  * @method static ProcessPool pool(?int $workerCount = null) Get ProcessPool instance
- * @method static array runTasks(array $tasks, int $maxConcurrent = 4) Run tasks in parallel
+ * @method static array runTasks(array $tasks, int $maxConcurrent = 4, float $timeout = 30.0) Run tasks in parallel with timeout
  * @method static array run(int $maxConcurrent = 4) Execute all pending processes
  * @method static array map(array $items, callable $callback, ?int $workerCount = null) Map array in parallel
  * @method static array filter(array $items, callable $callback, ?int $workerCount = null) Filter array in parallel
