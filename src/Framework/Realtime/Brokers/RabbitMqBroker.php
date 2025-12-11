@@ -226,6 +226,16 @@ final class RabbitMqBroker implements BrokerInterface, HealthCheckableInterface
         $channelName = $this->routingMap[$routingKey] ?? $routingKey;
         $callback = $this->subscriptions[$channelName] ?? null;
 
+        // If no direct match, check for pattern subscriptions
+        if (!$callback) {
+            foreach ($this->subscriptions as $key => $cb) {
+                if (str_starts_with($key, '__pattern__')) {
+                    $callback = $cb;
+                    break;
+                }
+            }
+        }
+
         if (!$callback) {
             $message->ack();
             return;
