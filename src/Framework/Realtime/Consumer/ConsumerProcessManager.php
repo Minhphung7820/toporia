@@ -581,17 +581,49 @@ final class ConsumerProcessManager
 
     /**
      * Clear all process data (use with caution).
+     * This will also kill all running consumer processes.
      *
-     * @return void
+     * @param bool $killProcesses Whether to kill OS processes before clearing
+     * @return int Number of processes killed
      */
-    public function clearAll(): void
+    public function clearAll(bool $killProcesses = true): int
     {
         $processIds = $this->getProcessIds();
+        $killed = 0;
 
         foreach ($processIds as $processId) {
+            if ($killProcesses) {
+                $data = $this->getProcessData($processId);
+                if ($data !== null) {
+                    $pid = $data['pid'] ?? 0;
+                    $status = $data['status'] ?? '';
+
+                    // Kill running processes
+                    if ($pid > 0 && $status === self::STATUS_RUNNING) {
+                        if (function_exists('posix_kill') && $this->isOsProcessRunning($pid)) {
+                            // Try graceful shutdown first (SIGTERM)
+                            posix_kill($pid, SIGTERM);
+                            $killed++;
+
+                            // Give process 100ms to exit gracefully
+                            usleep(100000);
+
+                            // Force kill if still running
+                            if ($this->isOsProcessRunning($pid)) {
+                                posix_kill($pid, SIGKILL);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Delete process data from cache
             $this->cache->delete(self::CACHE_PREFIX . $processId);
         }
 
+        // Clear the index
         $this->cache->delete(self::INDEX_KEY);
+
+        return $killed;
     }
 }

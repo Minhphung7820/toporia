@@ -267,15 +267,19 @@ final class BrokerConsumerStatusCommand extends Command
 
     private function runClearAll(): int
     {
-        $this->warn("This will clear ALL consumer process data from cache.");
+        $this->warn("This will KILL all running consumer processes and clear ALL process data.");
 
         if (!$this->confirm("Are you sure you want to continue?")) {
             $this->info("Operation cancelled.");
             return 0;
         }
 
-        $this->processManager->clearAll();
+        $this->info("Killing consumer processes...");
+        $killed = $this->processManager->clearAll(killProcesses: true);
 
+        if ($killed > 0) {
+            $this->success("Killed <fg=cyan>{$killed}</> consumer process(es).");
+        }
         $this->success("All consumer process data has been cleared.");
         return 0;
     }
