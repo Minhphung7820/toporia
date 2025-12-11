@@ -747,6 +747,9 @@ final class RabbitMQQueue implements QueueInterface
     /**
      * Declare delayed queue with TTL and dead letter exchange.
      *
+     * queue_declare signature:
+     * queue_declare($queue, $passive, $durable, $exclusive, $auto_delete, $nowait, $arguments, $ticket)
+     *
      * @param string $delayedQueue
      * @param string $targetQueue
      * @param int $ttl
@@ -755,21 +758,21 @@ final class RabbitMQQueue implements QueueInterface
     private function declareDelayedQueue(string $delayedQueue, string $targetQueue, int $ttl): void
     {
         $channel = $this->getChannel();
-        $arguments = [
+        $arguments = new AMQPTable([
             'x-message-ttl' => $ttl * 1000, // TTL in milliseconds
             'x-dead-letter-exchange' => $this->exchange,
             'x-dead-letter-routing-key' => $targetQueue,
-        ];
+        ]);
 
+        // queue_declare($queue, $passive, $durable, $exclusive, $auto_delete, $nowait, $arguments)
         $channel->queue_declare(
-            $delayedQueue,
-            false,
-            $this->durable,
-            false,
-            true, // Auto-delete
-            false,
-            false,
-            new AMQPTable($arguments)
+            $delayedQueue,  // queue name
+            false,          // passive
+            $this->durable, // durable
+            false,          // exclusive
+            true,           // auto_delete
+            false,          // nowait
+            $arguments      // arguments (AMQPTable)
         );
 
         $channel->queue_bind($delayedQueue, $this->exchange, $delayedQueue);
