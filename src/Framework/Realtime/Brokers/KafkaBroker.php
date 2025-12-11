@@ -74,9 +74,12 @@ final class KafkaBroker implements BrokerInterface, HealthCheckableInterface
         }
 
         $topicName = $this->getTopicName($channel);
-        $partition = $this->getPartition($channel, $topicName);
         $key = $this->getMessageKey($channel);
         $payload = $message->toJson();
+
+        // Use null partition to let Kafka auto-assign based on key
+        // This avoids "Unknown partition" errors when topic has fewer partitions than calculated
+        $partition = null;
 
         try {
             $this->client->publish($topicName, $payload, $partition, $key);

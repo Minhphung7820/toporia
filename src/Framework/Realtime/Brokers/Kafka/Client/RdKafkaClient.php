@@ -116,6 +116,13 @@ final class RdKafkaClient implements KafkaClientInterface
         $producerConf->setErrorCb($errorCallback);
         $producerConf->setLogCb($logCallback);
 
+        // Delivery report callback for tracking message delivery
+        $producerConf->setDrMsgCb(function ($_kafka, $message): void {
+            if ($message->err) {
+                error_log("[Kafka] Delivery failed: " . rd_kafka_err2str($message->err));
+            }
+        });
+
         foreach ($this->producerConfig as $key => $value) {
             $producerConf->set($key, (string) $value);
         }
@@ -197,6 +204,13 @@ final class RdKafkaClient implements KafkaClientInterface
         // Periodic flush
         $now = (int) (microtime(true) * 1000);
         if ($now - $this->lastFlushTime >= $this->flushIntervalMs) {
+            $this->flushBuffer();
+            return;
+        }
+
+        // For HTTP/short-lived requests: flush immediately to ensure delivery
+        // In long-running processes (WebSocket server), batching provides better performance
+        if (!$this->consuming) {
             $this->flushBuffer();
         }
     }
@@ -328,8 +342,10 @@ final class RdKafkaClient implements KafkaClientInterface
 
     /**
      * Flush message buffer.
+     *
+     * @param bool $sync If true, wait for messages to be delivered (for HTTP requests)
      */
-    private function flushBuffer(): void
+    private function flushBuffer(bool $sync = true): void
     {
         if (empty($this->messageBuffer) || $this->producer === null) {
             return;
@@ -349,13 +365,26 @@ final class RdKafkaClient implements KafkaClientInterface
             }
         }
 
-        // Non-blocking poll
-        for ($i = 0; $i < 5; $i++) {
-            $this->producer->poll(0);
-        }
-
         $this->messageBuffer = [];
         $this->lastFlushTime = (int) (microtime(true) * 1000);
+
+        // Sync flush: wait for messages to be delivered
+        // This ensures HTTP requests don't return before messages are sent
+        if ($sync) {
+            // Poll to trigger delivery callbacks (max 100ms total)
+            for ($i = 0; $i < 5; $i++) {
+                $events = $this->producer->poll(20);
+                if ($events === 0) {
+                    break; // No more events to process
+                }
+            }
+
+            // Final flush with short timeout (500ms max)
+            $this->producer->flush(500);
+        } else {
+            // Async: just poll without waiting
+            $this->producer->poll(0);
+        }
     }
 
     /**

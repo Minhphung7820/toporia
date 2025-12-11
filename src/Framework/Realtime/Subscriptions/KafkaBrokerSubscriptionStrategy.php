@@ -8,9 +8,6 @@ use Toporia\Framework\Realtime\Contracts\BrokerSubscriptionStrategyInterface;
 use Toporia\Framework\Realtime\Brokers\Kafka\Client\KafkaClientFactory;
 use Toporia\Framework\Realtime\Brokers\Kafka\Client\KafkaClientInterface;
 use Toporia\Framework\Realtime\Brokers\Kafka\Client\KafkaMessage;
-use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyFactory;
-use Toporia\Framework\Realtime\Contracts\TopicStrategyInterface;
-use Toporia\Framework\Realtime\Message;
 
 /**
  * Class KafkaBrokerSubscriptionStrategy
@@ -47,7 +44,6 @@ final class KafkaBrokerSubscriptionStrategy implements BrokerSubscriptionStrateg
 {
     private array $config;
     private ?KafkaClientInterface $client = null;
-    private ?TopicStrategyInterface $topicStrategy = null;
 
     /**
      * @param array $config Kafka configuration
@@ -65,7 +61,7 @@ final class KafkaBrokerSubscriptionStrategy implements BrokerSubscriptionStrateg
         callable $messageHandler,
         callable $isRunning
     ): void {
-        \Swoole\Coroutine::create(function () use ($server, $messageHandler, $isRunning) {
+        \Swoole\Coroutine::create(function () use ($messageHandler, $isRunning) {
             // Configuration with defaults
             $brokers = $this->config['brokers'] ?? explode(',', env('KAFKA_BROKERS', 'localhost:9092'));
             $consumerGroup = $this->config['consumer_group'] ?? env('KAFKA_CONSUMER_GROUP', 'realtime-servers');
@@ -79,7 +75,6 @@ final class KafkaBrokerSubscriptionStrategy implements BrokerSubscriptionStrateg
             $maxDelay = 30.0;
             $currentDelay = $baseDelay;
             $consecutiveFailures = 0;
-            $maxConsecutiveErrors = 5;
 
             // Topics to subscribe (using topic strategy)
             $topics = $this->getSubscriptionTopics($topicPrefix, $defaultTopic);
@@ -87,10 +82,6 @@ final class KafkaBrokerSubscriptionStrategy implements BrokerSubscriptionStrateg
             // Auto-reconnect loop
             while ($isRunning()) {
                 try {
-                    echo "[Kafka Broker] Connecting to " . implode(',', $brokers) . "...\n";
-                    echo "[Kafka Broker] Consumer group: {$consumerGroup}\n";
-                    echo "[Kafka Broker] Topics: " . implode(', ', $topics) . "\n";
-
                     // Create Kafka client
                     $this->client = KafkaClientFactory::create(array_merge($this->config, [
                         'brokers' => $brokers,
@@ -106,8 +97,6 @@ final class KafkaBrokerSubscriptionStrategy implements BrokerSubscriptionStrateg
                     // Reset backoff on successful connection
                     $consecutiveFailures = 0;
                     $currentDelay = $baseDelay;
-                    echo "[Kafka Broker] Connected and consuming from topics: " . implode(', ', $topics) . "\n";
-                    echo "[Kafka Broker] Client: {$this->client->getName()}\n";
 
                     // Message buffer for batch processing
                     $messageBuffer = [];
@@ -178,7 +167,6 @@ final class KafkaBrokerSubscriptionStrategy implements BrokerSubscriptionStrateg
 
                             // If consume returns normally, something went wrong
                             if ($isRunning()) {
-                                echo "[Kafka Broker] Consumer stopped unexpectedly, reconnecting...\n";
                                 break;
                             }
 
@@ -190,10 +178,8 @@ final class KafkaBrokerSubscriptionStrategy implements BrokerSubscriptionStrateg
 
                 } catch (\Throwable $e) {
                     $consecutiveFailures++;
-                    echo "[Kafka Broker] Error: {$e->getMessage()} (attempt #{$consecutiveFailures})\n";
-
                     $currentDelay = min($baseDelay * pow(2, $consecutiveFailures - 1), $maxDelay);
-                    echo "[Kafka Broker] Retrying in {$currentDelay}s...\n";
+                    error_log("[Kafka Broker] Connection error: {$e->getMessage()}, retrying in {$currentDelay}s...");
                 } finally {
                     // Clean up client
                     try {
@@ -211,7 +197,6 @@ final class KafkaBrokerSubscriptionStrategy implements BrokerSubscriptionStrateg
                 }
             }
 
-            echo "[Kafka Broker] Subscription stopped\n";
         });
     }
 
