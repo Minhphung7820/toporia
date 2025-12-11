@@ -54,11 +54,15 @@ final class RealtimeServeCommand extends Command
         $host = $this->option('host', '0.0.0.0');
         $port = (int) $this->option('port', 6001);
 
-        $this->info("Starting Realtime Server");
-        $this->line("Transport: {$transport}");
-        $this->line("Host: {$host}");
-        $this->line("Port: {$port}");
-        $this->line(str_repeat('-', 50));
+        $this->newLine();
+        $this->info("╔════════════════════════════════════════════════════════════╗");
+        $this->info("║                   Realtime Server                           ║");
+        $this->info("╠════════════════════════════════════════════════════════════╣");
+        $this->writeln("║ Transport: <fg=cyan>" . str_pad($transport, 48) . "</> ║");
+        $this->writeln("║ Host:      <fg=cyan>" . str_pad($host, 48) . "</> ║");
+        $this->writeln("║ Port:      <fg=cyan>" . str_pad((string) $port, 48) . "</> ║");
+        $this->info("╚════════════════════════════════════════════════════════════╝");
+        $this->newLine();
 
         // Check transport requirements
         if ($transport === 'websocket') {
@@ -116,13 +120,13 @@ final class RealtimeServeCommand extends Command
         $brokerName = config('realtime.default_broker') ?: env('REALTIME_BROKER');
 
         if (!$brokerName) {
-            $this->line('Broker: none (single server mode)');
+            $this->writeln('Broker: <fg=gray>none (single server mode)</>');
             return;
         }
 
         // Broker subscription is handled by the transport itself in workerStart event
         // Just display info here
-        $this->line("Broker: {$brokerName} (subscription handled by transport)");
+        $this->writeln("Broker: <fg=green>{$brokerName}</> (subscription handled by transport)");
     }
 
     /**
@@ -142,9 +146,9 @@ final class RealtimeServeCommand extends Command
         // No need to register pcntl_signal as it conflicts with Swoole's event loop
 
         // Display shutdown instructions
-        $this->line('');
-        $this->info('Press Ctrl+C to stop the server');
-        $this->line('Or run: php console realtime:stop');
-        $this->line('');
+        $this->newLine();
+        $this->writeln('<fg=yellow>Press Ctrl+C to stop the server</>');
+        $this->writeln('Or run: <fg=cyan>php console realtime:stop</>');
+        $this->newLine();
     }
 }

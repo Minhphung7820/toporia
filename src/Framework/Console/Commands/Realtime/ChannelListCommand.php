@@ -32,8 +32,14 @@ final class ChannelListCommand extends Command
         // Look for channel definitions in routes/channels.php
         $channelsPath = $this->getBasePath() . '/routes/channels.php';
 
+        $this->newLine();
+        $this->info("╔════════════════════════════════════════════════════════════╗");
+        $this->info("║                  Broadcast Channels                         ║");
+        $this->info("╚════════════════════════════════════════════════════════════╝");
+        $this->newLine();
+
         if (!file_exists($channelsPath)) {
-            $this->info('No channels file found at routes/channels.php');
+            $this->warn('No channels file found at routes/channels.php');
             return 0;
         }
 
@@ -43,19 +49,49 @@ final class ChannelListCommand extends Command
         $channels = $this->parseChannels($content);
 
         if (empty($channels)) {
-            $this->info('No broadcast channels defined.');
+            $this->warn('No broadcast channels defined.');
             return 0;
         }
 
-        $this->table(
-            ['Channel', 'Type'],
-            $channels
-        );
+        // Display header
+        $this->writeln(sprintf(
+            "  %-40s %-15s",
+            "Channel",
+            "Type"
+        ));
+        $this->writeln("  " . str_repeat("-", 55));
+
+        // Display each channel with color
+        foreach ($channels as $channel) {
+            $channelName = $channel[0];
+            $channelType = $channel[1];
+            $typeColored = $this->getTypeColored($channelType);
+
+            $this->writeln(sprintf(
+                "  %-40s %s",
+                $channelName,
+                $typeColored
+            ));
+        }
 
         $this->newLine();
-        $this->info('Total: ' . count($channels) . ' channel(s)');
+        $this->writeln("Total: <fg=green>" . count($channels) . "</> channel(s)");
 
         return 0;
+    }
+
+    /**
+     * Get colored type label.
+     */
+    private function getTypeColored(string $type): string
+    {
+        return match ($type) {
+            'Private' => '<fg=yellow>Private</>',
+            'Presence' => '<fg=magenta>Presence</>',
+            'Dynamic' => '<fg=cyan>Dynamic</>',
+            'Public' => '<fg=green>Public</>',
+            default => $type,
+        };
     }
 
     private function parseChannels(string $content): array

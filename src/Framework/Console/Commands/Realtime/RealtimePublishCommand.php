@@ -42,7 +42,8 @@ final class RealtimePublishCommand extends Command
         $driver = $this->option('driver') ?: config('realtime.default_broker', 'redis');
         $event = $this->option('event') ?: 'test';
 
-        $this->info("Publishing to channel [{$channel}] using [{$driver}] driver...");
+        $this->newLine();
+        $this->writeln("Publishing to channel <fg=cyan>[{$channel}]</> using <fg=green>[{$driver}]</> driver...");
 
         try {
             // Parse message as JSON if possible
@@ -64,7 +65,7 @@ final class RealtimePublishCommand extends Command
 
             if ($broker === null) {
                 $this->error("Broker [{$driver}] is not configured or available.");
-                $this->info("Available brokers: redis, rabbitmq, kafka");
+                $this->writeln("Available brokers: <fg=cyan>redis</>, <fg=cyan>rabbitmq</>, <fg=cyan>kafka</>");
                 return 1;
             }
 
@@ -72,25 +73,26 @@ final class RealtimePublishCommand extends Command
             $message = Message::event($channel, $event, $data);
             $broker->publish($channel, $message);
 
+            $this->newLine();
             $this->success("Message published successfully!");
             $this->newLine();
             $this->info("Details:");
-            $this->info("  Channel: {$channel}");
-            $this->info("  Event: {$event}");
-            $this->info("  Driver: {$driver}");
-            $this->info("  Data: " . json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $this->writeln("  Channel: <fg=cyan>{$channel}</>");
+            $this->writeln("  Event:   <fg=cyan>{$event}</>");
+            $this->writeln("  Driver:  <fg=green>{$driver}</>");
+            $this->writeln("  Data:    <fg=gray>" . json_encode($data, JSON_UNESCAPED_UNICODE) . "</>");
         } catch (BrokerException $e) {
             $this->error("Broker error: {$e->getMessage()}");
             $context = $e->getContext();
             if (!empty($context)) {
-                $this->info("Context: " . json_encode($context, JSON_PRETTY_PRINT));
+                $this->writeln("Context: <fg=gray>" . json_encode($context, JSON_PRETTY_PRINT) . "</>");
             }
             return 1;
         } catch (\Throwable $e) {
             $this->error("Failed to publish: {$e->getMessage()}");
             if ($this->isVerbose()) {
-                $this->info("Stack trace:");
-                $this->line($e->getTraceAsString());
+                $this->writeln("Stack trace:");
+                $this->writeln("<fg=gray>{$e->getTraceAsString()}</>");
             }
             return 1;
         }

@@ -37,13 +37,17 @@ final class RealtimeStopCommand extends Command
     {
         $port = $this->option('port');
 
-        $this->info('Stopping Realtime Server...');
+        $this->newLine();
+        $this->info("╔════════════════════════════════════════════════════════════╗");
+        $this->info("║                Stop Realtime Server                         ║");
+        $this->info("╚════════════════════════════════════════════════════════════╝");
+        $this->newLine();
 
         $killed = 0;
 
         // Method 1: Kill by port if specified
         if ($port) {
-            $this->line("Stopping server on port {$port}...");
+            $this->writeln("Stopping server on port <fg=cyan>{$port}</>...");
             $killed += $this->killByPort((int) $port);
         }
 
@@ -81,7 +85,7 @@ final class RealtimeStopCommand extends Command
         foreach ($output as $pid) {
             $pid = trim($pid);
             if ($pid && is_numeric($pid)) {
-                $this->line("Killing PID {$pid} on port {$port}...");
+                $this->writeln("  <fg=yellow>→</> Sending SIGTERM to PID <fg=cyan>{$pid}</> on port {$port}");
                 posix_kill((int) $pid, SIGTERM);
                 $killed++;
             }
@@ -95,7 +99,7 @@ final class RealtimeStopCommand extends Command
             foreach ($stillRunning as $pid) {
                 $pid = trim($pid);
                 if ($pid && is_numeric($pid)) {
-                    $this->warn("Force killing PID {$pid}...");
+                    $this->writeln("  <fg=red>✗</> Force killing PID <fg=cyan>{$pid}</>...");
                     posix_kill((int) $pid, SIGKILL);
                 }
             }
@@ -122,7 +126,7 @@ final class RealtimeStopCommand extends Command
             $pid = trim($pid);
             // Skip our own process
             if ($pid && is_numeric($pid) && (int) $pid !== getmypid()) {
-                $this->line("Killing process {$pid} ({$pattern})...");
+                $this->writeln("  <fg=yellow>→</> Sending SIGTERM to PID <fg=cyan>{$pid}</> (pattern: {$pattern})");
                 posix_kill((int) $pid, SIGTERM);
                 $killed++;
             }
