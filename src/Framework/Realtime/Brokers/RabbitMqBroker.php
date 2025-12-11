@@ -175,6 +175,9 @@ final class RabbitMqBroker implements BrokerInterface, HealthCheckableInterface
 
     /**
      * Consume messages from RabbitMQ queue.
+     *
+     * This method processes messages for a limited time then returns,
+     * allowing the caller to perform other tasks (heartbeat, signal handling).
      */
     public function consume(int $timeoutMs = 1000, int $batchSize = 100): void
     {
@@ -205,18 +208,18 @@ final class RabbitMqBroker implements BrokerInterface, HealthCheckableInterface
         }
 
         $timeoutSeconds = max($timeoutMs, 1000) / 1000;
+        $messagesProcessed = 0;
 
-        try {
-            while ($this->consuming && $this->channel->is_consuming()) {
-                try {
-                    $this->channel->wait(null, false, $timeoutSeconds);
-                } catch (AMQPTimeoutException) {
-                    // Timeout is used to periodically check $this->consuming
-                    continue;
-                }
+        // Process messages for limited iterations, then return to allow heartbeat
+        // This prevents blocking the main loop indefinitely
+        while ($this->consuming && $this->channel->is_consuming() && $messagesProcessed < $batchSize) {
+            try {
+                $this->channel->wait(null, false, $timeoutSeconds);
+                $messagesProcessed++;
+            } catch (AMQPTimeoutException) {
+                // Timeout reached, return control to caller for heartbeat/signal handling
+                return;
             }
-        } finally {
-            $this->stopConsuming();
         }
     }
 

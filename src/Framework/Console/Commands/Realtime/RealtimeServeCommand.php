@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Toporia\Framework\Console\Commands;
+namespace Toporia\Framework\Console\Commands\Realtime;
 
 use Toporia\Framework\Console\Command;
 use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;

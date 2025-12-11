@@ -142,13 +142,14 @@ final class ConsoleServiceProvider extends ServiceProvider
       'event:generate' => \Toporia\Framework\Console\Commands\Event\EventGenerateCommand::class,
 
       // Realtime commands
-      'realtime:serve' => \Toporia\Framework\Console\Commands\RealtimeServeCommand::class,
-      'realtime:stop' => \Toporia\Framework\Console\Commands\RealtimeStopCommand::class,
+      'realtime:serve' => \Toporia\Framework\Console\Commands\Realtime\RealtimeServeCommand::class,
+      'realtime:stop' => \Toporia\Framework\Console\Commands\Realtime\RealtimeStopCommand::class,
       'realtime:health' => \Toporia\Framework\Console\Commands\Realtime\RealtimeHealthCommand::class,
       'realtime:publish' => \Toporia\Framework\Console\Commands\Realtime\RealtimePublishCommand::class,
       'channel:list' => \Toporia\Framework\Console\Commands\Realtime\ChannelListCommand::class,
-      'broker:consume' => \Toporia\Framework\Console\Commands\Realtime\BrokerConsumeCommand::class,
-      'broker:stop' => \Toporia\Framework\Console\Commands\Realtime\BrokerStopCommand::class,
+      'broker:consume' => \Toporia\Framework\Console\Commands\Realtime\BrokerHandlerConsumeCommand::class,
+      'broker:consumers' => \Toporia\Framework\Console\Commands\Realtime\BrokerConsumersListCommand::class,
+      'broker:consumer:status' => \Toporia\Framework\Console\Commands\Realtime\BrokerConsumerStatusCommand::class,
 
       // Notification commands
       'notification:table' => \Toporia\Framework\Console\Commands\Notification\NotificationTableCommand::class,

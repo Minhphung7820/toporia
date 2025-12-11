@@ -249,15 +249,16 @@ final class RdKafkaClient implements KafkaClientInterface
 
         $this->consuming = true;
         $this->consecutiveErrors = 0;
-        $batch = [];
-        $lastBatchFlushTime = (int) (microtime(true) * 1000);
+        $messagesProcessed = 0;
 
-        while ($this->consuming) {
+        // Process up to batchSize messages, then return to allow heartbeat
+        while ($this->consuming && $messagesProcessed < $batchSize) {
             try {
                 $message = $this->consumer->consume($timeoutMs);
 
                 if ($message === null) {
-                    continue;
+                    // Timeout with no message - return control to caller
+                    return;
                 }
 
                 $kafkaMessage = KafkaMessage::fromRdKafka($message);
@@ -265,14 +266,14 @@ final class RdKafkaClient implements KafkaClientInterface
                 // Handle errors
                 if ($kafkaMessage->hasError()) {
                     if ($kafkaMessage->isEof() || $kafkaMessage->isTimeout()) {
-                        // Normal, continue
+                        // Normal timeout/EOF - return control to caller for heartbeat
                         $this->consecutiveErrors = 0;
-                        continue;
+                        return;
                     }
 
                     if ($kafkaMessage->isUnknownTopicOrPartition()) {
                         $this->handleUnknownTopicError();
-                        continue;
+                        return;
                     }
 
                     // Other errors
@@ -293,19 +294,7 @@ final class RdKafkaClient implements KafkaClientInterface
                     break;
                 }
 
-                $batch[] = $kafkaMessage;
-
-                // Process batch when full
-                if (count($batch) >= $batchSize) {
-                    $batch = [];
-                }
-
-                // Periodic batch flush
-                $now = (int) (microtime(true) * 1000);
-                if ($now - $lastBatchFlushTime >= 100) {
-                    $batch = [];
-                    $lastBatchFlushTime = $now;
-                }
+                $messagesProcessed++;
 
             } catch (BrokerException $e) {
                 throw $e;
