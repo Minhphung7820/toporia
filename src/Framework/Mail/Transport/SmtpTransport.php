@@ -117,13 +117,13 @@ final class SmtpTransport extends AbstractTransport
             return false;
         }
 
-        try {
-            $this->sendCommand('NOOP');
-            return true;
-        } catch (\Throwable) {
-            $this->disconnect();
-            return false;
+        $isAlive = $this->isConnectionAlive();
+
+        if (!$isAlive) {
+            $this->forceDisconnect();
         }
+
+        return $isAlive;
     }
 
     /**
@@ -225,12 +225,24 @@ final class SmtpTransport extends AbstractTransport
     /**
      * Connect to SMTP server.
      *
+     * Handles connection reuse with health check to detect stale/dead connections
+     * (e.g., Gmail closes idle connections after ~5-10 minutes).
+     *
      * @throws TransportException
      */
     private function connect(): void
     {
+        // Check if existing connection is still alive
         if ($this->connected && $this->socket !== null) {
-            return;
+            if ($this->isConnectionAlive()) {
+                return; // Connection still healthy, reuse it
+            }
+
+            // Connection is dead/stale, close and reconnect
+            if ($this->debug) {
+                $this->log('debug', 'SMTP connection is stale, reconnecting...', []);
+            }
+            $this->forceDisconnect();
         }
 
         $host = $this->encryption === 'ssl' ? "ssl://{$this->host}" : $this->host;
@@ -598,6 +610,53 @@ final class SmtpTransport extends AbstractTransport
     }
 
     /**
+     * Check if SMTP connection is still alive.
+     *
+     * Uses NOOP command which is lightweight and resets server idle timer.
+     * Gmail closes idle connections after ~5-10 minutes.
+     *
+     * @return bool True if connection is healthy
+     */
+    private function isConnectionAlive(): bool
+    {
+        if ($this->socket === null) {
+            return false;
+        }
+
+        // Check socket status first
+        $meta = stream_get_meta_data($this->socket);
+        if ($meta['eof'] || $meta['timed_out']) {
+            return false;
+        }
+
+        try {
+            // NOOP is a lightweight command to check connection health
+            // It also resets the server's idle timer
+            $response = $this->sendCommand('NOOP');
+            return $this->isSuccessResponse($response);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Force disconnect without sending QUIT command.
+     *
+     * Used when connection is already dead/stale and QUIT would fail.
+     */
+    private function forceDisconnect(): void
+    {
+        if ($this->socket !== null) {
+            @fclose($this->socket);
+            $this->socket = null;
+        }
+
+        $this->connected = false;
+        $this->authenticated = false;
+        $this->capabilities = [];
+    }
+
+    /**
      * Disconnect from server.
      */
     public function disconnect(): void
@@ -609,7 +668,7 @@ final class SmtpTransport extends AbstractTransport
                 // Ignore errors during disconnect
             }
 
-            fclose($this->socket);
+            @fclose($this->socket);
             $this->socket = null;
         }
 

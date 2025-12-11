@@ -602,14 +602,30 @@ if (!function_exists('broadcast')) {
     /**
      * Broadcast realtime event to a channel.
      *
-     * @param string $channel Channel name
-     * @param string $event Event name
-     * @param mixed $data Event data
-     * @return void
+     * Usage:
+     *   broadcast('channel', 'event', $data);                    // Quick send
+     *   broadcast('channel', 'event', $data, 'kafka');           // With driver
+     *   broadcast()->channel('ch')->event('ev')->with($d)->now(); // Fluent API
+     *
+     * @param string|null $channel Channel name (null for fluent API)
+     * @param string|null $event Event name
+     * @param array $data Event data
+     * @param string|null $driver Broker driver (redis, rabbitmq, kafka)
+     * @return \Toporia\Framework\Realtime\Broadcast|bool
      */
-    function broadcast(string $channel, string $event, mixed $data): void
-    {
-        app('realtime')->broadcast($channel, $event, $data);
+    function broadcast(
+        ?string $channel = null,
+        ?string $event = null,
+        array $data = [],
+        ?string $driver = null
+    ): \Toporia\Framework\Realtime\Broadcast|bool {
+        // Fluent API mode: broadcast()->channel('ch')->...
+        if ($channel === null) {
+            return \Toporia\Framework\Realtime\Broadcast::create();
+        }
+
+        // Quick send mode: broadcast('channel', 'event', $data)
+        return \Toporia\Framework\Realtime\Broadcast::send($channel, $event ?? 'message', $data, $driver);
     }
 }
 
