@@ -128,7 +128,6 @@ Route::get('/broker/health', [BrokerTestController::class, 'health']);
 use Toporia\Framework\Realtime\Auth\BroadcastAuthController;
 
 // Channel authorization endpoint (Pusher-compatible)
-Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate']);
 
 // Internal endpoint for realtime server to verify session auth
 Route::post('/broadcasting/verify-session', [BroadcastAuthController::class, 'verifySession']);

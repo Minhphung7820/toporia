@@ -57,7 +57,6 @@ declare(strict_types=1);
 use Toporia\Framework\Realtime\ChannelRoute;
 use Toporia\Framework\Realtime\Broadcast;
 
-Broadcast::routes();
 // ============================================================================
 // PUBLIC CHANNELS - No authentication required
 // ============================================================================
