@@ -112,6 +112,14 @@ Route::get('/relationships/has-many', [RelationshipTestController::class, 'testH
 Route::get('/relationships/has-many-through', [RelationshipTestController::class, 'testHasManyThrough']);
 Route::get('/relationships/belongs-to-many', [RelationshipTestController::class, 'testBelongsToMany']);
 
+// =========================================================================
+// BROKER TESTING ROUTES (Producer)
+// =========================================================================
+use App\Presentation\Http\Controllers\Api\BrokerTestController;
+
+Route::post('/broker/publish', [BrokerTestController::class, 'publish']);
+Route::get('/broker/health', [BrokerTestController::class, 'health']);
+
 // Simple Queue + Mail Test
 Route::post('/send-email', function (Request $request) {
     $to = $request->input('to', 'minhphung485@gmail.com');
