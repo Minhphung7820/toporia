@@ -219,8 +219,9 @@ final class BroadcastAuthenticator
             // If callback has more parameters than user + channel params, pass guard
             // Callback signature: function($user, ...$channelParams, $guard = null)
             if ($paramCount > count($params) + 1 && $guardName !== null) {
-                // Append guard as last parameter
-                $result = $callback($user, ...$params, $guardName);
+                // Append guard to params array before unpacking
+                $paramsWithGuard = array_merge($params, [$guardName]);
+                $result = $callback($user, ...$paramsWithGuard);
             } else {
                 $result = $callback($user, ...$params);
             }

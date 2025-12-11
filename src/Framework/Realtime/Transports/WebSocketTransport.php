@@ -626,7 +626,9 @@ final class WebSocketTransport implements TransportInterface
 
                 // If callback has more parameters than user + channel params, pass guard
                 if ($paramCount > count($params) + 1 && $connectionGuard !== null) {
-                    $result = $callback($user, ...$params, $connectionGuard);
+                    // Append guard to params array before unpacking
+                    $paramsWithGuard = array_merge($params, [$connectionGuard]);
+                    $result = $callback($user, ...$paramsWithGuard);
                 } else {
                     $result = $callback($user, ...$params);
                 }
