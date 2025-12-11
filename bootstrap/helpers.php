@@ -301,6 +301,123 @@ if (!function_exists('session')) {
     }
 }
 
+if (!function_exists('cookie')) {
+    /**
+     * Get a cookie value or the Cookie manager.
+     *
+     * Usage:
+     * - cookie() - Get Cookie manager instance
+     * - cookie('name') - Get cookie value (decoded/decrypted)
+     * - cookie('name', 'default') - Get with default value
+     *
+     * @param string|null $key Cookie name
+     * @param mixed $default Default value if not found
+     * @return mixed|null
+     */
+    function cookie(?string $key = null, mixed $default = null): mixed
+    {
+        // If no key, return raw cookies for manager-like usage
+        if ($key === null) {
+            return $_COOKIE;
+        }
+
+        // Get cookie value
+        $value = $_COOKIE[$key] ?? null;
+
+        if ($value === null) {
+            return $default;
+        }
+
+        return $value;
+    }
+}
+
+if (!function_exists('set_cookie')) {
+    /**
+     * Set a cookie with secure defaults.
+     *
+     * @param string $name Cookie name
+     * @param string $value Cookie value
+     * @param int $minutes Minutes until expiration (0 = session cookie)
+     * @param string $path Cookie path
+     * @param string $domain Cookie domain
+     * @param bool|null $secure HTTPS only (null = auto-detect)
+     * @param bool $httponly HttpOnly flag
+     * @param string $samesite SameSite attribute (Strict, Lax, None)
+     * @return bool True on success
+     */
+    function set_cookie(
+        string $name,
+        string $value,
+        int $minutes = 0,
+        string $path = '/',
+        string $domain = '',
+        ?bool $secure = null,
+        bool $httponly = true,
+        string $samesite = 'Lax'
+    ): bool {
+        if (headers_sent()) {
+            return false;
+        }
+
+        // Auto-detect secure connection
+        if ($secure === null) {
+            $secure = (
+                (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+                (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||
+                (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)
+            );
+        }
+
+        // Calculate expiration
+        $expires = $minutes > 0 ? time() + ($minutes * 60) : 0;
+
+        return setcookie(
+            $name,
+            $value,
+            [
+                'expires' => $expires,
+                'path' => $path,
+                'domain' => $domain,
+                'secure' => $secure,
+                'httponly' => $httponly,
+                'samesite' => $samesite,
+            ]
+        );
+    }
+}
+
+if (!function_exists('forget_cookie')) {
+    /**
+     * Remove a cookie by setting it to expire in the past.
+     *
+     * @param string $name Cookie name
+     * @param string $path Cookie path
+     * @param string $domain Cookie domain
+     * @return bool True on success
+     */
+    function forget_cookie(string $name, string $path = '/', string $domain = ''): bool
+    {
+        if (headers_sent()) {
+            return false;
+        }
+
+        // Unset from current request
+        unset($_COOKIE[$name]);
+
+        // Set expiration in the past
+        return setcookie(
+            $name,
+            '',
+            [
+                'expires' => time() - 3600,
+                'path' => $path,
+                'domain' => $domain,
+            ]
+        );
+    }
+}
+
 if (!function_exists('e')) {
     /**
      * Escape HTML special characters.

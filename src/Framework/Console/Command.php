@@ -27,6 +27,21 @@ use Toporia\Framework\Console\Contracts\OutputInterface;
 abstract class Command
 {
     /**
+     * Exit code for successful command execution.
+     */
+    public const SUCCESS = 0;
+
+    /**
+     * Exit code for failed command execution.
+     */
+    public const FAILURE = 1;
+
+    /**
+     * Exit code for invalid input.
+     */
+    public const INVALID = 2;
+
+    /**
      * Command signature (name and arguments)
      *
      * Format: "command:name {arg1} {arg2?} {--option} {--option2=}"
