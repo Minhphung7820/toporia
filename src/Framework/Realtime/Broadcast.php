@@ -6,6 +6,8 @@ namespace Toporia\Framework\Realtime;
 
 use Toporia\Framework\Realtime\Contracts\BrokerInterface;
 use Toporia\Framework\Realtime\Contracts\MessageInterface;
+use Toporia\Framework\Realtime\Auth\BroadcastAuthController;
+use Toporia\Framework\Routing\Router;
 
 /**
  * Class Broadcast
@@ -373,5 +375,174 @@ final class Broadcast
     public static function reset(): void
     {
         self::$manager = null;
+    }
+
+    // =========================================================================
+    // ROUTING HELPERS (Laravel-style)
+    // =========================================================================
+
+    /**
+     * Register broadcast authentication routes.
+     *
+     * Similar to Laravel's Broadcast::routes()
+     *
+     * Usage:
+     *   // In routes/api.php or routes/web.php
+     *   Broadcast::routes();
+     *
+     *   // With middleware
+     *   Broadcast::routes(['middleware' => ['auth:api']]);
+     *
+     *   // Custom prefix
+     *   Broadcast::routes(['prefix' => 'api', 'middleware' => ['auth:api']]);
+     *
+     *   // Custom path
+     *   Broadcast::routes(['path' => '/custom/auth']);
+     *
+     * @param array $options {
+     *     @type string|array $middleware Middleware to apply (default: [])
+     *     @type string $prefix Route prefix (default: '')
+     *     @type string $path Auth endpoint path (default: '/broadcasting/auth')
+     *     @type string $name Route name (default: 'broadcasting.auth')
+     * }
+     * @return void
+     */
+    public static function routes(array $options = []): void
+    {
+        $middleware = $options['middleware'] ?? [];
+        $prefix = $options['prefix'] ?? '';
+        $path = $options['path'] ?? '/broadcasting/auth';
+        $name = $options['name'] ?? 'broadcasting.auth';
+
+        // Normalize middleware to array
+        if (is_string($middleware)) {
+            $middleware = [$middleware];
+        }
+
+        // Get router instance
+        $router = self::getRouter();
+
+        if ($router === null) {
+            throw new \RuntimeException('Router not available. Make sure to call Broadcast::routes() after the router is initialized.');
+        }
+
+        // Build full path with prefix
+        $fullPath = $prefix ? rtrim($prefix, '/') . '/' . ltrim($path, '/') : $path;
+
+        // Register the route
+        $route = $router->post($fullPath, [BroadcastAuthController::class, 'authenticate']);
+
+        // Apply middleware if any
+        if (!empty($middleware)) {
+            $route->middleware($middleware);
+        }
+
+        // Set route name
+        $route->name($name);
+    }
+
+    /**
+     * Register broadcast routes with channel authorization loader.
+     *
+     * This method registers routes AND loads channel definitions from routes/channels.php
+     *
+     * Usage:
+     *   Broadcast::routesWithChannels(['middleware' => ['auth:api']]);
+     *
+     * @param array $options Same as routes()
+     * @param string|null $channelsFile Path to channels file (default: routes/channels.php)
+     * @return void
+     */
+    public static function routesWithChannels(array $options = [], ?string $channelsFile = null): void
+    {
+        // Register routes
+        self::routes($options);
+
+        // Load channel definitions
+        self::loadChannels($channelsFile);
+    }
+
+    /**
+     * Load channel authorization definitions.
+     *
+     * Usage:
+     *   Broadcast::channel('orders.{orderId}', function ($user, $orderId) {
+     *       return $user['id'] === Order::find($orderId)->user_id;
+     *   }, ['guards' => ['api', 'admin']]);
+     *
+     * This is an alias for ChannelRoute::channel() for Laravel-like DX.
+     *
+     * @param string $pattern Channel pattern
+     * @param callable $callback Authorization callback
+     * @param array $options Options including 'guards'
+     * @return ChannelRoute
+     */
+    public static function authChannel(string $pattern, callable $callback, array $options = []): ChannelRoute
+    {
+        return ChannelRoute::channel($pattern, $callback, $options);
+    }
+
+    /**
+     * Load channel definitions from file.
+     *
+     * @param string|null $file Path to channels file (default: routes/channels.php)
+     * @return void
+     */
+    public static function loadChannels(?string $file = null): void
+    {
+        $file = $file ?? self::getChannelsFilePath();
+
+        if ($file !== null && file_exists($file)) {
+            require_once $file;
+        }
+    }
+
+    /**
+     * Get default channels file path.
+     *
+     * @return string|null
+     */
+    private static function getChannelsFilePath(): ?string
+    {
+        // Try common locations
+        $basePath = function_exists('base_path') ? base_path() : getcwd();
+
+        $paths = [
+            $basePath . '/routes/channels.php',
+            dirname(__DIR__, 4) . '/routes/channels.php', // From vendor
+        ];
+
+        foreach ($paths as $path) {
+            if (file_exists($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get router instance.
+     *
+     * @return Router|null
+     */
+    private static function getRouter(): ?Router
+    {
+        // Try to get from container
+        if (function_exists('app')) {
+            $container = app();
+
+            // Try Router class
+            if ($container->has(Router::class)) {
+                return $container->make(Router::class);
+            }
+
+            // Try 'router' alias
+            if ($container->has('router')) {
+                return $container->make('router');
+            }
+        }
+
+        return null;
     }
 }

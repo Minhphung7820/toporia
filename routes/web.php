@@ -12,6 +12,10 @@ declare(strict_types=1);
 use Toporia\Framework\Support\Accessors\Route;
 use App\Presentation\Http\Controllers\AppController;
 use App\Presentation\Http\Controllers\TestController;
+use App\Presentation\Http\Controllers\RealtimeDemoController;
+
+// Realtime Demo Page - WebSocket + Redis Notification Demo
+Route::get('/realtime-demo', [RealtimeDemoController::class, 'index']);
 
 // SPA Fallback Route - Catches all routes for Vue Router
 // This allows Vue Router to handle client-side routing

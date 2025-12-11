@@ -18,6 +18,8 @@ use App\Presentation\Http\Controllers\Api\CsrfCookieController;
 use App\Presentation\Http\Controllers\ProductController;
 use App\Presentation\Http\Controllers\RelationshipTestController;
 use App\Infrastructure\Jobs\SendEmailJob;
+use App\Presentation\Http\Controllers\Api\BrokerTestController;
+use Toporia\Framework\Realtime\Broadcast;
 
 // CSRF Cookie endpoint for SPA authentication (must be called before login/register)
 // CSRF cookie endpoint for SPA authentication
@@ -115,10 +117,56 @@ Route::get('/relationships/belongs-to-many', [RelationshipTestController::class,
 // =========================================================================
 // BROKER TESTING ROUTES (Producer)
 // =========================================================================
-use App\Presentation\Http\Controllers\Api\BrokerTestController;
 
 Route::post('/broker/publish', [BrokerTestController::class, 'publish']);
 Route::get('/broker/health', [BrokerTestController::class, 'health']);
+
+// =========================================================================
+// NOTIFICATION API - Simple endpoint to send realtime notifications
+// =========================================================================
+Route::post('/notifications/send', function (Request $request) {
+    $type = $request->input('type', 'info'); // info, success, warning, error
+    $title = $request->input('title', 'Notification');
+    $message = $request->input('message', '');
+    $channel = $request->input('channel', 'notifications');
+    $driver = $request->input('driver', config('realtime.default_broker', 'redis'));
+
+    try {
+        $success = Broadcast::via($driver)
+            ->toChannel($channel)
+            ->event('notification')
+            ->with([
+                'type' => $type,
+                'title' => $title,
+                'message' => $message,
+                'timestamp' => date('Y-m-d H:i:s'),
+            ])
+            ->now();
+
+        if (!$success) {
+            return response()->json([
+                'success' => false,
+                'error' => "Failed to send notification. Check broker [{$driver}] is configured.",
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification sent',
+            'data' => [
+                'channel' => $channel,
+                'type' => $type,
+                'title' => $title,
+                'driver' => $driver,
+            ],
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+});
 
 // Simple Queue + Mail Test
 Route::post('/send-email', function (Request $request) {

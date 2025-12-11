@@ -12,9 +12,20 @@ use Toporia\Framework\Realtime\Contracts\ConnectionInterface;
  * Fluent API for defining realtime channel authorization and middleware.
  *
  * Usage:
- *   ChannelRoute::channel('user.{userId}', function($conn, $userId) {
- *       return $conn->getUserId() === (int) $userId;
+ *   // Basic usage
+ *   ChannelRoute::channel('user.{userId}', function($user, $userId) {
+ *       return $user['id'] === (int) $userId;
  *   })->middleware(['auth']);
+ *
+ *   // With guards option (Laravel-style)
+ *   ChannelRoute::channel('orders.{orderId}', function($user, $orderId) {
+ *       return (int) $user['id'] === (int) Order::find($orderId)->user_id;
+ *   }, ['guards' => ['web', 'admin']]);
+ *
+ *   // Guard with callback receiving guard name
+ *   ChannelRoute::channel('admin.dashboard', function($user, $guard = null) {
+ *       return $guard === 'admin';
+ *   }, ['guards' => ['admin']]);
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
@@ -31,7 +42,7 @@ final class ChannelRoute
     /**
      * Channel definitions registry.
      *
-     * @var array<string, array{pattern: string, callback: callable, middleware: array}>
+     * @var array<string, array{pattern: string, callback: callable, middleware: array, guards: array}>
      */
     private static array $channels = [];
 
@@ -46,19 +57,24 @@ final class ChannelRoute
      * Define a channel route.
      *
      * @param string $pattern Channel pattern (supports wildcards like 'user.{userId}' or 'private-*')
-     * @param callable $callback Authorization callback(ConnectionInterface $connection, ...$params): bool
+     * @param callable $callback Authorization callback($user, ...$params, $guard = null): bool|array
+     * @param array $options Options including 'guards' => ['web', 'api', 'admin']
      * @return self
      */
-    public static function channel(string $pattern, callable $callback): self
+    public static function channel(string $pattern, callable $callback, array $options = []): self
     {
         $instance = new self();
         $instance->currentPattern = $pattern;
 
-        // Register channel with empty middleware initially
+        // Extract guards from options (default: all guards allowed)
+        $guards = $options['guards'] ?? [];
+
+        // Register channel
         self::$channels[$pattern] = [
             'pattern' => $pattern,
             'callback' => $callback,
             'middleware' => [],
+            'guards' => $guards, // Empty array = all guards allowed
         ];
 
         return $instance;
@@ -77,6 +93,44 @@ final class ChannelRoute
         }
 
         return $this;
+    }
+
+    /**
+     * Set allowed guards for the current channel (fluent API).
+     *
+     * Usage:
+     *   ChannelRoute::channel('orders.{id}', $callback)->guards(['web', 'admin']);
+     *
+     * @param array<string> $guards Guard names (e.g., ['web', 'api', 'admin'])
+     * @return self
+     */
+    public function guards(array $guards): self
+    {
+        if ($this->currentPattern !== null && isset(self::$channels[$this->currentPattern])) {
+            self::$channels[$this->currentPattern]['guards'] = $guards;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Check if a guard is allowed for a channel definition.
+     *
+     * @param array $channelDef Channel definition
+     * @param string|null $guardName Guard name to check
+     * @return bool True if guard is allowed (empty guards = all allowed)
+     */
+    public static function isGuardAllowed(array $channelDef, ?string $guardName): bool
+    {
+        $allowedGuards = $channelDef['guards'] ?? [];
+
+        // Empty guards array = all guards allowed
+        if (empty($allowedGuards)) {
+            return true;
+        }
+
+        // Check if guard is in allowed list
+        return $guardName !== null && in_array($guardName, $allowedGuards, true);
     }
 
     /**

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime\Transports;
 
 use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterface, MessageInterface, RealtimeManagerInterface};
-use Toporia\Framework\Realtime\{Connection, Message};
-use Toporia\Framework\Realtime\Auth\ConnectionAuthenticator;
+use Toporia\Framework\Realtime\{Connection, Message, ChannelRoute};
+use Toporia\Framework\Realtime\Auth\BroadcastAuthenticator;
 use Toporia\Framework\Realtime\Subscriptions\BrokerSubscriptionFactory;
 
 /**
@@ -30,17 +30,24 @@ final class WebSocketTransport implements TransportInterface
     private array $connections = [];
     private bool $running = false;
     private int $workerNum = 1;
+    private ?BroadcastAuthenticator $broadcastAuthenticator = null;
 
     /**
      * @param array $config Configuration
      * @param RealtimeManagerInterface $manager Realtime manager
-     * @param ConnectionAuthenticator|null $authenticator Connection authenticator
      */
     public function __construct(
         private readonly array $config,
-        private readonly RealtimeManagerInterface $manager,
-        private readonly ?ConnectionAuthenticator $authenticator = null
-    ) {}
+        private readonly RealtimeManagerInterface $manager
+    ) {
+        // Initialize broadcast authenticator for channel authorization
+        try {
+            $this->broadcastAuthenticator = new BroadcastAuthenticator();
+        } catch (\Throwable $e) {
+            // Authenticator not available (missing config)
+            error_log("[WebSocket] Broadcast auth not configured: {$e->getMessage()}");
+        }
+    }
 
     /**
      * {@inheritdoc}
@@ -226,8 +233,8 @@ final class WebSocketTransport implements TransportInterface
                 $ddosProtection->recordConnection($ipAddress);
             }
 
-            // 1. Try to authenticate connection
-            $authData = $this->authenticator?->authenticateFromRequest($request);
+            // 1. Try to authenticate from handshake (query string token or header)
+            $authData = $this->authenticateFromHandshake($request);
 
             // 2. Check if authentication is required on connect
             $requireAuth = $this->config['require_auth'] ?? false;
@@ -246,7 +253,9 @@ final class WebSocketTransport implements TransportInterface
                 'user_agent' => $request->header['user-agent'] ?? null,
                 'user_id' => $authData['user_id'] ?? null,
                 'username' => $authData['username'] ?? null,
+                'email' => $authData['email'] ?? null,
                 'roles' => $authData['roles'] ?? [],
+                'auth_guard' => $authData['guard'] ?? null,
                 'authenticated_at' => $authData['authenticated_at'] ?? null,
             ]);
 
@@ -474,6 +483,10 @@ final class WebSocketTransport implements TransportInterface
     /**
      * Handle subscribe request.
      *
+     * Supports two modes:
+     * 1. Public channel: { "type": "subscribe", "channel": "news" }
+     * 2. Private/Presence with auth: { "type": "subscribe", "channel": "private-orders.123", "data": { "auth": "app_key:signature" } }
+     *
      * @param ConnectionInterface $connection
      * @param MessageInterface $message
      * @return void
@@ -487,14 +500,21 @@ final class WebSocketTransport implements TransportInterface
             return;
         }
 
-        $channel = $this->manager->channel($channelName);
+        // Determine channel type
+        $channelType = $this->getChannelType($channelName);
 
-        // Check authorization
-        if (!$channel->authorize($connection)) {
-            $this->send($connection, Message::error("Unauthorized for channel: {$channelName}", 403));
-            return;
+        // For private/presence channels, verify authentication
+        if ($channelType !== 'public') {
+            $messageData = $message->getData();
+            $authorized = $this->authorizeSubscription($connection, $channelName, $messageData);
+
+            if (!$authorized) {
+                $this->send($connection, Message::error("Unauthorized for channel: {$channelName}", 403));
+                return;
+            }
         }
 
+        $channel = $this->manager->channel($channelName);
         $channel->subscribe($connection);
 
         // Log subscription for debugging
@@ -511,12 +531,160 @@ final class WebSocketTransport implements TransportInterface
         ]));
 
         // Broadcast presence join for presence channels
-        if ($channel->isPresence()) {
+        if ($channel->isPresence() || str_starts_with($channelName, 'presence-')) {
             $channel->broadcast(Message::event($channelName, 'presence.join', [
                 'user_id' => $connection->getUserId(),
-                'user_info' => $connection->get('user_info', [])
+                'user_info' => $connection->get('presence_user_info', $connection->get('user_info', []))
             ]), $connection);
         }
+    }
+
+    /**
+     * Authorize subscription to private/presence channel.
+     *
+     * Supports two methods:
+     * 1. Auth signature from /broadcasting/auth endpoint
+     * 2. Direct auth if connection is already authenticated (uses routes/channels.php)
+     *
+     * @param ConnectionInterface $connection
+     * @param string $channelName
+     * @param array|null $data Subscribe request data
+     * @return bool
+     */
+    private function authorizeSubscription(ConnectionInterface $connection, string $channelName, ?array $data): bool
+    {
+        $authSignature = $data['auth'] ?? null;
+        $channelData = $data['channel_data'] ?? null;
+
+        // Method 1: Verify auth signature (Pusher-style)
+        if ($authSignature !== null && $this->broadcastAuthenticator !== null) {
+            // Generate a socket_id for this connection if not set
+            $socketId = $connection->get('socket_id') ?? $connection->getId();
+
+            $isValid = $this->broadcastAuthenticator->verifySignature(
+                $socketId,
+                $channelName,
+                $authSignature,
+                $channelData
+            );
+
+            if ($isValid) {
+                // For presence channels, extract user data from channel_data
+                if ($channelData !== null && str_starts_with($channelName, 'presence-')) {
+                    $parsedData = json_decode($channelData, true);
+                    if (is_array($parsedData)) {
+                        $connection->setUserId($parsedData['user_id'] ?? null);
+                        $connection->set('presence_user_info', $parsedData['user_info'] ?? []);
+                    }
+                }
+                return true;
+            }
+
+            echo "[{$connection->getId()}] Invalid auth signature for channel '{$channelName}'\n";
+            return false;
+        }
+
+        // Method 2: Direct authorization (connection already authenticated)
+        if ($connection->getUserId() !== null) {
+            // Normalize channel name for route matching
+            $normalizedChannel = $this->normalizeChannelName($channelName);
+
+            // Find channel definition in routes/channels.php
+            $channelDef = ChannelRoute::match($normalizedChannel);
+
+            if ($channelDef === null) {
+                // No channel definition - deny private channels by default
+                echo "[{$connection->getId()}] No channel definition for '{$normalizedChannel}'\n";
+                return false;
+            }
+
+            // Check if connection's guard is allowed for this channel
+            $connectionGuard = $connection->get('auth_guard');
+            if (!ChannelRoute::isGuardAllowed($channelDef, $connectionGuard)) {
+                echo "[{$connection->getId()}] Guard '{$connectionGuard}' not allowed for channel '{$channelName}'\n";
+                return false;
+            }
+
+            // Build user array for callback
+            $user = [
+                'id' => $connection->getUserId(),
+                'user_id' => $connection->getUserId(),
+                'username' => $connection->get('username'),
+                'email' => $connection->get('email'),
+                'roles' => $connection->get('roles', []),
+                'guard' => $connectionGuard,
+            ];
+
+            // Execute authorization callback
+            try {
+                $params = array_values($channelDef['params'] ?? []);
+                $callback = $channelDef['callback'];
+
+                // Check if callback accepts guard parameter (reflection)
+                $reflection = new \ReflectionFunction($callback);
+                $paramCount = $reflection->getNumberOfParameters();
+
+                // If callback has more parameters than user + channel params, pass guard
+                if ($paramCount > count($params) + 1 && $connectionGuard !== null) {
+                    $result = $callback($user, ...$params, $connectionGuard);
+                } else {
+                    $result = $callback($user, ...$params);
+                }
+
+                if ($result === false || $result === null) {
+                    echo "[{$connection->getId()}] Authorization denied for channel '{$channelName}'\n";
+                    return false;
+                }
+
+                // For presence channels, store user info from callback result
+                if (is_array($result) && str_starts_with($channelName, 'presence-')) {
+                    $connection->set('presence_user_info', $result);
+                }
+
+                return true;
+            } catch (\Throwable $e) {
+                error_log("[WebSocket] Authorization callback error: {$e->getMessage()}");
+                return false;
+            }
+        }
+
+        // Not authenticated and no auth signature
+        echo "[{$connection->getId()}] Not authenticated for private channel '{$channelName}'\n";
+        return false;
+    }
+
+    /**
+     * Get channel type from channel name.
+     *
+     * @param string $channelName
+     * @return string 'public', 'private', or 'presence'
+     */
+    private function getChannelType(string $channelName): string
+    {
+        if (str_starts_with($channelName, 'private-')) {
+            return 'private';
+        }
+        if (str_starts_with($channelName, 'presence-')) {
+            return 'presence';
+        }
+        return 'public';
+    }
+
+    /**
+     * Normalize channel name by removing prefix.
+     *
+     * @param string $channelName
+     * @return string
+     */
+    private function normalizeChannelName(string $channelName): string
+    {
+        if (str_starts_with($channelName, 'private-')) {
+            return substr($channelName, 8);
+        }
+        if (str_starts_with($channelName, 'presence-')) {
+            return substr($channelName, 9);
+        }
+        return $channelName;
     }
 
     /**
@@ -581,6 +749,12 @@ final class WebSocketTransport implements TransportInterface
      * Handle authentication request (two-step auth).
      *
      * Allows clients to authenticate after connection.
+     * Supports guard-based authentication like SocketIOGateway.
+     *
+     * Client sends:
+     *   { "type": "auth", "data": { "token": "jwt_token" } }
+     *   { "type": "auth", "data": { "token": "jwt_token", "guard": "api" } }
+     *   { "type": "auth", "data": { "token": "jwt_token", "guard": "admin" } }
      *
      * @param ConnectionInterface $connection
      * @param MessageInterface $message
@@ -594,36 +768,161 @@ final class WebSocketTransport implements TransportInterface
             return;
         }
 
-        // Get token from message data
-        $token = $message->getData()['token'] ?? null;
+        // Get token and guard from message data
+        $data = $message->getData();
+        $token = $data['token'] ?? null;
+        $guardName = $data['guard'] ?? 'api';
 
         if (!$token) {
             $this->send($connection, Message::error('Token required', 400));
             return;
         }
 
-        // Authenticate using token
-        $authData = $this->authenticator?->authenticateToken($token);
+        // Authenticate using token with guard support
+        $authData = $this->verifyTokenWithGuard($token, $guardName);
 
-        if ($authData === null) {
+        if ($authData === null || ($authData['user_id'] ?? null) === null) {
             $this->send($connection, Message::error('Invalid token', 401));
             return;
         }
 
         // Update connection with authentication data
         $connection->set('user_id', $authData['user_id']);
-        $connection->set('username', $authData['username']);
-        $connection->set('roles', $authData['roles']);
-        $connection->set('authenticated_at', $authData['authenticated_at']);
+        $connection->set('username', $authData['username'] ?? null);
+        $connection->set('email', $authData['email'] ?? null);
+        $connection->set('roles', $authData['roles'] ?? []);
+        $connection->set('auth_guard', $guardName);
+        $connection->set('authenticated_at', $authData['authenticated_at'] ?? time());
 
         // Send success response
         $this->send($connection, Message::create('auth_success', null, 'Authenticated successfully', [
             'user_id' => $authData['user_id'],
-            'username' => $authData['username'],
-            'roles' => $authData['roles'],
+            'username' => $authData['username'] ?? null,
+            'roles' => $authData['roles'] ?? [],
+            'guard' => $guardName,
         ]));
 
-        echo "[{$connection->getId()}] Authenticated: user_id={$authData['user_id']}\n";
+        echo "[{$connection->getId()}] Authenticated: user_id={$authData['user_id']} (guard: {$guardName})\n";
+    }
+
+    /**
+     * Authenticate from WebSocket handshake request.
+     *
+     * Extracts JWT from query string (?token=xxx&guard=api) or Authorization header.
+     *
+     * @param \Swoole\Http\Request $request Swoole HTTP request
+     * @return array|null User data or null
+     */
+    private function authenticateFromHandshake(\Swoole\Http\Request $request): ?array
+    {
+        $token = null;
+        $guardName = 'api';
+
+        // Method 1: JWT from query string (?token=xxx&guard=api)
+        if (isset($request->get['token'])) {
+            $token = $request->get['token'];
+            $guardName = $request->get['guard'] ?? 'api';
+        }
+        // Method 2: JWT from Authorization header
+        elseif (isset($request->header['authorization'])) {
+            $auth = $request->header['authorization'];
+            $token = str_replace('Bearer ', '', $auth);
+            // Guard from query string or default
+            $guardName = $request->get['guard'] ?? 'api';
+        }
+
+        if ($token === null) {
+            return null;
+        }
+
+        return $this->verifyTokenWithGuard($token, $guardName);
+    }
+
+    /**
+     * Verify JWT token with guard-specific secret.
+     *
+     * @param string $token JWT token
+     * @param string $guardName Guard name
+     * @return array|null User data or null if invalid
+     */
+    private function verifyTokenWithGuard(string $token, string $guardName): ?array
+    {
+        return $this->manualJwtVerify($token, $guardName);
+    }
+
+    /**
+     * Verify JWT token with signature validation.
+     *
+     * @param string $token JWT token
+     * @param string $guardName Guard name for secret lookup
+     * @return array|null User data or null
+     */
+    private function manualJwtVerify(string $token, string $guardName): ?array
+    {
+        try {
+            $parts = explode('.', $token);
+            if (count($parts) !== 3) {
+                return null;
+            }
+
+            [$headerEncoded, $payloadEncoded, $signatureEncoded] = $parts;
+
+            // Get guard-specific secret
+            $secret = $this->getJwtSecretForGuard($guardName);
+            if ($secret === null || strlen($secret) < 32) {
+                return null;
+            }
+
+            // Verify signature
+            $expectedSignature = hash_hmac('sha256', "$headerEncoded.$payloadEncoded", $secret, true);
+            $expectedSignatureEncoded = rtrim(strtr(base64_encode($expectedSignature), '+/', '-_'), '=');
+
+            if (!hash_equals($expectedSignatureEncoded, $signatureEncoded)) {
+                return null;
+            }
+
+            // Decode payload
+            $payload = json_decode(base64_decode(strtr($payloadEncoded, '-_', '+/')), true);
+            if (!is_array($payload)) {
+                return null;
+            }
+
+            // Check expiration
+            if (isset($payload['exp']) && $payload['exp'] < time()) {
+                return null;
+            }
+
+            return [
+                'user_id' => $payload['sub'] ?? null,
+                'username' => $payload['username'] ?? $payload['name'] ?? null,
+                'email' => $payload['email'] ?? null,
+                'roles' => $payload['roles'] ?? [],
+                'authenticated_at' => time(),
+                'guard' => $guardName,
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get JWT secret for a specific guard.
+     *
+     * @param string $guardName Guard name
+     * @return string|null
+     */
+    private function getJwtSecretForGuard(string $guardName): ?string
+    {
+        $guardUpper = strtoupper($guardName);
+
+        // 1. Guard-specific env
+        $secret = $_ENV["JWT_SECRET_{$guardUpper}"] ?? getenv("JWT_SECRET_{$guardUpper}");
+        if (!empty($secret) && is_string($secret)) {
+            return $secret;
+        }
+
+        // 2. Default secret
+        return $_ENV['JWT_SECRET'] ?? getenv('JWT_SECRET') ?: null;
     }
 
     /**

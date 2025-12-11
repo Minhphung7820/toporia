@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime\Transports;
 
 use Toporia\Framework\Realtime\Contracts\{TransportInterface, ConnectionInterface, MessageInterface, RealtimeManagerInterface};
-use Toporia\Framework\Realtime\{Connection, Message};
+use Toporia\Framework\Realtime\{Connection, Message, ChannelRoute};
 use Toporia\Framework\Realtime\Subscriptions\BrokerSubscriptionFactory;
+use Toporia\Framework\Realtime\Auth\BroadcastAuthenticator;
+use App\Infrastructure\Realtime\Middleware\AuthMiddleware;
 
 /**
  * Class SocketIOGateway
@@ -31,6 +33,7 @@ final class SocketIOGateway implements TransportInterface
     private array $rooms = [];
     private bool $running = false;
     private int $workerNum = 1;
+    private ?BroadcastAuthenticator $authenticator = null;
 
     // Socket.IO packet types
     private const PACKET_CONNECT = 0;
@@ -57,7 +60,15 @@ final class SocketIOGateway implements TransportInterface
     public function __construct(
         private readonly array $config,
         private readonly RealtimeManagerInterface $manager
-    ) {}
+    ) {
+        // Initialize broadcast authenticator for signature verification
+        try {
+            $this->authenticator = new BroadcastAuthenticator();
+        } catch (\Throwable $e) {
+            // Authenticator not available (missing config)
+            error_log("[SocketIO] Broadcast auth not configured: {$e->getMessage()}");
+        }
+    }
 
     /**
      * {@inheritdoc}
@@ -474,10 +485,512 @@ final class SocketIOGateway implements TransportInterface
 
         // Special Socket.IO events
         match ($eventName) {
+            'auth' => $this->handleAuth($connection, $eventData, $ackId),
+            'subscribe' => $this->handleSubscribe($connection, $eventData, $ackId),
+            'unsubscribe' => $this->handleUnsubscribe($connection, $eventData, $ackId),
             'join' => $this->handleJoinRoom($connection, $eventData, $ackId),
             'leave' => $this->handleLeaveRoom($connection, $eventData, $ackId),
             default => $this->handleCustomEvent($connection, $eventName, $eventData, $ackId)
         };
+    }
+
+    /**
+     * Handle 'auth' event - authenticate connection with JWT token.
+     *
+     * Client sends:
+     *   socket.emit('auth', { token: 'jwt_token' })
+     *   socket.emit('auth', { token: 'jwt_token', guard: 'api' })
+     *   socket.emit('auth', { token: 'jwt_token', guard: 'admin' })
+     *
+     * @param ConnectionInterface $connection
+     * @param mixed $data { token: string, guard?: string }
+     * @param string|null $ackId
+     * @return void
+     */
+    private function handleAuth(ConnectionInterface $connection, mixed $data, ?string $ackId): void
+    {
+        $token = is_array($data) ? ($data['token'] ?? null) : null;
+        $guardName = is_array($data) ? ($data['guard'] ?? 'api') : 'api';
+
+        if (empty($token)) {
+            $this->emitToConnection($connection, 'auth_error', ['message' => 'Token required']);
+            return;
+        }
+
+        // Verify JWT and authenticate connection with specified guard
+        $userData = $this->verifyTokenWithGuard($token, $guardName);
+
+        if ($userData === null || $userData['user_id'] === null) {
+            $this->emitToConnection($connection, 'auth_error', ['message' => 'Invalid token']);
+            return;
+        }
+
+        // Set user data on connection
+        $connection->setUserId($userData['user_id']);
+        $connection->set('token_issued_at', $userData['issued_at']);
+        $connection->set('token_expires_at', $userData['expires_at']);
+        $connection->set('auth_guard', $guardName);
+
+        // Store additional user info if available
+        if (isset($userData['username'])) {
+            $connection->set('username', $userData['username']);
+        }
+        if (isset($userData['email'])) {
+            $connection->set('email', $userData['email']);
+        }
+        if (isset($userData['roles'])) {
+            $connection->set('roles', $userData['roles']);
+        }
+
+        echo "[{$connection->getId()}] Authenticated as user {$userData['user_id']} (guard: {$guardName})\n";
+
+        // Send success response
+        $this->emitToConnection($connection, 'authenticated', [
+            'user_id' => $userData['user_id'],
+            'socket_id' => $connection->get('sid'),
+            'guard' => $guardName,
+        ]);
+
+        // Send ACK if requested
+        if ($ackId !== null) {
+            $this->sendAck($connection, $ackId, [
+                'authenticated' => true,
+                'user_id' => $userData['user_id'],
+                'guard' => $guardName,
+            ]);
+        }
+    }
+
+    /**
+     * Verify JWT token with guard-specific secret.
+     *
+     * @param string $token JWT token
+     * @param string $guardName Guard name
+     * @return array|null User data or null if invalid
+     */
+    private function verifyTokenWithGuard(string $token, string $guardName): ?array
+    {
+        // First try using AuthMiddleware (uses framework's auth system)
+        $userData = AuthMiddleware::verifyToken($token);
+
+        if ($userData !== null) {
+            // Validate guard matches if specified in token
+            $tokenGuard = $userData['guard'] ?? null;
+            if ($tokenGuard !== null && $tokenGuard !== $guardName) {
+                error_log("[SocketIO] Token guard '{$tokenGuard}' does not match requested guard '{$guardName}'");
+                return null;
+            }
+            return $userData;
+        }
+
+        // Fallback: Manual JWT verification with guard-specific secret
+        return $this->manualJwtVerify($token, $guardName);
+    }
+
+    /**
+     * Manually verify JWT token (fallback when AuthMiddleware fails).
+     *
+     * @param string $token JWT token
+     * @param string $guardName Guard name for secret lookup
+     * @return array|null User data or null
+     */
+    private function manualJwtVerify(string $token, string $guardName): ?array
+    {
+        try {
+            $parts = explode('.', $token);
+            if (count($parts) !== 3) {
+                return null;
+            }
+
+            [$headerEncoded, $payloadEncoded, $signatureEncoded] = $parts;
+
+            // Get guard-specific secret
+            $secret = $this->getJwtSecretForGuard($guardName);
+            if ($secret === null || strlen($secret) < 32) {
+                return null;
+            }
+
+            // Verify signature
+            $expectedSignature = hash_hmac('sha256', "$headerEncoded.$payloadEncoded", $secret, true);
+            $expectedSignatureEncoded = rtrim(strtr(base64_encode($expectedSignature), '+/', '-_'), '=');
+
+            if (!hash_equals($expectedSignatureEncoded, $signatureEncoded)) {
+                return null;
+            }
+
+            // Decode payload
+            $payload = json_decode(base64_decode(strtr($payloadEncoded, '-_', '+/')), true);
+            if (!is_array($payload)) {
+                return null;
+            }
+
+            // Check expiration
+            if (isset($payload['exp']) && $payload['exp'] < time()) {
+                return null;
+            }
+
+            return [
+                'user_id' => $payload['sub'] ?? null,
+                'username' => $payload['username'] ?? $payload['name'] ?? null,
+                'email' => $payload['email'] ?? null,
+                'roles' => $payload['roles'] ?? [],
+                'issued_at' => $payload['iat'] ?? null,
+                'expires_at' => $payload['exp'] ?? null,
+                'guard' => $guardName,
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get JWT secret for a specific guard.
+     *
+     * @param string $guardName Guard name
+     * @return string|null
+     */
+    private function getJwtSecretForGuard(string $guardName): ?string
+    {
+        $guardUpper = strtoupper($guardName);
+
+        // 1. Guard-specific env
+        $secret = $_ENV["JWT_SECRET_{$guardUpper}"] ?? getenv("JWT_SECRET_{$guardUpper}");
+        if (!empty($secret) && is_string($secret)) {
+            return $secret;
+        }
+
+        // 2. Default secret
+        return $_ENV['JWT_SECRET'] ?? getenv('JWT_SECRET') ?: null;
+    }
+
+    /**
+     * Handle 'subscribe' event - subscribe to a channel with optional auth signature.
+     *
+     * Two modes:
+     * 1. Public channel: socket.emit('subscribe', { channel: 'news' })
+     * 2. Private/Presence with auth: socket.emit('subscribe', { channel: 'private-orders.123', auth: 'app_key:signature' })
+     *
+     * @param ConnectionInterface $connection
+     * @param mixed $data { channel: string, auth?: string, channel_data?: string }
+     * @param string|null $ackId
+     * @return void
+     */
+    private function handleSubscribe(ConnectionInterface $connection, mixed $data, ?string $ackId): void
+    {
+        $channelName = is_array($data) ? ($data['channel'] ?? null) : $data;
+
+        if (empty($channelName)) {
+            $this->emitToConnection($connection, 'subscription_error', ['message' => 'Channel name required']);
+            return;
+        }
+
+        // Determine channel type
+        $channelType = $this->getChannelType($channelName);
+
+        // For private/presence channels, verify authentication
+        if ($channelType !== 'public') {
+            $authorized = $this->authorizeSubscription($connection, $channelName, $data);
+
+            if (!$authorized) {
+                $this->emitToConnection($connection, 'subscription_error', [
+                    'channel' => $channelName,
+                    'message' => 'Unauthorized',
+                ]);
+                return;
+            }
+        }
+
+        // Subscribe to channel
+        $this->subscribeToChannel($connection, $channelName);
+
+        // Send success response
+        $this->emitToConnection($connection, 'subscribed', ['channel' => $channelName]);
+
+        // Send ACK if requested
+        if ($ackId !== null) {
+            $this->sendAck($connection, $ackId, ['channel' => $channelName, 'subscribed' => true]);
+        }
+    }
+
+    /**
+     * Authorize subscription to private/presence channel.
+     *
+     * Supports two methods:
+     * 1. Auth signature from /broadcasting/auth endpoint
+     * 2. Direct auth if connection is already authenticated
+     *
+     * @param ConnectionInterface $connection
+     * @param string $channelName
+     * @param mixed $data Subscribe request data
+     * @return bool
+     */
+    private function authorizeSubscription(ConnectionInterface $connection, string $channelName, mixed $data): bool
+    {
+        $authSignature = is_array($data) ? ($data['auth'] ?? null) : null;
+        $channelData = is_array($data) ? ($data['channel_data'] ?? null) : null;
+        $socketId = $connection->get('sid');
+
+        // Method 1: Verify auth signature (Laravel-style)
+        if ($authSignature !== null && $this->authenticator !== null) {
+            $isValid = $this->authenticator->verifySignature(
+                $socketId,
+                $channelName,
+                $authSignature,
+                $channelData
+            );
+
+            if ($isValid) {
+                // For presence channels, extract user data from channel_data
+                if ($channelData !== null && str_starts_with($channelName, 'presence-')) {
+                    $parsedData = json_decode($channelData, true);
+                    if (is_array($parsedData)) {
+                        $connection->setUserId($parsedData['user_id'] ?? null);
+                        $connection->set('presence_user_info', $parsedData['user_info'] ?? []);
+                    }
+                }
+                return true;
+            }
+
+            echo "[{$connection->getId()}] Invalid auth signature for channel '{$channelName}'\n";
+            return false;
+        }
+
+        // Method 2: Direct authorization (connection already authenticated)
+        if ($connection->isAuthenticated()) {
+            // Normalize channel name for route matching
+            $normalizedChannel = $this->normalizeChannelName($channelName);
+
+            // Find channel definition
+            $channelDef = ChannelRoute::match($normalizedChannel);
+
+            if ($channelDef === null) {
+                // No channel definition - deny private channels by default
+                echo "[{$connection->getId()}] No channel definition for '{$normalizedChannel}'\n";
+                return false;
+            }
+
+            // Check if connection's guard is allowed for this channel
+            $connectionGuard = $connection->get('auth_guard');
+            if (!ChannelRoute::isGuardAllowed($channelDef, $connectionGuard)) {
+                echo "[{$connection->getId()}] Guard '{$connectionGuard}' not allowed for channel '{$channelName}'\n";
+                return false;
+            }
+
+            // Build user array for callback
+            $user = [
+                'id' => $connection->getUserId(),
+                'user_id' => $connection->getUserId(),
+                'username' => $connection->getUsername(),
+                'email' => $connection->getEmail(),
+                'roles' => $connection->getRoles(),
+                'guard' => $connectionGuard,
+            ];
+
+            // Execute authorization callback
+            try {
+                $params = array_values($channelDef['params'] ?? []);
+                $callback = $channelDef['callback'];
+
+                // Check if callback accepts guard parameter (reflection)
+                $reflection = new \ReflectionFunction($callback);
+                $paramCount = $reflection->getNumberOfParameters();
+
+                // If callback has more parameters than user + channel params, pass guard
+                if ($paramCount > count($params) + 1 && $connectionGuard !== null) {
+                    $result = $callback($user, ...$params, $connectionGuard);
+                } else {
+                    $result = $callback($user, ...$params);
+                }
+
+                if ($result === false || $result === null) {
+                    echo "[{$connection->getId()}] Authorization denied for channel '{$channelName}'\n";
+                    return false;
+                }
+
+                // For presence channels, store user info from callback result
+                if (is_array($result) && str_starts_with($channelName, 'presence-')) {
+                    $connection->set('presence_user_info', $result);
+                }
+
+                return true;
+            } catch (\Throwable $e) {
+                error_log("[SocketIO] Authorization callback error: {$e->getMessage()}");
+                return false;
+            }
+        }
+
+        // Not authenticated and no auth signature
+        echo "[{$connection->getId()}] Not authenticated for private channel '{$channelName}'\n";
+        return false;
+    }
+
+    /**
+     * Subscribe connection to a channel.
+     *
+     * @param ConnectionInterface $connection
+     * @param string $channelName
+     * @return void
+     */
+    private function subscribeToChannel(ConnectionInterface $connection, string $channelName): void
+    {
+        // Add to room
+        if (!isset($this->rooms[$channelName])) {
+            $this->rooms[$channelName] = [];
+        }
+        $this->rooms[$channelName][$connection->getId()] = $connection;
+
+        // Track in connection
+        $rooms = $connection->get('rooms', []);
+        $rooms[] = $channelName;
+        $connection->set('rooms', array_unique($rooms));
+
+        // Also mark as subscribed channel
+        $connection->subscribe($channelName);
+
+        // Subscribe via manager
+        $channel = $this->manager->channel($channelName);
+        $channel->subscribe($connection);
+
+        echo "[{$connection->getId()}] Subscribed to channel: {$channelName}\n";
+
+        // For presence channels, broadcast join event
+        if (str_starts_with($channelName, 'presence-')) {
+            $this->broadcastPresenceJoin($connection, $channelName);
+        }
+    }
+
+    /**
+     * Handle 'unsubscribe' event.
+     *
+     * @param ConnectionInterface $connection
+     * @param mixed $data { channel: string }
+     * @param string|null $ackId
+     * @return void
+     */
+    private function handleUnsubscribe(ConnectionInterface $connection, mixed $data, ?string $ackId): void
+    {
+        $channelName = is_array($data) ? ($data['channel'] ?? null) : $data;
+
+        if (empty($channelName)) {
+            return;
+        }
+
+        // For presence channels, broadcast leave event first
+        if (str_starts_with($channelName, 'presence-')) {
+            $this->broadcastPresenceLeave($connection, $channelName);
+        }
+
+        // Remove from room
+        if (isset($this->rooms[$channelName][$connection->getId()])) {
+            unset($this->rooms[$channelName][$connection->getId()]);
+        }
+
+        // Update connection
+        $rooms = $connection->get('rooms', []);
+        $rooms = array_diff($rooms, [$channelName]);
+        $connection->set('rooms', array_values($rooms));
+        $connection->unsubscribe($channelName);
+
+        // Unsubscribe via manager
+        $channel = $this->manager->channel($channelName);
+        $channel->unsubscribe($connection);
+
+        echo "[{$connection->getId()}] Unsubscribed from channel: {$channelName}\n";
+
+        // Send ACK
+        if ($ackId !== null) {
+            $this->sendAck($connection, $ackId, ['channel' => $channelName, 'unsubscribed' => true]);
+        }
+    }
+
+    /**
+     * Broadcast presence join event to channel members.
+     *
+     * @param ConnectionInterface $connection
+     * @param string $channelName
+     * @return void
+     */
+    private function broadcastPresenceJoin(ConnectionInterface $connection, string $channelName): void
+    {
+        $userInfo = [
+            'user_id' => $connection->getUserId(),
+            'user_info' => $connection->get('presence_user_info', [
+                'name' => $connection->getUsername(),
+            ]),
+        ];
+
+        $message = Message::event($channelName, 'presence:member_added', $userInfo);
+        $this->broadcastToRoom($channelName, $message, $connection); // Exclude joiner
+    }
+
+    /**
+     * Broadcast presence leave event to channel members.
+     *
+     * @param ConnectionInterface $connection
+     * @param string $channelName
+     * @return void
+     */
+    private function broadcastPresenceLeave(ConnectionInterface $connection, string $channelName): void
+    {
+        $userInfo = [
+            'user_id' => $connection->getUserId(),
+        ];
+
+        $message = Message::event($channelName, 'presence:member_removed', $userInfo);
+        $this->broadcastToRoom($channelName, $message, $connection); // Exclude leaver
+    }
+
+    /**
+     * Get channel type from channel name.
+     *
+     * @param string $channelName
+     * @return string 'public', 'private', or 'presence'
+     */
+    private function getChannelType(string $channelName): string
+    {
+        if (str_starts_with($channelName, 'private-')) {
+            return 'private';
+        }
+        if (str_starts_with($channelName, 'presence-')) {
+            return 'presence';
+        }
+        return 'public';
+    }
+
+    /**
+     * Normalize channel name by removing prefix.
+     *
+     * @param string $channelName
+     * @return string
+     */
+    private function normalizeChannelName(string $channelName): string
+    {
+        if (str_starts_with($channelName, 'private-')) {
+            return substr($channelName, 8);
+        }
+        if (str_starts_with($channelName, 'presence-')) {
+            return substr($channelName, 9);
+        }
+        return $channelName;
+    }
+
+    /**
+     * Emit event to a specific connection.
+     *
+     * @param ConnectionInterface $connection
+     * @param string $event
+     * @param mixed $data
+     * @return void
+     */
+    private function emitToConnection(ConnectionInterface $connection, string $event, mixed $data): void
+    {
+        $packet = $this->createSocketIOPacket(
+            type: self::PACKET_EVENT,
+            namespace: $connection->get('namespace', '/'),
+            data: [$event, $data]
+        );
+
+        $this->sendRaw($connection, self::EIO_MESSAGE . $packet);
     }
 
     /**
