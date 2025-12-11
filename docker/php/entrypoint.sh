@@ -23,6 +23,45 @@ if [ "$(id -u)" = "0" ] && [ "$(id -u www-data 2>/dev/null)" != "$HOST_UID" ]; t
     echo "✓ www-data UID synced to ${HOST_UID}"
 fi
 
+# ============================================
+# FIX SOURCE CODE PERMISSIONS (WSL FIX)
+# ============================================
+# Problem: Files created by host (WSL) have restrictive permissions (600/700)
+# Solution: Set permissive permissions on ALL source files so PHP can read them
+echo "=== Fixing source code permissions for WSL compatibility ==="
+
+# Make all directories readable and executable (755)
+find /var/www/html -type d -exec chmod 755 {} \; 2>/dev/null || true
+
+# Make all PHP/config files readable (644)
+find /var/www/html -type f \( -name "*.php" -o -name "*.json" -o -name "*.xml" -o -name "*.yml" -o -name "*.yaml" -o -name "*.env*" -o -name "*.md" -o -name "*.lock" \) -exec chmod 644 {} \; 2>/dev/null || true
+
+# Explicitly fix src directory (most common issue)
+if [ -d "/var/www/html/src" ]; then
+    find /var/www/html/src -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find /var/www/html/src -type f -exec chmod 644 {} \; 2>/dev/null || true
+fi
+
+# Explicitly fix config directory
+if [ -d "/var/www/html/config" ]; then
+    find /var/www/html/config -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find /var/www/html/config -type f -exec chmod 644 {} \; 2>/dev/null || true
+fi
+
+# Explicitly fix bootstrap directory
+if [ -d "/var/www/html/bootstrap" ]; then
+    find /var/www/html/bootstrap -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find /var/www/html/bootstrap -type f -exec chmod 644 {} \; 2>/dev/null || true
+fi
+
+# Explicitly fix routes directory
+if [ -d "/var/www/html/routes" ]; then
+    find /var/www/html/routes -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find /var/www/html/routes -type f -exec chmod 644 {} \; 2>/dev/null || true
+fi
+
+echo "✓ Source code permissions fixed (dirs: 755, files: 644)"
+
 # CRITICAL: Configure PHP-FPM to listen on 0.0.0.0:9000 (all interfaces)
 # This allows Nginx container to connect via Docker network
 # Default is 127.0.0.1:9000 (localhost only), which doesn't work with Docker
@@ -84,11 +123,9 @@ WWW_DATA_GID=$(id -g www-data 2>/dev/null || echo 82)
 chown -R ${WWW_DATA_UID}:${WWW_DATA_GID} /var/www/html/storage 2>/dev/null || true
 chown -R ${WWW_DATA_UID}:${WWW_DATA_GID} /var/www/html/bootstrap/cache 2>/dev/null || true
 
-# Set permissions: directories 775, files 664
-find /var/www/html/storage -type d -exec chmod 775 {} \; 2>/dev/null || true
-find /var/www/html/storage -type f -exec chmod 664 {} \; 2>/dev/null || true
-find /var/www/html/bootstrap/cache -type d -exec chmod 775 {} \; 2>/dev/null || true
-find /var/www/html/bootstrap/cache -type f -exec chmod 664 {} \; 2>/dev/null || true
+# Set permissions: 777 for storage (WSL compatibility - host user needs write access)
+chmod -R 777 /var/www/html/storage 2>/dev/null || true
+chmod -R 777 /var/www/html/bootstrap/cache 2>/dev/null || true
 
 # Set umask for new files (rw-rw-r--)
 umask 002
