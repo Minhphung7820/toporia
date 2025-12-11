@@ -56,10 +56,7 @@ final class RealtimeManager implements RealtimeManagerInterface
     private string $defaultTransport;
     private ?string $defaultBroker;
 
-    // Legacy rate limiter (v1) - kept for backward compatibility
-    private ?RateLimiter $rateLimiter = null;
-
-    // New rate limiting system (v2)
+    // Rate limiting system (v2)
     private ?MultiLayerRateLimiter $multiLayerLimiter = null;
     private ?RateLimiterInterface $channelLimiter = null;
 
@@ -122,15 +119,7 @@ final class RealtimeManager implements RealtimeManagerInterface
             'redis' => $redis,
         ]);
 
-        // Legacy v1 rate limiter for backward compatibility
-        $legacyConfig = $this->config['rate_limit'] ?? [];
-        if ($legacyConfig['enabled'] ?? false) {
-            $this->rateLimiter = new RateLimiter(
-                maxMessages: (int) ($legacyConfig['messages_per_minute'] ?? 60),
-                windowSeconds: 60,
-                enabled: true
-            );
-        }
+        // Legacy v1 rate limiter removed - use MultiLayerRateLimiter (v2) instead
     }
 
     /**
@@ -244,9 +233,6 @@ final class RealtimeManager implements RealtimeManagerInterface
                 error_log("Rate limit exceeded for channel {$channel}: {$e->getMessage()}");
                 throw $e;
             }
-        } elseif ($this->rateLimiter !== null) {
-            // Fallback to legacy rate limiter
-            $this->rateLimiter->check("channel:{$channel}");
         }
 
         $message = Message::event($channel, $event, $data);
@@ -365,21 +351,21 @@ final class RealtimeManager implements RealtimeManagerInterface
     /**
      * Get rate limiter instance.
      *
-     * @return RateLimiter|null
+     * @return RateLimiterInterface|null
      */
-    public function getRateLimiter(): ?RateLimiter
+    public function getRateLimiter(): ?RateLimiterInterface
     {
-        return $this->rateLimiter;
+        return $this->channelLimiter;
     }
 
     /**
      * Set rate limiter instance.
      *
-     * @param RateLimiter|null $rateLimiter
+     * @param RateLimiterInterface|null $rateLimiter
      */
-    public function setRateLimiter(?RateLimiter $rateLimiter): void
+    public function setRateLimiter(?RateLimiterInterface $rateLimiter): void
     {
-        $this->rateLimiter = $rateLimiter;
+        $this->channelLimiter = $rateLimiter;
     }
 
     /**
