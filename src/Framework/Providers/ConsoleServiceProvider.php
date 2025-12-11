@@ -144,12 +144,11 @@ final class ConsoleServiceProvider extends ServiceProvider
       // Realtime commands
       'realtime:serve' => \Toporia\Framework\Console\Commands\RealtimeServeCommand::class,
       'realtime:stop' => \Toporia\Framework\Console\Commands\RealtimeStopCommand::class,
-      'realtime:kafka' => \Toporia\Framework\Console\Commands\RealtimeKafkaConsumerCommand::class,
-      'realtime:redis' => \Toporia\Framework\Console\Commands\RealtimeRedisConsumerCommand::class,
-      'realtime:rabbitmq' => \Toporia\Framework\Console\Commands\RealtimeRabbitMqConsumerCommand::class,
       'realtime:health' => \Toporia\Framework\Console\Commands\Realtime\RealtimeHealthCommand::class,
-      'channel:list' => \Toporia\Framework\Console\Commands\Realtime\ChannelListCommand::class,
       'realtime:publish' => \Toporia\Framework\Console\Commands\Realtime\RealtimePublishCommand::class,
+      'channel:list' => \Toporia\Framework\Console\Commands\Realtime\ChannelListCommand::class,
+      'broker:consume' => \Toporia\Framework\Console\Commands\Realtime\BrokerConsumeCommand::class,
+      'broker:stop' => \Toporia\Framework\Console\Commands\Realtime\BrokerStopCommand::class,
 
       // Notification commands
       'notification:table' => \Toporia\Framework\Console\Commands\Notification\NotificationTableCommand::class,
