@@ -29,6 +29,22 @@ final class Output implements OutputInterface
     private const COLOR_WARNING = "\033[33m";   // Yellow
     private const COLOR_ERROR = "\033[31m";     // Red
 
+    /**
+     * ANSI color codes map for <fg=color> tags.
+     */
+    private const COLORS = [
+        'black' => "\033[30m",
+        'red' => "\033[31m",
+        'green' => "\033[32m",
+        'yellow' => "\033[33m",
+        'blue' => "\033[34m",
+        'magenta' => "\033[35m",
+        'cyan' => "\033[36m",
+        'white' => "\033[37m",
+        'gray' => "\033[90m",
+        'default' => "\033[39m",
+    ];
+
     private bool $decorated;
 
     public function __construct(?bool $decorated = null)
@@ -44,12 +60,43 @@ final class Output implements OutputInterface
 
     public function write(string $message): void
     {
-        echo $message;
+        echo $this->parseColorTags($message);
     }
 
     public function writeln(string $message): void
     {
-        echo $message . PHP_EOL;
+        echo $this->parseColorTags($message) . PHP_EOL;
+    }
+
+    /**
+     * Parse color tags like <fg=green>text</> and convert to ANSI codes.
+     *
+     * Supports: <fg=color>text</> or <fg=color>text</fg>
+     *
+     * @param string $message
+     * @return string
+     */
+    private function parseColorTags(string $message): string
+    {
+        if (!$this->decorated) {
+            // Strip tags if no decoration
+            return preg_replace('/<\/?(?:fg=[a-z]+|\/?)>/', '', $message) ?? $message;
+        }
+
+        // Replace <fg=color>...</> with ANSI codes
+        $pattern = '/<fg=([a-z]+)>(.*?)<\/?(?:fg)?>/s';
+
+        return preg_replace_callback($pattern, function ($matches) {
+            $color = $matches[1];
+            $text = $matches[2];
+            $ansiCode = self::COLORS[$color] ?? '';
+
+            if ($ansiCode === '') {
+                return $text; // Unknown color, return text as-is
+            }
+
+            return $ansiCode . $text . self::COLOR_RESET;
+        }, $message) ?? $message;
     }
 
     public function info(string $message): void

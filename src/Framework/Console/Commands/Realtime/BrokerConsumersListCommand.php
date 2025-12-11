@@ -114,23 +114,36 @@ final class BrokerConsumersListCommand extends Command
         foreach ($processes as $process) {
             $handler = $process['handler'] ?? 'Unknown';
             $driver = $process['driver'] ?? 'Unknown';
-            $status = $this->formatStatus($process['status'] ?? 'unknown', $process['is_alive'] ?? false);
+            $statusRaw = $process['status'] ?? 'unknown';
+            $isAlive = $process['is_alive'] ?? false;
             $pid = $process['pid'] ?? 0;
             $msgs = $process['message_count'] ?? 0;
             $errors = $process['error_count'] ?? 0;
             $uptime = $this->formatUptime($process['uptime'] ?? 0);
 
-            $this->writeln(sprintf(
-                "%-20s %-12s %-10s %-8d %-8d %-10d %-12s",
-                $this->truncate($handler, 20),
-                $driver,
-                $status,
-                $pid,
-                $msgs,
-                $errors,
-                $uptime
-            ));
+            // Format status with fixed width BEFORE adding color
+            $statusText = $this->getStatusText($statusRaw, $isAlive);
+            $statusColored = $this->formatStatus($statusRaw, $isAlive);
+
+            // Build row with manual padding to avoid sprintf messing up color tags
+            $row = sprintf("%-20s %-12s ", $this->truncate($handler, 20), $driver);
+            $row .= $statusColored . str_repeat(' ', max(0, 10 - strlen($statusText)));
+            $row .= sprintf("%-8d %-8d %-10d %-12s", $pid, $msgs, $errors, $uptime);
+
+            $this->writeln($row);
         }
+    }
+
+    private function getStatusText(string $status, bool $isAlive): string
+    {
+        return match ($status) {
+            ConsumerProcessManager::STATUS_RUNNING => $isAlive ? 'running' : 'dead?',
+            ConsumerProcessManager::STATUS_STARTING => 'starting',
+            ConsumerProcessManager::STATUS_STOPPING => 'stopping',
+            ConsumerProcessManager::STATUS_STOPPED => 'stopped',
+            ConsumerProcessManager::STATUS_FAILED => 'failed',
+            default => $status,
+        };
     }
 
     private function formatStatus(string $status, bool $isAlive): string

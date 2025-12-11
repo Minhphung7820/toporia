@@ -140,7 +140,17 @@ final class ConsumerProcessManager
     }
 
     /**
+     * Local cache to reduce read operations.
+     * @var array<string, array<string, mixed>>
+     */
+    private array $localCache = [];
+
+    /**
      * Update process heartbeat and status.
+     *
+     * Optimized for high-frequency calls:
+     * - Uses local cache to avoid redundant reads
+     * - Only writes essential data to reduce cache operations
      *
      * @param string $processId Process ID
      * @param ConsumerContext|null $context Current context (optional)
@@ -148,12 +158,15 @@ final class ConsumerProcessManager
      */
     public function heartbeat(string $processId, ?ConsumerContext $context = null): void
     {
-        $data = $this->getProcessData($processId);
+        // Use local cache if available (avoids read on every heartbeat)
+        $data = $this->localCache[$processId] ?? $this->getProcessData($processId);
+
         if ($data === null) {
             return;
         }
 
-        $data['last_heartbeat'] = microtime(true);
+        $now = microtime(true);
+        $data['last_heartbeat'] = $now;
         $data['status'] = self::STATUS_RUNNING;
 
         if ($context !== null) {
@@ -162,6 +175,10 @@ final class ConsumerProcessManager
             $data['current_channel'] = $context->channel;
         }
 
+        // Update local cache
+        $this->localCache[$processId] = $data;
+
+        // Write to shared cache
         $this->cache->set(
             self::CACHE_PREFIX . $processId,
             $data,

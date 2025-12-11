@@ -32,6 +32,17 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
     private bool $connected = false;
     private bool $consuming = false;
 
+    /**
+     * Track if subscriber is already in subscribe mode.
+     * Redis subscribe() is a one-time blocking call that maintains connection.
+     */
+    private bool $subscriberActive = false;
+
+    /**
+     * Current read timeout setting to avoid redundant setOption() calls.
+     */
+    private float $currentReadTimeout = 0.0;
+
     public function __construct(
         array $config = [],
         private readonly ?RealtimeManager $manager = null
@@ -180,16 +191,16 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
     /**
      * Start consuming messages from subscribed channels.
      *
-     * This method is called by the Redis consumer command.
-     * It runs in a loop, consuming messages and invoking callbacks.
+     * Optimized for production with minimal overhead:
+     * - Caches read timeout to avoid redundant setOption() calls
+     * - Uses native Redis Pub/Sub (push model, no polling)
+     * - Returns control periodically via read timeout for heartbeat
      *
-     * This method processes messages for a limited time then returns,
-     * allowing the caller to perform other tasks (heartbeat, signal handling).
-     *
-     * Uses native Redis subscribe with read timeout to periodically return control.
+     * Note: Redis Pub/Sub is inherently push-based and very efficient.
+     * The main optimization is reducing syscall overhead.
      *
      * @param int $timeoutMs Poll timeout in milliseconds (used as read timeout)
-     * @param int $batchSize Maximum messages per batch (not used for Redis)
+     * @param int $batchSize Maximum messages per batch (not used for Redis Pub/Sub)
      * @return void
      */
     public function consume(int $timeoutMs = 1000, int $batchSize = 100): void
@@ -202,7 +213,7 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
 
         // Check if we have regular subscriptions
         if (empty($this->subscriptions)) {
-            return; // No subscriptions
+            return;
         }
 
         $this->consuming = true;
@@ -214,9 +225,12 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
             return;
         }
 
-        // Set read timeout to allow periodic return for heartbeat
+        // Only set read timeout if it changed (avoid syscall overhead)
         $timeoutSeconds = max(1.0, $timeoutMs / 1000);
-        $this->subscriber->setOption(\Redis::OPT_READ_TIMEOUT, $timeoutSeconds);
+        if (abs($this->currentReadTimeout - $timeoutSeconds) > 0.001) {
+            $this->subscriber->setOption(\Redis::OPT_READ_TIMEOUT, $timeoutSeconds);
+            $this->currentReadTimeout = $timeoutSeconds;
+        }
 
         try {
             // Subscribe to all channels (blocking operation with timeout)
@@ -224,23 +238,23 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
             $this->subscriber->subscribe($redisChannels, function ($redis, $redisChannel, $payload) {
                 // Check if we should stop (called by signal handler)
                 if (!$this->consuming) {
-                    return false; // Stop consuming (exit subscribe loop)
+                    return false;
                 }
 
                 $subscriptions = $this->subscriptions[$redisChannel] ?? null;
 
                 if (!$subscriptions) {
-                    return true; // Continue but skip
+                    return true;
                 }
 
                 try {
-                    // Decode message
+                    // Decode message (hot path - keep minimal)
                     $message = \Toporia\Framework\Realtime\Message::fromJson($payload);
 
                     // Extract channel name from Redis channel (remove "realtime:" prefix)
                     $channel = str_replace('realtime:', '', $redisChannel);
 
-                    // Handle new format: array of callbacks per channel
+                    // Handle array of callbacks per channel
                     if (is_array($subscriptions)) {
                         $callback = $subscriptions[$channel] ?? null;
                         if ($callback) {
@@ -254,33 +268,27 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
                             }
                         }
                     } elseif (is_callable($subscriptions)) {
-                        // Old format: single callback (backward compatibility)
                         $subscriptions($message);
                     }
                 } catch (\Throwable $e) {
                     error_log("Redis subscriber error on {$redisChannel}: {$e->getMessage()}");
-                    // Continue consuming even on error
                 }
 
-                return true; // Continue consuming
+                return true;
             });
         } catch (\RedisException $e) {
             // Read timeout is normal - return control to caller for heartbeat
-            // Only re-throw if it's not a timeout error
             $errorMessage = strtolower($e->getMessage());
             if (!str_contains($errorMessage, 'timeout') && !str_contains($errorMessage, 'read error')) {
                 throw $e;
             }
-            // Timeout occurred - this is expected, return control to main loop
         }
     }
 
     /**
      * Consume messages using pattern subscriptions (PSUBSCRIBE).
      *
-     * This allows subscribing to multiple channels using wildcards:
-     * - 'realtime:*' - all realtime channels
-     * - 'realtime:user.*' - all user channels
+     * Optimized for production with cached read timeout.
      *
      * @param int $timeoutMs Poll timeout in milliseconds
      * @return void
@@ -295,14 +303,16 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
             return;
         }
 
-        // Set read timeout to allow periodic return for heartbeat
+        // Only set read timeout if it changed (avoid syscall overhead)
         $timeoutSeconds = max(1.0, $timeoutMs / 1000);
-        $this->subscriber->setOption(\Redis::OPT_READ_TIMEOUT, $timeoutSeconds);
+        if (abs($this->currentReadTimeout - $timeoutSeconds) > 0.001) {
+            $this->subscriber->setOption(\Redis::OPT_READ_TIMEOUT, $timeoutSeconds);
+            $this->currentReadTimeout = $timeoutSeconds;
+        }
 
         try {
             // Use PSUBSCRIBE for pattern matching (with timeout)
             $this->subscriber->psubscribe($patterns, function ($redis, $pattern, $redisChannel, $payload) {
-                // Check if we should stop
                 if (!$this->consuming) {
                     return false;
                 }
@@ -310,31 +320,24 @@ final class RedisBroker implements BrokerInterface, HealthCheckableInterface
                 $callback = $this->patternSubscriptions[$pattern] ?? null;
 
                 if (!$callback) {
-                    return true; // Continue but skip
+                    return true;
                 }
 
                 try {
-                    // Decode message
                     $message = \Toporia\Framework\Realtime\Message::fromJson($payload);
-
-                    // Extract channel name (remove "realtime:" prefix)
                     $channel = str_replace('realtime:', '', $redisChannel);
-
-                    // Call callback with message and channel
                     $callback($message, $channel);
                 } catch (\Throwable $e) {
                     error_log("Redis psubscriber error on {$redisChannel} (pattern: {$pattern}): {$e->getMessage()}");
                 }
 
-                return true; // Continue consuming
+                return true;
             });
         } catch (\RedisException $e) {
-            // Read timeout is normal - return control to caller for heartbeat
             $errorMessage = strtolower($e->getMessage());
             if (!str_contains($errorMessage, 'timeout') && !str_contains($errorMessage, 'read error')) {
                 throw $e;
             }
-            // Timeout occurred - return control to main loop
         }
     }
 

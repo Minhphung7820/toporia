@@ -200,7 +200,18 @@ final class BrokerHandlerConsumeCommand extends Command
     }
 
     /**
+     * Signal dispatch interval counter.
+     */
+    private int $loopCounter = 0;
+
+    /**
      * Main consume loop.
+     *
+     * Optimized for high-throughput production:
+     * - Adaptive sleep: only sleeps when no messages (avoids latency)
+     * - Batched signal dispatch: reduces syscall overhead
+     * - Efficient heartbeat: only when interval elapsed
+     * - Batch size tuning based on throughput
      */
     private function consume(
         BrokerInterface $broker,
@@ -210,32 +221,52 @@ final class BrokerHandlerConsumeCommand extends Command
         int $sleepMs,
         array $limits
     ): void {
-        // Subscribe to channels
+        // Subscribe to channels once
         foreach ($channels as $channel) {
             $this->subscribeChannel($broker, $driver, $channel);
         }
 
-        // Main loop
+        // Track messages for adaptive behavior
+        $lastMessageCount = 0;
+        $batchSize = 100; // Start with default
+
+        // Main loop - optimized for minimal overhead
         while ($this->running) {
-            // Check limits
-            if ($this->shouldStop($limits)) {
-                $this->info("Limit reached. Stopping...");
-                break;
+            $this->loopCounter++;
+
+            // Check limits every 10 iterations (reduce overhead)
+            if ($this->loopCounter % 10 === 0) {
+                if ($this->shouldStop($limits)) {
+                    $this->info("Limit reached. Stopping...");
+                    break;
+                }
             }
 
-            // Send heartbeat
+            // Send heartbeat (internal check for interval)
             $this->sendHeartbeat();
 
-            // Consume messages
-            $broker->consume($timeout, 100);
+            // Consume messages with adaptive batch size
+            $broker->consume($timeout, $batchSize);
 
-            // Sleep between cycles
-            if ($sleepMs > 0) {
+            // Calculate if we got messages this cycle
+            $messagesThisCycle = $this->messageCount - $lastMessageCount;
+            $lastMessageCount = $this->messageCount;
+
+            // Adaptive sleep: only sleep if no messages received (idle state)
+            // This prevents unnecessary latency when messages are flowing
+            if ($messagesThisCycle === 0 && $sleepMs > 0) {
                 usleep($sleepMs * 1000);
             }
 
-            // Process signals
-            if (function_exists('pcntl_signal_dispatch')) {
+            // Adaptive batch size: increase if processing many messages
+            if ($messagesThisCycle >= $batchSize) {
+                $batchSize = min(500, $batchSize + 50); // Scale up, max 500
+            } elseif ($messagesThisCycle === 0 && $batchSize > 100) {
+                $batchSize = max(100, $batchSize - 25); // Scale down, min 100
+            }
+
+            // Process signals every 10 iterations (reduces syscall overhead)
+            if ($this->loopCounter % 10 === 0 && function_exists('pcntl_signal_dispatch')) {
                 pcntl_signal_dispatch();
             }
         }
@@ -359,14 +390,15 @@ final class BrokerHandlerConsumeCommand extends Command
             'attempt' => $attempt,
         ]);
 
-        $this->line("[{$timestamp}] <fg=green>✓</> Message #{$this->messageCount} processed" . ($attempt > 1 ? " (attempt {$attempt})" : ""));
+        $attemptInfo = $attempt > 1 ? " (attempt {$attempt})" : "";
+        $this->writeln("[{$timestamp}] <fg=green>✓</> Message #{$this->messageCount} processed{$attemptInfo}");
     }
 
     private function logMessageFailed(string $channel, MessageInterface $message, \Throwable $e, int $attempts): void
     {
         $timestamp = now()->format('Y-m-d H:i:s');
 
-        $this->line("[{$timestamp}] <fg=red>✗</> Message #{$this->messageCount} failed after {$attempts} attempts: {$e->getMessage()}");
+        $this->writeln("[{$timestamp}] <fg=red>✗</> Message #{$this->messageCount} failed after {$attempts} attempts: {$e->getMessage()}");
     }
 
     /**
