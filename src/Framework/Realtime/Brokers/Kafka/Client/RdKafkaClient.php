@@ -208,10 +208,10 @@ final class RdKafkaClient implements KafkaClientInterface
             return;
         }
 
-        // For HTTP/short-lived requests: flush async (fire-and-forget for low latency)
-        // In long-running processes (WebSocket server), batching provides better performance
+        // For HTTP/short-lived requests: flush sync to ensure delivery
+        // Trade-off: ~20ms latency but guaranteed message delivery
         if (!$this->consuming) {
-            $this->flushBuffer(sync: false);
+            $this->flushBuffer(sync: true);
         }
     }
 
