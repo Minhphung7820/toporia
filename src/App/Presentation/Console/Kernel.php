@@ -42,10 +42,6 @@ final class Kernel
             // Add your custom application commands here...
             Commands\ExportExcelCommand::class,
             Commands\ImportExcelCommand::class,
-            Commands\KafkaTopicManagerCommand::class,
-            Commands\RedisEventConsumerCommand::class,
-            Commands\RabbitMqEventConsumerCommand::class,
-            Commands\OrderTrackingConsumerCommand::class,
         ];
     }
 }

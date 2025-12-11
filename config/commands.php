@@ -36,14 +36,6 @@ return [
     'export:excel' => App\Presentation\Console\Commands\ExportExcelCommand::class,
     'import:excel' => App\Presentation\Console\Commands\ImportExcelCommand::class,
 
-    // Kafka commands
-    'kafka:topics' => App\Presentation\Console\Commands\KafkaTopicManagerCommand::class,
-
-    // Event consumer commands
-    'redis:consume' => App\Presentation\Console\Commands\RedisEventConsumerCommand::class,
-    'rabbitmq:consume' => App\Presentation\Console\Commands\RabbitMqEventConsumerCommand::class,
-    'order:track' => App\Presentation\Console\Commands\OrderTrackingConsumerCommand::class,
-
     /*
     |--------------------------------------------------------------------------
     | Auto-Discovery
