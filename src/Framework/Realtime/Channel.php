@@ -145,23 +145,20 @@ final class Channel implements ChannelInterface
      */
     public function authorize(ConnectionInterface $connection): bool
     {
-        // Public channels always authorized
-        if ($this->isPublic()) {
-            return true;
+        // If authorizer is set, always call it (regardless of public/private)
+        if ($this->authorizer) {
+            try {
+                return (bool) call_user_func($this->authorizer, $connection, $this->name);
+            } catch (\Throwable $e) {
+                error_log("Authorization failed for {$this->name}: {$e->getMessage()}");
+                return false;
+            }
         }
 
-        // No authorizer set - deny private channels
-        if (!$this->authorizer) {
-            return false;
-        }
-
-        // Call custom authorizer
-        try {
-            return (bool) call_user_func($this->authorizer, $connection, $this->name);
-        } catch (\Throwable $e) {
-            error_log("Authorization failed for {$this->name}: {$e->getMessage()}");
-            return false;
-        }
+        // No authorizer set:
+        // - Public channels are allowed by default
+        // - Private/Presence channels are denied by default
+        return $this->isPublic();
     }
 
     /**

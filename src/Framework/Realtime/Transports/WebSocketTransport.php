@@ -253,10 +253,11 @@ final class WebSocketTransport implements TransportInterface
             $this->connections[$request->fd] = $connection;
             $this->manager->addConnection($connection);
 
+            $workerId = $server->worker_id;
             if ($authData) {
-                echo "[{$request->fd}] Connected: user_id={$authData['user_id']} IP={$ipAddress}\n";
+                echo "[Worker #{$workerId}][{$request->fd}] Connected: user_id={$authData['user_id']} IP={$ipAddress}\n";
             } else {
-                echo "[{$request->fd}] Connected: anonymous (IP: {$ipAddress})\n";
+                echo "[Worker #{$workerId}][{$request->fd}] Connected: anonymous (IP: {$ipAddress})\n";
             }
         });
 
@@ -316,12 +317,38 @@ final class WebSocketTransport implements TransportInterface
         });
 
         // Inter-worker communication for multi-worker broadcast
-        $this->server->on('pipeMessage', function ($server, $_srcWorkerId, $message) {
-            // Received broadcast message from Worker #0 (Redis subscription handler)
-            // Broadcast to all connections in THIS worker
-            foreach ($server->connections as $fd) {
-                if ($server->isEstablished($fd)) {
-                    $server->push($fd, $message, WEBSOCKET_OPCODE_TEXT);
+        $this->server->on('pipeMessage', function ($server, $srcWorkerId, $message) {
+            $workerId = $server->worker_id;
+            echo "[Worker #{$workerId}] Received pipeMessage from Worker #{$srcWorkerId}\n";
+
+            // Received message from Worker #0 (broker subscription handler)
+            $decoded = json_decode($message, true);
+
+            if ($decoded && ($decoded['type'] ?? '') === 'channel_broadcast') {
+                $channelName = $decoded['channel'] ?? '';
+                $event = $decoded['event'] ?? 'message';
+                $data = $decoded['data'] ?? [];
+
+                echo "[Worker #{$workerId}] Broadcasting to channel: {$channelName}, has " . count($this->connections) . " connections\n";
+
+                if ($channelName) {
+                    // Broadcast directly to subscribed connections in THIS worker
+                    $msg = Message::event($channelName, $event, $data);
+                    $json = $msg->toJson();
+
+                    $sentCount = 0;
+                    foreach ($this->connections as $connection) {
+                        $subscribed = $connection->isSubscribed($channelName);
+                        echo "[Worker #{$workerId}] Connection {$connection->getId()} subscribed to {$channelName}: " . ($subscribed ? 'yes' : 'no') . "\n";
+                        if ($subscribed) {
+                            $fd = (int) $connection->getResource();
+                            if ($server->isEstablished($fd)) {
+                                $server->push($fd, $json, WEBSOCKET_OPCODE_TEXT);
+                                $sentCount++;
+                            }
+                        }
+                    }
+                    echo "[Worker #{$workerId}] Sent to {$sentCount} connections\n";
                 }
             }
         });
@@ -363,21 +390,42 @@ final class WebSocketTransport implements TransportInterface
             return;
         }
 
-        // Message handler callback - broadcasts to all workers
+        // Message handler callback - broadcasts to channel subscribers in all workers
         $messageHandler = function (string $channelName, string $event, array $data) use ($server): void {
             $message = Message::event($channelName, $event, $data);
             $json = $message->toJson();
 
-            // Broadcast to connections in Worker #0 (current worker)
-            foreach ($server->connections as $fd) {
-                if ($server->isEstablished($fd)) {
-                    $server->push($fd, $json, WEBSOCKET_OPCODE_TEXT);
+            echo "[Broker] Received message for channel: {$channelName}, event: {$event}\n";
+            echo "[Broker] Worker #0 has " . count($this->connections) . " connections\n";
+
+            // Broadcast to subscribers in Worker #0 (current worker)
+            $sentCount = 0;
+            foreach ($this->connections as $connection) {
+                $subscribed = $connection->isSubscribed($channelName);
+                echo "[Broker] Connection {$connection->getId()} subscribed to {$channelName}: " . ($subscribed ? 'yes' : 'no') . "\n";
+                if ($subscribed) {
+                    $fd = (int) $connection->getResource();
+                    if ($server->isEstablished($fd)) {
+                        $server->push($fd, $json, WEBSOCKET_OPCODE_TEXT);
+                        $sentCount++;
+                    }
                 }
             }
+            echo "[Broker] Sent to {$sentCount} connections in Worker #0\n";
 
-            // Send message to all OTHER workers via pipe for them to broadcast
-            for ($workerId = 1; $workerId < $this->workerNum; $workerId++) {
-                $server->sendMessage($json, $workerId);
+            // For multi-worker setup, send to other workers via pipe
+            if ($this->workerNum > 1) {
+                echo "[Broker] Sending to " . ($this->workerNum - 1) . " other workers via pipe\n";
+                $pipeMessage = json_encode([
+                    'type' => 'channel_broadcast',
+                    'channel' => $channelName,
+                    'event' => $event,
+                    'data' => $data,
+                ]);
+
+                for ($workerId = 1; $workerId < $this->workerNum; $workerId++) {
+                    $server->sendMessage($pipeMessage, $workerId);
+                }
             }
         };
 
@@ -448,6 +496,13 @@ final class WebSocketTransport implements TransportInterface
         }
 
         $channel->subscribe($connection);
+
+        // Log subscription for debugging
+        if ($this->server) {
+            $workerId = $this->server->worker_id;
+            echo "[Worker #{$workerId}] Connection {$connection->getId()} subscribed to channel: {$channelName}\n";
+            echo "[Worker #{$workerId}] Connection channels: " . implode(', ', $connection->getChannels()) . "\n";
+        }
 
         // Send success response
         $this->send($connection, Message::event($channelName, 'subscribed', [
