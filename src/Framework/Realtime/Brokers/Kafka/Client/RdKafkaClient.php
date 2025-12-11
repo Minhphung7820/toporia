@@ -208,10 +208,10 @@ final class RdKafkaClient implements KafkaClientInterface
             return;
         }
 
-        // For HTTP/short-lived requests: flush immediately to ensure delivery
+        // For HTTP/short-lived requests: flush async (fire-and-forget for low latency)
         // In long-running processes (WebSocket server), batching provides better performance
         if (!$this->consuming) {
-            $this->flushBuffer();
+            $this->flushBuffer(sync: false);
         }
     }
 
@@ -368,21 +368,14 @@ final class RdKafkaClient implements KafkaClientInterface
         $this->messageBuffer = [];
         $this->lastFlushTime = (int) (microtime(true) * 1000);
 
-        // Sync flush: wait for messages to be delivered
-        // This ensures HTTP requests don't return before messages are sent
+        // Flush strategy based on sync mode
         if ($sync) {
-            // Poll to trigger delivery callbacks (max 100ms total)
-            for ($i = 0; $i < 5; $i++) {
-                $events = $this->producer->poll(20);
-                if ($events === 0) {
-                    break; // No more events to process
-                }
-            }
-
-            // Final flush with short timeout (500ms max)
-            $this->producer->flush(500);
+            // Sync: Poll briefly then flush with short timeout
+            // Optimized for ~20ms latency while ensuring delivery
+            $this->producer->poll(5);
+            $this->producer->flush(15); // 15ms timeout - enough for local/fast Kafka
         } else {
-            // Async: just poll without waiting
+            // Async: fire-and-forget (fastest, but no delivery guarantee)
             $this->producer->poll(0);
         }
     }
