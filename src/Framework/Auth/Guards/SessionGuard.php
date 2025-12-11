@@ -35,8 +35,7 @@ final class SessionGuard implements GuardInterface
     public function __construct(
         private UserProviderInterface $provider,
         private string $name = 'default'
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritdoc}
@@ -149,22 +148,27 @@ final class SessionGuard implements GuardInterface
     /**
      * Get user ID from session.
      *
+     * Uses framework's session() helper which stores in storage/sessions.
+     *
      * @return int|string|null
      */
     private function getSessionId(): int|string|null
     {
-        return $_SESSION[$this->getName()] ?? null;
+        return session()->get($this->getName());
     }
 
     /**
      * Update session with user ID.
+     *
+     * Uses framework's session() helper which stores in storage/sessions.
      *
      * @param int|string $id User ID.
      * @return void
      */
     private function updateSession(int|string $id): void
     {
-        $_SESSION[$this->getName()] = $id;
+        session()->set($this->getName(), $id);
+        session()->save();
     }
 
     /**
@@ -285,7 +289,8 @@ final class SessionGuard implements GuardInterface
      */
     private function clearUserData(): void
     {
-        unset($_SESSION[$this->getName()]);
+        session()->remove($this->getName());
+        session()->save();
 
         // Clear remember cookie with secure options
         if (isset($_COOKIE[$this->getRememberTokenName()])) {

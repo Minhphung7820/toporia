@@ -122,6 +122,18 @@ Route::post('/broker/publish', [BrokerTestController::class, 'publish']);
 Route::get('/broker/health', [BrokerTestController::class, 'health']);
 
 // =========================================================================
+// BROADCASTING AUTH ROUTES
+// =========================================================================
+
+use Toporia\Framework\Realtime\Auth\BroadcastAuthController;
+
+// Channel authorization endpoint (Pusher-compatible)
+Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate']);
+
+// Internal endpoint for realtime server to verify session auth
+Route::post('/broadcasting/verify-session', [BroadcastAuthController::class, 'verifySession']);
+
+// =========================================================================
 // NOTIFICATION API - Simple endpoint to send realtime notifications
 // =========================================================================
 Route::post('/notifications/send', function (Request $request) {

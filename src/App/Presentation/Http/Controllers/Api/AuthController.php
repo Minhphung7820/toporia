@@ -12,7 +12,9 @@ use App\Application\Services\{
     ChangePasswordService
 };
 use App\Presentation\Http\Controllers\BaseController;
+use Toporia\Framework\Http\Contracts\JsonResponseInterface;
 use Toporia\Framework\Http\Request;
+use Toporia\Framework\Http\Response;
 use Toporia\Framework\Support\Accessors\Auth;
 
 /**
@@ -24,25 +26,29 @@ use Toporia\Framework\Support\Accessors\Auth;
 final class AuthController extends BaseController
 {
     public function __construct(
+        Request $request,
+        Response $response,
         private readonly RegisterUserService $registerService,
         private readonly LoginService $loginService,
         private readonly ForgotPasswordService $forgotPasswordService,
         private readonly ResetPasswordService $resetPasswordService,
         private readonly ChangePasswordService $changePasswordService
-    ) {}
+    ) {
+        parent::__construct($request, $response);
+    }
 
     /**
      * Register new user.
      *
      * POST /api/auth/register
      */
-    public function register(Request $request): void
+    public function register(Request $request): JsonResponseInterface
     {
         $data = $request->json();
         $result = $this->registerService->execute($data);
 
         if ($result['success']) {
-            $this->json([
+            return $this->json([
                 'success' => true,
                 'message' => $result['message'],
                 'user' => [
@@ -51,13 +57,13 @@ final class AuthController extends BaseController
                     'name' => $result['user']->name,
                 ]
             ], 201);
-        } else {
-            $this->json([
-                'success' => false,
-                'message' => $result['message'],
-                'errors' => $result['errors'] ?? []
-            ], 422);
         }
+
+        return $this->json([
+            'success' => false,
+            'message' => $result['message'],
+            'errors' => $result['errors'] ?? []
+        ], 422);
     }
 
     /**
@@ -65,13 +71,13 @@ final class AuthController extends BaseController
      *
      * POST /api/auth/login
      */
-    public function login(Request $request): void
+    public function login(Request $request): JsonResponseInterface
     {
         $credentials = $request->json();
         $result = $this->loginService->execute($credentials);
 
         if ($result['success']) {
-            $this->json([
+            return $this->json([
                 'success' => true,
                 'message' => $result['message'],
                 'user' => [
@@ -80,12 +86,12 @@ final class AuthController extends BaseController
                     'name' => $result['user']->name,
                 ]
             ], 200);
-        } else {
-            $this->json([
-                'success' => false,
-                'message' => $result['message']
-            ], 401);
         }
+
+        return $this->json([
+            'success' => false,
+            'message' => $result['message']
+        ], 401);
     }
 
     /**
@@ -93,19 +99,18 @@ final class AuthController extends BaseController
      *
      * GET /api/auth/user
      */
-    public function user(): void
+    public function user(): JsonResponseInterface
     {
         if (!Auth::check()) {
-            $this->json([
+            return $this->json([
                 'success' => false,
                 'message' => 'Unauthenticated'
             ], 401);
-            return;
         }
 
         $user = Auth::user();
 
-        $this->json([
+        return $this->json([
             'success' => true,
             'user' => [
                 'id' => $user->getAuthIdentifier(),
@@ -120,11 +125,11 @@ final class AuthController extends BaseController
      *
      * POST /api/auth/logout
      */
-    public function logout(): void
+    public function logout(): JsonResponseInterface
     {
         Auth::logout();
 
-        $this->json([
+        return $this->json([
             'success' => true,
             'message' => 'Logout successful'
         ]);
@@ -135,20 +140,19 @@ final class AuthController extends BaseController
      *
      * POST /api/auth/refresh
      */
-    public function refresh(): void
+    public function refresh(): JsonResponseInterface
     {
         if (!Auth::check()) {
-            $this->json([
+            return $this->json([
                 'success' => false,
                 'message' => 'Unauthenticated'
             ], 401);
-            return;
         }
 
         // Regenerate session ID (security best practice)
         session_regenerate_id(true);
 
-        $this->json([
+        return $this->json([
             'success' => true,
             'message' => 'Session refreshed'
         ]);
@@ -159,7 +163,7 @@ final class AuthController extends BaseController
      *
      * POST /api/auth/forgot-password
      */
-    public function forgotPassword(Request $request): void
+    public function forgotPassword(Request $request): JsonResponseInterface
     {
         $data = $request->json();
         $email = $data['email'] ?? '';
@@ -167,7 +171,7 @@ final class AuthController extends BaseController
         $result = $this->forgotPasswordService->execute($email);
 
         $statusCode = $result['success'] ? 200 : 422;
-        $this->json($result, $statusCode);
+        return $this->json($result, $statusCode);
     }
 
     /**
@@ -175,13 +179,13 @@ final class AuthController extends BaseController
      *
      * POST /api/auth/reset-password
      */
-    public function resetPassword(Request $request): void
+    public function resetPassword(Request $request): JsonResponseInterface
     {
         $data = $request->json();
         $result = $this->resetPasswordService->execute($data);
 
         $statusCode = $result['success'] ? 200 : ($result['message'] === 'Invalid or expired token' ? 400 : 422);
-        $this->json($result, $statusCode);
+        return $this->json($result, $statusCode);
     }
 
     /**
@@ -189,14 +193,13 @@ final class AuthController extends BaseController
      *
      * POST /api/auth/change-password
      */
-    public function changePassword(Request $request): void
+    public function changePassword(Request $request): JsonResponseInterface
     {
         if (!Auth::check()) {
-            $this->json([
+            return $this->json([
                 'success' => false,
                 'message' => 'Unauthenticated'
             ], 401);
-            return;
         }
 
         $data = $request->json();
@@ -204,16 +207,15 @@ final class AuthController extends BaseController
 
         // Type check - ensure it's our User entity
         if (!$user instanceof \App\Domain\Entities\User) {
-            $this->json([
+            return $this->json([
                 'success' => false,
                 'message' => 'Invalid user type'
             ], 500);
-            return;
         }
 
         $result = $this->changePasswordService->execute($user, $data);
 
         $statusCode = $result['success'] ? 200 : 422;
-        $this->json($result, $statusCode);
+        return $this->json($result, $statusCode);
     }
 }

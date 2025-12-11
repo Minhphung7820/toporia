@@ -15,6 +15,9 @@ services:
     volumes:
       - .:/var/www/html
       - ./storage/logs:/var/www/html/storage/logs
+      - ./storage/sessions:/var/www/html/storage/sessions
+      - ./storage/cache:/var/www/html/storage/cache
+      - ./storage/framework:/var/www/html/storage/framework
     environment:
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG: ${APP_DEBUG:-true}

@@ -36,7 +36,25 @@ final class FileSessionDriver implements SessionStoreInterface
     ) {
         $this->name = $name;
         $this->ensureDirectoryExists();
-        $this->id = $this->generateId();
+        // Read session ID from cookie first, generate new if not exists
+        $this->id = $this->getSessionIdFromCookie() ?? $this->generateId();
+    }
+
+    /**
+     * Get session ID from cookie.
+     *
+     * @return string|null Session ID or null if not found
+     */
+    private function getSessionIdFromCookie(): ?string
+    {
+        $sessionId = $_COOKIE[$this->name] ?? null;
+
+        // Validate session ID format (prevent directory traversal)
+        if ($sessionId !== null && preg_match('/^[a-zA-Z0-9,-]{22,256}$/', $sessionId)) {
+            return $sessionId;
+        }
+
+        return null;
     }
 
     /**
@@ -209,7 +227,60 @@ final class FileSessionDriver implements SessionStoreInterface
             'expires_at' => now()->getTimestamp() + $this->lifetime,
         ]);
 
-        return file_put_contents($file, $data, LOCK_EX) !== false;
+        $result = file_put_contents($file, $data, LOCK_EX) !== false;
+
+        // Set session cookie if not already set
+        if ($result && !isset($_COOKIE[$this->name])) {
+            $this->setSessionCookie();
+        }
+
+        return $result;
+    }
+
+    /**
+     * Set session cookie with secure options.
+     *
+     * @return void
+     */
+    private function setSessionCookie(): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+
+        $isSecure = $this->isSecureConnection();
+
+        setcookie(
+            $this->name,
+            $this->id,
+            [
+                'expires' => 0, // Session cookie (expires when browser closes)
+                'path' => '/',
+                'domain' => '',
+                'secure' => $isSecure,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]
+        );
+    }
+
+    /**
+     * Check if current connection is secure (HTTPS).
+     *
+     * @return bool
+     */
+    private function isSecureConnection(): bool
+    {
+        if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+            return true;
+        }
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            return true;
+        }
+        if (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) {
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -262,14 +333,19 @@ final class FileSessionDriver implements SessionStoreInterface
     }
 
     /**
-     * Ensure session directory exists.
+     * Ensure session directory exists with proper permissions.
      *
      * @return void
      */
     private function ensureDirectoryExists(): void
     {
         if (!is_dir($this->path)) {
-            mkdir($this->path, 0755, true);
+            mkdir($this->path, 0777, true);
+        }
+
+        // Ensure directory is writable
+        if (!is_writable($this->path)) {
+            @chmod($this->path, 0777);
         }
     }
 }

@@ -102,15 +102,16 @@ COPY . .
 # Generate optimized autoloader
 RUN composer dump-autoload --optimize --classmap-authoritative --no-dev
 
-# Create storage directories with correct permissions
+# Create storage directories with full permissions (no restrictions)
 RUN mkdir -p \
     storage/logs \
+    storage/sessions \
+    storage/cache \
     storage/framework/cache \
     storage/framework/sessions \
     storage/framework/views \
     bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
+    && chmod -R 777 /var/www/html
 
 # Expose PHP-FPM port
 EXPOSE 9000

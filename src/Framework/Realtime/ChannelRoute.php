@@ -203,12 +203,19 @@ final class ChannelRoute
         // 'team.{teamId}.channel.{channelId}' -> '/^team\.([^.]+)\.channel\.([^.]+)$/'
 
         $paramNames = [];
-        $regex = preg_replace_callback('/\{(\w+)\}/', function ($matches) use (&$paramNames) {
-            $paramNames[] = $matches[1];
-            return '([^.]+)'; // Match anything except dot
-        }, preg_quote($pattern, '/'));
 
-        $regex = '/^' . $regex . '$/';
+        // First, replace {param} with placeholder before escaping
+        $placeholder = '___PARAM_PLACEHOLDER___';
+        $paramPattern = preg_replace_callback('/\{(\w+)\}/', function ($matches) use (&$paramNames, $placeholder) {
+            $paramNames[] = $matches[1];
+            return $placeholder;
+        }, $pattern);
+
+        // Escape special regex characters (dots, etc.)
+        $escaped = preg_quote($paramPattern, '/');
+
+        // Replace placeholders with capture groups
+        $regex = '/^' . str_replace($placeholder, '([^.]+)', $escaped) . '$/';
 
         if (preg_match($regex, $channelName, $matches)) {
             array_shift($matches); // Remove full match

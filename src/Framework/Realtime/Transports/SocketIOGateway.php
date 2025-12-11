@@ -495,41 +495,63 @@ final class SocketIOGateway implements TransportInterface
     }
 
     /**
-     * Handle 'auth' event - authenticate connection with JWT token.
+     * Handle 'auth' event - authenticate connection with JWT token or session.
      *
      * Client sends:
+     *   // JWT auth
      *   socket.emit('auth', { token: 'jwt_token' })
      *   socket.emit('auth', { token: 'jwt_token', guard: 'api' })
      *   socket.emit('auth', { token: 'jwt_token', guard: 'admin' })
      *
+     *   // Session auth (HttpOnly cookie-based)
+     *   socket.emit('auth', { session_id: 'session_id_from_cookie' })
+     *
      * @param ConnectionInterface $connection
-     * @param mixed $data { token: string, guard?: string }
+     * @param mixed $data { token?: string, session_id?: string, guard?: string }
      * @param string|null $ackId
      * @return void
      */
     private function handleAuth(ConnectionInterface $connection, mixed $data, ?string $ackId): void
     {
         $token = is_array($data) ? ($data['token'] ?? null) : null;
-        $guardName = is_array($data) ? ($data['guard'] ?? 'api') : 'api';
+        $sessionId = is_array($data) ? ($data['session_id'] ?? null) : null;
+        $guardName = is_array($data) ? ($data['guard'] ?? 'web') : 'web';
 
-        if (empty($token)) {
-            $this->emitToConnection($connection, 'auth_error', ['message' => 'Token required']);
+        $userData = null;
+
+        // Method 1: JWT token auth
+        if (!empty($token)) {
+            $guardName = is_array($data) ? ($data['guard'] ?? 'api') : 'api';
+            $userData = $this->verifyTokenWithGuard($token, $guardName);
+            if ($userData !== null) {
+                $userData['auth_method'] = 'jwt';
+            }
+        }
+        // Method 2: Session auth
+        elseif (!empty($sessionId)) {
+            $userData = $this->verifySessionAuth($sessionId, $guardName);
+        } else {
+            $this->emitToConnection($connection, 'auth_error', ['message' => 'Token or session_id required']);
             return;
         }
 
-        // Verify JWT and authenticate connection with specified guard
-        $userData = $this->verifyTokenWithGuard($token, $guardName);
-
         if ($userData === null || $userData['user_id'] === null) {
-            $this->emitToConnection($connection, 'auth_error', ['message' => 'Invalid token']);
+            $this->emitToConnection($connection, 'auth_error', ['message' => 'Invalid credentials']);
             return;
         }
 
         // Set user data on connection
         $connection->setUserId($userData['user_id']);
-        $connection->set('token_issued_at', $userData['issued_at']);
-        $connection->set('token_expires_at', $userData['expires_at']);
         $connection->set('auth_guard', $guardName);
+        $connection->set('auth_method', $userData['auth_method'] ?? 'jwt');
+
+        // Store token-specific data
+        if (isset($userData['issued_at'])) {
+            $connection->set('token_issued_at', $userData['issued_at']);
+        }
+        if (isset($userData['expires_at'])) {
+            $connection->set('token_expires_at', $userData['expires_at']);
+        }
 
         // Store additional user info if available
         if (isset($userData['username'])) {
@@ -538,17 +560,22 @@ final class SocketIOGateway implements TransportInterface
         if (isset($userData['email'])) {
             $connection->set('email', $userData['email']);
         }
+        if (isset($userData['name'])) {
+            $connection->set('username', $userData['name']);
+        }
         if (isset($userData['roles'])) {
             $connection->set('roles', $userData['roles']);
         }
 
-        echo "[{$connection->getId()}] Authenticated as user {$userData['user_id']} (guard: {$guardName})\n";
+        $authMethod = $userData['auth_method'] ?? 'jwt';
+        echo "[{$connection->getId()}] Authenticated as user {$userData['user_id']} (guard: {$guardName}, method: {$authMethod})\n";
 
         // Send success response
         $this->emitToConnection($connection, 'authenticated', [
             'user_id' => $userData['user_id'],
             'socket_id' => $connection->get('sid'),
             'guard' => $guardName,
+            'method' => $authMethod,
         ]);
 
         // Send ACK if requested
@@ -557,8 +584,249 @@ final class SocketIOGateway implements TransportInterface
                 'authenticated' => true,
                 'user_id' => $userData['user_id'],
                 'guard' => $guardName,
+                'method' => $authMethod,
             ]);
         }
+    }
+
+    /**
+     * Verify session-based authentication.
+     *
+     * Reads session directly from storage/sessions (Toporia's session driver).
+     *
+     * @param string $sessionId Session ID
+     * @param string $guardName Guard name (web, admin, default, etc.)
+     * @return array|null User data or null if invalid
+     */
+    private function verifySessionAuth(string $sessionId, string $guardName): ?array
+    {
+        // Validate session ID format (prevent directory traversal)
+        if (!preg_match('/^[a-zA-Z0-9,-]{22,256}$/', $sessionId)) {
+            echo "[Session Auth] Invalid session ID format\n";
+            return null;
+        }
+
+        try {
+            // Find session file
+            $sessionFile = $this->findSessionFile($sessionId);
+
+            if ($sessionFile === null) {
+                return null;
+            }
+
+            // Read session data
+            $sessionData = file_get_contents($sessionFile);
+            if ($sessionData === false || empty($sessionData)) {
+                echo "[Session Auth] Failed to read session file\n";
+                return null;
+            }
+
+            // Parse session data (Toporia format)
+            $userData = $this->parseSessionData($sessionData, $guardName);
+
+            if ($userData !== null) {
+                $userData['auth_method'] = 'session';
+            }
+
+            return $userData;
+        } catch (\Throwable $e) {
+            error_log("[Session Auth] Error: {$e->getMessage()}");
+            return null;
+        }
+    }
+
+    /**
+     * Get possible session storage paths.
+     *
+     * Priority: Toporia storage/sessions first (framework's session driver)
+     *
+     * @return array<string>
+     */
+    private function getSessionPaths(): array
+    {
+        $paths = [];
+
+        // 1. Toporia custom path from config (highest priority)
+        $configPath = config('session.stores.file.path', null);
+        if ($configPath !== null && is_dir($configPath)) {
+            $paths[] = $configPath;
+        }
+
+        // 2. Default Toporia session path: storage/sessions
+        $basePath = defined('BASE_PATH') ? constant('BASE_PATH') : dirname(__DIR__, 5);
+        $defaultPath = $basePath . '/storage/sessions';
+        if (is_dir($defaultPath) && !in_array($defaultPath, $paths)) {
+            $paths[] = $defaultPath;
+        }
+
+        // 3. PHP native session path (fallback)
+        $phpSessionPath = session_save_path();
+        if (!empty($phpSessionPath) && is_dir($phpSessionPath) && !in_array($phpSessionPath, $paths)) {
+            $paths[] = $phpSessionPath;
+        }
+
+        // 4. Common PHP session paths (last resort)
+        $commonPaths = ['/var/lib/php/sessions', '/tmp'];
+        foreach ($commonPaths as $path) {
+            if (is_dir($path) && !in_array($path, $paths)) {
+                $paths[] = $path;
+            }
+        }
+
+        return $paths;
+    }
+
+    /**
+     * Find session file across multiple paths.
+     *
+     * @param string $sessionId Session ID
+     * @return string|null Full path to session file or null
+     */
+    private function findSessionFile(string $sessionId): ?string
+    {
+        $paths = $this->getSessionPaths();
+
+        foreach ($paths as $path) {
+            $file = $path . '/sess_' . $sessionId;
+            if (file_exists($file) && is_readable($file)) {
+                echo "[Session Auth] Found session file: {$file}\n";
+                return $file;
+            }
+        }
+
+        echo "[Session Auth] Session file not found. Searched paths: " . implode(', ', $paths) . "\n";
+        return null;
+    }
+
+    /**
+     * Parse session data - supports both PHP native and Toporia custom format.
+     *
+     * PHP native format: "auth_web|i:1;other_key|s:5:\"value\";"
+     * Toporia format: serialize(['data' => [...], 'expires_at' => timestamp])
+     *
+     * @param string $sessionData Raw session file content
+     * @param string $guardName Guard name
+     * @return array|null User data or null
+     */
+    private function parseSessionData(string $sessionData, string $guardName): ?array
+    {
+        // Use guard name directly - SessionGuard uses auth_{guardName} as session key
+        // e.g., guard 'web' stores in auth_web, guard 'admin' stores in auth_admin
+        $guardToCheck = $guardName;
+
+        // Try Toporia's custom format first: serialize(['data' => [...], 'expires_at' => ...])
+        $session = @unserialize($sessionData, ['allowed_classes' => false]);
+        if (is_array($session) && isset($session['data']) && isset($session['expires_at'])) {
+            echo "[Session Parse] Detected Toporia custom format\n";
+
+            if ($session['expires_at'] < time()) {
+                echo "[Session Parse] Session expired\n";
+                return null;
+            }
+
+            return $this->extractAuthFromData($session['data'], $guardToCheck, $guardName);
+        }
+
+        // Try PHP native session format: "key|serialized_value;key2|serialized_value2;"
+        echo "[Session Parse] Trying PHP native format\n";
+        $data = $this->parsePhpNativeSession($sessionData);
+
+        if (!empty($data)) {
+            echo "[Session Parse] Parsed keys: " . implode(', ', array_keys($data)) . "\n";
+            return $this->extractAuthFromData($data, $guardToCheck, $guardName);
+        }
+
+        echo "[Session Parse] Failed to parse session data\n";
+        return null;
+    }
+
+    /**
+     * Parse PHP native session format.
+     *
+     * Format: "key|serialized_value;key2|serialized_value2;"
+     *
+     * @param string $sessionData Raw session data
+     * @return array Parsed data
+     */
+    private function parsePhpNativeSession(string $sessionData): array
+    {
+        $result = [];
+        $offset = 0;
+        $length = strlen($sessionData);
+
+        while ($offset < $length) {
+            $keyEnd = strpos($sessionData, '|', $offset);
+            if ($keyEnd === false) {
+                break;
+            }
+
+            $key = substr($sessionData, $offset, $keyEnd - $offset);
+            $offset = $keyEnd + 1;
+
+            $remaining = substr($sessionData, $offset);
+
+            // Handle boolean false: 'b:0;'
+            if (str_starts_with($remaining, 'b:0;')) {
+                $result[$key] = false;
+                $offset += 4;
+                continue;
+            }
+
+            $value = @unserialize($remaining);
+            if ($value !== false) {
+                $result[$key] = $value;
+                $serialized = serialize($value);
+                $offset += strlen($serialized);
+            } else {
+                // Skip malformed entry
+                if (preg_match('/;([a-zA-Z_][a-zA-Z0-9_]*)\|/', $remaining, $matches, PREG_OFFSET_CAPTURE)) {
+                    $offset += $matches[0][1] + 1;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Extract auth data from parsed session data.
+     *
+     * @param array $data Parsed session data
+     * @param string $guardToCheck Primary guard to check
+     * @param string $originalGuard Original guard name
+     * @return array|null User data or null
+     */
+    private function extractAuthFromData(array $data, string $guardToCheck, string $originalGuard): ?array
+    {
+        // Try primary guard
+        $authKey = "auth_{$guardToCheck}";
+        if (isset($data[$authKey]) && !empty($data[$authKey])) {
+            echo "[Session Parse] Found auth at {$authKey} = {$data[$authKey]}\n";
+            return ['user_id' => $data[$authKey], 'guard' => $guardToCheck];
+        }
+
+        // Try original guard name
+        if ($guardToCheck !== $originalGuard) {
+            $authKey = "auth_{$originalGuard}";
+            if (isset($data[$authKey]) && !empty($data[$authKey])) {
+                echo "[Session Parse] Found auth at {$authKey} = {$data[$authKey]}\n";
+                return ['user_id' => $data[$authKey], 'guard' => $originalGuard];
+            }
+        }
+
+        // Fallback: Check all auth_* keys
+        foreach ($data as $key => $value) {
+            if (str_starts_with($key, 'auth_') && !empty($value)) {
+                $foundGuard = substr($key, 5);
+                echo "[Session Parse] Found auth (fallback) at {$key} = {$value}\n";
+                return ['user_id' => $value, 'guard' => $foundGuard];
+            }
+        }
+
+        echo "[Session Parse] No auth data found\n";
+        return null;
     }
 
     /**

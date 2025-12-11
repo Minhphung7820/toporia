@@ -273,6 +273,34 @@ if (!function_exists('cache')) {
     }
 }
 
+if (!function_exists('session')) {
+    /**
+     * Get the session store instance or get/set a session value.
+     *
+     * @param string|array|null $key Session key or array of key-value pairs
+     * @param mixed $default Default value when getting
+     * @return mixed|\Toporia\Framework\Session\Store
+     */
+    function session(string|array|null $key = null, mixed $default = null): mixed
+    {
+        $session = app('session');
+
+        if ($key === null) {
+            return $session;
+        }
+
+        if (is_array($key)) {
+            foreach ($key as $k => $v) {
+                $session->set($k, $v);
+            }
+            $session->save();
+            return null;
+        }
+
+        return $session->get($key, $default);
+    }
+}
+
 if (!function_exists('e')) {
     /**
      * Escape HTML special characters.

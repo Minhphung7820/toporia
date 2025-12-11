@@ -404,4 +404,202 @@ final class BroadcastAuthController
             ->json(['error' => $message], $status)
             ->header('Content-Type', 'application/json');
     }
+
+    /**
+     * Verify session and return authenticated user data.
+     *
+     * This endpoint allows the realtime server to verify session authentication
+     * by making an HTTP request instead of reading session files directly.
+     *
+     * Request:
+     *   POST /broadcasting/verify-session
+     *   Body: { "session_id": "abc123", "guard": "web" }
+     *   Headers: { "X-Realtime-Secret": "your-realtime-secret" }
+     *
+     * Response (success):
+     *   { "authenticated": true, "user": { "id": 1, "name": "...", ... }, "guard": "web" }
+     *
+     * Response (error):
+     *   { "authenticated": false, "error": "..." }
+     *
+     * @param Request $request HTTP request
+     * @return Response JSON response
+     */
+    public function verifySession(Request $request): Response
+    {
+        // Verify internal request (only realtime server should call this)
+        $realtimeSecret = config('realtime.internal_secret') ?? env('REALTIME_INTERNAL_SECRET');
+        $requestSecret = $request->header('X-Realtime-Secret');
+
+        if (!empty($realtimeSecret) && $requestSecret !== $realtimeSecret) {
+            return $this->jsonResponse(['authenticated' => false, 'error' => 'Invalid secret'], 403);
+        }
+
+        $sessionId = $request->input('session_id', '');
+        $guardName = $request->input('guard', 'web');
+
+        if (empty($sessionId)) {
+            return $this->jsonResponse(['authenticated' => false, 'error' => 'Missing session_id'], 422);
+        }
+
+        // Validate guard exists
+        $guardName = $this->validateGuard($guardName);
+
+        // Read session from Toporia's storage/sessions directory
+        try {
+            $sessionPath = config('session.stores.file.path', storage_path('sessions'));
+            $sessionFile = $sessionPath . '/sess_' . $sessionId;
+
+            if (!file_exists($sessionFile)) {
+                return $this->jsonResponse([
+                    'authenticated' => false,
+                    'error' => 'Session not found',
+                    'guard' => $guardName
+                ]);
+            }
+
+            // Read and parse session file (Toporia format)
+            $content = file_get_contents($sessionFile);
+            if ($content === false) {
+                return $this->jsonResponse([
+                    'authenticated' => false,
+                    'error' => 'Cannot read session file',
+                    'guard' => $guardName
+                ]);
+            }
+
+            // Parse Toporia session format: serialize(['data' => [...], 'expires_at' => timestamp])
+            $sessionData = @unserialize($content, ['allowed_classes' => false]);
+
+            if (!is_array($sessionData) || !isset($sessionData['data'], $sessionData['expires_at'])) {
+                return $this->jsonResponse([
+                    'authenticated' => false,
+                    'error' => 'Invalid session format',
+                    'guard' => $guardName
+                ]);
+            }
+
+            // Check expiration
+            if ($sessionData['expires_at'] < time()) {
+                return $this->jsonResponse([
+                    'authenticated' => false,
+                    'error' => 'Session expired',
+                    'guard' => $guardName
+                ]);
+            }
+
+            // Get user ID from session data
+            $authKey = "auth_{$guardName}";
+            $userId = $sessionData['data'][$authKey] ?? null;
+
+            if ($userId === null) {
+                return $this->jsonResponse([
+                    'authenticated' => false,
+                    'error' => 'No authenticated user in session',
+                    'guard' => $guardName
+                ]);
+            }
+
+            // Load user data from database
+            $userData = $this->loadUserById($userId, $guardName);
+
+            if ($userData === null) {
+                return $this->jsonResponse([
+                    'authenticated' => false,
+                    'error' => 'User not found',
+                    'guard' => $guardName
+                ]);
+            }
+
+            return $this->jsonResponse([
+                'authenticated' => true,
+                'user' => $userData,
+                'guard' => $guardName
+            ]);
+        } catch (\Throwable $e) {
+            error_log("[BroadcastAuth] Session verify error: {$e->getMessage()}");
+            return $this->jsonResponse([
+                'authenticated' => false,
+                'error' => 'Session verification failed'
+            ], 500);
+        }
+    }
+
+    /**
+     * Load user by ID using the configured user provider.
+     *
+     * @param int|string $userId User ID
+     * @param string $guardName Guard name
+     * @return array|null User data or null
+     */
+    private function loadUserById(int|string $userId, string $guardName): ?array
+    {
+        // Method 1: Use auth manager's user provider
+        if ($this->authManager !== null) {
+            try {
+                $guard = $this->authManager->guard($guardName);
+
+                // Get user provider from guard if available
+                if (method_exists($guard, 'getProvider')) {
+                    $provider = $guard->getProvider();
+                    $user = $provider->findById($userId);
+                    if ($user !== null) {
+                        return $this->formatUserData($user);
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log("[BroadcastAuth] loadUserById via guard error: {$e->getMessage()}");
+            }
+        }
+
+        // Method 2: Try to find UserModel directly
+        try {
+            $userModelClass = config("auth.providers.users.model", 'Toporia\\App\\Infrastructure\\Persistence\\Models\\UserModel');
+
+            if (class_exists($userModelClass)) {
+                $user = $userModelClass::find($userId);
+                if ($user !== null) {
+                    return $this->formatUserData($user);
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log("[BroadcastAuth] loadUserById via model error: {$e->getMessage()}");
+        }
+
+        // Method 3: Return minimal data if user exists
+        return [
+            'id' => $userId,
+            'user_id' => $userId,
+        ];
+    }
+
+    /**
+     * Format user data for response.
+     *
+     * @param mixed $user User model or array
+     * @return array Formatted user data
+     */
+    private function formatUserData(mixed $user): array
+    {
+        if (is_array($user)) {
+            return [
+                'id' => $user['id'] ?? null,
+                'user_id' => $user['id'] ?? null,
+                'name' => $user['name'] ?? null,
+                'username' => $user['username'] ?? $user['name'] ?? null,
+                'email' => $user['email'] ?? null,
+                'roles' => $user['roles'] ?? [],
+            ];
+        }
+
+        // Object (model)
+        return [
+            'id' => $user->id ?? $user->getId() ?? null,
+            'user_id' => $user->id ?? $user->getId() ?? null,
+            'name' => $user->name ?? null,
+            'username' => $user->username ?? $user->name ?? null,
+            'email' => $user->email ?? null,
+            'roles' => $user->roles ?? [],
+        ];
+    }
 }

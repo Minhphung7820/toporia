@@ -40,23 +40,25 @@ else
     echo "✗ WARNING: PHP-FPM config file not found: $PHP_FPM_CONF"
 fi
 
-# Fix permissions for source files and directories
-# This ensures www-data user can read all PHP files and traverse directories
-# Directories need execute permission for traversal, files need read permission
-find /var/www/html -type d -exec chmod 755 {} \; 2>/dev/null || true
-find /var/www/html -type f -exec chmod 644 {} \; 2>/dev/null || true
+# Fix permissions for entire project - Full access for everyone
+echo "=== Setting full permissions for entire project ==="
 
-# Fix permissions for storage directories
-# This ensures www-data user can write logs, cache, etc.
-if [ -d /var/www/html/storage ]; then
-    chown -R www-data:www-data /var/www/html/storage
-    chmod -R 775 /var/www/html/storage
-fi
+# Set 777 for everything (no restrictions)
+chmod -R 777 /var/www/html 2>/dev/null || true
 
-if [ -d /var/www/html/bootstrap/cache ]; then
-    chown -R www-data:www-data /var/www/html/bootstrap/cache
-    chmod -R 775 /var/www/html/bootstrap/cache
-fi
+# Ensure storage subdirectories exist
+mkdir -p /var/www/html/storage/sessions
+mkdir -p /var/www/html/storage/cache
+mkdir -p /var/www/html/storage/logs
+mkdir -p /var/www/html/storage/framework/cache
+mkdir -p /var/www/html/storage/framework/sessions
+mkdir -p /var/www/html/storage/framework/views
+mkdir -p /var/www/html/bootstrap/cache
+
+# Set umask to 000 so new files are 666/777
+umask 000
+
+echo "✓ Full permissions set (777)"
 
 # Execute the main command (php-fpm)
 exec "$@"

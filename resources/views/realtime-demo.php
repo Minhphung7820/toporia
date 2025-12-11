@@ -244,16 +244,40 @@
 
         <!-- Authentication Panel -->
         <div class="auth-panel">
-            <h3>1. Authentication (JWT Token)</h3>
-            <div class="auth-form">
-                <input type="text" id="tokenInput" placeholder="Enter JWT token or leave empty for demo token">
-                <button class="btn-primary" onclick="authenticate()">Authenticate</button>
-                <button class="btn-secondary" onclick="generateDemoToken()">Generate Demo Token</button>
-                <button class="btn-danger" onclick="logout()">Logout</button>
+            <h3>1. Authentication</h3>
+
+            <!-- Session Auth (Primary for web) -->
+            <div style="margin-bottom: 15px; padding: 15px; background: rgba(46, 213, 115, 0.1); border-radius: 8px; border: 1px solid rgba(46, 213, 115, 0.3);">
+                <h4 style="color: #2ed573; font-size: 0.9rem; margin-bottom: 10px;">Session Auth (Recommended for Web)</h4>
+                <div class="auth-form">
+                    <button class="btn-primary" onclick="authenticateWithSession()" style="background: #2ed573;">
+                        Authenticate with Session
+                    </button>
+                    <span id="sessionStatus" style="color: rgba(255,255,255,0.7); font-size: 0.85rem;">
+                        Session ID: <code id="sessionIdDisplay">-</code>
+                    </span>
+                </div>
+                <p style="margin-top: 8px; font-size: 0.8rem; color: rgba(255,255,255,0.5);">
+                    Uses your current PHP session. Login via <code>/login</code> page first.
+                </p>
             </div>
-            <p style="margin-top: 10px; font-size: 0.8rem; color: rgba(255,255,255,0.5);">
-                For testing: Use demo token or get real token from <code>POST /api/auth/login</code>
-            </p>
+
+            <!-- JWT Auth (Alternative) -->
+            <div style="padding: 15px; background: rgba(102, 126, 234, 0.1); border-radius: 8px; border: 1px solid rgba(102, 126, 234, 0.3);">
+                <h4 style="color: #667eea; font-size: 0.9rem; margin-bottom: 10px;">JWT Token Auth (For API)</h4>
+                <div class="auth-form">
+                    <input type="text" id="tokenInput" placeholder="Enter JWT token">
+                    <button class="btn-primary" onclick="authenticateWithToken()">Authenticate</button>
+                    <button class="btn-secondary" onclick="generateDemoToken()">Demo Token</button>
+                </div>
+                <p style="margin-top: 8px; font-size: 0.8rem; color: rgba(255,255,255,0.5);">
+                    Get token from <code>POST /api/auth/login</code>
+                </p>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <button class="btn-danger" onclick="logout()">Logout / Clear Auth</button>
+            </div>
         </div>
 
         <!-- Channel Subscription Panel -->
@@ -268,7 +292,7 @@
             </div>
             <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
                 <button class="btn-secondary" onclick="quickSubscribe('notifications')">Public: notifications</button>
-                <button class="btn-secondary" onclick="quickSubscribe('private-user.1')">Private: user.1</button>
+                <button class="btn-secondary" id="btnPrivateUser" onclick="quickSubscribePrivateUser()">Private: user.<span id="privateUserIdBtn">?</span></button>
                 <button class="btn-secondary" onclick="quickSubscribe('presence-chat.room1')">Presence: chat.room1</button>
             </div>
         </div>
@@ -316,6 +340,7 @@ curl -X POST http://localhost:8000/api/broadcasting/auth \
         let jwtToken = null;
         let subscribedChannels = [];
         let events = [];
+        let currentUserId = null;
 
         // DOM Elements
         const connDot = document.getElementById('connDot');
@@ -373,9 +398,15 @@ curl -X POST http://localhost:8000/api/broadcasting/auth \
             // Authentication response
             socket.on('authenticated', (data) => {
                 authDot.classList.add('connected');
-                authStatus.textContent = `User #${data.user_id}`;
+                const method = data.method || 'unknown';
+                authStatus.textContent = `User #${data.user_id} (${method})`;
                 socketId = data.socket_id;
                 socketIdEl.textContent = socketId || socket.id || '-';
+
+                // Store user ID and update button
+                currentUserId = data.user_id;
+                updatePrivateUserButton();
+
                 addEvent('auth', 'authenticated', data, 'success');
             });
 
@@ -424,16 +455,66 @@ curl -X POST http://localhost:8000/api/broadcasting/auth \
         // =========================================================================
         // Authentication
         // =========================================================================
-        function authenticate() {
+
+        // Get session ID from cookie
+        function getSessionId() {
+            const match = document.cookie.match(/PHPSESSID=([^;]+)/);
+            return match ? match[1] : null;
+        }
+
+        // Display session ID on page load
+        function displaySessionId() {
+            const sessionId = getSessionId();
+            const sessionIdDisplay = document.getElementById('sessionIdDisplay');
+            if (sessionId) {
+                sessionIdDisplay.textContent = sessionId.substring(0, 12) + '...';
+                sessionIdDisplay.title = sessionId;
+            } else {
+                sessionIdDisplay.textContent = 'Not found';
+            }
+        }
+
+        // Session-based authentication (for web users)
+        function authenticateWithSession() {
+            const sessionId = getSessionId();
+
+            if (!sessionId) {
+                addEvent('auth', 'session_error', {
+                    message: 'No PHP session found. Please login first via /login page.'
+                }, 'error');
+                alert('No session found. Please login via the web form first.');
+                return;
+            }
+
+            addEvent('auth', 'session_auth', {
+                message: 'Authenticating with session...',
+                session_id: sessionId.substring(0, 12) + '...'
+            }, 'info');
+
+            // Send session auth to server
+            socket.emit('auth', {
+                session_id: sessionId,
+                guard: 'web'
+            });
+        }
+
+        // JWT token authentication (for API users)
+        function authenticateWithToken() {
             const token = tokenInput.value.trim();
 
             if (!token) {
-                alert('Please enter a JWT token or click "Generate Demo Token"');
+                alert('Please enter a JWT token or click "Demo Token"');
                 return;
             }
 
             jwtToken = token;
-            socket.emit('auth', { token });
+            addEvent('auth', 'jwt_auth', { message: 'Authenticating with JWT token...' }, 'info');
+            socket.emit('auth', { token, guard: 'api' });
+        }
+
+        // Legacy function name for compatibility
+        function authenticate() {
+            authenticateWithToken();
         }
 
         function generateDemoToken() {
@@ -458,8 +539,10 @@ curl -X POST http://localhost:8000/api/broadcasting/auth \
 
         function logout() {
             jwtToken = null;
+            currentUserId = null;
             authDot.classList.remove('connected');
             authStatus.textContent = 'Not authenticated';
+            updatePrivateUserButton();
 
             // Unsubscribe from all private/presence channels
             subscribedChannels.filter(ch => ch.startsWith('private-') || ch.startsWith('presence-')).forEach(ch => {
@@ -542,6 +625,21 @@ curl -X POST http://localhost:8000/api/broadcasting/auth \
             subscribeChannel();
         }
 
+        function quickSubscribePrivateUser() {
+            if (!currentUserId) {
+                alert('Please authenticate first to subscribe to your private channel');
+                return;
+            }
+            quickSubscribe(`private-user.${currentUserId}`);
+        }
+
+        function updatePrivateUserButton() {
+            const btn = document.getElementById('privateUserIdBtn');
+            if (btn) {
+                btn.textContent = currentUserId || '?';
+            }
+        }
+
         function unsubscribeChannel(channel) {
             socket.emit('unsubscribe', { channel });
             subscribedChannels = subscribedChannels.filter(ch => ch !== channel);
@@ -616,6 +714,7 @@ curl -X POST http://localhost:8000/api/broadcasting/auth \
         // =========================================================================
         connect();
         renderEvents();
+        displaySessionId();
     </script>
 </body>
 </html>
