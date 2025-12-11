@@ -49,8 +49,8 @@ final class FileSessionDriver implements SessionStoreInterface
     {
         $sessionId = $_COOKIE[$this->name] ?? null;
 
-        // Validate session ID format (prevent directory traversal)
-        if ($sessionId !== null && preg_match('/^[a-zA-Z0-9,-]{22,256}$/', $sessionId)) {
+        // Validate session ID format (strict alphanumeric only - prevent injection)
+        if ($sessionId !== null && preg_match('/^[a-zA-Z0-9]{22,256}$/', $sessionId)) {
             return $sessionId;
         }
 

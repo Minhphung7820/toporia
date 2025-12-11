@@ -472,6 +472,9 @@ final class RealtimeManager implements RealtimeManagerInterface
         $transport = $this->transport();
         $transport->close($connection);
 
+        // Clear connection state to prevent memory leaks
+        $connection->clear();
+
         // Remove from registry
         unset($this->connections[$connectionId]);
     }

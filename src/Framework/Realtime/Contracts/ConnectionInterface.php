@@ -432,4 +432,14 @@ interface ConnectionInterface
      * @return array
      */
     public function toArray(): array;
+
+    /**
+     * Clear connection state to prevent memory leaks.
+     *
+     * Call this method when disconnecting a client to ensure
+     * all references are released and can be garbage collected.
+     *
+     * @return void
+     */
+    public function clear(): void;
 }

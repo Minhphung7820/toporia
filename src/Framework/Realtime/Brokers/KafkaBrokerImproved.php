@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime\Brokers;
 
 use Toporia\Framework\Realtime\Brokers\CircuitBreaker\CircuitBreaker;
-use Toporia\Framework\Realtime\Brokers\Kafka\Client\{KafkaClientFactory, KafkaClientInterface, KafkaMessage};
+use Toporia\Framework\Realtime\Brokers\Kafka\Client\{KafkaClientInterface, KafkaMessage, RdKafkaClientImproved};
 use Toporia\Framework\Realtime\Brokers\Kafka\TopicStrategy\TopicStrategyFactory;
 use Toporia\Framework\Realtime\Contracts\{BrokerInterface, HealthCheckableInterface, HealthCheckResult, MessageInterface, TopicStrategyInterface};
 use Toporia\Framework\Realtime\Exceptions\BrokerException;
@@ -54,7 +54,7 @@ final class KafkaBrokerImproved implements BrokerInterface, HealthCheckableInter
         private readonly array $config = [],
         private readonly ?RealtimeManager $manager = null
     ) {
-        $this->client = KafkaClientFactory::create($config);
+        $this->client = $this->createClient($config);
         $this->topicStrategy = TopicStrategyFactory::create($config);
 
         $this->circuitBreaker = new CircuitBreaker(
@@ -86,6 +86,88 @@ final class KafkaBrokerImproved implements BrokerInterface, HealthCheckableInter
             BrokerMetrics::recordConnectionEvent('kafka', 'connect_failed');
             throw BrokerException::connectionFailed('kafka', $e->getMessage(), $e);
         }
+    }
+
+    /**
+     * Create Kafka client instance (uses RdKafkaClientImproved for reliability).
+     *
+     * @param array<string, mixed> $config
+     * @return KafkaClientInterface
+     */
+    private function createClient(array $config): KafkaClientInterface
+    {
+        if (!extension_loaded('rdkafka')) {
+            throw BrokerException::invalidConfiguration(
+                'kafka',
+                'rdkafka extension is required for KafkaBrokerImproved. Install: pecl install rdkafka'
+            );
+        }
+
+        $brokers = $this->normalizeBrokers($config['brokers'] ?? ['localhost:9092']);
+        $consumerGroup = (string) ($config['consumer_group'] ?? 'realtime-servers');
+        $manualCommit = (bool) ($config['manual_commit'] ?? false);
+        $producerConfig = $this->sanitizeConfig($config['producer_config'] ?? []);
+        $consumerConfig = $this->sanitizeConfig($config['consumer_config'] ?? []);
+
+        return new RdKafkaClientImproved(
+            brokers: $brokers,
+            consumerGroup: $consumerGroup,
+            manualCommit: $manualCommit,
+            producerConfig: $producerConfig,
+            consumerConfig: $consumerConfig
+        );
+    }
+
+    /**
+     * Normalize broker list to array.
+     *
+     * @param mixed $brokers
+     * @return array<string>
+     */
+    private function normalizeBrokers(mixed $brokers): array
+    {
+        if (is_string($brokers)) {
+            $brokers = explode(',', $brokers);
+        }
+
+        if (!is_array($brokers)) {
+            $brokers = ['localhost:9092'];
+        }
+
+        return array_filter(
+            array_map('trim', $brokers),
+            fn($b) => !empty($b)
+        );
+    }
+
+    /**
+     * Sanitize Kafka configuration.
+     *
+     * @param array<string, mixed> $config
+     * @return array<string, string>
+     */
+    private function sanitizeConfig(array $config): array
+    {
+        $sanitized = [];
+
+        foreach ($config as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            $strValue = (string) $value;
+
+            // Remove empty compression settings
+            if (in_array($key, ['compression.type', 'compression.codec'])) {
+                if ($strValue === '' || strcasecmp($strValue, 'none') === 0 || strcasecmp($strValue, 'off') === 0) {
+                    continue;
+                }
+            }
+
+            $sanitized[$key] = $strValue;
+        }
+
+        return $sanitized;
     }
 
     /**

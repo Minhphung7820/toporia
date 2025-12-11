@@ -29,6 +29,11 @@ final class Channel implements ChannelInterface
     private array $subscribers = [];
 
     /**
+     * @var bool Lock flag to prevent concurrent modifications
+     */
+    private bool $locked = false;
+
+    /**
      * @param string $name Channel name
      * @param TransportInterface|null $transport Transport for broadcasting
      * @param callable|null $authorizer Authorization callback
@@ -95,8 +100,14 @@ final class Channel implements ChannelInterface
      */
     public function subscribe(ConnectionInterface $connection): void
     {
-        $this->subscribers[$connection->getId()] = $connection;
-        $connection->subscribe($this->name);
+        $this->withLock(function () use ($connection) {
+            // Double-check to avoid duplicate subscription
+            $connId = $connection->getId();
+            if (!isset($this->subscribers[$connId])) {
+                $this->subscribers[$connId] = $connection;
+                $connection->subscribe($this->name);
+            }
+        });
     }
 
     /**
@@ -104,8 +115,13 @@ final class Channel implements ChannelInterface
      */
     public function unsubscribe(ConnectionInterface $connection): void
     {
-        unset($this->subscribers[$connection->getId()]);
-        $connection->unsubscribe($this->name);
+        $this->withLock(function () use ($connection) {
+            $connId = $connection->getId();
+            if (isset($this->subscribers[$connId])) {
+                unset($this->subscribers[$connId]);
+                $connection->unsubscribe($this->name);
+            }
+        });
     }
 
     /**
@@ -117,6 +133,39 @@ final class Channel implements ChannelInterface
     }
 
     /**
+     * Execute callback with spin-lock protection.
+     *
+     * Uses a simple spin-lock with yield for coroutine-safe operations.
+     *
+     * @param callable $callback
+     * @return void
+     */
+    private function withLock(callable $callback): void
+    {
+        $maxAttempts = 100;
+        $attempts = 0;
+
+        // Spin-lock with yield for coroutine context
+        while ($this->locked && $attempts < $maxAttempts) {
+            $attempts++;
+            // Yield CPU time in Swoole coroutine context
+            if (function_exists('\\Swoole\\Coroutine::yield')) {
+                \Swoole\Coroutine::yield();
+            } else {
+                usleep(100); // 0.1ms
+            }
+        }
+
+        $this->locked = true;
+
+        try {
+            $callback();
+        } finally {
+            $this->locked = false;
+        }
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function broadcast(MessageInterface $message, ?ConnectionInterface $except = null): void
@@ -125,12 +174,53 @@ final class Channel implements ChannelInterface
             return; // No transport available
         }
 
-        foreach ($this->subscribers as $connection) {
+        // Get subscribers as a snapshot to avoid modification during iteration
+        $subscribers = $this->subscribers;
+        $exceptId = $except ? $except->getId() : null;
+
+        // Batch size for chunked broadcasting (prevents blocking)
+        $batchSize = 100;
+        $batch = [];
+        $batchCount = 0;
+
+        foreach ($subscribers as $connId => $connection) {
             // Skip excluded connection
-            if ($except && $connection->getId() === $except->getId()) {
+            if ($exceptId !== null && $connId === $exceptId) {
                 continue;
             }
 
+            $batch[] = $connection;
+            $batchCount++;
+
+            // Process batch when full
+            if ($batchCount >= $batchSize) {
+                $this->sendBatch($batch, $message);
+                $batch = [];
+                $batchCount = 0;
+
+                // Yield CPU time in coroutine context for better concurrency
+                if (function_exists('\\Swoole\\Coroutine::yield')) {
+                    \Swoole\Coroutine::yield();
+                }
+            }
+        }
+
+        // Process remaining connections
+        if ($batchCount > 0) {
+            $this->sendBatch($batch, $message);
+        }
+    }
+
+    /**
+     * Send message to a batch of connections.
+     *
+     * @param array<ConnectionInterface> $connections
+     * @param MessageInterface $message
+     * @return void
+     */
+    private function sendBatch(array $connections, MessageInterface $message): void
+    {
+        foreach ($connections as $connection) {
             try {
                 $this->transport->send($connection, $message);
             } catch (\Throwable $e) {

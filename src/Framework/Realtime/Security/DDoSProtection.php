@@ -52,6 +52,13 @@ final class DDoSProtection
     private array $connectionTracking = [];
 
     /**
+     * Lock flag for thread-safe operations.
+     *
+     * @var bool
+     */
+    private bool $locked = false;
+
+    /**
      * @param Redis|null $redis Redis connection for distributed blocking
      * @param int $connectionThreshold Max connections per IP in window
      * @param int $connectionWindow Window size in seconds
@@ -105,30 +112,32 @@ final class DDoSProtection
             return;
         }
 
-        $now = microtime(true);
+        $this->withLock(function () use ($ipAddress) {
+            $now = microtime(true);
 
-        // Initialize tracking if not exists
-        if (!isset($this->connectionTracking[$ipAddress])) {
-            $this->connectionTracking[$ipAddress] = [];
-        }
-
-        // Add timestamp
-        $this->connectionTracking[$ipAddress][] = $now;
-
-        // Record in Redis for distributed tracking
-        if ($this->redis !== null) {
-            try {
-                $key = "{$this->prefix}:connections:{$ipAddress}";
-                $uniqueId = uniqid('', true);
-                $this->redis->zAdd($key, $now, $uniqueId);
-                $this->redis->expire($key, $this->connectionWindow * 2);
-            } catch (\RedisException $e) {
-                error_log("DDoS protection Redis error: {$e->getMessage()}");
+            // Initialize tracking if not exists
+            if (!isset($this->connectionTracking[$ipAddress])) {
+                $this->connectionTracking[$ipAddress] = [];
             }
-        }
 
-        // Cleanup old entries
-        $this->cleanupConnectionTracking($ipAddress);
+            // Add timestamp
+            $this->connectionTracking[$ipAddress][] = $now;
+
+            // Record in Redis for distributed tracking
+            if ($this->redis !== null) {
+                try {
+                    $key = "{$this->prefix}:connections:{$ipAddress}";
+                    $uniqueId = uniqid('', true);
+                    $this->redis->zAdd($key, $now, $uniqueId);
+                    $this->redis->expire($key, $this->connectionWindow * 2);
+                } catch (\RedisException $e) {
+                    error_log("DDoS protection Redis error: {$e->getMessage()}");
+                }
+            }
+
+            // Cleanup old entries (internal, no lock needed)
+            $this->cleanupConnectionTrackingInternal($ipAddress);
+        });
     }
 
     /**
@@ -301,11 +310,23 @@ final class DDoSProtection
     }
 
     /**
-     * Cleanup old connection tracking entries.
+     * Cleanup old connection tracking entries (public, thread-safe).
      *
      * @param string $ipAddress
      */
     private function cleanupConnectionTracking(string $ipAddress): void
+    {
+        $this->withLock(function () use ($ipAddress) {
+            $this->cleanupConnectionTrackingInternal($ipAddress);
+        });
+    }
+
+    /**
+     * Cleanup old connection tracking entries (internal, no lock).
+     *
+     * @param string $ipAddress
+     */
+    private function cleanupConnectionTrackingInternal(string $ipAddress): void
     {
         if (!isset($this->connectionTracking[$ipAddress])) {
             return;
@@ -322,6 +343,36 @@ final class DDoSProtection
         // Remove if empty
         if (empty($this->connectionTracking[$ipAddress])) {
             unset($this->connectionTracking[$ipAddress]);
+        }
+    }
+
+    /**
+     * Execute callback with spin-lock protection.
+     *
+     * @param callable $callback
+     * @return mixed
+     */
+    private function withLock(callable $callback): mixed
+    {
+        $maxAttempts = 100;
+        $attempts = 0;
+
+        // Spin-lock with yield for coroutine context
+        while ($this->locked && $attempts < $maxAttempts) {
+            $attempts++;
+            if (function_exists('\\Swoole\\Coroutine::yield')) {
+                \Swoole\Coroutine::yield();
+            } else {
+                usleep(100); // 0.1ms
+            }
+        }
+
+        $this->locked = true;
+
+        try {
+            return $callback();
+        } finally {
+            $this->locked = false;
         }
     }
 

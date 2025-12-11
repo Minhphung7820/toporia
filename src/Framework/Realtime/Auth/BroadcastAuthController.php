@@ -458,8 +458,18 @@ final class BroadcastAuthController
                 ]);
             }
 
-            // Read and parse session file (Toporia format)
-            $content = file_get_contents($sessionFile);
+            // Read and parse session file with size limit (prevent memory exhaustion)
+            $maxSize = 1024 * 1024; // 1MB max session file
+            $fileSize = @filesize($sessionFile);
+            if ($fileSize === false || $fileSize > $maxSize) {
+                return $this->jsonResponse([
+                    'authenticated' => false,
+                    'error' => 'Session file too large or unreadable',
+                    'guard' => $guardName
+                ]);
+            }
+
+            $content = @file_get_contents($sessionFile, false, null, 0, $maxSize);
             if ($content === false) {
                 return $this->jsonResponse([
                     'authenticated' => false,

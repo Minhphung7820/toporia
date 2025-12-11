@@ -540,4 +540,21 @@ final class Connection implements ConnectionInterface
     {
         return $this->resource;
     }
+
+    /**
+     * Clear connection state to prevent memory leaks.
+     *
+     * Call this method when disconnecting a client to ensure
+     * all references are released and can be garbage collected.
+     *
+     * @return void
+     */
+    public function clear(): void
+    {
+        // Clear all channel subscriptions
+        $this->channels = [];
+
+        // Clear metadata (including user data, roles, permissions)
+        $this->metadata = [];
+    }
 }

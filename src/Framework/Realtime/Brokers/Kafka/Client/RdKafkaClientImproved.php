@@ -35,25 +35,15 @@ final class RdKafkaClientImproved implements KafkaClientInterface
      */
     private array $topicCache = [];
 
-    /**
-     * @var array<array{topic: RdKafka\ProducerTopic, partition: int|null, key: string|null, payload: string, timestamp: float}> Message buffer
-     */
-    private array $messageBuffer = [];
-
-    private int $lastFlushTime = 0;
     private int $consecutiveErrors = 0;
     private int $lastErrorTime = 0;
 
     private const TOPIC_CACHE_TTL = 3600; // 1 hour
-    private const MAX_BUFFER_SIZE_MULTIPLIER = 2; // Max buffer = bufferSize * 2
-    private const BACKPRESSURE_WAIT_US = 10000; // 10ms
 
     /**
      * @param array<string> $brokers Broker addresses
      * @param string $consumerGroup Consumer group ID
      * @param bool $manualCommit Enable manual offset commit
-     * @param int $bufferSize Message buffer size before flush
-     * @param int $flushIntervalMs Flush interval in milliseconds
      * @param array<string, string> $producerConfig Additional producer config
      * @param array<string, string> $consumerConfig Additional consumer config
      */
@@ -61,8 +51,6 @@ final class RdKafkaClientImproved implements KafkaClientInterface
         private readonly array $brokers,
         private readonly string $consumerGroup = 'realtime-servers',
         private readonly bool $manualCommit = false,
-        private readonly int $bufferSize = 100,
-        private readonly int $flushIntervalMs = 100,
         private readonly array $producerConfig = [],
         private readonly array $consumerConfig = []
     ) {
@@ -143,7 +131,6 @@ final class RdKafkaClientImproved implements KafkaClientInterface
 
         $this->producer = null;
         $this->topicCache = [];
-        $this->messageBuffer = [];
         $this->connected = false;
 
         BrokerMetrics::recordConnectionEvent('kafka', 'disconnect');
@@ -155,60 +142,67 @@ final class RdKafkaClientImproved implements KafkaClientInterface
             throw BrokerException::notConnected('kafka');
         }
 
-        // BACKPRESSURE: Block if buffer too large
-        $maxBufferSize = $this->bufferSize * self::MAX_BUFFER_SIZE_MULTIPLIER;
-        $retries = 0;
-        $maxRetries = 10;
-
-        while (count($this->messageBuffer) >= $maxBufferSize) {
-            if ($retries++ >= $maxRetries) {
-                BrokerMetrics::recordError('kafka', 'buffer_overflow');
-                throw BrokerException::publishFailed('kafka', $topic,
-                    'Buffer overflow: Cannot flush messages fast enough');
-            }
-
-            // Try to flush
-            try {
-                $this->flushBuffer();
-            } catch (\Throwable $e) {
-                error_log("Kafka flush failed during backpressure: {$e->getMessage()}");
-            }
-
-            // Wait a bit
-            usleep(self::BACKPRESSURE_WAIT_US);
-        }
-
         // Get or create cached topic with TTL check
         $topicInstance = $this->getTopicInstance($topic);
 
-        // Add to buffer with timestamp
-        $this->messageBuffer[] = [
-            'topic' => $topicInstance,
-            'partition' => $partition,
-            'key' => $key,
-            'payload' => $payload,
-            'timestamp' => microtime(true),
-        ];
+        // Produce directly without buffering for reliability
+        // This ensures every message is sent immediately
+        $partitionVal = $partition ?? RD_KAFKA_PARTITION_UA;
 
-        // Flush if buffer is full
-        if (count($this->messageBuffer) >= $this->bufferSize) {
-            $this->flushBuffer();
-            return;
-        }
+        try {
+            if ($key !== null && method_exists($topicInstance, 'producev')) {
+                $topicInstance->producev($partitionVal, 0, $payload, $key);
+            } else {
+                $topicInstance->produce($partitionVal, 0, $payload);
+            }
 
-        // Periodic flush
-        $now = (int) (microtime(true) * 1000);
-        if ($now - $this->lastFlushTime >= $this->flushIntervalMs) {
-            $this->flushBuffer();
+            // Poll to trigger delivery callbacks and ensure message is sent
+            // This is critical - without this, messages may be lost
+            $this->producer->poll(0);
+
+            // Flush with short timeout to ensure message delivery
+            // This blocks until the message is delivered or timeout
+            $result = $this->producer->flush(1000); // 1 second timeout
+
+            if ($result !== RD_KAFKA_RESP_ERR_NO_ERROR) {
+                // Message may not have been delivered, poll more aggressively
+                $retries = 5;
+                while ($retries-- > 0 && $this->producer->getOutQLen() > 0) {
+                    $this->producer->poll(100);
+                    $this->producer->flush(500);
+                }
+
+                // Final check
+                if ($this->producer->getOutQLen() > 0) {
+                    throw new \RuntimeException("Kafka producer queue not empty after flush, {$this->producer->getOutQLen()} messages pending");
+                }
+            }
+
+        } catch (\Throwable $e) {
+            BrokerMetrics::recordError('kafka', 'publish');
+            throw BrokerException::publishFailed('kafka', $topic, $e->getMessage(), $e);
         }
     }
 
     public function flush(int $timeoutMs = 5000): void
     {
-        $this->flushBuffer();
+        if ($this->producer === null) {
+            return;
+        }
 
-        if ($this->producer !== null && method_exists($this->producer, 'flush')) {
-            $this->producer->flush($timeoutMs);
+        // Poll first to process any pending callbacks
+        $this->producer->poll(0);
+
+        // Flush with timeout
+        $result = $this->producer->flush($timeoutMs);
+
+        // If flush didn't complete, keep trying
+        if ($result !== RD_KAFKA_RESP_ERR_NO_ERROR) {
+            $retries = 10;
+            while ($retries-- > 0 && $this->producer->getOutQLen() > 0) {
+                $this->producer->poll(100);
+                $this->producer->flush(500);
+            }
         }
     }
 
@@ -322,69 +316,6 @@ final class RdKafkaClientImproved implements KafkaClientInterface
         }
 
         return $this->topicCache[$topic]['topic'];
-    }
-
-    /**
-     * Flush message buffer with retry logic.
-     *
-     * @return void
-     */
-    private function flushBuffer(): void
-    {
-        if (empty($this->messageBuffer) || $this->producer === null) {
-            return;
-        }
-
-        $maxRetries = 3;
-        $retryCount = 0;
-
-        while ($retryCount < $maxRetries) {
-            try {
-                foreach ($this->messageBuffer as $item) {
-                    $topic = $item['topic'];
-                    $partition = $item['partition'] ?? RD_KAFKA_PARTITION_UA;
-                    $key = $item['key'];
-                    $payload = $item['payload'];
-
-                    if ($key !== null && method_exists($topic, 'producev')) {
-                        $topic->producev($partition, 0, $payload, $key);
-                    } else {
-                        $topic->produce($partition, 0, $payload);
-                    }
-                }
-
-                // Non-blocking poll with retry
-                $pollRetries = 10;
-                while ($pollRetries-- > 0) {
-                    $outstanding = $this->producer->poll(100);
-                    if ($outstanding === 0) {
-                        break; // All messages sent
-                    }
-                }
-
-                if ($pollRetries <= 0) {
-                    throw new \RuntimeException('Kafka producer queue not empty after poll');
-                }
-
-                $this->messageBuffer = [];
-                $this->lastFlushTime = (int) (microtime(true) * 1000);
-                return;
-
-            } catch (\Throwable $e) {
-                $retryCount++;
-                BrokerMetrics::recordError('kafka', 'flush');
-
-                if ($retryCount >= $maxRetries) {
-                    error_log("CRITICAL: Kafka flush failed after {$maxRetries} retries. Discarding " .
-                        count($this->messageBuffer) . " messages");
-                    $this->messageBuffer = []; // Discard to prevent OOM
-                    throw BrokerException::publishFailed('kafka', 'batch', $e->getMessage(), $e);
-                }
-
-                error_log("Kafka flush failed (retry {$retryCount}/{$maxRetries}): {$e->getMessage()}");
-                usleep(100000 * $retryCount); // 100ms, 200ms, 300ms
-            }
-        }
     }
 
     /**

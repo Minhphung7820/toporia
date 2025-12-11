@@ -289,6 +289,10 @@ final class SocketIOGateway implements TransportInterface
                 $this->removeFromAllRooms($connection);
 
                 $this->manager->removeConnection($connection);
+
+                // Clear connection state to prevent memory leaks
+                $connection->clear();
+
                 unset($this->connections[$fd]);
 
                 echo "[{$fd}] Socket.IO client disconnected\n";
@@ -600,8 +604,8 @@ final class SocketIOGateway implements TransportInterface
      */
     private function verifySessionAuth(string $sessionId, string $guardName): ?array
     {
-        // Validate session ID format (prevent directory traversal)
-        if (!preg_match('/^[a-zA-Z0-9,-]{22,256}$/', $sessionId)) {
+        // Validate session ID format (strict alphanumeric only - prevent injection)
+        if (!preg_match('/^[a-zA-Z0-9]{22,256}$/', $sessionId)) {
             echo "[Session Auth] Invalid session ID format\n";
             return null;
         }
@@ -614,8 +618,15 @@ final class SocketIOGateway implements TransportInterface
                 return null;
             }
 
-            // Read session data
-            $sessionData = file_get_contents($sessionFile);
+            // Read session data with size limit (prevent memory exhaustion)
+            $maxSize = 1024 * 1024; // 1MB max session file
+            $fileSize = @filesize($sessionFile);
+            if ($fileSize === false || $fileSize > $maxSize) {
+                echo "[Session Auth] Session file too large or unreadable\n";
+                return null;
+            }
+
+            $sessionData = @file_get_contents($sessionFile, false, null, 0, $maxSize);
             if ($sessionData === false || empty($sessionData)) {
                 echo "[Session Auth] Failed to read session file\n";
                 return null;
@@ -772,13 +783,31 @@ final class SocketIOGateway implements TransportInterface
                 continue;
             }
 
-            $value = @unserialize($remaining);
-            if ($value !== false) {
-                $result[$key] = $value;
-                $serialized = serialize($value);
-                $offset += strlen($serialized);
-            } else {
-                // Skip malformed entry
+            // Safe unserialize with error handling
+            try {
+                set_error_handler(function () {
+                    throw new \ErrorException('Unserialize failed');
+                });
+
+                $value = unserialize($remaining, ['allowed_classes' => false]);
+
+                restore_error_handler();
+
+                if ($value !== false) {
+                    $result[$key] = $value;
+                    $serialized = serialize($value);
+                    $offset += strlen($serialized);
+                } else {
+                    // Skip malformed entry
+                    if (preg_match('/;([a-zA-Z_][a-zA-Z0-9_]*)\|/', $remaining, $matches, PREG_OFFSET_CAPTURE)) {
+                        $offset += $matches[0][1] + 1;
+                    } else {
+                        break;
+                    }
+                }
+            } catch (\Throwable) {
+                restore_error_handler();
+                // Try to find next key
                 if (preg_match('/;([a-zA-Z_][a-zA-Z0-9_]*)\|/', $remaining, $matches, PREG_OFFSET_CAPTURE)) {
                     $offset += $matches[0][1] + 1;
                 } else {
