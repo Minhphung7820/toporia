@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime\Security;
 
 use Redis;
+use Toporia\Framework\Realtime\Sync\AtomicLock;
 
 /**
  * DDoS Protection
@@ -52,11 +53,9 @@ final class DDoSProtection
     private array $connectionTracking = [];
 
     /**
-     * Lock flag for thread-safe operations.
-     *
-     * @var bool
+     * Atomic lock for thread-safe operations.
      */
-    private bool $locked = false;
+    private AtomicLock $lock;
 
     /**
      * @param Redis|null $redis Redis connection for distributed blocking
@@ -73,7 +72,9 @@ final class DDoSProtection
         private readonly int $blockDuration = 3600,
         private readonly bool $enabled = true,
         private readonly string $prefix = 'realtime:ddos'
-    ) {}
+    ) {
+        $this->lock = new AtomicLock();
+    }
 
     /**
      * Check if IP is allowed to connect.
@@ -112,7 +113,7 @@ final class DDoSProtection
             return;
         }
 
-        $this->withLock(function () use ($ipAddress) {
+        $this->lock->synchronized(function () use ($ipAddress): void {
             $now = microtime(true);
 
             // Initialize tracking if not exists
@@ -310,13 +311,13 @@ final class DDoSProtection
     }
 
     /**
-     * Cleanup old connection tracking entries (public, thread-safe).
+     * Cleanup old connection tracking entries (thread-safe).
      *
      * @param string $ipAddress
      */
     private function cleanupConnectionTracking(string $ipAddress): void
     {
-        $this->withLock(function () use ($ipAddress) {
+        $this->lock->synchronized(function () use ($ipAddress): void {
             $this->cleanupConnectionTrackingInternal($ipAddress);
         });
     }
@@ -343,36 +344,6 @@ final class DDoSProtection
         // Remove if empty
         if (empty($this->connectionTracking[$ipAddress])) {
             unset($this->connectionTracking[$ipAddress]);
-        }
-    }
-
-    /**
-     * Execute callback with spin-lock protection.
-     *
-     * @param callable $callback
-     * @return mixed
-     */
-    private function withLock(callable $callback): mixed
-    {
-        $maxAttempts = 100;
-        $attempts = 0;
-
-        // Spin-lock with yield for coroutine context
-        while ($this->locked && $attempts < $maxAttempts) {
-            $attempts++;
-            if (function_exists('\\Swoole\\Coroutine::yield')) {
-                \Swoole\Coroutine::yield();
-            } else {
-                usleep(100); // 0.1ms
-            }
-        }
-
-        $this->locked = true;
-
-        try {
-            return $callback();
-        } finally {
-            $this->locked = false;
         }
     }
 

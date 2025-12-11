@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Realtime;
 
 use Toporia\Framework\Realtime\Contracts\{ChannelInterface, ConnectionInterface, MessageInterface, TransportInterface};
+use Toporia\Framework\Realtime\Sync\AtomicLock;
 
 /**
  * Class Channel
@@ -14,7 +15,7 @@ use Toporia\Framework\Realtime\Contracts\{ChannelInterface, ConnectionInterface,
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
- * @version     1.0.0
+ * @version     1.1.0
  * @package     toporia/framework
  * @subpackage  Realtime
  * @since       2025-01-10
@@ -29,9 +30,9 @@ final class Channel implements ChannelInterface
     private array $subscribers = [];
 
     /**
-     * @var bool Lock flag to prevent concurrent modifications
+     * Atomic lock for thread-safe operations.
      */
-    private bool $locked = false;
+    private AtomicLock $lock;
 
     /**
      * @param string $name Channel name
@@ -42,7 +43,9 @@ final class Channel implements ChannelInterface
         private readonly string $name,
         private readonly ?TransportInterface $transport = null,
         private readonly mixed $authorizer = null
-    ) {}
+    ) {
+        $this->lock = new AtomicLock();
+    }
 
     /**
      * {@inheritdoc}
@@ -100,7 +103,7 @@ final class Channel implements ChannelInterface
      */
     public function subscribe(ConnectionInterface $connection): void
     {
-        $this->withLock(function () use ($connection) {
+        $this->lock->synchronized(function () use ($connection): void {
             // Double-check to avoid duplicate subscription
             $connId = $connection->getId();
             if (!isset($this->subscribers[$connId])) {
@@ -115,7 +118,7 @@ final class Channel implements ChannelInterface
      */
     public function unsubscribe(ConnectionInterface $connection): void
     {
-        $this->withLock(function () use ($connection) {
+        $this->lock->synchronized(function () use ($connection): void {
             $connId = $connection->getId();
             if (isset($this->subscribers[$connId])) {
                 unset($this->subscribers[$connId]);
@@ -130,39 +133,6 @@ final class Channel implements ChannelInterface
     public function hasSubscriber(ConnectionInterface $connection): bool
     {
         return isset($this->subscribers[$connection->getId()]);
-    }
-
-    /**
-     * Execute callback with spin-lock protection.
-     *
-     * Uses a simple spin-lock with yield for coroutine-safe operations.
-     *
-     * @param callable $callback
-     * @return void
-     */
-    private function withLock(callable $callback): void
-    {
-        $maxAttempts = 100;
-        $attempts = 0;
-
-        // Spin-lock with yield for coroutine context
-        while ($this->locked && $attempts < $maxAttempts) {
-            $attempts++;
-            // Yield CPU time in Swoole coroutine context
-            if (function_exists('\\Swoole\\Coroutine::yield')) {
-                \Swoole\Coroutine::yield();
-            } else {
-                usleep(100); // 0.1ms
-            }
-        }
-
-        $this->locked = true;
-
-        try {
-            $callback();
-        } finally {
-            $this->locked = false;
-        }
     }
 
     /**
