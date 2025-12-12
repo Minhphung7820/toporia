@@ -43,6 +43,7 @@ final class Kernel
             Commands\ExportExcelCommand::class,
             Commands\ImportExcelCommand::class,
             Commands\ImportPostsCommand::class,
+            Commands\ExportPostsCommand::class,
         ];
     }
 }
