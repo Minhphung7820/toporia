@@ -138,9 +138,24 @@ final class SmtpTransport extends AbstractTransport
             $this->connect();
             $this->authenticate();
 
-            // MAIL FROM
+            // MAIL FROM with auto-reconnect on 421 (connection expired)
             $from = $message->getFrom();
             $response = $this->sendCommand("MAIL FROM:<{$from}>");
+
+            // Gmail/SMTP servers return 421 when connection expired after idle timeout (~10 min)
+            // Auto-reconnect and retry once to avoid queue retry overhead
+            if ($this->isConnectionExpiredResponse($response)) {
+                if ($this->debug) {
+                    $this->log('debug', 'Connection expired (421), reconnecting...', [
+                        'response' => $response
+                    ]);
+                }
+                $this->forceDisconnect();
+                $this->connect();
+                $this->authenticate();
+                $response = $this->sendCommand("MAIL FROM:<{$from}>");
+            }
+
             if (!$this->isSuccessResponse($response)) {
                 $this->resetTransaction();  // Reset before returning
                 return TransportResult::failure("MAIL FROM rejected: {$response}");
@@ -502,6 +517,24 @@ final class SmtpTransport extends AbstractTransport
     private function isSuccessResponse(string $response): bool
     {
         return str_starts_with($response, '2') || str_starts_with($response, '3');
+    }
+
+    /**
+     * Check if response indicates connection expired (421 error).
+     *
+     * Gmail and other SMTP servers return 421 when:
+     * - Connection has been idle too long (~10 minutes for Gmail)
+     * - Server is temporarily unavailable
+     * - Too many connections from same IP
+     *
+     * @param string $response Server response.
+     * @return bool
+     */
+    private function isConnectionExpiredResponse(string $response): bool
+    {
+        // 421 = Service not available, closing transmission channel
+        // Common messages: "Connection expired", "try reconnecting", "timeout"
+        return str_starts_with($response, '421');
     }
 
     /**
