@@ -19,7 +19,6 @@ const routes = [
         path: '/',
         name: 'home',
         component: Home,
-        // Welcome page Laravel style in Vue SPA
     },
     {
         path: '/about',

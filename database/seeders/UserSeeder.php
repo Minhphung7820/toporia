@@ -60,7 +60,7 @@ final class UserSeeder extends Seeder
     {
         $this->line('Creating users...');
 
-        // Method 1: Using Model::factory() syntax (Laravel-like)
+        // Method 1: Using Model::factory()
         $users = UserModel::factory()->createMany(50);
         $this->line("✓ Created " . count($users) . " regular users");
 

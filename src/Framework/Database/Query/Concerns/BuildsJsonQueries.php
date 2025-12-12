@@ -169,9 +169,9 @@ trait BuildsJsonQueries
      *
      * Example:
      * ```php
-     * $query->whereJsonOverlaps('tags', ['php', 'laravel']);
-     * // MySQL: WHERE JSON_OVERLAPS(tags, '["php","laravel"]')
-     * // PostgreSQL: WHERE tags ?| array['php', 'laravel']
+     * $query->whereJsonOverlaps('tags', ['php', 'toporia']);
+     * // MySQL: WHERE JSON_OVERLAPS(tags, '["php","toporia"]')
+     * // PostgreSQL: WHERE tags ?| array['php', 'toporia']
      * ```
      *
      * @param string $column JSON column name

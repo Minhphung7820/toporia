@@ -6,7 +6,6 @@ declare(strict_types=1);
  * Realtime Channel Authorization Routes
  *
  * Define channel authorization and middleware here.
- * Similar to Laravel's routes/channels.php
  *
  * CALLBACK SIGNATURE:
  *   function($user, ...$channelParams, $guard = null): bool|array
@@ -125,7 +124,7 @@ ChannelRoute::channel('presence-online', function ($user) {
 });
 
 // ============================================================================
-// GUARD-RESTRICTED CHANNELS (Laravel-style)
+// GUARD-RESTRICTED CHANNELS (toporia-style)
 // ============================================================================
 
 // Admin dashboard - ONLY admin guard allowed

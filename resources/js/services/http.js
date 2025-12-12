@@ -122,7 +122,7 @@ http.interceptors.response.use(
     if (!error.response) {
       // Network error (no response from server)
       console.error('[HTTP] Network error:', error.message);
-      router.push({ name: 'error-network' }).catch(() => {});
+      router.push({ name: 'error-network' }).catch(() => { });
       return Promise.reject(error);
     }
 
@@ -139,26 +139,26 @@ http.interceptors.response.use(
       case 401:
         // Unauthorized - Not authenticated
         console.warn('[HTTP] Unauthorized (401)');
-        router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } }).catch(() => {});
+        router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } }).catch(() => { });
         break;
 
       case 403:
         // Forbidden - Authenticated but not authorized
         console.warn('[HTTP] Forbidden (403)');
-        router.push({ name: 'error-403' }).catch(() => {});
+        router.push({ name: 'error-403' }).catch(() => { });
         break;
 
       case 404:
         // Not Found
         console.warn('[HTTP] Not Found (404)');
-        router.push({ name: 'error-404' }).catch(() => {});
+        router.push({ name: 'error-404' }).catch(() => { });
         break;
 
       case 419:
-        // CSRF token mismatch (Laravel/Toporia specific)
+        // CSRF token
         console.warn('[HTTP] CSRF token mismatch (419)');
         csrfCookiePromise = null; // Reset CSRF cache
-        router.push({ name: 'error-419' }).catch(() => {});
+        router.push({ name: 'error-419' }).catch(() => { });
         break;
 
       case 422:
@@ -170,7 +170,7 @@ http.interceptors.response.use(
       case 429:
         // Too Many Requests - Rate limiting
         console.warn('[HTTP] Too Many Requests (429)');
-        router.push({ name: 'error-429' }).catch(() => {});
+        router.push({ name: 'error-429' }).catch(() => { });
         break;
 
       case 500:
@@ -179,13 +179,13 @@ http.interceptors.response.use(
       case 504:
         // Server errors
         console.error('[HTTP] Server Error:', status, data);
-        router.push({ name: 'error-500' }).catch(() => {});
+        router.push({ name: 'error-500' }).catch(() => { });
         break;
 
       default:
         // Other errors
         console.error('[HTTP] Error:', status, data);
-        router.push({ name: 'error-generic', params: { code: status } }).catch(() => {});
+        router.push({ name: 'error-generic', params: { code: status } }).catch(() => { });
     }
 
     // Always reject to allow component-level error handling if needed

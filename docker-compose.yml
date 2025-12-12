@@ -1,5 +1,4 @@
 # Toporia Framework - Production-Ready Docker Compose
-# Simple, stable, high-performance like Laravel Sail
 # All services have proper healthchecks and dependencies
 
 services:

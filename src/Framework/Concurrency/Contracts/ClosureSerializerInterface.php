@@ -9,7 +9,7 @@ namespace Toporia\Framework\Concurrency\Contracts;
  *
  * Abstraction for closure serialization/deserialization.
  * This allows swapping the underlying serialization library
- * (e.g., laravel/serializable-closure, opis/closure) without
+ * (e.g., toporia/serializable-closure, opis/closure) without
  * affecting the rest of the concurrency system.
  *
  * @author      Toporia Framework

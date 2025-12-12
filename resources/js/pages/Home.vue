@@ -136,10 +136,10 @@ export default {
           iconClass: 'icon-zero'
         },
         {
-          title: 'Laravel-Compatible API',
-          description: 'Familiar syntax for developers coming from Laravel, with modern improvements',
+          title: 'Intuitive Developer Experience',
+          description: 'Elegant, expressive syntax with fluent APIs that feel natural and boost productivity',
           emoji: '🔧',
-          iconClass: 'icon-laravel'
+          iconClass: 'icon-dx'
         },
         {
           title: 'Rich Ecosystem',
