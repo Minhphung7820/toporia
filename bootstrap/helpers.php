@@ -1753,3 +1753,25 @@ if (!function_exists('view')) {
         return $content ?: '';
     }
 }
+
+// ========================================
+// Concurrency Helpers
+// ========================================
+
+if (!function_exists('concurrency')) {
+    /**
+     * Get the concurrency manager instance.
+     *
+     * Usage:
+     * - concurrency() - Get ConcurrencyManager instance
+     * - concurrency()->run([...]) - Run tasks concurrently
+     * - concurrency()->defer([...]) - Defer tasks for background execution
+     * - concurrency()->driver('fork') - Use specific driver
+     *
+     * @return \Toporia\Framework\Concurrency\ConcurrencyManager
+     */
+    function concurrency(): \Toporia\Framework\Concurrency\ConcurrencyManager
+    {
+        return app('concurrency');
+    }
+}

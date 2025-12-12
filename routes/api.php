@@ -126,6 +126,7 @@ Route::get('/broker/health', [BrokerTestController::class, 'health']);
 // =========================================================================
 
 use Toporia\Framework\Realtime\Auth\BroadcastAuthController;
+use Toporia\Framework\Support\Accessors\Concurrency;
 
 // Channel authorization endpoint (Pusher-compatible)
 
@@ -203,8 +204,15 @@ Route::post('/parallel-log', function (Request $request) {
     $jobId = $request->input('job_id', uniqid('parallel_'));
 
     // Dispatch the parallel log job to queue
-    dispatch(new \App\Infrastructure\Jobs\ParallelLogJob($jobId));
-
+    [$a, $b] = Concurrency::run([
+        function () {
+            return "task 1";
+        },
+        function () {
+            return "task 2";
+        },
+    ]);
+    dd($a, $b);
     return response()->json([
         'success' => true,
         'message' => 'ParallelLogJob queued successfully!',

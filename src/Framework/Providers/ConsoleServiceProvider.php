@@ -202,6 +202,9 @@ final class ConsoleServiceProvider extends ServiceProvider
 
       // Testing
       'test' => \Toporia\Framework\Console\Commands\TestCommand::class,
+
+      // Concurrency commands
+      'concurrency:invoke' => \Toporia\Framework\Concurrency\Console\InvokeSerializedClosureCommand::class,
     ];
   }
 

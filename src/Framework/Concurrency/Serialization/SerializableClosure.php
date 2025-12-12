@@ -1,0 +1,362 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Toporia\Framework\Concurrency\Serialization;
+
+use Closure;
+use ReflectionFunction;
+use Throwable;
+
+/**
+ * Serializable Closure
+ *
+ * Custom implementation for serializing PHP closures.
+ * Captures closure code, use variables, and binding context.
+ *
+ * How it works:
+ * 1. Extract closure code using ReflectionFunction
+ * 2. Capture used variables from closure scope
+ * 3. Serialize as a bundle of code + variables
+ * 4. On unserialize, recreate closure using eval (with security checks)
+ *
+ * Limitations:
+ * - Cannot serialize closures that use $this (bound closures)
+ * - Cannot serialize closures with unserializable use variables
+ * - Requires the same class/function context on unserialize
+ *
+ * @author      Toporia Framework
+ * @copyright   Copyright (c) 2025 Toporia Framework
+ * @license     MIT
+ */
+final class SerializableClosure
+{
+    /**
+     * The original closure (not serialized).
+     */
+    private ?Closure $closure = null;
+
+    /**
+     * Serialized closure data.
+     *
+     * @var array{
+     *     code: string,
+     *     variables: array<string, mixed>,
+     *     binding: string|null,
+     *     scope: string|null
+     * }|null
+     */
+    private ?array $data = null;
+
+    /**
+     * Secret key for signature verification.
+     */
+    private static ?string $secretKey = null;
+
+    /**
+     * Create a new SerializableClosure instance.
+     */
+    public function __construct(Closure $closure)
+    {
+        $this->closure = $closure;
+    }
+
+    /**
+     * Set the secret key for closure signing.
+     */
+    public static function setSecretKey(?string $key): void
+    {
+        self::$secretKey = $key;
+    }
+
+    /**
+     * Get the underlying closure.
+     */
+    public function getClosure(): Closure
+    {
+        if ($this->closure !== null) {
+            return $this->closure;
+        }
+
+        if ($this->data === null) {
+            throw new \RuntimeException('Closure has not been initialized');
+        }
+
+        return $this->recreateClosure();
+    }
+
+    /**
+     * Invoke the closure.
+     *
+     * @param mixed ...$args Arguments to pass to the closure
+     * @return mixed
+     */
+    public function __invoke(mixed ...$args): mixed
+    {
+        return ($this->getClosure())(...$args);
+    }
+
+    /**
+     * Serialize the closure.
+     *
+     * @return array<string, mixed>
+     */
+    public function __serialize(): array
+    {
+        if ($this->closure === null) {
+            throw new \RuntimeException('No closure to serialize');
+        }
+
+        $reflection = new ReflectionFunction($this->closure);
+
+        // Check for $this binding - try to unbind if possible
+        $binding = $reflection->getClosureThis();
+        if ($binding !== null) {
+            // Try to unbind the closure from $this
+            $unbound = $this->closure->bindTo(null);
+            if ($unbound !== null) {
+                $this->closure = $unbound;
+                $reflection = new ReflectionFunction($this->closure);
+            } else {
+                // Closure actually uses $this internally
+                throw new \RuntimeException(
+                    'Cannot serialize closures that use $this. Use static closures instead.'
+                );
+            }
+        }
+
+        // Extract closure code
+        $code = $this->extractClosureCode($reflection);
+
+        // Get used variables
+        $variables = $reflection->getStaticVariables();
+
+        // Get scope class
+        $scopeClass = $reflection->getClosureScopeClass();
+        $scope = $scopeClass?->getName();
+
+        $data = [
+            'code' => $code,
+            'variables' => $this->serializeVariables($variables),
+            'binding' => null,
+            'scope' => $scope,
+        ];
+
+        // Sign the data if secret key is set
+        if (self::$secretKey !== null) {
+            $data['signature'] = $this->sign($data);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Unserialize the closure.
+     *
+     * @param array<string, mixed> $data
+     */
+    public function __unserialize(array $data): void
+    {
+        // Verify signature if secret key is set
+        if (self::$secretKey !== null) {
+            if (!isset($data['signature'])) {
+                throw new \RuntimeException('Closure signature is missing');
+            }
+
+            $signature = $data['signature'];
+            unset($data['signature']);
+
+            if (!$this->verify($data, $signature)) {
+                throw new \RuntimeException('Closure signature verification failed');
+            }
+        }
+
+        $this->data = [
+            'code' => $data['code'],
+            'variables' => $data['variables'],
+            'binding' => $data['binding'] ?? null,
+            'scope' => $data['scope'] ?? null,
+        ];
+
+        $this->closure = null;
+    }
+
+    /**
+     * Extract closure code from reflection.
+     */
+    private function extractClosureCode(ReflectionFunction $reflection): string
+    {
+        $filename = $reflection->getFileName();
+        $startLine = $reflection->getStartLine();
+        $endLine = $reflection->getEndLine();
+
+        if ($filename === false || $startLine === false || $endLine === false) {
+            throw new \RuntimeException('Cannot extract closure code: source not available');
+        }
+
+        $lines = file($filename);
+        if ($lines === false) {
+            throw new \RuntimeException('Cannot read source file: ' . $filename);
+        }
+
+        // Extract the relevant lines
+        $codeLines = array_slice($lines, $startLine - 1, $endLine - $startLine + 1);
+        $code = implode('', $codeLines);
+
+        // Extract just the closure part
+        $code = $this->extractClosureFromCode($code, $reflection);
+
+        return $code;
+    }
+
+    /**
+     * Extract the closure definition from code.
+     */
+    private function extractClosureFromCode(string $code, ReflectionFunction $reflection): string
+    {
+        // Try to find the closure pattern
+        // Handle: fn() =>, function(), static fn(), static function()
+        $patterns = [
+            '/static\s+fn\s*\([^)]*\)\s*(?::\s*[^\s]+\s*)?=>\s*.+/s',
+            '/fn\s*\([^)]*\)\s*(?::\s*[^\s]+\s*)?=>\s*.+/s',
+            '/static\s+function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?(?::\s*[^\s]+\s*)?\{.+\}/s',
+            '/function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?(?::\s*[^\s]+\s*)?\{.+\}/s',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $code, $matches)) {
+                return $this->normalizeClosureCode($matches[0]);
+            }
+        }
+
+        // Fallback: return code as-is
+        return trim($code);
+    }
+
+    /**
+     * Normalize closure code.
+     */
+    private function normalizeClosureCode(string $code): string
+    {
+        // Remove trailing semicolons and clean up
+        $code = rtrim(trim($code), ';,');
+        return $code;
+    }
+
+    /**
+     * Serialize variables for storage.
+     *
+     * @param array<string, mixed> $variables
+     * @return array<string, mixed>
+     */
+    private function serializeVariables(array $variables): array
+    {
+        $serialized = [];
+
+        foreach ($variables as $name => $value) {
+            if ($value instanceof Closure) {
+                // Recursively serialize closures
+                $serialized[$name] = ['__closure__' => serialize(new self($value))];
+            } else {
+                try {
+                    serialize($value); // Test if serializable
+                    $serialized[$name] = $value;
+                } catch (Throwable $e) {
+                    throw new \RuntimeException(
+                        "Cannot serialize variable '\${$name}': " . $e->getMessage()
+                    );
+                }
+            }
+        }
+
+        return $serialized;
+    }
+
+    /**
+     * Recreate closure from serialized data.
+     */
+    private function recreateClosure(): Closure
+    {
+        if ($this->data === null) {
+            throw new \RuntimeException('No data to recreate closure from');
+        }
+
+        $code = $this->data['code'];
+        $variables = $this->unserializeVariables($this->data['variables']);
+
+        // Build variable extraction code
+        $varExtractions = [];
+        foreach ($variables as $name => $value) {
+            $varExtractions[] = "\${$name} = \$__variables__['{$name}'];";
+        }
+        $varCode = implode("\n", $varExtractions);
+
+        // Build the eval code
+        $evalCode = <<<PHP
+return (function() use (\$__variables__) {
+    {$varCode}
+    return {$code};
+})();
+PHP;
+
+        try {
+            $__variables__ = $variables;
+            $closure = eval($evalCode);
+
+            if (!$closure instanceof Closure) {
+                throw new \RuntimeException('Failed to recreate closure: result is not a Closure');
+            }
+
+            $this->closure = $closure;
+            return $closure;
+        } catch (Throwable $e) {
+            throw new \RuntimeException(
+                'Failed to recreate closure: ' . $e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Unserialize variables.
+     *
+     * @param array<string, mixed> $variables
+     * @return array<string, mixed>
+     */
+    private function unserializeVariables(array $variables): array
+    {
+        $unserialized = [];
+
+        foreach ($variables as $name => $value) {
+            if (is_array($value) && isset($value['__closure__'])) {
+                // Recursively unserialize closures
+                $wrapper = unserialize($value['__closure__']);
+                $unserialized[$name] = $wrapper->getClosure();
+            } else {
+                $unserialized[$name] = $value;
+            }
+        }
+
+        return $unserialized;
+    }
+
+    /**
+     * Sign data with secret key.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function sign(array $data): string
+    {
+        return hash_hmac('sha256', serialize($data), self::$secretKey ?? '');
+    }
+
+    /**
+     * Verify signature.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function verify(array $data, string $signature): bool
+    {
+        $expected = $this->sign($data);
+        return hash_equals($expected, $signature);
+    }
+}
