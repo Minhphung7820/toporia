@@ -143,7 +143,7 @@ final class ForkConcurrencyDriver implements ConcurrencyDriverInterface
 
             // Small delay to prevent CPU spinning
             if (!empty($this->runningTasks)) {
-                usleep(1000); // 1ms
+                usleep(5000); // 5ms - balance between responsiveness and CPU usage
             }
         }
 

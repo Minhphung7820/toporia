@@ -214,23 +214,83 @@ final class SerializableClosure
      */
     private function extractClosureFromCode(string $code, ReflectionFunction $reflection): string
     {
-        // Try to find the closure pattern
+        // Try to find the closure pattern using balanced brace matching for function closures
         // Handle: fn() =>, function(), static fn(), static function()
-        $patterns = [
-            '/static\s+fn\s*\([^)]*\)\s*(?::\s*[^\s]+\s*)?=>\s*.+/s',
-            '/fn\s*\([^)]*\)\s*(?::\s*[^\s]+\s*)?=>\s*.+/s',
-            '/static\s+function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?(?::\s*[^\s]+\s*)?\{.+\}/s',
-            '/function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?(?::\s*[^\s]+\s*)?\{.+\}/s',
+
+        // First, try to match arrow functions (simpler pattern)
+        $arrowPatterns = [
+            '/static\s+fn\s*\([^)]*\)\s*(?::\s*\S+\s*)?=>\s*[^;,\]]+/s',
+            '/fn\s*\([^)]*\)\s*(?::\s*\S+\s*)?=>\s*[^;,\]]+/s',
         ];
 
-        foreach ($patterns as $pattern) {
+        foreach ($arrowPatterns as $pattern) {
             if (preg_match($pattern, $code, $matches)) {
                 return $this->normalizeClosureCode($matches[0]);
             }
         }
 
+        // For function closures, use balanced brace matching
+        $functionPattern = '/(static\s+)?function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?(?::\s*\S+\s*)?\{/s';
+        if (preg_match($functionPattern, $code, $matches, PREG_OFFSET_CAPTURE)) {
+            $start = (int) $matches[0][1];
+            $braceStart = strpos($code, '{', $start);
+
+            if ($braceStart !== false) {
+                $closureCode = $this->extractBalancedBraces($code, $braceStart);
+                if ($closureCode !== null) {
+                    return $this->normalizeClosureCode(substr($code, $start, strlen($closureCode) + $braceStart - $start + 1));
+                }
+            }
+        }
+
         // Fallback: return code as-is
         return trim($code);
+    }
+
+    /**
+     * Extract code with balanced braces starting from given position.
+     */
+    private function extractBalancedBraces(string $code, int $start): ?string
+    {
+        $length = strlen($code);
+        $depth = 0;
+        $inString = false;
+        $stringChar = '';
+        $escaped = false;
+
+        for ($i = $start; $i < $length; $i++) {
+            $char = $code[$i];
+
+            if ($escaped) {
+                $escaped = false;
+                continue;
+            }
+
+            if ($char === '\\') {
+                $escaped = true;
+                continue;
+            }
+
+            if (!$inString) {
+                if ($char === '"' || $char === "'") {
+                    $inString = true;
+                    $stringChar = $char;
+                } elseif ($char === '{') {
+                    $depth++;
+                } elseif ($char === '}') {
+                    $depth--;
+                    if ($depth === 0) {
+                        return substr($code, $start, $i - $start + 1);
+                    }
+                }
+            } else {
+                if ($char === $stringChar) {
+                    $inString = false;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

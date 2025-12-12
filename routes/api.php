@@ -206,9 +206,11 @@ Route::post('/parallel-log', function (Request $request) {
     // Dispatch the parallel log job to queue
     [$a, $b] = Concurrency::run([
         function () {
+            sleep(2);
             return "task 1";
         },
         function () {
+            sleep(2);
             return "task 2";
         },
     ]);
