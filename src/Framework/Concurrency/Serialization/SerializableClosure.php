@@ -135,11 +135,16 @@ final class SerializableClosure
         $scopeClass = $reflection->getClosureScopeClass();
         $scope = $scopeClass?->getName();
 
+        // Extract namespace and use statements from source file
+        $filename = $reflection->getFileName();
+        $useStatements = $filename ? $this->extractUseStatements($filename) : [];
+
         $data = [
             'code' => $code,
             'variables' => $this->serializeVariables($variables),
             'binding' => null,
             'scope' => $scope,
+            'use_statements' => $useStatements,
         ];
 
         // Sign the data if secret key is set
@@ -176,6 +181,7 @@ final class SerializableClosure
             'variables' => $data['variables'],
             'binding' => $data['binding'] ?? null,
             'scope' => $data['scope'] ?? null,
+            'use_statements' => $data['use_statements'] ?? [],
         ];
 
         $this->closure = null;
@@ -343,6 +349,7 @@ final class SerializableClosure
 
         $code = $this->data['code'];
         $variables = $this->unserializeVariables($this->data['variables']);
+        $useStatements = $this->data['use_statements'] ?? [];
 
         // Build variable extraction code
         $varExtractions = [];
@@ -351,9 +358,13 @@ final class SerializableClosure
         }
         $varCode = implode("\n", $varExtractions);
 
+        // Build class alias code from use statements
+        $aliasCode = $this->buildClassAliasCode($useStatements);
+
         // Build the eval code
         $evalCode = <<<PHP
 return (function() use (\$__variables__) {
+    {$aliasCode}
     {$varCode}
     return {$code};
 })();
@@ -397,6 +408,77 @@ PHP;
         }
 
         return $unserialized;
+    }
+
+    /**
+     * Extract use statements from source file.
+     *
+     * @param string $filename Source file path
+     * @return array<string, string> Map of alias => fully qualified class name
+     */
+    private function extractUseStatements(string $filename): array
+    {
+        $content = file_get_contents($filename);
+        if ($content === false) {
+            return [];
+        }
+
+        $useStatements = [];
+
+        // Match use statements: use Foo\Bar\Baz; or use Foo\Bar\Baz as Alias;
+        $pattern = '/^use\s+([a-zA-Z_\\\\][a-zA-Z0-9_\\\\]*)(?:\s+as\s+([a-zA-Z_][a-zA-Z0-9_]*))?\s*;/m';
+
+        if (preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $fqcn = $match[1];
+                // If there's an alias, use it; otherwise use the short class name
+                $alias = $match[2] ?? $this->getShortClassName($fqcn);
+                $useStatements[$alias] = $fqcn;
+            }
+        }
+
+        return $useStatements;
+    }
+
+    /**
+     * Get short class name from fully qualified class name.
+     *
+     * @param string $fqcn Fully qualified class name
+     * @return string Short class name
+     */
+    private function getShortClassName(string $fqcn): string
+    {
+        $parts = explode('\\', $fqcn);
+        return end($parts) ?: $fqcn;
+    }
+
+    /**
+     * Build class alias code from use statements.
+     *
+     * Creates class_alias calls to make short class names available.
+     *
+     * @param array<string, string> $useStatements Map of alias => FQCN
+     * @return string PHP code for class aliases
+     */
+    private function buildClassAliasCode(array $useStatements): string
+    {
+        if (empty($useStatements)) {
+            return '';
+        }
+
+        $aliasLines = [];
+        foreach ($useStatements as $alias => $fqcn) {
+            // Only create alias if class exists and alias doesn't already exist
+            $aliasLines[] = sprintf(
+                'if (class_exists(\'%s\') && !class_exists(\'%s\', false)) { class_alias(\'%s\', \'%s\'); }',
+                addslashes($fqcn),
+                addslashes($alias),
+                addslashes($fqcn),
+                addslashes($alias)
+            );
+        }
+
+        return implode("\n    ", $aliasLines);
     }
 
     /**
