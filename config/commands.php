@@ -36,6 +36,9 @@ return [
     'export:excel' => App\Presentation\Console\Commands\ExportExcelCommand::class,
     'import:excel' => App\Presentation\Console\Commands\ImportExcelCommand::class,
 
+    // Email commands
+    'email:daily' => App\Presentation\Console\Commands\SendDailyEmailCommand::class,
+
     /*
     |--------------------------------------------------------------------------
     | Auto-Discovery
