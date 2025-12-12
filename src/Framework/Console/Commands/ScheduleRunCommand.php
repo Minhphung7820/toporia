@@ -60,7 +60,7 @@ final class ScheduleRunCommand extends Command
             if ($tasksRun === 0) {
                 $this->info("No scheduled tasks are due to run.");
             } else {
-                $this->success("Executed {$tasksRun} task(s) successfully.");
+                $this->success("[" . now()->format('Y-m-d H:i:s') . "] Executed {$tasksRun} task(s)");
             }
         } catch (\Throwable $e) {
             $this->newLine();

@@ -144,10 +144,12 @@ final class Scheduler
             // Get console application
             $console = $this->container->get(Application::class);
 
-            // Build arguments array
-            $arguments = [$command];
+            // Parse command string into arguments array
+            // Handles: 'email:daily --to=test@email.com --subject="Hello World"'
+            // Prepend 'console' as $argv[0] since Application expects it
+            $arguments = array_merge(['console'], $this->parseCommandString($command));
 
-            // Add options
+            // Add additional options
             foreach ($options as $key => $value) {
                 if (is_int($key)) {
                     // Flag without value (e.g., '--force')
@@ -776,5 +778,54 @@ final class Scheduler
     public function clear(): void
     {
         $this->tasks = [];
+    }
+
+    /**
+     * Parse a command string into an array of arguments.
+     *
+     * Handles quoted strings properly:
+     * 'email:daily --to=test@email.com --subject="Hello World"'
+     * becomes: ['email:daily', '--to=test@email.com', '--subject=Hello World']
+     *
+     * @param string $command
+     * @return array<int, string>
+     */
+    private function parseCommandString(string $command): array
+    {
+        $args = [];
+        $length = strlen($command);
+        $current = '';
+        $inQuote = false;
+        $quoteChar = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $command[$i];
+
+            if ($inQuote) {
+                if ($char === $quoteChar) {
+                    $inQuote = false;
+                } else {
+                    $current .= $char;
+                }
+            } else {
+                if ($char === '"' || $char === "'") {
+                    $inQuote = true;
+                    $quoteChar = $char;
+                } elseif ($char === ' ') {
+                    if ($current !== '') {
+                        $args[] = $current;
+                        $current = '';
+                    }
+                } else {
+                    $current .= $char;
+                }
+            }
+        }
+
+        if ($current !== '') {
+            $args[] = $current;
+        }
+
+        return $args;
     }
 }

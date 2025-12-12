@@ -54,17 +54,22 @@ final class ScheduleListCommand extends Command
         // Prepare table data
         $headers = ['ID', 'Expression', 'Description', 'Next Run', 'Priority', 'Status'];
         $rows = [];
-        $now = new \DateTime();
+        $timezone = new \DateTimeZone(config('app.timezone', 'Asia/Ho_Chi_Minh'));
+        $now = new \DateTime('now', $timezone);
 
         foreach ($tasks as $task) {
             $nextRun = $task->getNextRunTime($now);
             $isDue = $task->isDue($now);
 
+            // Convert nextRun to app timezone for display
+            $nextRunDisplay = clone $nextRun;
+            $nextRunDisplay->setTimezone($timezone);
+
             $rows[] = [
                 substr($task->getTaskId(), 0, 8),
                 $task->getExpression(),
                 $task->getDescription() ?: '(no description)',
-                $nextRun->format('Y-m-d H:i:s'),
+                $nextRunDisplay->format('Y-m-d H:i:s'),
                 (string)$task->getPriority(),
                 $isDue ? 'Due' : 'Pending',
             ];

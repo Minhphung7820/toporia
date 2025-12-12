@@ -72,7 +72,7 @@ final class ScheduleWorkCommand extends Command
 
         while (!$this->shouldQuit) {
             try {
-                $currentTime = new \DateTime();
+                $currentTime = now();
                 $currentMinute = $currentTime->format('Y-m-d H:i:s');
 
                 if ($verbose) {
