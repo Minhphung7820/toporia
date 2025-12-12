@@ -42,6 +42,7 @@ final class Kernel
             // Add your custom application commands here...
             Commands\ExportExcelCommand::class,
             Commands\ImportExcelCommand::class,
+            Commands\ImportPostsCommand::class,
         ];
     }
 }

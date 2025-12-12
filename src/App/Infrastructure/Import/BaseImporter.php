@@ -91,8 +91,10 @@ abstract class BaseImporter implements ImportInterface
                 $chunk = [];
                 $chunkIndex++;
 
-                // Update progress
-                $this->progress = ($this->totalRows / $totalRows) * 100;
+                // Update progress (avoid division by zero when totalRows is unknown)
+                if ($totalRows > 0) {
+                    $this->progress = ($this->totalRows / $totalRows) * 100;
+                }
             }
         }
 
@@ -164,8 +166,10 @@ abstract class BaseImporter implements ImportInterface
                 $chunk = [];
                 $chunkIndex++;
 
-                // Update progress
-                $this->progress = ($this->totalRows / $totalRows) * 100;
+                // Update progress (avoid division by zero when totalRows is unknown)
+                if ($totalRows > 0) {
+                    $this->progress = ($this->totalRows / $totalRows) * 100;
+                }
             }
         }
 
