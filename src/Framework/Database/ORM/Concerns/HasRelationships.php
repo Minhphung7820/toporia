@@ -23,7 +23,7 @@ use Toporia\Framework\Database\ORM\Relations\{
  * Trait HasRelationships
  *
  * Provides Eloquent-like relationship definition methods for ORM models.
- * Follows Laravel's pattern for defining model relationships.
+ * Follows Toporia's pattern for defining model relationships.
  *
  * Supported Relationships:
  * - HasOne: One-to-one (User has one Profile)

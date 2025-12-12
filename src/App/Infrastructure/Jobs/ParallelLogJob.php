@@ -46,7 +46,7 @@ final class ParallelLogJob extends Job implements ShouldQueueInterface
             fn() => $this->logTask4($jobId),
         ];
 
-        // Run all 4 tasks in parallel using Concurrency::run (Laravel-style API)
+        // Run all 4 tasks in parallel using Concurrency::run (Toporia-style API)
         $results = Concurrency::run($tasks);
 
         $duration = round((microtime(true) - $startTime) * 1000, 2);

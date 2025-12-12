@@ -8,7 +8,7 @@ namespace Toporia\Framework\Http\Contracts;
  * JSON Response Interface
  *
  * Specialized interface for JSON responses with advanced serialization capabilities.
- * Provides Laravel-compatible JSON response functionality with performance optimizations.
+ * Provides Toporia-style JSON response functionality with performance optimizations.
  *
  * Features:
  * - Advanced JSON serialization with JsonSerializable support

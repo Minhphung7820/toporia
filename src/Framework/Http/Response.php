@@ -140,7 +140,7 @@ class Response implements ResponseInterface
         $this->setStatus($status);
         $this->header('Content-Type', 'application/json');
 
-        // Laravel-style JSON encoding with proper object handling
+        // Toporia-style JSON encoding with proper object handling
         $processedData = $this->prepareDataForJson($data);
 
         $json = json_encode(
@@ -160,7 +160,7 @@ class Response implements ResponseInterface
     }
 
     /**
-     * Prepare data for JSON encoding (Laravel-style).
+     * Prepare data for JSON encoding (Toporia-style).
      *
      * Handles JsonSerializable, Arrayable objects, and collections properly.
      *

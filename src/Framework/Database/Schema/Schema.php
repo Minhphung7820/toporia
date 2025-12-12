@@ -11,7 +11,7 @@ use Toporia\Framework\Database\DatabaseManager;
  * Class Schema
  *
  * Static facade for database schema operations.
- * Provides Laravel-compatible static methods for schema manipulation
+ * Provides Toporia-style static methods for schema manipulation
  * with support for multiple database connections.
  *
  * Usage:

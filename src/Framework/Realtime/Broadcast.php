@@ -378,13 +378,13 @@ final class Broadcast
     }
 
     // =========================================================================
-    // ROUTING HELPERS (Laravel-style)
+    // ROUTING HELPERS (Toporia-style)
     // =========================================================================
 
     /**
      * Register broadcast authentication routes.
      *
-     * Similar to Laravel's Broadcast::routes()
+     * Similar to other frameworks's Broadcast::routes()
      *
      * Usage:
      *   // In routes/api.php or routes/web.php
@@ -470,7 +470,7 @@ final class Broadcast
      *       return $user['id'] === Order::find($orderId)->user_id;
      *   }, ['guards' => ['api', 'admin']]);
      *
-     * This is an alias for ChannelRoute::channel() for Laravel-like DX.
+     * This is an alias for ChannelRoute::channel() for fluent DX.
      *
      * @param string $pattern Channel pattern
      * @param callable $callback Authorization callback

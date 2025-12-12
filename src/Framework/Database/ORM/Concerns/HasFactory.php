@@ -9,7 +9,7 @@ use Toporia\Framework\Database\Contracts\FactoryInterface;
 /**
  * HasFactory Trait
  *
- * Provides factory method for models, enabling Laravel-like factory usage:
+ * Provides factory method for models, enabling fluent factory usage:
  * ```php
  * UserModel::factory()->count(10)->create();
  * ProductModel::factory()->state('active')->create();

@@ -12,7 +12,7 @@ use Toporia\Framework\Encryption\Exceptions\EncryptException;
  * Class Encrypter
  *
  * Provides encryption and decryption using OpenSSL with AES-256-GCM.
- * Similar to Laravel's Encrypter but with modern cipher support.
+ * Similar to other frameworks's Encrypter but with modern cipher support.
  *
  * Performance:
  * - Uses AES-256-GCM (authenticated encryption)

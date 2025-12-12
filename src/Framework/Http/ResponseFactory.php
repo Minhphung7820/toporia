@@ -16,11 +16,11 @@ use Toporia\Framework\Support\Macroable;
 /**
  * Enterprise Response Factory
  *
- * Factory class for creating various types of HTTP responses with Laravel compatibility.
+ * Factory class for creating various types of HTTP responses with Toporia compatibility.
  *
  * Features:
  * - Multiple response types (JSON, Redirect, Stream, File, View)
- * - Laravel-compatible API
+ * - Toporia-style API
  * - Performance optimizations
  * - Extensible via macros
  * - Clean Architecture compliance

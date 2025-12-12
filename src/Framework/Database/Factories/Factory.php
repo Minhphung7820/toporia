@@ -13,7 +13,7 @@ use Toporia\Framework\Database\Faker\ToportaFakerProvider;
 /**
  * Abstract Factory Base Class
  *
- * Professional, enterprise-grade factory system with Laravel-like features:
+ * Professional, enterprise-grade factory system with fluent features:
  * - State modifiers (state())
  * - Sequences for unique values
  * - After making/creating callbacks

@@ -21,7 +21,7 @@ use Toporia\Framework\Container\Exception\{ContainerException, NotFoundException
  * - get(string $id): mixed - Returns entry from container
  * - has(string $id): bool - Returns true if entry exists
  *
- * Additional features (Laravel-style):
+ * Additional features (Toporia-style):
  * - Binding (bind, singleton, instance)
  * - Contextual binding (when/needs/give)
  * - Tagged bindings

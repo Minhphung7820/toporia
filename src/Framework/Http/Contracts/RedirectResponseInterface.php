@@ -7,7 +7,7 @@ namespace Toporia\Framework\Http\Contracts;
 /**
  * Redirect Response Interface
  *
- * Interface for HTTP redirect responses with Laravel-compatible functionality.
+ * Interface for HTTP redirect responses with Toporia-style functionality.
  *
  * @author      Toporia Framework Team
  * @copyright   Copyright (c) 2025 Toporia Framework

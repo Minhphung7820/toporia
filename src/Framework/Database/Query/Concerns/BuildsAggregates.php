@@ -8,7 +8,7 @@ namespace Toporia\Framework\Database\Query\Concerns;
  * Trait BuildsAggregates
  *
  * Aggregate function builders for Query Builder.
- * Provides comprehensive aggregate methods matching Laravel's capabilities.
+ * Provides comprehensive aggregate methods matching Toporia's capabilities.
  *
  * Features:
  * - Basic aggregates: count, sum, avg, min, max

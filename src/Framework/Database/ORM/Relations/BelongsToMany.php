@@ -1836,7 +1836,7 @@ class BelongsToMany extends Relation
     /**
      * Detach a related model from the parent via pivot table.
      *
-     * FIXED: Applies relation constraints (wherePivot/where) like Laravel.
+     * FIXED: Applies relation constraints (wherePivot/where) like other frameworks.
      *
      * @param int|string|null $id Related model ID (null = detach all)
      * @return int Number of rows deleted
@@ -1976,7 +1976,7 @@ class BelongsToMany extends Relation
      * - Wrapped in database transaction for atomicity
      * - Loads current state once and reuses it
      * - Batch inserts for new attachments (bulk insert)
-     * - Applies relation constraints (wherePivot/where) like Laravel
+     * - Applies relation constraints (wherePivot/where) like other frameworks
      *
      * PERFORMANCE GUIDELINES:
      * - Use sync() for relationships with < 5,000 records
@@ -2222,7 +2222,7 @@ class BelongsToMany extends Relation
      * - Wrapped in database transaction for atomicity
      * - Loads current state once and reuses it
      * - Batch operations (single DELETE + single bulk INSERT)
-     * - Applies relation constraints (wherePivot/where) like Laravel
+     * - Applies relation constraints (wherePivot/where) like other frameworks
      *
      * @param array|int|string $ids Related model IDs
      * @param bool $touch Whether to touch parent timestamps
@@ -2296,8 +2296,8 @@ class BelongsToMany extends Relation
      * Update an existing pivot record.
      *
      * FIXED:
-     * - Supports array of IDs (WHERE IN) like Laravel
-     * - Applies relation constraints (wherePivot/where) like Laravel
+     * - Supports array of IDs (WHERE IN) like other frameworks
+     * - Applies relation constraints (wherePivot/where) like other frameworks
      * - Wrapped in database transaction for atomicity
      *
      * @param int|string|array $id Related model ID(s)
@@ -2322,7 +2322,7 @@ class BelongsToMany extends Relation
             $query = $qb->table($this->pivotTable)
                 ->where($this->foreignPivotKey, $this->parent->getAttribute($this->parentKey));
 
-            // FIXED: Support array of IDs (WHERE IN) like Laravel
+            // FIXED: Support array of IDs (WHERE IN) like other frameworks
             if (is_array($id)) {
                 if (empty($id)) {
                     $connection->rollback();
@@ -2342,7 +2342,7 @@ class BelongsToMany extends Relation
 
             $connection->commit();
 
-            // Return int for array, bool for single ID (Laravel compatibility)
+            // Return int for array, bool for single ID (Toporia compatibility)
             return is_array($id) ? $affected : ($affected > 0);
         } catch (\Exception $e) {
             $connection->rollback();
@@ -2353,7 +2353,7 @@ class BelongsToMany extends Relation
     /**
      * Get current pivot IDs for the parent model.
      *
-     * FIXED: Now applies relation constraints (wherePivot/where) like Laravel.
+     * FIXED: Now applies relation constraints (wherePivot/where) like other frameworks.
      * All queries now include constraints from the relation builder.
      *
      * PERFORMANCE WARNING: Loads all pivot IDs into memory.
@@ -2397,7 +2397,7 @@ class BelongsToMany extends Relation
     /**
      * Get current pivot IDs for specific related IDs only.
      *
-     * FIXED: Now applies relation constraints (wherePivot/where) like Laravel.
+     * FIXED: Now applies relation constraints (wherePivot/where) like other frameworks.
      *
      * Performance: O(log n) - Uses indexed lookup with whereIn
      * Clean Architecture: Targeted query for chunked operations
@@ -2461,7 +2461,7 @@ class BelongsToMany extends Relation
      *
      * FIXED:
      * - Removes duplicate IDs before building query
-     * - Applies relation constraints (wherePivot/where) like Laravel
+     * - Applies relation constraints (wherePivot/where) like other frameworks
      *
      * @param array $ids Related model IDs
      * @return int Number of rows deleted

@@ -298,7 +298,7 @@ interface RequestInterface
     public function all(): array;
 
     // ============================================================================
-    // Additional Laravel-Compatible Methods
+    // Additional Framework-Compatible Methods
     // ============================================================================
 
     /**

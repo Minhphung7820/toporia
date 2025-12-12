@@ -89,7 +89,7 @@ class ModelCollection extends DatabaseCollection implements \JsonSerializable
   /**
    * Convert the collection to an array for JSON serialization.
    *
-   * Laravel compatibility: implements JsonSerializable interface.
+   * Toporia compatibility: implements JsonSerializable interface.
    *
    * @return array
    */

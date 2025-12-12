@@ -12,7 +12,7 @@ use Toporia\Framework\RateLimit\{Contracts\RateLimiterInterface, RateLimiter, Li
 /**
  * Class ThrottleRequests
  *
- * Rate limits HTTP requests based on configurable criteria. Supports named limiters (like Laravel) and direct configuration.
+ * Rate limits HTTP requests based on configurable criteria. Supports named limiters (Toporia style) and direct configuration.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework

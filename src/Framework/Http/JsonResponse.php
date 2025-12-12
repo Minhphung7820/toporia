@@ -11,7 +11,7 @@ use Toporia\Framework\Support\Macroable;
 /**
  * Enterprise JSON Response
  *
- * Advanced JSON response implementation with Laravel compatibility and performance optimizations.
+ * Advanced JSON response implementation with Toporia compatibility and performance optimizations.
  *
  * Features:
  * - Advanced JSON serialization with JsonSerializer
@@ -19,7 +19,7 @@ use Toporia\Framework\Support\Macroable;
  * - Configurable encoding options
  * - Error handling and validation
  * - Performance optimizations
- * - Laravel-compatible API
+ * - Toporia-style API
  *
  * Performance Optimizations:
  * - Lazy JSON encoding (only when needed)

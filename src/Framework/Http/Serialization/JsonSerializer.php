@@ -10,7 +10,7 @@ use Toporia\Framework\Support\Collection\Collection;
 /**
  * Advanced JSON Serializer
  *
- * Enterprise-grade JSON serialization with Laravel compatibility and performance optimizations.
+ * Enterprise-grade JSON serialization with Toporia compatibility and performance optimizations.
  *
  * Features:
  * - JsonSerializable interface support
@@ -41,7 +41,7 @@ use Toporia\Framework\Support\Collection\Collection;
 final class JsonSerializer implements SerializerInterface
 {
     /**
-     * Default JSON encoding options (Laravel-compatible).
+     * Default JSON encoding options (Toporia-style).
      */
     private const DEFAULT_OPTIONS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION;
 
@@ -96,7 +96,7 @@ final class JsonSerializer implements SerializerInterface
     }
 
     /**
-     * Process data for JSON serialization (Laravel-style).
+     * Process data for JSON serialization (Toporia-style).
      *
      * @param mixed $data Data to process
      * @param int $maxDepth Maximum recursion depth
@@ -210,7 +210,7 @@ final class JsonSerializer implements SerializerInterface
             return $this->processData($object->jsonSerialize(), self::MAX_DEPTH - $this->depth);
         }
 
-        // Arrayable interface (Laravel-style)
+        // Arrayable interface (Toporia-style)
         if (method_exists($object, 'toArray')) {
             return $this->processData($object->toArray(), self::MAX_DEPTH - $this->depth);
         }

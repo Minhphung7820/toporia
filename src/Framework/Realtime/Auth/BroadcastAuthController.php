@@ -13,7 +13,7 @@ use Toporia\Framework\Http\Response;
  * Broadcast Authentication Controller
  *
  * Handles HTTP POST /broadcasting/auth requests for channel authorization.
- * Similar to Laravel's BroadcastController.
+ * Similar to other frameworks's BroadcastController.
  *
  * Supports flexible guard selection:
  *   - Via request parameter: { "guard": "admin" }

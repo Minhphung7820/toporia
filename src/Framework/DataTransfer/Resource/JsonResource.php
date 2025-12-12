@@ -11,7 +11,7 @@ use Toporia\Framework\Database\ORM\Model;
 /**
  * Class JsonResource
  *
- * Laravel-style JSON Resource for API responses.
+ * Toporia-style JSON Resource for API responses.
  * Wraps entities/data for consistent JSON serialization.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>

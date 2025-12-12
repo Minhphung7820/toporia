@@ -136,7 +136,7 @@ abstract class ServiceAccessor
      * Handle dynamic static method calls.
      *
      * Forwards all static method calls to the underlying service instance.
-     * This enables Laravel Facade-like behavior where you only need to
+     * This enables Accessor behavior where you only need to
      * implement getServiceName() and all methods are automatically delegated.
      *
      * Performance:

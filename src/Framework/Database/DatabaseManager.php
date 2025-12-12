@@ -344,7 +344,7 @@ class DatabaseManager
      * Returns an Expression object that can be used in query building.
      * The expression will not be quoted or escaped by the query grammar.
      *
-     * This method works exactly like Laravel's DB::raw() - it returns an
+     * This method works exactly like Toporia's DB::raw() - it returns an
      * expression object for use in query building, not execute a query.
      *
      * Performance: O(1) - lightweight object creation, no database overhead

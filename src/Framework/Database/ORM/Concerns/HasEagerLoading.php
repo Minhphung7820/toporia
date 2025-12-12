@@ -290,7 +290,7 @@ trait HasEagerLoading
                 if (!isset($existingConstraints[$firstLevel])) {
                     $existingConstraints[$firstLevel] = [];
                 }
-                // Merge constraints, later ones override earlier ones (Laravel behavior)
+                // Merge constraints, later ones override earlier ones (standard behavior)
                 $existingConstraints[$firstLevel] = array_merge(
                     $existingConstraints[$firstLevel],
                     $nestedConstraintList
@@ -381,7 +381,7 @@ trait HasEagerLoading
         // 2. Apply constraint to eager instance (relationship object, NOT query)
         // 3. Relationship methods modify the internal query
         //
-        // This matches Laravel's behavior where callbacks receive the relationship instance
+        // This matches Toporia's behavior where callbacks receive the relationship instance
 
         // Create eager instance first
         $eagerRelation = $firstRelation->newEagerInstance($freshQuery);
@@ -397,7 +397,7 @@ trait HasEagerLoading
         $eagerRelation->addEagerConstraints($modelsArray);
 
         // MorphTo has special handling - it does its own matching in getEager()
-        // This follows Laravel's architecture where MorphTo creates fresh queries per morph type
+        // This follows Toporia's architecture where MorphTo creates fresh queries per morph type
         if ($eagerRelation instanceof MorphTo) {
             // Store relation name before calling getEager (needed for matchToMorphParents)
             $eagerRelation->match($modelsArray, new ModelCollection([]), $relationName);
@@ -521,7 +521,7 @@ trait HasEagerLoading
      * - Single model relations: BelongsTo, HasOne, MorphTo, MorphOne, HasOneThrough → return null
      * - Collection relations: HasMany, BelongsToMany, HasManyThrough, MorphMany, MorphToMany, MorphedByMany → return empty ModelCollection
      *
-     * This ensures correct behavior matching Laravel's expectations:
+     * This ensures correct behavior matching Toporia's expectations:
      * - Single relations return null when no related model exists (not empty array)
      * - Collection relations return empty ModelCollection when no related models exist
      *

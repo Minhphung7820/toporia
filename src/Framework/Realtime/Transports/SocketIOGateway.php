@@ -1027,7 +1027,7 @@ final class SocketIOGateway implements TransportInterface
         $channelData = is_array($data) ? ($data['channel_data'] ?? null) : null;
         $socketId = $connection->get('sid');
 
-        // Method 1: Verify auth signature (Laravel-style)
+        // Method 1: Verify auth signature (Toporia-style)
         if ($authSignature !== null && $this->authenticator !== null) {
             $isValid = $this->authenticator->verifySignature(
                 $socketId,

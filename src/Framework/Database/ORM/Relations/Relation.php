@@ -234,7 +234,7 @@ abstract class Relation implements RelationInterface
      */
     protected static function getMorphConfigPath(): string
     {
-        // Try to use Laravel's base_path() if available
+        // Try to use Toporia's base_path() if available
         if (function_exists('base_path')) {
             return base_path('config/morphs.php');
         }
@@ -374,7 +374,7 @@ abstract class Relation implements RelationInterface
      */
     protected static function getBasePath(): string
     {
-        // Try to use Laravel's base_path() if available
+        // Try to use Toporia's base_path() if available
         if (function_exists('base_path')) {
             return base_path();
         }

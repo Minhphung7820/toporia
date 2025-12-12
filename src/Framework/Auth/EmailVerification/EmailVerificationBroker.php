@@ -12,7 +12,7 @@ use Toporia\Framework\Mail\Message;
 /**
  * Class EmailVerificationBroker
  *
- * Handles email verification similar to Laravel's built-in verification.
+ * Handles email verification similar to Toporia's built-in verification.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework

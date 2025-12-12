@@ -10,7 +10,7 @@ use Toporia\Framework\Support\Str;
  * Class Component
  *
  * Base class for creating reusable view components.
- * Similar to Laravel's View Components but optimized for performance.
+ * Similar to other frameworks's View Components but optimized for performance.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework

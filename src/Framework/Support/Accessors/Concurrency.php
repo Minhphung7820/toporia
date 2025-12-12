@@ -11,7 +11,7 @@ use Toporia\Framework\Concurrency\Contracts\ConcurrencyDriverInterface;
  * Concurrency Accessor
  *
  * Static facade for concurrent task execution.
- * Laravel-compatible API for running tasks in parallel.
+ * Toporia-style API for running tasks in parallel.
  *
  * @author      Toporia Framework
  * @copyright   Copyright (c) 2025 Toporia Framework

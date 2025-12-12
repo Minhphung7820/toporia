@@ -10,7 +10,7 @@ use Toporia\Framework\Database\Query\Expression;
  * Trait BuildsJsonQueries
  *
  * Complete JSON query support for QueryBuilder.
- * Provides full Laravel-compatible JSON operations plus advanced features.
+ * Provides full Toporia-style JSON operations plus advanced features.
  *
  * Features:
  * - whereJson: Basic JSON column queries with -> syntax

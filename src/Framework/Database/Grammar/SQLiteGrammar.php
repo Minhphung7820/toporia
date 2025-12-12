@@ -213,7 +213,7 @@ class SQLiteGrammar extends Grammar
         foreach ($values as $column => $value) {
             $wrappedColumn = $this->wrapColumn($column);
 
-            // Support Expression objects from DB::raw() (like Laravel)
+            // Support Expression objects from DB::raw() (Toporia style)
             if ($value instanceof Expression) {
                 $sets[] = "{$wrappedColumn} = " . (string) $value;
             } else {

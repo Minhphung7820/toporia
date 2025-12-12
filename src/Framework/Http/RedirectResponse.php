@@ -10,7 +10,7 @@ use Toporia\Framework\Support\Macroable;
 /**
  * Class RedirectResponse
  *
- * Laravel-compatible redirect response with session flash data support.
+ * Toporia-style redirect response with session flash data support.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework

@@ -10,7 +10,7 @@ use Toporia\Framework\Console\Contracts\OutputInterface;
 /**
  * Console Facade
  *
- * Provides static access to console commands (like Laravel's Artisan).
+ * Provides static access to console commands (like Toporia's Artisan).
  * Allows calling console commands programmatically from PHP code.
  *
  * Usage:

@@ -16,7 +16,7 @@ use Toporia\Framework\Database\Query\QueryBuilder;
  * Features:
  * - CTEs (WITH clauses) for recursive queries and query organization
  * - Window Functions (ROW_NUMBER, RANK, DENSE_RANK, etc.)
- * - Advanced SQL features matching Laravel's capabilities
+ * - Advanced SQL features matching Toporia's capabilities
  *
  * Performance:
  * - CTEs: Database-optimized, can improve query readability and performance

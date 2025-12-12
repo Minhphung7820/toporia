@@ -99,7 +99,7 @@ class HasMany extends Relation
         $isEagerLoading = $this->findWhereInRecursive($wheres, '');
 
         // If eager loading with limit, use window function for optimal performance
-        // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
+        // This matches Toporia's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
         // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
         // Also supports offset()/skip() for pagination within each parent
         if ($isEagerLoading) {
@@ -126,7 +126,7 @@ class HasMany extends Relation
                     return $this->relatedClass::hydrate($rows->toArray());
                 }
 
-                // Build window function query like Laravel
+                // Build window function query like other frameworks
                 // SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY foreignKey ORDER BY ...) AS toporia_row FROM table WHERE ...) AS toporia_table WHERE toporia_row <= limit
                 $foreignKey = $this->foreignKey;
                 $table = $this->query->getTable();

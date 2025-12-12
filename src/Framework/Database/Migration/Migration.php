@@ -19,7 +19,7 @@ use Toporia\Framework\Database\Schema\SchemaBuilder;
  * // Style 1: Instance property (backward compatible)
  * $this->schema->create('users', function ($table) { ... });
  *
- * // Style 2: Static facade (Laravel-like)
+ * // Style 2: Static facade (fluent)
  * Schema::create('users', function ($table) { ... });
  *
  * // Style 3: Multiple connections via facade

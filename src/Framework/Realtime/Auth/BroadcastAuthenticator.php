@@ -10,10 +10,10 @@ use Toporia\Framework\Realtime\ChannelRoute;
 /**
  * Broadcast Authenticator
  *
- * Handles channel authorization similar to Laravel Broadcasting.
+ * Handles channel authorization similar to other frameworks Broadcasting.
  * Generates HMAC signatures for Pusher-compatible authentication.
  *
- * Authentication Flow (Laravel-style):
+ * Authentication Flow (Toporia-style):
  * 1. Client connects to WebSocket server (gets socket_id)
  * 2. Client wants to join private/presence channel
  * 3. Client sends POST /broadcasting/auth with socket_id + channel_name

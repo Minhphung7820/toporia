@@ -7,7 +7,7 @@ namespace Toporia\Framework\Support;
 /**
  * VarDumper - Beautiful variable dumper
  *
- * Inspired by Symfony VarDumper and Laravel's dump implementation.
+ * Inspired by Symfony VarDumper and Toporia's dump implementation.
  * Provides beautiful HTML output with syntax highlighting and collapsible sections.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>

@@ -2179,7 +2179,7 @@ class QueryBuilder implements QueryBuilderInterface
     /**
      * Update rows matching the WHERE clauses.
      *
-     * Supports Expression objects from DB::raw() in values (like Laravel).
+     * Supports Expression objects from DB::raw() in values (Toporia style).
      *
      * Uses Grammar pattern for database-specific SQL compilation.
      *
@@ -2191,7 +2191,7 @@ class QueryBuilder implements QueryBuilderInterface
      * // Simple update
      * DB::table('users')->where('id', 1)->update(['name' => 'John']);
      *
-     * // With raw SQL expression (like Laravel)
+     * // With raw SQL expression (Toporia style)
      * DB::table('users')->where('id', 1)->update([
      *     'views' => DB::raw('views + 1'),
      *     'updated_at' => DB::raw('NOW()')

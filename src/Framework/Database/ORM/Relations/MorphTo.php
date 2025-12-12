@@ -13,7 +13,7 @@ use Toporia\Framework\Database\Query\QueryBuilder;
  * Handles inverse polymorphic relationships.
  * Example: Image morphTo Post/Video (imageable)
  *
- * This implementation follows Laravel's MorphTo architecture:
+ * This implementation follows Toporia's MorphTo architecture:
  * 1. addEagerConstraints() - Build dictionary grouping models by type
  * 2. getEager() - Main eager loading entry point (replaces getResults for eager loading)
  * 3. getResultsByType() - Create FRESH query per morph type
@@ -101,7 +101,7 @@ class MorphTo extends Relation
     }
 
     // =========================================================================
-    // EAGER LOADING - Laravel-compatible implementation
+    // EAGER LOADING - Toporia-style implementation
     // =========================================================================
 
     /**

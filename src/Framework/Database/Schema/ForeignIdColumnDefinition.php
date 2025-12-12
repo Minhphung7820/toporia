@@ -7,7 +7,7 @@ namespace Toporia\Framework\Database\Schema;
 /**
  * Foreign ID Column Definition
  *
- * Extends ColumnDefinition to add constrained() method for Laravel-like syntax.
+ * Extends ColumnDefinition to add constrained() method for fluent syntax.
  * Allows: $table->foreignId('user_id')->constrained()
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
@@ -36,7 +36,7 @@ class ForeignIdColumnDefinition extends ColumnDefinition
     }
 
     /**
-     * Create foreign key constraint using Laravel-like syntax.
+     * Create foreign key constraint using fluent syntax.
      *
      * Infers table name from column name if not provided.
      * Example: 'user_id' -> references 'id' on 'users' table.

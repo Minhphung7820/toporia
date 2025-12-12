@@ -12,7 +12,7 @@ use Toporia\Framework\Http\Exceptions\NotFoundHttpException;
  * Class RouteModelBinding
  *
  * Automatically resolves route parameters to model instances.
- * Provides both implicit and explicit binding similar to Laravel.
+ * Provides both implicit and explicit binding similar to other frameworks.
  *
  * Performance:
  * - O(1) binding resolution via hash lookup

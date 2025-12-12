@@ -44,7 +44,7 @@ use Toporia\Framework\Foundation\ServiceAccessor;
  * // Get named connection
  * DB::connection('mysql')->table('users')->get();
  *
- * // Create raw expression for query building (like Laravel's DB::raw())
+ * // Create raw expression for query building (like Toporia's DB::raw())
  * DB::table('users')
  *     ->select(DB::raw('COUNT(*) as total'))
  *     ->get();

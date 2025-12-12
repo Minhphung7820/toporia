@@ -8,7 +8,7 @@ namespace Toporia\Framework\Http\Contracts;
  * Response Factory Interface
  *
  * Provides a clean interface for creating various types of HTTP responses.
- * Follows Laravel's ResponseFactory pattern for maximum compatibility.
+ * Follows Toporia's ResponseFactory pattern for maximum compatibility.
  *
  * Clean Architecture:
  * - Interface Segregation: Focused on response creation only

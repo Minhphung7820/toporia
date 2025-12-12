@@ -1303,7 +1303,7 @@ class ModelQueryBuilder extends QueryBuilder
     }
 
     // =========================================================================
-    // ADVANCED RELATIONSHIP QUERY METHODS (Laravel 8+ compatible)
+    // ADVANCED RELATIONSHIP QUERY METHODS (ORM-style)
     // =========================================================================
 
     /**
@@ -2075,8 +2075,8 @@ class ModelQueryBuilder extends QueryBuilder
                 "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
                 "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
         } elseif ($relation instanceof MorphToMany) {
-            // Optimized MorphToMany query matching Laravel's structure
-            // Laravel starts from related table (tags) and joins pivot (taggables)
+            // Optimized MorphToMany query matching Toporia's structure
+            // Query starts from related table (tags) and joins pivot (taggables)
             // This is more efficient when filtering by related table columns
             $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
             $morphType = $this->getRelationProperty($relation, 'morphType');
@@ -2089,7 +2089,7 @@ class ModelQueryBuilder extends QueryBuilder
             $relatedTable = $relationQuery->getTable();
             $morphClass = $this->getMorphClassFromRelation($relation);
 
-            // Laravel's structure: SELECT COUNT(*) FROM tags INNER JOIN taggables ON tags.id = taggables.tag_id
+            // Toporia's structure: SELECT COUNT(*) FROM tags INNER JOIN taggables ON tags.id = taggables.tag_id
             // WHERE products.id = taggables.taggable_id AND taggables.taggable_type = ?
             // This is more efficient when filtering by tags because it can use tags table index first
             // Quote morph class value for safe SQL injection prevention
@@ -2273,8 +2273,8 @@ class ModelQueryBuilder extends QueryBuilder
                 "INNER JOIN {$relatedTable} ON {$pivotTable}.{$relatedPivotKey} = {$relatedTable}.{$relatedKey} " .
                 "WHERE {$pivotTable}.{$foreignPivotKey} = {$parentTable}.{$parentKey}";
         } elseif ($relation instanceof MorphToMany) {
-            // Optimized MorphToMany query matching Laravel's structure
-            // Laravel starts from related table (tags) and joins pivot (taggables)
+            // Optimized MorphToMany query matching Toporia's structure
+            // Query starts from related table (tags) and joins pivot (taggables)
             // This is more efficient when filtering by related table columns
             $pivotTable = $this->getRelationProperty($relation, 'pivotTable');
             $morphType = $this->getRelationProperty($relation, 'morphType');
@@ -2287,7 +2287,7 @@ class ModelQueryBuilder extends QueryBuilder
             $relatedTable = $relationQuery->getTable();
             $morphClass = $this->getMorphClassFromRelation($relation);
 
-            // Laravel's structure: SELECT * FROM tags INNER JOIN taggables ON tags.id = taggables.tag_id
+            // Toporia's structure: SELECT * FROM tags INNER JOIN taggables ON tags.id = taggables.tag_id
             // WHERE products.id = taggables.taggable_id AND taggables.taggable_type = ? AND tags.id = ?
             // This is more efficient when filtering by tags because it can use tags table index first
             // Use binding for morph class value instead of inline for better plan cache optimization
@@ -2921,7 +2921,7 @@ class ModelQueryBuilder extends QueryBuilder
      * Filter models that don't have nested relationships.
      *
      * Supports dot notation for nested relationships like 'posts.comments'.
-     * This is a Toporia exclusive feature - superior to Laravel.
+     * This is a Toporia exclusive feature - exclusive feature.
      * Uses optimized EXISTS/NOT EXISTS for maximum performance.
      *
      * @param string $relation Nested relationship using dot notation (e.g., 'posts.comments')
@@ -3455,7 +3455,7 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         // Ensure SoftDeletes is applied if relation model uses it
-        // This is important for withCount/withSum to match Laravel behavior
+        // This is important for withCount/withSum to match standard behavior
         // OPTIMIZED: Use public getRelatedClass() method instead of reflection (O(1) vs O(n))
         $relatedClass = $relationInstance->getRelatedClass();
 
@@ -3939,7 +3939,7 @@ class ModelQueryBuilder extends QueryBuilder
         }
 
         // Ensure SoftDeletes is applied if relation model uses it
-        // This is important for withSum/withAvg/etc to match Laravel behavior
+        // This is important for withSum/withAvg/etc to match standard behavior
         // OPTIMIZED: Use public getRelatedClass() method instead of reflection (O(1) vs O(n))
         $relatedClass = $relationInstance->getRelatedClass();
 

@@ -8,7 +8,7 @@ namespace Toporia\Framework\Http\Exceptions;
  * Class TokenMismatchException
  *
  * 419 Token Mismatch HTTP Exception (CSRF). Used when CSRF token validation fails.
- * Status 419 is a non-standard HTTP status used by Laravel/Symfony to indicate CSRF token mismatch/expired session.
+ * Status 419 is a non-standard HTTP status used by frameworks to indicate CSRF token mismatch/expired session.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework

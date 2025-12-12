@@ -10,7 +10,7 @@ use Closure;
  * Trait BuildsWhereClausesExtended
  *
  * Extended WHERE clause builders for Query Builder.
- * Provides comprehensive WHERE methods matching Laravel's capabilities.
+ * Provides comprehensive WHERE methods matching Toporia's capabilities.
  *
  * Features:
  * - Range queries: whereBetween, whereNotBetween

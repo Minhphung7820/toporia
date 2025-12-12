@@ -257,7 +257,7 @@ class MorphToMany extends Relation
         $isEagerLoading = $this->findWhereInRecursive($wheres, $this->pivotTable);
 
         // If eager loading with limit, use window function for optimal performance
-        // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
+        // This matches Toporia's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
         if ($isEagerLoading) {
             $orders = $this->query->getOrders();
             $limit = $this->query->getLimit();

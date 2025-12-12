@@ -17,7 +17,7 @@ use Toporia\Framework\Realtime\Contracts\ConnectionInterface;
  *       return $user['id'] === (int) $userId;
  *   })->middleware(['auth']);
  *
- *   // With guards option (Laravel-style)
+ *   // With guards option (Toporia-style)
  *   ChannelRoute::channel('orders.{orderId}', function($user, $orderId) {
  *       return (int) $user['id'] === (int) Order::find($orderId)->user_id;
  *   }, ['guards' => ['web', 'admin']]);

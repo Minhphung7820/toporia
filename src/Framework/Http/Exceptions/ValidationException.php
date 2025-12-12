@@ -8,7 +8,7 @@ namespace Toporia\Framework\Http\Exceptions;
  * Class ValidationException
  *
  * 422 Validation Exception. Exception thrown when validation fails.
- * Contains validation errors in a structured format compatible with Laravel's validation responses.
+ * Contains validation errors in a structured format compatible with Toporia's validation responses.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework

@@ -8,7 +8,7 @@ namespace Toporia\Framework\RateLimit;
  * Class Limit
  *
  * Represents a rate limit configuration with max attempts, decay time, and key resolver.
- * Similar to Laravel's Limit class but with enhanced features.
+ * Similar to other frameworks's Limit class but with enhanced features.
  *
  * Usage:
  * ```php

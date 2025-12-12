@@ -9,7 +9,7 @@ use JsonSerializable;
 /**
  * Interface ResourceInterface
  *
- * Contract for API resources (Laravel-style JsonResource).
+ * Contract for API resources (Toporia-style JsonResource).
  * Resources wrap entities for JSON/API responses.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>

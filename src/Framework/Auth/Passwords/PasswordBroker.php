@@ -11,7 +11,7 @@ use Toporia\Framework\Auth\Passwords\Contracts\TokenRepositoryInterface;
 /**
  * Class PasswordBroker
  *
- * Handles password reset flow similar to Laravel's Password Broker.
+ * Handles password reset flow similar to Toporia's Password Broker.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework

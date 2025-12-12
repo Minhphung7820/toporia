@@ -13,7 +13,7 @@ use Toporia\Framework\Testing\Browser\Concerns\WaitsForElements;
 /**
  * Class Browser
  *
- * Browser Testing Class - Provides browser automation similar to Laravel Dusk.
+ * Browser Testing Class - Provides browser automation similar to other frameworks Dusk.
  * Uses WebDriver protocol for browser control with connection pooling, lazy element resolution, and screenshot caching.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>

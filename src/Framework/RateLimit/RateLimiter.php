@@ -10,7 +10,7 @@ use Toporia\Framework\RateLimit\Contracts\RateLimiterInterface;
 /**
  * Class RateLimiter
  *
- * Manages named rate limiters similar to Laravel's RateLimiter.
+ * Manages named rate limiters similar to Toporia's RateLimiter.
  * Allows defining reusable rate limit configurations in ServiceProviders.
  *
  * Usage in ServiceProvider:

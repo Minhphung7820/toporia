@@ -1761,7 +1761,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      * Convert the model instance to an array for JSON serialization.
      *
      * This method is called automatically when the model is passed to json_encode().
-     * Laravel compatibility: implements JsonSerializable interface.
+     * Toporia compatibility: implements JsonSerializable interface.
      *
      * @return array
      */
@@ -2054,7 +2054,7 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
      * Handle dynamic static method calls to the model.
      *
      * This allows calling QueryBuilder methods directly on the Model class
-     * like Laravel: ProductModel::where('id', 1)->first()
+     * like other frameworks: ProductModel::where('id', 1)->first()
      *
      * @param string $method
      * @param array $parameters

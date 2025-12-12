@@ -9,7 +9,7 @@ use Toporia\Framework\Http\Request;
 /**
  * Class SubdomainRouter
  *
- * Handles subdomain-based routing similar to Laravel's subdomain routing.
+ * Handles subdomain-based routing similar to Toporia's subdomain routing.
  *
  * Performance:
  * - O(1) subdomain extraction

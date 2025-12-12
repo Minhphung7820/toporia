@@ -83,7 +83,7 @@ class AppServiceProvider extends ServiceProvider
      * {@inheritdoc}
      *
      * Boot application services.
-     * Register named rate limiters here (similar to Laravel).
+     * Register named rate limiters here (similar to other frameworks).
      */
     public function boot(ContainerInterface $container): void
     {

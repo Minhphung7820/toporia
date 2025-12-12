@@ -181,7 +181,7 @@ class CursorPaginator implements \JsonSerializable
     /**
      * Convert the paginator to an array.
      *
-     * Standard cursor pagination format (similar to Laravel, Stripe, Twitter API).
+     * Standard cursor pagination format (similar to other frameworks, Stripe, Twitter API).
      *
      * @return array<string, mixed>
      */

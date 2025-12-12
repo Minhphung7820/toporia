@@ -14,7 +14,7 @@ use Toporia\Framework\Http\Serialization\Contracts\SerializerInterface;
 /**
  * Response Service Provider
  *
- * Registers enterprise-grade response services with Laravel compatibility.
+ * Registers enterprise-grade response services with Toporia compatibility.
  *
  * Services Registered:
  * - ResponseFactory (singleton)
@@ -94,7 +94,7 @@ final class ResponseServiceProvider extends ServiceProvider
      */
     private function registerResponseMacros(): void
     {
-        // Add Laravel-compatible response macros
+        // Add Toporia-style response macros
         ResponseFactory::macro('api', function (mixed $data = null, string $message = 'Success', int $status = 200) {
             return $this->json([
                 'success' => $status < 400,

@@ -186,7 +186,7 @@ class MorphMany extends Relation
         $isEagerLoading = $this->findWhereInRecursive($wheres, '');
 
         // If eager loading with limit, use window function for optimal performance
-        // This matches Laravel's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
+        // This matches Toporia's behavior: ROW_NUMBER() OVER (PARTITION BY ...)
         // When limit()/take() is used in eager loading, we need per-parent limiting, not global limiting
         // Also supports offset()/skip() for pagination within each parent
         if ($isEagerLoading) {

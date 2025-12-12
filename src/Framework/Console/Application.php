@@ -145,7 +145,7 @@ final class Application
   }
 
   /**
-   * Call a console command programmatically (like Artisan::call in Laravel)
+   * Call a console command programmatically (programmatically)
    *
    * Usage:
    *   $exitCode = $console->call('migrate');

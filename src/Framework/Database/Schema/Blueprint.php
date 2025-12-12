@@ -198,7 +198,7 @@ class Blueprint
 
     /**
      * Add foreign ID column (unsigned big integer).
-     * Modern ORM helper with Laravel-like constrained() support.
+     * Modern ORM helper with fluent constrained() support.
      *
      * Usage:
      * $table->foreignId('user_id')->constrained()
