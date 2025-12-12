@@ -459,7 +459,9 @@ final class RabbitMQQueue implements QueueInterface
             $channel->basic_publish($message, $delayedExchange, $routingKey);
         } else {
             // Fallback: Use TTL + dead letter exchange
-            $delayedQueue = "{$queue}_delayed";
+            // IMPORTANT: Create unique queue per delay value to avoid PRECONDITION_FAILED error
+            // RabbitMQ doesn't allow changing x-message-ttl on existing queues
+            $delayedQueue = "{$queue}_delayed_{$delay}s";
             $this->declareDelayedQueue($delayedQueue, $queue, $delay);
 
             $payload = serialize($job);
