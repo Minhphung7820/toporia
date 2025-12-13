@@ -162,6 +162,10 @@ return [
             'topic' => env('KAFKA_TOPIC_ORDERS', 'orders.events'),
             'partitions' => (int) env('KAFKA_TOPIC_ORDERS_PARTITIONS', 10),
         ],
+        'events.*' => [
+            'topic' => env('KAFKA_TOPIC_EVENTS', 'events.stream'),
+            'partitions' => (int) env('KAFKA_TOPIC_EVENTS_PARTITIONS', 10),
+        ],
         'user.*' => [
             'topic' => env('KAFKA_TOPIC_USER', 'realtime.user'),
             'partitions' => (int) env('KAFKA_TOPIC_USER_PARTITIONS', 10),

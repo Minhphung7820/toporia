@@ -155,7 +155,7 @@ return [
         ],
 
         'kafka' => [
-            'driver' => 'kafka', // or 'kafka-improved' for enhanced version
+            'driver' => 'kafka-improved', // Use enhanced version with backpressure, circuit breaker, metrics
             'client' => env('KAFKA_CLIENT', 'auto'), // php, rdkafka, auto (auto = prefer rdkafka)
             'brokers' => explode(',', env('KAFKA_BROKERS', 'localhost:9092')),
             'topic_prefix' => env('KAFKA_TOPIC_PREFIX', 'realtime'),
@@ -310,14 +310,12 @@ return [
 
         // Common middleware (application-level)
         'auth' => App\Infrastructure\Realtime\Middleware\AuthMiddleware::class,
-        'role' => App\Infrastructure\Realtime\Middleware\RoleMiddleware::class,
 
-        // Business logic middleware
-        'premium' => App\Infrastructure\Realtime\Middleware\PremiumMiddleware::class,
-        'verified' => App\Infrastructure\Realtime\Middleware\VerifiedMiddleware::class,
-        'team' => App\Infrastructure\Realtime\Middleware\TeamMemberMiddleware::class,
-
-        // Add your custom middleware here:
+        // Uncomment and create these middleware classes as needed:
+        // 'role' => App\Infrastructure\Realtime\Middleware\RoleMiddleware::class,
+        // 'premium' => App\Infrastructure\Realtime\Middleware\PremiumMiddleware::class,
+        // 'verified' => App\Infrastructure\Realtime\Middleware\VerifiedMiddleware::class,
+        // 'team' => App\Infrastructure\Realtime\Middleware\TeamMemberMiddleware::class,
         // 'admin' => App\Infrastructure\Realtime\Middleware\AdminMiddleware::class,
         // 'subscription' => App\Infrastructure\Realtime\Middleware\ActiveSubscriptionMiddleware::class,
     ],

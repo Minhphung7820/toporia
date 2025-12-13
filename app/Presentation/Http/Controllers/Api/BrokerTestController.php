@@ -131,6 +131,68 @@ final class BrokerTestController
     }
 
     /**
+     * Debug Kafka publish directly.
+     *
+     * GET /api/broker/debug
+     */
+    public function debug()
+    {
+        $logs = [];
+        $logs[] = "PHP_SAPI: " . PHP_SAPI;
+        $logs[] = "rdkafka extension: " . (extension_loaded('rdkafka') ? 'loaded' : 'NOT loaded');
+
+        if (!extension_loaded('rdkafka')) {
+            return response()->json(['logs' => $logs, 'error' => 'rdkafka not loaded']);
+        }
+
+        // Use KAFKA_BROKERS env var (set in docker-compose.yml as kafka:29092)
+        $brokers = env('KAFKA_BROKERS', 'localhost:9092');
+        $logs[] = "KAFKA_BROKERS: " . $brokers;
+
+        try {
+            $conf = new \RdKafka\Conf();
+            $conf->set('bootstrap.servers', $brokers);
+            $conf->set('metadata.broker.list', $brokers);
+
+            $deliveryLog = null;
+            $conf->setDrMsgCb(function ($kafka, $message) use (&$deliveryLog) {
+                if ($message->err) {
+                    $deliveryLog = "ERROR: " . rd_kafka_err2str($message->err);
+                } else {
+                    $deliveryLog = "OK: topic={$message->topic_name}, partition={$message->partition}, offset={$message->offset}";
+                }
+            });
+
+            $producer = new \RdKafka\Producer($conf);
+            $producer->addBrokers($brokers);
+            $logs[] = "Producer created";
+
+            $topic = $producer->newTopic('realtime');
+            $logs[] = "Topic created";
+
+            $payload = json_encode(['test' => 'http_debug', 'sapi' => PHP_SAPI, 'time' => time()]);
+            $topic->produce(RD_KAFKA_PARTITION_UA, 0, $payload, 'events.stream');
+            $logs[] = "Message produced";
+
+            $producer->poll(0);
+            $logs[] = "Poll(0) done";
+
+            $result = $producer->flush(5000);
+            $logs[] = "Flush result: " . ($result === RD_KAFKA_RESP_ERR_NO_ERROR ? 'SUCCESS' : rd_kafka_err2str($result));
+            $logs[] = "OutQLen after flush: " . $producer->getOutQLen();
+            $logs[] = "Delivery callback: " . ($deliveryLog ?? 'NOT CALLED');
+
+            return response()->json([
+                'success' => $result === RD_KAFKA_RESP_ERR_NO_ERROR,
+                'logs' => $logs
+            ]);
+        } catch (\Throwable $e) {
+            $logs[] = "Exception: " . $e->getMessage();
+            return response()->json(['success' => false, 'logs' => $logs, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Health check for all brokers.
      *
      * GET /api/broker/health
