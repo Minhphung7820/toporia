@@ -46,5 +46,12 @@ final class ScheduleServiceProvider extends ServiceProvider
             ->timezone('Asia/Ho_Chi_Minh')
             ->withoutOverlapping()
             ->description('Send daily email notification every 10 minutes');
+
+        // Security: Cleanup expired nonces from sessions (hourly)
+        // Prevents session bloat from accumulated replay attack protection nonces
+        $scheduler->command('security:cleanup')
+            ->hourly()
+            ->withoutOverlapping()
+            ->description('Cleanup expired security nonces');
     }
 }

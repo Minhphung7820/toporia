@@ -335,17 +335,25 @@ final class FileSessionDriver implements SessionStoreInterface
     /**
      * Ensure session directory exists with proper permissions.
      *
+     * SECURITY: Uses 0700 permissions (owner only) to prevent
+     * other users on the server from reading session files.
+     * This prevents session hijacking via file system access.
+     *
      * @return void
      */
     private function ensureDirectoryExists(): void
     {
         if (!is_dir($this->path)) {
-            mkdir($this->path, 0777, true);
+            // SECURITY: 0700 = only owner can read/write/execute
+            mkdir($this->path, 0700, true);
         }
 
-        // Ensure directory is writable
+        // Ensure directory is writable by owner
         if (!is_writable($this->path)) {
-            @chmod($this->path, 0777);
+            // Try 0700 first (secure), fallback to 0770 for group scenarios
+            if (!@chmod($this->path, 0700)) {
+                @chmod($this->path, 0770);
+            }
         }
     }
 }

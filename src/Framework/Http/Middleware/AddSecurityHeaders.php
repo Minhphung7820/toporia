@@ -34,14 +34,15 @@ final class AddSecurityHeaders extends AbstractMiddleware
     public function __construct(array $config = [])
     {
         $this->config = array_merge($this->getDefaultConfig(), $config);
-        // Generate cryptographically secure nonce for this request
-        $this->nonce = base64_encode(random_bytes(16));
+        // Use shared nonce from csp_nonce() helper for consistency across request
+        // This ensures templates and CSP header use the same nonce
+        $this->nonce = csp_nonce();
     }
 
     /**
      * Get the CSP nonce for this request.
      *
-     * Use this in Blade templates: <script nonce="{{ csp_nonce() }}">
+     * Use this in templates: <script nonce="<?= csp_nonce() ?>">
      *
      * @return string Base64-encoded nonce
      */

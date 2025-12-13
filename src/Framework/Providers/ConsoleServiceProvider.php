@@ -157,6 +157,9 @@ final class ConsoleServiceProvider extends ServiceProvider
       // Search
       'search:reindex' => \Toporia\Framework\Console\Commands\ReindexSearchCommand::class,
 
+      // Security commands
+      'security:cleanup' => \Toporia\Framework\Console\Commands\SecurityCleanupCommand::class,
+
       // Optimization commands
       'optimize' => \Toporia\Framework\Console\Commands\Optimize\OptimizeCommand::class,
       'optimize:clear' => \Toporia\Framework\Console\Commands\Optimize\OptimizeClearCommand::class,

@@ -253,6 +253,44 @@ if (!function_exists('csrf_field')) {
     }
 }
 
+if (!function_exists('csp_nonce')) {
+    /**
+     * Get or generate the CSP nonce for inline scripts/styles.
+     *
+     * SECURITY: Use this in templates with inline scripts/styles:
+     *   <script nonce="<?= csp_nonce() ?>">...</script>
+     *   <style nonce="<?= csp_nonce() ?>">...</style>
+     *
+     * The nonce is generated once per request and stored in the container.
+     * This allows the same nonce to be used across multiple inline elements.
+     *
+     * @return string Base64-encoded nonce
+     */
+    function csp_nonce(): string
+    {
+        static $nonce = null;
+
+        if ($nonce === null) {
+            // Try to get from AddSecurityHeaders middleware if it's been processed
+            try {
+                $container = app();
+                if ($container->has('csp_nonce')) {
+                    $nonce = $container->get('csp_nonce');
+                } else {
+                    // Generate and store for this request
+                    $nonce = base64_encode(random_bytes(16));
+                    $container->instance('csp_nonce', $nonce);
+                }
+            } catch (\Throwable $e) {
+                // Fallback: generate nonce without storing
+                $nonce = base64_encode(random_bytes(16));
+            }
+        }
+
+        return $nonce;
+    }
+}
+
 if (!function_exists('cache')) {
     /**
      * Get the cache service or get/set a cached value.
