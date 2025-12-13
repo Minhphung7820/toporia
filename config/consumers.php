@@ -57,7 +57,7 @@ return [
     */
     'discovery' => [
         // Enable auto-discovery from these paths:
-        // base_path('src/App/Infrastructure/Consumers') => 'Toporia\\App\\Infrastructure\\Consumers',
+        // base_path('app/Infrastructure/Consumers') => 'App\\Infrastructure\\Consumers',
     ],
 
     /*

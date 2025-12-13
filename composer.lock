@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "65cdfaf379f2464d5948d24b85b974a2",
+    "content-hash": "cb2cb892a09d373eeb29ae3903fee4b2",
     "packages": [
         {
             "name": "amphp/amp",
@@ -2322,6 +2322,64 @@
                 }
             ],
             "time": "2024-12-23T08:48:59+00:00"
+        },
+        {
+            "name": "toporia/framework",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/framework",
+                "reference": "48cf569309cf56791e86a1bc2a25441656eb0957"
+            },
+            "require": {
+                "php": ">=8.1",
+                "psr/container": "^2.0"
+            },
+            "suggest": {
+                "aws/aws-sdk-php": "Required for AWS S3 storage",
+                "elasticsearch/elasticsearch": "Required for Elasticsearch search",
+                "ext-pcntl": "Required for multi-process execution (Linux/macOS)",
+                "ext-pdo_mysql": "Required for MySQL database support",
+                "ext-pdo_pgsql": "Required for PostgreSQL database support",
+                "ext-pdo_sqlite": "Required for SQLite database support",
+                "ext-redis": "Required for Redis cache/session/queue drivers",
+                "openspout/openspout": "High-performance Excel streaming",
+                "php-amqplib/php-amqplib": "Required for RabbitMQ queue/broker",
+                "phpmailer/phpmailer": "Required for email functionality",
+                "phpoffice/phpspreadsheet": "Required for Excel import/export"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "1.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\Framework\\": "src/"
+                },
+                "files": [
+                    "src/Support/helpers.php"
+                ]
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Toporia\\Framework\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Phungtruong7820",
+                    "email": "minhphung485@gmail.com"
+                }
+            ],
+            "description": "Toporia Framework - A modern PHP framework with Clean Architecture",
+            "transport-options": {
+                "relative": true
+            }
         }
     ],
     "packages-dev": [
@@ -4339,9 +4397,11 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "stable",
-    "stability-flags": {},
-    "prefer-stable": false,
+    "minimum-stability": "dev",
+    "stability-flags": {
+        "toporia/framework": 20
+    },
+    "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.1"

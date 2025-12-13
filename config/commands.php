@@ -56,7 +56,7 @@ return [
         'enabled' => false, // Set to true to enable auto-discovery
         'paths' => [
             // Directories to scan for commands
-            base_path('src/App/Presentation/Console/Commands'),
+            base_path('app/Presentation/Console/Commands'),
         ],
         'namespaces' => [
             // Corresponding namespaces
