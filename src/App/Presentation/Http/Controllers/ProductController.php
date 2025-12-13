@@ -123,9 +123,9 @@ final class ProductController extends BaseController
             ->whereHas('allTags', function ($q) {
                 $q->where('tags.id', 17);
             })
-            ->optimizeForLargeResults()
+            // ->optimizeForLargeResults()
             ->orderBy('id', 'DESC') // Cursor column must be ordered
-            ->cursorPaginate($perPage, ['cursor' => $cursor], ['path' => $path, 'baseUrl' => $baseUrl]);
+            ->paginate($perPage);
         $queries = $this->formatQueryLogs(DB::getQueryLog());
         $singleProduct = [
             'queries' => $queries,
