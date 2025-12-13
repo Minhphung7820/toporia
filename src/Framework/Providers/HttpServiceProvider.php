@@ -34,21 +34,10 @@ class HttpServiceProvider extends ServiceProvider
      */
     public function register(ContainerInterface $container): void
     {
-        // Request - Created per request with Session dependency injection
-        $container->bind(RequestInterface::class, function ($c) {
-            $request = Request::capture();
-
-            // Inject session if available
-            try {
-                $session = $c->get('session');
-                $request->setSession($session);
-            } catch (\Throwable $e) {
-                // Session not available, continue without it
-            }
-
-            return $request;
-        });
-
+        // Request - Created per request
+        // Note: Session is injected lazily by StartSession middleware, NOT here
+        // This keeps SessionServiceProvider deferred for API routes
+        $container->bind(RequestInterface::class, fn() => Request::capture());
         $container->bind(Request::class, fn($c) => $c->get(RequestInterface::class));
         $container->bind('request', fn($c) => $c->get(RequestInterface::class));
 

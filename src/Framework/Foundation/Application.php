@@ -104,15 +104,17 @@ class Application
     /**
      * Setup automatic resolution of deferred services.
      *
-     * Registers a global resolving callback that loads deferred providers
-     * when their services are requested.
+     * Registers a before resolving callback that loads deferred providers
+     * when their services are requested from the container.
      *
      * @return void
      */
     private function setupDeferredServiceResolution(): void
     {
-        // Deferred providers are loaded on-demand via loadDeferredProviderIfNeeded()
-        // which is called in make() and makeWith() methods
+        // Register callback to load deferred providers when container resolves services
+        $this->container->beforeResolving(function (string $abstract) {
+            $this->loadDeferredProviderIfNeeded($abstract);
+        });
     }
 
     /**

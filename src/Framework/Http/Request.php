@@ -91,19 +91,14 @@ final class Request implements RequestInterface
     /**
      * Create a Request instance from PHP globals.
      *
+     * Note: Session is NOT injected here to keep SessionServiceProvider deferred.
+     * Session is injected lazily by StartSession middleware for web routes.
+     *
      * @return self
      */
     public static function capture(): self
     {
-        // Get session from container if available
-        $session = null;
-        try {
-            $session = app('session');
-        } catch (\Throwable $e) {
-            // Session not available, continue without it
-        }
-
-        $request = new self($session);
+        $request = new self();
 
         // Method
         $request->method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');

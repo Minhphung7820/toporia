@@ -147,6 +147,11 @@ final class Container implements ContainerInterface
     private array $resolving = [];
 
     /**
+     * @var array<callable> Before resolving callbacks (called before resolution)
+     */
+    private array $beforeResolvingCallbacks = [];
+
+    /**
      * @var array<string, mixed> Build stack with parameters
      */
     private array $with = [];
@@ -206,6 +211,9 @@ final class Container implements ContainerInterface
     {
         // Resolve alias
         $abstract = $this->getAlias($abstract);
+
+        // Fire before resolving callbacks (for deferred provider loading)
+        $this->fireBeforeResolvingCallbacks($abstract);
 
         // Check if already resolved as singleton
         if (isset($this->instances[$abstract])) {
@@ -573,6 +581,32 @@ final class Container implements ContainerInterface
             $this->globalResolvingCallbacks[] = $abstract;
         } else {
             $this->resolvingCallbacks[$abstract][] = $callback;
+        }
+    }
+
+    /**
+     * Register a callback to be called before resolving a service.
+     *
+     * This is useful for loading deferred service providers on-demand.
+     *
+     * @param Closure $callback Callback receives the abstract being resolved
+     * @return void
+     */
+    public function beforeResolving(Closure $callback): void
+    {
+        $this->beforeResolvingCallbacks[] = $callback;
+    }
+
+    /**
+     * Fire before resolving callbacks.
+     *
+     * @param string $abstract Service being resolved
+     * @return void
+     */
+    private function fireBeforeResolvingCallbacks(string $abstract): void
+    {
+        foreach ($this->beforeResolvingCallbacks as $callback) {
+            $callback($abstract, $this);
         }
     }
 
