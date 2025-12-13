@@ -166,4 +166,3 @@ CLAUDE.md
 # examples/ - Removed (was not used)
 # Uncomment if you want to ignore docs
 #docs/*.log
-packages/framework
