@@ -26,10 +26,8 @@ use Toporia\Framework\Realtime\Contracts\RealtimeManagerInterface;
  */
 final class RealtimeServiceProvider extends ServiceProvider
 {
-    /**
-     * Indicates if loading of the provider is deferred.
-     */
-    protected bool $defer = true;
+    // Note: Realtime should NOT be deferred because:
+    // Console commands need it (realtime:serve, realtime:stop, realtime:health)
 
     /**
      * Container instance.
@@ -37,20 +35,6 @@ final class RealtimeServiceProvider extends ServiceProvider
      * @var ContainerInterface|null
      */
     protected ?ContainerInterface $container = null;
-
-    /**
-     * Get the services provided by the provider.
-     *
-     * @return array<string>
-     */
-    public function provides(): array
-    {
-        return [
-            RealtimeManager::class,
-            RealtimeManagerInterface::class,
-            'realtime',
-        ];
-    }
 
     /**
      * {@inheritdoc}

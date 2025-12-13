@@ -27,26 +27,9 @@ use Toporia\Framework\Queue\Contracts\QueueInterface;
  */
 final class MailServiceProvider extends ServiceProvider
 {
-    /**
-     * Indicates if loading of the provider is deferred.
-     */
-    protected bool $defer = true;
-
-    /**
-     * Get the services provided by the provider.
-     *
-     * @return array<string>
-     */
-    public function provides(): array
-    {
-        return [
-            MailManager::class,
-            MailManagerInterface::class,
-            MailerInterface::class,
-            'mailer',
-            'mail',
-        ];
-    }
+    // Note: Mail should NOT be deferred because:
+    // 1. Queue workers need MailManagerInterface for SendEmailJob
+    // 2. Deferred providers don't load properly in queue context
 
     /**
      * {@inheritdoc}

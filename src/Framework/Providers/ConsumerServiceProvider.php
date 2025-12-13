@@ -27,28 +27,13 @@ use Toporia\Framework\Realtime\Consumer\ConsumerProcessManager;
  */
 final class ConsumerServiceProvider extends ServiceProvider
 {
-    /**
-     * Indicates if loading of the provider is deferred.
-     */
-    protected bool $defer = true;
+    // Note: Consumer should NOT be deferred because:
+    // Console commands need it (broker:consume, broker:consumers, etc.)
 
     /**
      * Track if handlers have been registered.
      */
     private static bool $handlersRegistered = false;
-
-    /**
-     * Get the services provided by the provider.
-     *
-     * @return array<string>
-     */
-    public function provides(): array
-    {
-        return [
-            ConsumerHandlerRegistry::class,
-            ConsumerProcessManager::class,
-        ];
-    }
 
     /**
      * {@inheritdoc}
