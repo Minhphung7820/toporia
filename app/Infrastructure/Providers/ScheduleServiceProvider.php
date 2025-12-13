@@ -47,11 +47,7 @@ final class ScheduleServiceProvider extends ServiceProvider
             ->withoutOverlapping()
             ->description('Send daily email notification every 10 minutes');
 
-        // Security: Cleanup expired nonces from sessions (hourly)
-        // Prevents session bloat from accumulated replay attack protection nonces
-        $scheduler->command('security:cleanup')
-            ->hourly()
-            ->withoutOverlapping()
-            ->description('Cleanup expired security nonces');
+        // Note: security:cleanup command removed because session-based nonces
+        // are automatically cleaned up when session expires. No need for manual cleanup.
     }
 }

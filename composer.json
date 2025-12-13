@@ -11,7 +11,7 @@
     ],
     "require": {
         "php": ">=8.1",
-        "toporia/framework": "@dev",
+        "toporia/framework": "^1.0@dev",
         "phpmailer/phpmailer": "^7.0",
         "aws/aws-sdk-php": "^3.359",
         "php-amqplib/php-amqplib": "^3.0",
@@ -46,6 +46,12 @@
             "Tests\\": "tests/"
         }
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/framework"
+        }
+    ],
     "config": {
         "allow-plugins": {
             "php-http/discovery": true

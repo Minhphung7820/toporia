@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import toporiaVitePlugin from './src/Framework/Support/Vite/ToporiaVitePlugin.js';
+import toporiaVitePlugin from './packages/framework/src/Support/Vite/ToporiaVitePlugin.js';
 
 /**
  * Vite Configuration for Toporia Framework
