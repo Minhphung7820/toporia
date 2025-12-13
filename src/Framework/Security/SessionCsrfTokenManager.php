@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Toporia\Framework\Security;
 
 use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
+use Toporia\Framework\Session\Store;
 
 /**
  * Class SessionCsrfTokenManager
  *
  * Session-based CSRF token manager.
  * Stores CSRF tokens in the session for validation using cryptographically secure random tokens.
+ *
+ * Uses framework's Store class instead of $_SESSION superglobal for consistency
+ * and to support different session drivers (file, redis, database, etc.).
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
@@ -25,6 +29,10 @@ use Toporia\Framework\Security\Contracts\CsrfTokenManagerInterface;
 final class SessionCsrfTokenManager implements CsrfTokenManagerInterface
 {
     private const SESSION_KEY_PREFIX = '_csrf_';
+
+    public function __construct(
+        private Store $session
+    ) {}
 
     public function generate(string $key = '_token'): string
     {
@@ -54,13 +62,13 @@ final class SessionCsrfTokenManager implements CsrfTokenManagerInterface
     public function remove(string $key = '_token'): void
     {
         $sessionKey = $this->getSessionKey($key);
-        unset($_SESSION[$sessionKey]);
+        $this->session->remove($sessionKey);
     }
 
     public function getToken(string $key = '_token'): ?string
     {
         $sessionKey = $this->getSessionKey($key);
-        return $_SESSION[$sessionKey] ?? null;
+        return $this->session->get($sessionKey);
     }
 
     /**
@@ -83,7 +91,7 @@ final class SessionCsrfTokenManager implements CsrfTokenManagerInterface
     private function storeToken(string $key, string $token): void
     {
         $sessionKey = $this->getSessionKey($key);
-        $_SESSION[$sessionKey] = $token;
+        $this->session->set($sessionKey, $token);
     }
 
     /**

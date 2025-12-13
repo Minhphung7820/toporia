@@ -6,6 +6,7 @@ namespace Toporia\Framework\Socialite;
 
 use Toporia\Framework\Socialite\Contracts\ProviderInterface;
 use Toporia\Framework\Http\{Request, Contracts\HttpClientInterface};
+use Toporia\Framework\Session\Store;
 use Toporia\Framework\Support\Str;
 
 /**
@@ -154,20 +155,24 @@ abstract class AbstractProvider implements ProviderInterface
     }
 
     /**
-     * Store state in session.
+     * Store state in session using framework's Store class.
      *
      * @param string $state State string
      * @return void
      */
     protected function storeState(string $state): void
     {
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION['socialite_state'] = $state;
+        try {
+            /** @var Store $session */
+            $session = app(Store::class);
+            $session->set('socialite_state', $state);
+        } catch (\Throwable $e) {
+            // Session not available, skip storing state
         }
     }
 
     /**
-     * Verify state from session.
+     * Verify state from session using framework's Store class.
      *
      * @param string|null $state State to verify
      * @return bool True if valid
@@ -178,10 +183,16 @@ abstract class AbstractProvider implements ProviderInterface
             return false;
         }
 
-        $storedState = $_SESSION['socialite_state'] ?? null;
-        unset($_SESSION['socialite_state']);
+        try {
+            /** @var Store $session */
+            $session = app(Store::class);
+            $storedState = $session->get('socialite_state');
+            $session->remove('socialite_state');
 
-        return hash_equals($storedState ?? '', $state);
+            return hash_equals($storedState ?? '', $state);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**

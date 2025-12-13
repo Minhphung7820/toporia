@@ -15,6 +15,7 @@ use App\Presentation\Http\Controllers\BaseController;
 use Toporia\Framework\Http\Contracts\JsonResponseInterface;
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Http\Response;
+use Toporia\Framework\Session\Store;
 use Toporia\Framework\Support\Accessors\Auth;
 
 /**
@@ -32,7 +33,8 @@ final class AuthController extends BaseController
         private readonly LoginService $loginService,
         private readonly ForgotPasswordService $forgotPasswordService,
         private readonly ResetPasswordService $resetPasswordService,
-        private readonly ChangePasswordService $changePasswordService
+        private readonly ChangePasswordService $changePasswordService,
+        private readonly Store $session
     ) {
         parent::__construct($request, $response);
     }
@@ -149,8 +151,8 @@ final class AuthController extends BaseController
             ], 401);
         }
 
-        // Regenerate session ID (security best practice)
-        session_regenerate_id(true);
+        // Regenerate session ID using framework's Store (security best practice)
+        $this->session->regenerate(true);
 
         return $this->json([
             'success' => true,

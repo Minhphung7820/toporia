@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Toporia\Framework\Http;
 
 use Toporia\Framework\Http\Contracts\RedirectResponseInterface;
+use Toporia\Framework\Session\Store;
 use Toporia\Framework\Support\Macroable;
 
 /**
@@ -174,7 +175,7 @@ final class RedirectResponse extends Response implements RedirectResponseInterfa
     }
 
     /**
-     * Flash data to session.
+     * Flash data to session using framework's Store class.
      *
      * @return void
      */
@@ -184,14 +185,18 @@ final class RedirectResponse extends Response implements RedirectResponseInterfa
             return;
         }
 
-        // Start session if not already started
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        // Get session from container
+        try {
+            /** @var Store $session */
+            $session = app(Store::class);
 
-        // Flash each piece of data
-        foreach ($this->flashData as $key => $value) {
-            $_SESSION["_flash_{$key}"] = $value;
+            // Flash each piece of data
+            foreach ($this->flashData as $key => $value) {
+                $session->setFlash($key, $value);
+            }
+        } catch (\Throwable $e) {
+            // Session not available, skip flashing
+            // This can happen in console or API contexts
         }
     }
 }

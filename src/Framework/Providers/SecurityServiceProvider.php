@@ -12,6 +12,7 @@ use Toporia\Framework\Auth\Contracts\{AuthManagerInterface, GateContract};
 use Toporia\Framework\Auth\Access\Gate;
 use Toporia\Framework\Http\CookieJar;
 use Toporia\Framework\RateLimit\{CacheRateLimiter, Contracts\RateLimiterInterface, RateLimiter};
+use Toporia\Framework\Session\Store;
 
 /**
  * Class SecurityServiceProvider
@@ -32,9 +33,10 @@ final class SecurityServiceProvider extends ServiceProvider
 {
     public function register(ContainerInterface $container): void
     {
-        // CSRF Token Manager
-        $container->singleton(CsrfTokenManagerInterface::class, function () {
-            return new SessionCsrfTokenManager();
+        // CSRF Token Manager (requires Store from SessionServiceProvider)
+        $container->singleton(CsrfTokenManagerInterface::class, function ($c) {
+            $session = $c->get(Store::class);
+            return new SessionCsrfTokenManager($session);
         });
 
         $container->bind('csrf', fn($c) => $c->get(CsrfTokenManagerInterface::class));
@@ -62,9 +64,10 @@ final class SecurityServiceProvider extends ServiceProvider
 
         $container->bind('xss', fn($c) => $c->get(XssService::class));
 
-        // Replay Attack Protection
-        $container->singleton(ReplayAttackProtectionInterface::class, function () {
-            return new SessionReplayAttackProtection();
+        // Replay Attack Protection (requires Store from SessionServiceProvider)
+        $container->singleton(ReplayAttackProtectionInterface::class, function ($c) {
+            $session = $c->get(Store::class);
+            return new SessionReplayAttackProtection($session);
         });
 
         $container->bind('replay', fn($c) => $c->get(ReplayAttackProtectionInterface::class));

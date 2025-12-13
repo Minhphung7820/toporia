@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Toporia\Framework\Security;
 
 use Toporia\Framework\Security\Contracts\ReplayAttackProtectionInterface;
+use Toporia\Framework\Session\Store;
 
 /**
  * Class SessionReplayAttackProtection
  *
  * Prevents replay attacks by generating unique nonces with timestamps,
  * storing used nonces in session, and validating nonce expiration.
+ *
+ * Uses framework's Store class instead of $_SESSION superglobal for consistency
+ * and to support different session drivers (file, redis, database, etc.).
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
@@ -27,6 +31,10 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
     private const SESSION_KEY_PREFIX = '_replay_nonce_';
     private const NONCE_SEPARATOR = ':';
     private const DEFAULT_TTL = 300; // 5 minutes
+
+    public function __construct(
+        private Store $session
+    ) {}
 
     /**
      * Generate a new nonce with timestamp.
@@ -130,16 +138,15 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
     {
         $cleaned = 0;
         $currentTime = now()->getTimestamp();
-        $sessionKey = $this->getSessionKey('*');
 
-        // Get all nonce keys
-        $allKeys = array_keys($_SESSION);
-        $nonceKeys = array_filter($allKeys, function ($key) {
-            return strpos($key, self::SESSION_KEY_PREFIX) === 0;
+        // Get all session data
+        $allData = $this->session->all();
+        $nonceKeys = array_filter(array_keys($allData), function ($key) {
+            return str_starts_with($key, self::SESSION_KEY_PREFIX);
         });
 
         foreach ($nonceKeys as $key) {
-            $nonceData = $_SESSION[$key] ?? null;
+            $nonceData = $allData[$key] ?? null;
 
             if ($nonceData === null) {
                 continue;
@@ -147,7 +154,7 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
 
             // Check if expired
             if (isset($nonceData['expires_at']) && $nonceData['expires_at'] < $currentTime) {
-                unset($_SESSION[$key]);
+                $this->session->remove($key);
                 $cleaned++;
             }
         }
@@ -196,7 +203,7 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
     private function isNonceUsed(string $token): bool
     {
         $sessionKey = $this->getSessionKey($token);
-        return isset($_SESSION[$sessionKey]);
+        return $this->session->has($sessionKey);
     }
 
     /**
@@ -211,10 +218,10 @@ final class SessionReplayAttackProtection implements ReplayAttackProtectionInter
     private function markNonceAsUsed(string $token, int $expiresAt): void
     {
         $sessionKey = $this->getSessionKey($token);
-        $_SESSION[$sessionKey] = [
+        $this->session->set($sessionKey, [
             'used_at' => now()->getTimestamp(),
             'expires_at' => $expiresAt,
-        ];
+        ]);
     }
 
     /**

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Toporia\Framework\Socialite\Controllers;
 
 use Toporia\Framework\Http\{Request, RedirectResponse};
+use Toporia\Framework\Session\Store;
 use Toporia\Framework\Socialite\SocialiteManager;
 
 /**
  * Class SocialiteController
  *
  * Handles OAuth authentication flows.
+ * Uses framework's Store class for session management.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
@@ -26,9 +28,11 @@ final class SocialiteController
 {
     /**
      * @param SocialiteManager $socialite Socialite manager
+     * @param Store $session Session store
      */
     public function __construct(
-        private SocialiteManager $socialite
+        private SocialiteManager $socialite,
+        private Store $session
     ) {}
 
     /**
@@ -60,10 +64,8 @@ final class SocialiteController
             $user = $driver->user($request);
 
             // Store user data in session for application to handle
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                $_SESSION['socialite_user'] = $user->toArray();
-                $_SESSION['socialite_provider'] = $provider;
-            }
+            $this->session->set('socialite_user', $user->toArray());
+            $this->session->set('socialite_provider', $provider);
 
             // Redirect to application's callback handler
             $redirectUrl = $request->input('redirect') ?? '/auth/socialite/success';
@@ -73,9 +75,7 @@ final class SocialiteController
             // Redirect to error page
             $redirectUrl = $request->input('redirect_error') ?? '/auth/socialite/error';
 
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                $_SESSION['socialite_error'] = $e->getMessage();
-            }
+            $this->session->set('socialite_error', $e->getMessage());
 
             return new RedirectResponse($redirectUrl);
         }
