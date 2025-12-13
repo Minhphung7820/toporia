@@ -83,10 +83,8 @@ final class SecurityServiceProvider extends ServiceProvider
 
     public function boot(ContainerInterface $container): void
     {
-        // Start session if not already started
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        // Note: Session is started lazily by StartSession middleware
+        // Do NOT call session_start() here - it adds unnecessary overhead
 
         // Set RateLimiter instance for named limiters
         // This allows AppServiceProvider to register named limiters
