@@ -28,6 +28,27 @@ use Toporia\Framework\Queue\Contracts\QueueInterface;
 final class MailServiceProvider extends ServiceProvider
 {
     /**
+     * Indicates if loading of the provider is deferred.
+     */
+    protected bool $defer = true;
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array<string>
+     */
+    public function provides(): array
+    {
+        return [
+            MailManager::class,
+            MailManagerInterface::class,
+            MailerInterface::class,
+            'mailer',
+            'mail',
+        ];
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function register(ContainerInterface $container): void

@@ -13,8 +13,8 @@ declare(strict_types=1);
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
-// Start session
-session_start();
+// Note: Session is started lazily by SessionMiddleware when needed
+// DO NOT call session_start() here - it adds ~5-10ms overhead per request
 
 /*
 |--------------------------------------------------------------------------

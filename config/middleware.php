@@ -16,6 +16,7 @@ use Toporia\Framework\Http\Middleware\CsrfProtection;
 use Toporia\Framework\Http\Middleware\ReplayAttackProtection;
 use Toporia\Framework\Http\Middleware\HandleCors;
 use Toporia\Framework\Http\Middleware\ThrottleRequests;
+use Toporia\Framework\Session\Middleware\StartSession;
 
 return [
     /*
@@ -36,6 +37,7 @@ return [
         'web' => [
             // Web routes middleware
             // Auto-wiring: Framework automatically resolves dependencies from container
+            StartSession::class,      // Start session (lazy - only for web routes)
             AddSecurityHeaders::class,
             CsrfProtection::class,  // Auto-wires: csrf service, config
             ReplayAttackProtection::class,  // Auto-wires: replay service, config

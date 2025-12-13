@@ -28,6 +28,27 @@ use Toporia\Framework\Search\SearchManager;
  */
 final class SearchServiceProvider extends ServiceProvider
 {
+    /**
+     * Indicates if loading of the provider is deferred.
+     */
+    protected bool $defer = true;
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array<string>
+     */
+    public function provides(): array
+    {
+        return [
+            Client::class,
+            SearchClientInterface::class,
+            SearchIndexerInterface::class,
+            SearchManager::class,
+            'search',
+        ];
+    }
+
     public function register(ContainerInterface $container): void
     {
         /** @var \Elastic\Elasticsearch\Client */

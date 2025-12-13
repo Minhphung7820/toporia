@@ -8,11 +8,15 @@ use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Session\SessionManager;
 use Toporia\Framework\Session\Store;
+use Toporia\Framework\Session\Middleware\StartSession;
 
 /**
  * Class SessionServiceProvider
  *
  * Registers session management services.
+ *
+ * Session is started lazily by StartSession middleware (added to 'web' group),
+ * not automatically on every request. This improves performance for API routes.
  *
  * @author      Phungtruong7820 <minhphung485@gmail.com>
  * @copyright   Copyright (c) 2025 Toporia Framework
@@ -26,6 +30,30 @@ use Toporia\Framework\Session\Store;
  */
 final class SessionServiceProvider extends ServiceProvider
 {
+    /**
+     * Indicates if loading of the provider is deferred.
+     *
+     * Session is only needed for web routes (via StartSession middleware),
+     * not for API routes or console commands.
+     */
+    protected bool $defer = true;
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array<string>
+     */
+    public function provides(): array
+    {
+        return [
+            SessionManager::class,
+            Store::class,
+            StartSession::class,
+            'session.manager',
+            'session',
+        ];
+    }
+
     public function register(ContainerInterface $container): void
     {
         // Session Manager
@@ -55,15 +83,16 @@ final class SessionServiceProvider extends ServiceProvider
         });
 
         $container->bind('session', fn($c) => $c->get(Store::class));
+
+        // StartSession middleware
+        $container->bind(StartSession::class, function ($c) {
+            return new StartSession($c->get(Store::class));
+        });
     }
 
     public function boot(ContainerInterface $container): void
     {
-        // Start session automatically
-        if ($container->has('session')) {
-            $session = $container->get('session');
-            $session->start();
-        }
+        // Session is started by StartSession middleware, not here.
+        // This allows API routes to skip session entirely for better performance.
     }
 }
-

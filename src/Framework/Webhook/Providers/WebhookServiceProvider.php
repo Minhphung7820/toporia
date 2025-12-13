@@ -30,6 +30,29 @@ use Toporia\Framework\Webhook\Contracts\{WebhookDispatcherInterface, WebhookRece
 final class WebhookServiceProvider extends ServiceProvider
 {
     /**
+     * Indicates if loading of the provider is deferred.
+     */
+    protected bool $defer = true;
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array<string>
+     */
+    public function provides(): array
+    {
+        return [
+            SignatureGeneratorInterface::class,
+            WebhookDispatcherInterface::class,
+            WebhookReceiverInterface::class,
+            WebhookManager::class,
+            'webhook',
+            'webhook.dispatcher',
+            'webhook.receiver',
+        ];
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function register(ContainerInterface $container): void

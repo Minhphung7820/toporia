@@ -27,6 +27,24 @@ use Toporia\Framework\Http\Contracts\HttpClientInterface;
 final class SocialiteServiceProvider extends ServiceProvider
 {
     /**
+     * Indicates if loading of the provider is deferred.
+     */
+    protected bool $defer = true;
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array<string>
+     */
+    public function provides(): array
+    {
+        return [
+            SocialiteManager::class,
+            'socialite',
+        ];
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function register(ContainerInterface $container): void
