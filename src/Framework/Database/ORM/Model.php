@@ -1896,6 +1896,16 @@ abstract class Model implements ModelInterface, ObservableInterface, \JsonSerial
     }
 
     /**
+     * Get all loaded relations.
+     *
+     * @return array<string, mixed>
+     */
+    public function getRelations(): array
+    {
+        return $this->relations;
+    }
+
+    /**
      * Create a typed collection for this model type.
      *
      * @param array<int,static> $models
