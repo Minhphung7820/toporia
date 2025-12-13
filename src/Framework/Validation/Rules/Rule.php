@@ -450,13 +450,9 @@ final class Rule
         return new Exists($table, $column, $connection);
     }
 
-    public static function unique(
-        string $table,
-        ?string $column = null,
-        mixed $ignoreId = null,
-        mixed $connection = null
-    ): Unique {
-        return new Unique($table, $column, $ignoreId, $connection);
+    public static function unique(string $table, ?string $column = null): Unique
+    {
+        return new Unique($table, $column);
     }
 
     // ==========================================
