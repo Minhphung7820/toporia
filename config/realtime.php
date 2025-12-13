@@ -213,6 +213,67 @@ return [
                 // Note: metadata.request.timeout.ms is deprecated in rdkafka and not used
             ],
         ],
+
+        // High-Performance Kafka Broker (v3) - Maximum throughput
+        // Use this for 100K+ msg/s scenarios
+        'kafka-hp' => [
+            'driver' => 'kafka-hp', // High-performance version with async queue, producer pool, batch consumer
+            'brokers' => explode(',', env('KAFKA_BROKERS', 'localhost:9092')),
+            'topic_prefix' => env('KAFKA_TOPIC_PREFIX', 'realtime'),
+            'consumer_group' => env('KAFKA_CONSUMER_GROUP', 'realtime-hp'),
+
+            // High-performance settings
+            'async_queue' => env('KAFKA_HP_ASYNC_QUEUE', true), // Non-blocking HTTP publish
+            'producer_pool' => env('KAFKA_HP_PRODUCER_POOL', false), // Multiple producer instances
+            'pool_size' => (int) env('KAFKA_HP_POOL_SIZE', 4), // Number of producers in pool
+
+            // Async queue settings
+            'queue_max_size' => (int) env('KAFKA_HP_QUEUE_MAX_SIZE', 100000), // Max messages in queue
+            'batch_size' => (int) env('KAFKA_HP_BATCH_SIZE', 1000), // Messages per batch
+            'flush_interval_ms' => (int) env('KAFKA_HP_FLUSH_INTERVAL_MS', 50), // Max time between flushes
+
+            // Dead Letter Queue
+            'dlq_enabled' => env('KAFKA_HP_DLQ_ENABLED', false),
+            'dlq_prefix' => env('KAFKA_HP_DLQ_PREFIX', 'dlq'),
+            'dlq_max_retries' => (int) env('KAFKA_HP_DLQ_MAX_RETRIES', 3),
+
+            // Circuit breaker
+            'circuit_breaker_threshold' => env('KAFKA_CB_THRESHOLD', 5),
+            'circuit_breaker_timeout' => env('KAFKA_CB_TIMEOUT', 60),
+
+            // Topic strategy
+            'topic_strategy' => env('KAFKA_TOPIC_STRATEGY', 'grouped'),
+            'topic_mapping' => (function () {
+                $kafkaConfig = @include __DIR__ . '/kafka.php';
+                return $kafkaConfig['topic_mapping'] ?? [];
+            })(),
+            'default_topic' => env('KAFKA_DEFAULT_TOPIC', 'realtime'),
+            'default_partitions' => (int) env('KAFKA_DEFAULT_PARTITIONS', 10),
+
+            // Manual commit for reliability
+            'manual_commit' => env('KAFKA_MANUAL_COMMIT', true),
+
+            // Producer config (optimized for throughput)
+            'producer_config' => [
+                'security.protocol' => env('KAFKA_SECURITY_PROTOCOL', 'plaintext'),
+                'compression.type' => env('KAFKA_COMPRESSION', 'lz4'),
+                'batch.size' => '262144', // 256KB
+                'linger.ms' => '10',
+                'acks' => '1',
+                'max.in.flight.requests.per.connection' => '10',
+            ],
+
+            // Consumer config (optimized for throughput)
+            'consumer_config' => [
+                'auto.offset.reset' => 'earliest',
+                'session.timeout.ms' => '30000',
+                'max.poll.interval.ms' => '300000',
+                'fetch.min.bytes' => '1024',
+                'fetch.wait.max.ms' => '100',
+                'max.partition.fetch.bytes' => '1048576',
+                'security.protocol' => env('KAFKA_SECURITY_PROTOCOL', 'plaintext'),
+            ],
+        ],
     ],
 
     /*
