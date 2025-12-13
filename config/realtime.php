@@ -223,12 +223,20 @@ return [
             'consumer_group' => env('KAFKA_CONSUMER_GROUP', 'realtime-hp'),
 
             // High-performance settings
-            'async_queue' => env('KAFKA_HP_ASYNC_QUEUE', true), // Non-blocking HTTP publish
-            'producer_pool' => env('KAFKA_HP_PRODUCER_POOL', false), // Multiple producer instances
+            'async_queue' => env('KAFKA_HP_ASYNC_QUEUE', true), // Non-blocking HTTP publish (in-process)
+            'producer_pool' => env('KAFKA_HP_PRODUCER_POOL', false), // Multiple producer instances (CLI)
             'pool_size' => (int) env('KAFKA_HP_POOL_SIZE', 4), // Number of producers in pool
 
-            // Async queue settings
-            'queue_max_size' => (int) env('KAFKA_HP_QUEUE_MAX_SIZE', 100000), // Max messages in queue
+            // Shared Memory Queue (APCu) - True async via inter-process communication
+            // Requires: APCu extension with apc.enable_cli=1
+            // Use with: php console kafka:flush-worker
+            'shared_memory' => env('KAFKA_HP_SHARED_MEMORY', false), // Use APCu for true async
+            'shared_queue_name' => env('KAFKA_HP_SHARED_QUEUE_NAME', 'kafka_hp_queue'),
+            'shared_queue_max_size' => (int) env('KAFKA_HP_SHARED_QUEUE_MAX_SIZE', 1000000), // 1M messages
+            'shared_queue_ttl' => (int) env('KAFKA_HP_SHARED_QUEUE_TTL', 300), // 5 min TTL
+
+            // Async queue settings (in-process, fallback if shared_memory unavailable)
+            'queue_max_size' => (int) env('KAFKA_HP_QUEUE_MAX_SIZE', 131072), // 128K messages (power of 2)
             'batch_size' => (int) env('KAFKA_HP_BATCH_SIZE', 1000), // Messages per batch
             'flush_interval_ms' => (int) env('KAFKA_HP_FLUSH_INTERVAL_MS', 50), // Max time between flushes
 
