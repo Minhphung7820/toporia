@@ -55,9 +55,13 @@ RUN { \
     echo 'error_log=/proc/self/fd/2'; \
     } > /usr/local/etc/php/conf.d/99-custom.ini
 
-# Disable OPcache for development (enable in production)
+# OPcache enabled (same as Laravel default)
+# validate_timestamps=1 means check if files changed (good for development)
+# revalidate_freq=2 means check every 2 seconds
 RUN { \
-    echo 'opcache.enable=0'; \
+    echo 'opcache.enable=1'; \
+    echo 'opcache.validate_timestamps=1'; \
+    echo 'opcache.revalidate_freq=2'; \
     } > /usr/local/etc/php/conf.d/opcache.ini
 
 # Install Composer
