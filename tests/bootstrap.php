@@ -19,10 +19,7 @@ define('TESTING', true);
 // Load Composer autoloader
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// Load framework helpers if needed
-if (file_exists(__DIR__ . '/../src/Framework/Support/helpers.php')) {
-    require_once __DIR__ . '/../src/Framework/Support/helpers.php';
-}
+// Load framework helpers if needed (loaded via composer autoload from toporia/framework)
 
 // Set timezone for consistent test results
 date_default_timezone_set('UTC');
