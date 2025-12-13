@@ -46,12 +46,6 @@
             "Tests\\": "tests/"
         }
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "packages/framework"
-        }
-    ],
     "config": {
         "allow-plugins": {
             "php-http/discovery": true
