@@ -36,6 +36,10 @@ return [
     'export:excel' => App\Presentation\Console\Commands\ExportExcelCommand::class,
     'import:excel' => App\Presentation\Console\Commands\ImportExcelCommand::class,
 
+    // Posts commands
+    'import:posts' => App\Presentation\Console\Commands\ImportPostsCommand::class,
+    'export:posts' => App\Presentation\Console\Commands\ExportPostsCommand::class,
+
     // Email commands
     'email:daily' => App\Presentation\Console\Commands\SendDailyEmailCommand::class,
 

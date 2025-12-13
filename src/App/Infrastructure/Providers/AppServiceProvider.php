@@ -10,7 +10,6 @@ use App\Domain\Contracts\Services\ClusterFixerInterface;
 use App\Infrastructure\Services\Kafka\KafkaTopicService;
 use App\Infrastructure\Services\Kafka\KafkaHealthChecker;
 use App\Infrastructure\Services\Kafka\KafkaClusterIdFixer;
-use App\Presentation\Console\Kernel;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Realtime\RealtimeManager;
@@ -49,14 +48,6 @@ class AppServiceProvider extends ServiceProvider
                 $c->get(ClusterFixerInterface::class),
                 config('kafka', [])
             );
-        });
-
-        // Register console kernel bootstrap callback
-        $container->singleton('console.kernel.bootstrap', function (ContainerInterface $c) {
-            return function ($application) {
-                $kernel = new Kernel();
-                $kernel->bootstrap($application);
-            };
         });
 
         // Register Application Services (auto-wired via constructor injection)
