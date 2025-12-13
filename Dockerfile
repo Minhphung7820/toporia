@@ -55,15 +55,9 @@ RUN { \
     echo 'error_log=/proc/self/fd/2'; \
     } > /usr/local/etc/php/conf.d/99-custom.ini
 
-# Configure OPcache for performance
+# Disable OPcache for development (enable in production)
 RUN { \
-    echo 'opcache.enable=1'; \
-    echo 'opcache.memory_consumption=256'; \
-    echo 'opcache.interned_strings_buffer=16'; \
-    echo 'opcache.max_accelerated_files=20000'; \
-    echo 'opcache.validate_timestamps=0'; \
-    echo 'opcache.save_comments=1'; \
-    echo 'opcache.fast_shutdown=1'; \
+    echo 'opcache.enable=0'; \
     } > /usr/local/etc/php/conf.d/opcache.ini
 
 # Install Composer
