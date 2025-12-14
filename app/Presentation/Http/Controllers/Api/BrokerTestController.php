@@ -6,7 +6,6 @@ namespace App\Presentation\Http\Controllers\Api;
 
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Realtime\Broadcast;
-use Toporia\Framework\Realtime\Message;
 use Toporia\Framework\Realtime\RealtimeManager;
 
 /**
@@ -26,11 +25,16 @@ use Toporia\Framework\Realtime\RealtimeManager;
  *   // Start with channel (uses default driver)
  *   Broadcast::channel('events')->event('user.action')->with($data)->now();
  *
- *   // Private channel
- *   Broadcast::private('user.123')->event('notification')->with($data)->now();
+ *   // Batch publishing (high throughput - 50K-200K msg/s)
+ *   $result = Broadcast::batch('kafka')
+ *       ->channel('events.stream')
+ *       ->event('user.action')
+ *       ->messages([['user_id' => 1], ['user_id' => 2]])
+ *       ->publish();
  *
  *   // Helper function
  *   broadcast('channel', 'event', $data, 'kafka');
+ *   broadcastBatch('kafka')->channel('ch')->event('ev')->messages($data)->publish();
  */
 final class BrokerTestController
 {
@@ -113,94 +117,37 @@ final class BrokerTestController
                 ]);
             }
 
-            // Get broker instance for batch publish
-            $broker = $this->realtimeManager->broker($driver);
-
-            if ($broker === null) {
-                return response()->json([
-                    'success' => false,
-                    'error' => "Broker [{$driver}] is not configured",
-                    'available_brokers' => ['redis', 'rabbitmq', 'kafka']
-                ], 400);
-            }
-
-            // TRUE batch mode - prepare all messages first, then batch publish
-            $batchResults = [];
-            $totalBatches = (int) ceil($count / $batchSize);
-            $totalQueued = 0;
-            $totalFailed = 0;
-
-            for ($batch = 0; $batch < $totalBatches; $batch++) {
-                $batchStart = microtime(true);
-
-                $startIndex = $batch * $batchSize;
-                $endIndex = min($startIndex + $batchSize, $count);
-                $currentBatchSize = $endIndex - $startIndex;
-
-                // Prepare batch messages
-                $messages = [];
-                for ($i = $startIndex; $i < $endIndex; $i++) {
-                    $messageData = array_merge($data, [
-                        'request_id' => $i,
-                        'batch_id' => $batch,
-                        'timestamp' => microtime(true),
-                        'user_id' => rand(1, 100000),
-                        'session_id' => bin2hex(random_bytes(4)),
-                    ]);
-
-                    $messages[] = [
-                        'channel' => $channel,
-                        'message' => Message::event($channel, $event, $messageData),
-                    ];
-                }
-
-                // TRUE Kafka batching - all messages queued, single flush
-                $result = $broker->publishBatch($messages);
-
-                $batchDuration = microtime(true) - $batchStart;
-                $totalQueued += $result['queued'];
-                $totalFailed += $result['failed'];
-
-                $batchResults[] = [
-                    'batch' => $batch + 1,
-                    'size' => $currentBatchSize,
-                    'queued' => $result['queued'],
-                    'failed' => $result['failed'],
-                    'queue_time_ms' => $result['queue_time_ms'],
-                    'flush_time_ms' => $result['flush_time_ms'],
-                    'total_time_ms' => round($batchDuration * 1000, 2),
-                    'throughput' => $result['throughput'],
-                ];
-            }
+            // Fluent Batch API - clean DX with TRUE Kafka batching
+            $result = Broadcast::batch($driver)
+                ->channel($channel)
+                ->event($event)
+                ->batchSize($batchSize)
+                ->each(range(0, $count - 1), fn($i) => array_merge($data, [
+                    'request_id' => $i,
+                    'batch_id' => (int) floor($i / $batchSize),
+                    'timestamp' => microtime(true),
+                    'user_id' => rand(1, 100000),
+                    'session_id' => bin2hex(random_bytes(4)),
+                ]))
+                ->publish();
 
             $duration = microtime(true) - $startTime;
-            $throughput = $duration > 0 ? $totalQueued / $duration : 0;
 
             return response()->json([
-                'success' => $totalFailed === 0,
-                'message' => "TRUE batch publish: {$totalQueued}/{$count} messages in {$totalBatches} batches",
-                'mode' => 'true_kafka_batching',
-                'results' => [
-                    'total' => $count,
-                    'queued' => $totalQueued,
-                    'failed' => $totalFailed,
-                    'duration_seconds' => round($duration, 3),
-                    'throughput_per_second' => round($throughput, 0),
-                    'avg_latency_ms' => $count > 0 ? round(($duration / $count) * 1000, 4) : 0,
-                ],
-                'batches' => [
-                    'count' => $totalBatches,
-                    'size' => $batchSize,
-                    'details' => $batchResults,
-                ],
+                'success' => $result->successful(),
+                'message' => "TRUE batch publish: {$result->queued}/{$result->total} messages",
+                'mode' => 'fluent_batch_api',
+                'results' => $result->toArray(),
                 'config' => [
                     'channel' => $channel,
                     'event' => $event,
                     'driver' => $driver,
+                    'batch_size' => $batchSize,
                 ],
                 'explanation' => [
                     'how_it_works' => 'Messages queued to Kafka buffer → Grouped by topic/partition → Compressed (lz4) → Single network request',
                     'performance' => '50K-200K msg/s (vs 1K-5K with individual publish)',
+                    'api' => 'Broadcast::batch($driver)->channel()->event()->messages()->publish()',
                 ],
             ]);
         } catch (\Throwable $e) {

@@ -812,6 +812,47 @@ if (!function_exists('broadcast')) {
     }
 }
 
+if (!function_exists('broadcastBatch')) {
+    /**
+     * Create a BatchBroadcast instance for high-throughput batch publishing.
+     *
+     * TRUE Kafka batching: queue all → compress → single flush
+     * Performance: 50K-200K msg/s (vs 1K-5K with individual publish)
+     *
+     * Usage:
+     *   $result = broadcastBatch('kafka')
+     *       ->channel('events.stream')
+     *       ->event('user.action')
+     *       ->messages([
+     *           ['user_id' => 1, 'action' => 'login'],
+     *           ['user_id' => 2, 'action' => 'logout'],
+     *       ])
+     *       ->publish();
+     *
+     *   // Builder pattern
+     *   $result = broadcastBatch('kafka')
+     *       ->channel('events')
+     *       ->event('notification')
+     *       ->add(['user_id' => 1, 'type' => 'welcome'])
+     *       ->add(['user_id' => 2, 'type' => 'reminder'])
+     *       ->publish();
+     *
+     *   // Memory efficient for large datasets
+     *   $result = broadcastBatch('kafka')
+     *       ->channel('events')
+     *       ->event('bulk')
+     *       ->each($users, fn($user) => ['id' => $user->id, 'name' => $user->name])
+     *       ->publish();
+     *
+     * @param string|null $driver Broker driver (kafka, redis, rabbitmq)
+     * @return \Toporia\Framework\Realtime\BatchBroadcast
+     */
+    function broadcastBatch(?string $driver = null): \Toporia\Framework\Realtime\BatchBroadcast
+    {
+        return \Toporia\Framework\Realtime\BatchBroadcast::create($driver);
+    }
+}
+
 if (!function_exists('config')) {
     /**
      * Get configuration value.
@@ -1459,7 +1500,7 @@ if (!function_exists('concurrency')) {
      * - concurrency()->driver('sync') - Get specific driver
      *
      * @param array<string|int, callable>|null $tasks Tasks to run (null = get instance)
-     * @return array<string|int, mixed>|\Toporia\Framework\Process\Concurrency Results or instance
+     * @return array<string|int, mixed>|\Toporia\Framework\Concurrency\ConcurrencyManager Results or instance
      *
      * @example
      * // Run parallel tasks with named results
@@ -1474,12 +1515,13 @@ if (!function_exists('concurrency')) {
      */
     function concurrency(?array $tasks = null): mixed
     {
+        $manager = app('concurrency');
+
         if ($tasks !== null) {
-            return \Toporia\Framework\Process\Concurrency::run($tasks);
+            return $manager->run($tasks);
         }
 
-        // Return proxy object for fluent API
-        return new \Toporia\Framework\Process\ConcurrencyProxy();
+        return $manager;
     }
 }
 
@@ -1510,7 +1552,7 @@ if (!function_exists('defer')) {
      */
     function defer(callable $task): void
     {
-        \Toporia\Framework\Process\Concurrency::defer($task);
+        app('concurrency')->defer($task);
     }
 }
 
@@ -1789,27 +1831,5 @@ if (!function_exists('view')) {
         $content = ob_get_clean();
 
         return $content ?: '';
-    }
-}
-
-// ========================================
-// Concurrency Helpers
-// ========================================
-
-if (!function_exists('concurrency')) {
-    /**
-     * Get the concurrency manager instance.
-     *
-     * Usage:
-     * - concurrency() - Get ConcurrencyManager instance
-     * - concurrency()->run([...]) - Run tasks concurrently
-     * - concurrency()->defer([...]) - Defer tasks for background execution
-     * - concurrency()->driver('fork') - Use specific driver
-     *
-     * @return \Toporia\Framework\Concurrency\ConcurrencyManager
-     */
-    function concurrency(): \Toporia\Framework\Concurrency\ConcurrencyManager
-    {
-        return app('concurrency');
     }
 }
