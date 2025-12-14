@@ -9,7 +9,7 @@ declare(strict_types=1);
  */
 
 use Toporia\Framework\Support\Accessors\Route;
-use Toporia\Framework\Socialite\Controllers\SocialiteController;
+use Toporia\Socialite\Controllers\SocialiteController;
 
 // OAuth redirect routes
 Route::get('/auth/socialite/{provider}/redirect', [SocialiteController::class, 'redirect'])

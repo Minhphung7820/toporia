@@ -9,7 +9,7 @@ declare(strict_types=1);
  */
 
 use Toporia\Framework\Support\Accessors\Route;
-use Toporia\Framework\Webhook\Controllers\WebhookController;
+use Toporia\Webhook\Controllers\WebhookController;
 
 // Inbound webhook endpoint
 // POST /webhook/{provider} or POST /webhook
