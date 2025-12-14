@@ -119,8 +119,6 @@ Route::get('/relationships/belongs-to-many', [RelationshipTestController::class,
 // =========================================================================
 
 Route::post('/broker/publish', [BrokerTestController::class, 'publish']);
-Route::get('/broker/health', [BrokerTestController::class, 'health']);
-Route::get('/broker/debug', [BrokerTestController::class, 'debug']);
 
 // =========================================================================
 // BROADCASTING AUTH ROUTES

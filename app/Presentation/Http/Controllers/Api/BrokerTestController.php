@@ -6,7 +6,6 @@ namespace App\Presentation\Http\Controllers\Api;
 
 use Toporia\Framework\Http\Request;
 use Toporia\Framework\Realtime\Broadcast;
-use Toporia\Framework\Realtime\RealtimeManager;
 
 /**
  * BrokerTestController
@@ -33,19 +32,28 @@ use Toporia\Framework\Realtime\RealtimeManager;
  */
 final class BrokerTestController
 {
-    public function __construct(
-        private readonly RealtimeManager $realtime
-    ) {}
 
     /**
-     * Publish a message to broker.
+     * Publish message(s) to broker.
      *
      * POST /api/broker/publish
-     * Body: {
+     *
+     * Single message:
+     * {
      *   "channel": "test.channel",
      *   "event": "test.event",
      *   "data": {"message": "Hello World"},
-     *   "driver": "redis"  // redis, rabbitmq, kafka
+     *   "driver": "kafka"
+     * }
+     *
+     * Load test (multiple messages with batching):
+     * {
+     *   "channel": "events.stream",
+     *   "event": "user.action",
+     *   "data": {"action": "login"},
+     *   "driver": "kafka",
+     *   "count": 100000,
+     *   "batch_size": 1000
      * }
      */
     public function publish(Request $request)
@@ -56,37 +64,123 @@ final class BrokerTestController
         $event = $request->input('event', 'test.event');
         $data = $request->input('data', ['message' => 'Hello from BrokerTestController']);
         $driver = $request->input('driver', 'redis');
+        $count = min(max((int) $request->input('count', 1), 1), 100000);
+        $batchSize = min(max((int) $request->input('batch_size', 1000), 100), 5000);
 
         try {
-            // New fluent API with Broadcast facade
-            // Use toChannel() after via() since via() returns instance
-            $success = Broadcast::via($driver)
-                ->toChannel($channel)
-                ->event($event)
-                ->with($data)
-                ->now();
+            // Single message mode
+            if ($count === 1) {
+                $success = Broadcast::via($driver)
+                    ->toChannel($channel)
+                    ->event($event)
+                    ->with($data)
+                    ->now();
 
-            if (!$success) {
+                if (!$success) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => "Broker [{$driver}] is not configured or failed to publish",
+                        'available_brokers' => ['redis', 'rabbitmq', 'kafka']
+                    ], 400);
+                }
+
+                $duration = (microtime(true) - $startTime) * 1000;
+
                 return response()->json([
-                    'success' => false,
-                    'error' => "Broker [{$driver}] is not configured or failed to publish",
-                    'available_brokers' => ['redis', 'rabbitmq', 'kafka']
-                ], 400);
+                    'success' => true,
+                    'message' => 'Message published successfully',
+                    'details' => [
+                        'channel' => $channel,
+                        'event' => $event,
+                        'driver' => $driver,
+                        'data' => $data,
+                        'duration_ms' => round($duration, 2),
+                        'timestamp' => date('Y-m-d H:i:s')
+                    ]
+                ]);
             }
 
-            $duration = (microtime(true) - $startTime) * 1000;
+            // Load test mode with batching
+            $successful = 0;
+            $failed = 0;
+            $errors = [];
+            $batchResults = [];
+            $totalBatches = (int) ceil($count / $batchSize);
+
+            for ($batch = 0; $batch < $totalBatches; $batch++) {
+                $batchStart = microtime(true);
+                $batchSuccessful = 0;
+                $batchFailed = 0;
+
+                $startIndex = $batch * $batchSize;
+                $endIndex = min($startIndex + $batchSize, $count);
+
+                for ($i = $startIndex; $i < $endIndex; $i++) {
+                    $messageData = array_merge($data, [
+                        'request_id' => $i,
+                        'batch_id' => $batch,
+                        'timestamp' => microtime(true),
+                        'user_id' => rand(1, 100000),
+                        'session_id' => bin2hex(random_bytes(4)),
+                    ]);
+
+                    try {
+                        Broadcast::via($driver)
+                            ->toChannel($channel)
+                            ->event($event)
+                            ->with($messageData)
+                            ->now();
+                        $batchSuccessful++;
+                        $successful++;
+                    } catch (\Throwable $e) {
+                        $batchFailed++;
+                        $failed++;
+                        if (count($errors) < 5) {
+                            $errors[] = $e->getMessage();
+                        }
+                    }
+                }
+
+                $batchDuration = microtime(true) - $batchStart;
+                $batchResults[] = [
+                    'batch' => $batch + 1,
+                    'sent' => $batchSuccessful,
+                    'failed' => $batchFailed,
+                    'duration_ms' => round($batchDuration * 1000, 2),
+                    'throughput' => $batchDuration > 0 ? round($batchSuccessful / $batchDuration, 0) : 0,
+                ];
+
+                // Small pause between batches to prevent overwhelming
+                if ($batch < $totalBatches - 1) {
+                    usleep(10000); // 10ms pause
+                }
+            }
+
+            $duration = microtime(true) - $startTime;
+            $throughput = $duration > 0 ? $successful / $duration : 0;
 
             return response()->json([
-                'success' => true,
-                'message' => 'Message published successfully',
-                'details' => [
+                'success' => $failed === 0,
+                'message' => "Load test: {$successful}/{$count} messages sent in {$totalBatches} batches",
+                'results' => [
+                    'total' => $count,
+                    'successful' => $successful,
+                    'failed' => $failed,
+                    'duration_seconds' => round($duration, 3),
+                    'throughput_per_second' => round($throughput, 0),
+                    'avg_latency_ms' => round(($duration / $count) * 1000, 4),
+                ],
+                'batches' => [
+                    'count' => $totalBatches,
+                    'size' => $batchSize,
+                    'details' => $batchResults,
+                ],
+                'config' => [
                     'channel' => $channel,
                     'event' => $event,
                     'driver' => $driver,
-                    'data' => $data,
-                    'duration_ms' => round($duration, 2),
-                    'timestamp' => date('Y-m-d H:i:s')
-                ]
+                ],
+                'errors' => $errors,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -95,149 +189,5 @@ final class BrokerTestController
                 'driver' => $driver
             ], 500);
         }
-    }
-
-    /**
-     * Publish using helper function (alternative syntax).
-     *
-     * POST /api/broker/publish-alt
-     */
-    public function publishAlt(Request $request)
-    {
-        $startTime = microtime(true);
-
-        $channel = $request->input('channel', 'test.channel');
-        $event = $request->input('event', 'test.event');
-        $data = $request->input('data', ['message' => 'Hello from helper']);
-        $driver = $request->input('driver', 'redis');
-
-        try {
-            // Using helper function
-            $success = broadcast($channel, $event, $data, $driver);
-
-            $duration = (microtime(true) - $startTime) * 1000;
-
-            return response()->json([
-                'success' => $success,
-                'message' => $success ? 'Published via helper' : 'Failed to publish',
-                'duration_ms' => round($duration, 2)
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Debug Kafka publish directly.
-     *
-     * GET /api/broker/debug
-     */
-    public function debug()
-    {
-        $logs = [];
-        $logs[] = "PHP_SAPI: " . PHP_SAPI;
-        $logs[] = "rdkafka extension: " . (extension_loaded('rdkafka') ? 'loaded' : 'NOT loaded');
-
-        if (!extension_loaded('rdkafka')) {
-            return response()->json(['logs' => $logs, 'error' => 'rdkafka not loaded']);
-        }
-
-        // Use KAFKA_BROKERS env var (set in docker-compose.yml as kafka:29092)
-        $brokers = env('KAFKA_BROKERS', 'localhost:9092');
-        $logs[] = "KAFKA_BROKERS: " . $brokers;
-
-        try {
-            $conf = new \RdKafka\Conf();
-            $conf->set('bootstrap.servers', $brokers);
-            $conf->set('metadata.broker.list', $brokers);
-
-            $deliveryLog = null;
-            $conf->setDrMsgCb(function ($kafka, $message) use (&$deliveryLog) {
-                if ($message->err) {
-                    $deliveryLog = "ERROR: " . rd_kafka_err2str($message->err);
-                } else {
-                    $deliveryLog = "OK: topic={$message->topic_name}, partition={$message->partition}, offset={$message->offset}";
-                }
-            });
-
-            $producer = new \RdKafka\Producer($conf);
-            $producer->addBrokers($brokers);
-            $logs[] = "Producer created";
-
-            $topic = $producer->newTopic('realtime');
-            $logs[] = "Topic created";
-
-            $payload = json_encode(['test' => 'http_debug', 'sapi' => PHP_SAPI, 'time' => time()]);
-            $topic->produce(RD_KAFKA_PARTITION_UA, 0, $payload, 'events.stream');
-            $logs[] = "Message produced";
-
-            $producer->poll(0);
-            $logs[] = "Poll(0) done";
-
-            $result = $producer->flush(5000);
-            $logs[] = "Flush result: " . ($result === RD_KAFKA_RESP_ERR_NO_ERROR ? 'SUCCESS' : rd_kafka_err2str($result));
-            $logs[] = "OutQLen after flush: " . $producer->getOutQLen();
-            $logs[] = "Delivery callback: " . ($deliveryLog ?? 'NOT CALLED');
-
-            return response()->json([
-                'success' => $result === RD_KAFKA_RESP_ERR_NO_ERROR,
-                'logs' => $logs
-            ]);
-        } catch (\Throwable $e) {
-            $logs[] = "Exception: " . $e->getMessage();
-            return response()->json(['success' => false, 'logs' => $logs, 'error' => $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * Health check for all brokers.
-     *
-     * GET /api/broker/health
-     */
-    public function health()
-    {
-        $results = [];
-
-        foreach (['redis', 'rabbitmq', 'kafka'] as $brokerName) {
-            try {
-                $broker = $this->realtime->broker($brokerName);
-
-                if ($broker === null) {
-                    $results[$brokerName] = [
-                        'status' => 'not_configured',
-                        'message' => 'Broker not configured'
-                    ];
-                    continue;
-                }
-
-                if (method_exists($broker, 'healthCheck')) {
-                    $health = $broker->healthCheck();
-                    $results[$brokerName] = [
-                        'status' => $health->status,
-                        'message' => $health->message,
-                        'latency_ms' => $health->latencyMs,
-                        'details' => $health->details
-                    ];
-                } else {
-                    $results[$brokerName] = [
-                        'status' => $broker->isConnected() ? 'healthy' : 'unhealthy',
-                        'connected' => $broker->isConnected()
-                    ];
-                }
-            } catch (\Throwable $e) {
-                $results[$brokerName] = [
-                    'status' => 'error',
-                    'message' => $e->getMessage()
-                ];
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'brokers' => $results
-        ]);
     }
 }
