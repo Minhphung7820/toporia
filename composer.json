@@ -28,6 +28,8 @@
         "fakerphp/faker": "^1.24"
     },
     "suggest": {
+        "mongodb/mongodb": "Required for MongoDB support (toporia/mongodb package)",
+        "ext-mongodb": "Required for MongoDB PHP extension",
         "ext-redis": "Required for Redis Pub/Sub broker and cache driver",
         "ext-rdkafka": "Required for high-performance Kafka broker",
         "ext-pdo_mysql": "Required for MySQL database support",

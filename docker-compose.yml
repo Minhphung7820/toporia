@@ -37,6 +37,11 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       ELASTICSEARCH_HOST: elasticsearch:9200
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: 27017
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-toporia}
+      MONGODB_USERNAME: ${MONGODB_USERNAME:-root}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-root}
     depends_on:
       mysql:
         condition: service_healthy
@@ -233,6 +238,31 @@ services:
     profiles:
       - full
 
+  # ============================================
+  # MongoDB (Optional)
+  # ============================================
+  mongodb:
+    image: mongo:7.0
+    container_name: toporia_mongodb
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-root}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-toporia}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - toporia
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - full
+
 # ============================================
 # Networks
 # ============================================
@@ -257,4 +287,6 @@ volumes:
   kafka_data:
     driver: local
   elasticsearch_data:
+    driver: local
+  mongodb_data:
     driver: local

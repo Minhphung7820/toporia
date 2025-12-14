@@ -1,11 +1,11 @@
-# Toporia Framework - Production-Ready PHP 8.2 Docker Image
+# Toporia Framework - Production-Ready PHP 8.4 Docker Image
 # Optimized for stability, security, and performance
 
-FROM php:8.2-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 # Maintainer
 LABEL maintainer="Toporia Framework"
-LABEL description="PHP 8.2 FPM with ext-redis, ext-rdkafka, optimized for production"
+LABEL description="PHP 8.4 FPM with ext-redis, ext-rdkafka, ext-mongodb, optimized for production"
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -13,6 +13,8 @@ RUN apk add --no-cache \
     autoconf g++ make pkgconfig \
     # Kafka & Redis
     librdkafka-dev linux-headers \
+    # MongoDB
+    openssl-dev \
     # Database drivers
     postgresql-dev mysql-dev \
     # Compression & utilities
@@ -37,9 +39,9 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
         gd \
         opcache
 
-# Install PECL extensions (Redis + RdKafka)
-RUN pecl install redis-6.0.2 rdkafka-6.0.3 && \
-    docker-php-ext-enable redis rdkafka
+# Install PECL extensions (Redis + RdKafka + MongoDB)
+RUN pecl install redis rdkafka mongodb && \
+    docker-php-ext-enable redis rdkafka mongodb
 
 # Configure PHP for production
 RUN { \
@@ -81,24 +83,19 @@ RUN chmod +x /usr/local/bin/php-fpm-healthcheck
 COPY docker/php/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Copy composer files for dependency caching
-COPY composer.json composer.lock* ./
-
-# Install Composer dependencies (production mode)
-RUN composer install \
-    --no-dev \
-    --no-scripts \
-    --no-autoloader \
-    --prefer-dist \
-    --optimize-autoloader \
-    --ignore-platform-reqs \
-    && rm -rf /root/.composer
-
 # Copy application code
 COPY . .
 
-# Generate optimized autoloader
-RUN composer dump-autoload --optimize --classmap-authoritative --no-dev
+# Install Composer dependencies (development mode - install in container)
+# For production, uncomment --no-dev
+RUN composer install \
+    --no-scripts \
+    --prefer-dist \
+    --ignore-platform-reqs \
+    || true
+
+# Generate autoloader
+RUN composer dump-autoload --optimize || true
 
 # Create storage directories with full permissions (no restrictions)
 RUN mkdir -p \
