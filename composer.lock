@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0065e40ca11ed05b39cc041fc6b2ada0",
+    "content-hash": "e72357475109b0cad43c167152410faf",
     "packages": [
         {
             "name": "amphp/amp",
@@ -919,6 +919,66 @@
                 "source": "https://github.com/MarkBaker/PHPMatrix/tree/3.0.1"
             },
             "time": "2022-12-02T22:17:43+00:00"
+        },
+        {
+            "name": "mongodb/mongodb",
+            "version": "0.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/mongodb/mongo-php-library.git",
+                "reference": "98e14e8dc9a0c35e864baf999dc12433e937accd"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/mongodb/mongo-php-library/zipball/98e14e8dc9a0c35e864baf999dc12433e937accd",
+                "reference": "98e14e8dc9a0c35e864baf999dc12433e937accd",
+                "shasum": ""
+            },
+            "require": {
+                "ext-mongodb": ">=0.6.0"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "0.2.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "MongoDB\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "Apache-2.0"
+            ],
+            "authors": [
+                {
+                    "name": "Jeremy Mikola",
+                    "email": "jmikola@gmail.com"
+                },
+                {
+                    "name": "Hannes Magnusson",
+                    "email": "bjori@mongodb.com"
+                },
+                {
+                    "name": "Derick Rethans",
+                    "email": "github@derickrethans.nl"
+                }
+            ],
+            "description": "MongoDB driver library",
+            "homepage": "https://jira.mongodb.org/browse/PHPLIB",
+            "keywords": [
+                "database",
+                "driver",
+                "mongodb",
+                "persistence"
+            ],
+            "support": {
+                "issues": "https://github.com/mongodb/mongo-php-library/issues",
+                "source": "https://github.com/mongodb/mongo-php-library/tree/0.2.0"
+            },
+            "time": "2015-05-12T23:33:27+00:00"
         },
         {
             "name": "mtdowling/jmespath.php",
@@ -2329,7 +2389,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/framework",
-                "reference": "e0a98f77933b9af50260281bee77998a33370dac"
+                "reference": "f4666df924160c7ef888c5d1718b08e9c429dee5"
             },
             "require": {
                 "php": ">=8.1",
