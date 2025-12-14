@@ -2329,7 +2329,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/framework",
-                "reference": "62e184002795d6759e21bc74b4d68a6f46e5c1c8"
+                "reference": "e0a98f77933b9af50260281bee77998a33370dac"
             },
             "require": {
                 "php": ">=8.1",

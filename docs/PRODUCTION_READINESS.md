@@ -35,7 +35,7 @@ Framework Toporia Realtime Brokers v2.0 đã được **hoàn thiện và tích 
 | Broker | File | LOC | Status | Improvements |
 |--------|------|-----|--------|--------------|
 | Redis | `Brokers/RedisBrokerImproved.php` | 450 | ✅ | Pooling + Auto-reconnect |
-| Kafka Client | `Kafka/Client/RdKafkaClientImproved.php` | 400 | ✅ | Backpressure + TTL cache |
+| Kafka Client | `Kafka/Client/RdKafkaClient.php` | 400 | ✅ | Backpressure + TTL cache |
 | Kafka Broker | `Brokers/KafkaBrokerImproved.php` | 400 | ✅ | Full integration |
 | RabbitMQ | `Brokers/RabbitMqBrokerImproved.php` | 700 | ✅ | Channel pooling (10x) |
 
