@@ -112,9 +112,18 @@ return [
             'port' => env('REDIS_PORT', 6379),
             'password' => env('REDIS_PASSWORD'),
             'database' => env('REDIS_DB', 0),
-            'timeout' => env('REDIS_TIMEOUT', 2.0),
-            'read_timeout' => env('REDIS_READ_TIMEOUT', 5.0),
-            'write_timeout' => env('REDIS_WRITE_TIMEOUT', 2.0),
+            'timeout' => env('REDIS_TIMEOUT', 5.0),
+            'read_timeout' => env('REDIS_READ_TIMEOUT', 30.0), // Increased for long-running consumers
+            'write_timeout' => env('REDIS_WRITE_TIMEOUT', 5.0),
+
+            // Redis Streams settings
+            'max_stream_length' => (int) env('REDIS_STREAM_MAX_LENGTH', 100000), // 100K messages
+            'consumer_group' => env('REDIS_STREAM_CONSUMER_GROUP', 'realtime-group'),
+            'consumer_batch_size' => (int) env('REDIS_STREAM_BATCH_SIZE', 1000), // Increased from 100 for throughput
+            'consumer_block_ms' => (int) env('REDIS_STREAM_BLOCK_MS', 100), // Reduced from 1000ms for lower latency
+            'idle_time_ms' => (int) env('REDIS_STREAM_IDLE_TIME_MS', 60000), // 1 min
+            'consumer_prefetch_count' => (int) env('REDIS_STREAM_PREFETCH_COUNT', 5000), // Messages to prefetch
+
             // Circuit breaker settings
             'circuit_breaker_threshold' => env('REDIS_CB_THRESHOLD', 5),
             'circuit_breaker_timeout' => env('REDIS_CB_TIMEOUT', 60),

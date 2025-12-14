@@ -26,8 +26,11 @@ final class UserActionEventHandler extends AbstractConsumerHandler
 {
     /**
      * Channels to subscribe.
+     *
+     * Note: For Redis Streams, use exact channel names only.
+     * Wildcards like 'events.*' work with Kafka/RabbitMQ but create separate streams in Redis.
      */
-    protected array $channels = ['events.stream', 'events.*'];
+    protected array $channels = ['events.stream'];
 
     /**
      * Preferred broker driver.
@@ -46,52 +49,31 @@ final class UserActionEventHandler extends AbstractConsumerHandler
 
     /**
      * Handle incoming message.
+     *
+     * Optimized for high throughput - single log line only.
      */
     public function handle(MessageInterface $message, ConsumerContext $context): void
     {
         $data = $this->getData($message);
-
         $event = $data['event'] ?? 'unknown';
         $payload = $data['data'] ?? [];
+        $action = $payload['action'] ?? 'unknown';
 
-        // Log the received event
-        Log::info('User action event received', [
-            'channel' => $message->getChannel(),
-            'event' => $event,
-            'action' => $payload['action'] ?? null,
-            'ip' => $payload['ip'] ?? null,
-            'agent' => $payload['agent'] ?? null,
-            'message_id' => $message->getId(),
-            'attempt' => $context->attempt,
-            'timestamp' => date('Y-m-d H:i:s'),
-        ]);
-
-        $this->info("Received user action event", [
-            'event' => $event,
-            'action' => $payload['action'] ?? 'unknown',
-        ]);
-
-        // Process based on action type
-        $action = $payload['action'] ?? null;
-
-        switch ($action) {
-            case 'login':
-                $this->handleLogin($payload);
-                break;
-            case 'logout':
-                $this->handleLogout($payload);
-                break;
-            case 'register':
-                $this->handleRegister($payload);
-                break;
-            default:
-                $this->handleGenericAction($action, $payload);
-        }
-
-        Log::info('User action event processed successfully', [
+        // Single log line with all essential info
+        Log::info("User action: {$action}", [
             'event' => $event,
             'action' => $action,
+            'user_id' => $payload['user_id'] ?? null,
+            'message_id' => $message->getId(),
         ]);
+
+        // Process logic without additional logging
+        match ($action) {
+            'login' => $this->handleLogin($payload),
+            'logout' => $this->handleLogout($payload),
+            'register' => $this->handleRegister($payload),
+            default => null, // Generic action - no additional processing
+        };
     }
 
     /**
@@ -99,15 +81,9 @@ final class UserActionEventHandler extends AbstractConsumerHandler
      */
     private function handleLogin(array $payload): void
     {
-        Log::info('User login detected', [
-            'ip' => $payload['ip'] ?? 'unknown',
-            'agent' => $payload['agent'] ?? 'unknown',
-            'user_id' => $payload['user_id'] ?? null,
-        ]);
-
-        // Example: Track login statistics
-        // Example: Send login notification
-        // Example: Update last login timestamp
+        // Track login statistics
+        // Send login notification
+        // Update last login timestamp
     }
 
     /**
@@ -115,9 +91,7 @@ final class UserActionEventHandler extends AbstractConsumerHandler
      */
     private function handleLogout(array $payload): void
     {
-        Log::info('User logout detected', [
-            'user_id' => $payload['user_id'] ?? null,
-        ]);
+        // Track logout statistics
     }
 
     /**
@@ -125,23 +99,8 @@ final class UserActionEventHandler extends AbstractConsumerHandler
      */
     private function handleRegister(array $payload): void
     {
-        Log::info('User registration detected', [
-            'email' => $payload['email'] ?? null,
-        ]);
-
-        // Example: Send welcome email
-        // Example: Track registration metrics
-    }
-
-    /**
-     * Handle generic action.
-     */
-    private function handleGenericAction(?string $action, array $payload): void
-    {
-        Log::info('Generic user action detected', [
-            'action' => $action,
-            'payload' => $payload,
-        ]);
+        // Send welcome email
+        // Track registration metrics
     }
 
     /**
