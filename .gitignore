@@ -161,9 +161,9 @@ logs/
 CLAUDE.md
 
 # ==========================================
-# Framework Package (separate repo)
+# Framework & Optional Packages (separate repos)
 # ==========================================
-packages/framework/
+packages/
 
 # ==========================================
 # Documentation & Examples
