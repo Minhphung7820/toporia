@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-use Toporia\Framework\Database\Schema\Schema;
-use Toporia\Framework\Database\Schema\Blueprint;
-use Toporia\Framework\Database\Migrations\Migration;
+use Toporia\Framework\Database\Migration\Migration;
 
 /**
  * CreateWebhookFailuresTable Migration
@@ -16,14 +14,14 @@ use Toporia\Framework\Database\Migrations\Migration;
  * @copyright   Copyright (c) 2025 Toporia Framework
  * @license     MIT
  */
-return new class extends Migration
+class CreateWebhookFailuresTable extends Migration
 {
     /**
      * Run the migrations.
      */
     public function up(): void
     {
-        Schema::create('webhook_failures', function (Blueprint $table) {
+        $this->schema->create('webhook_failures', function ($table) {
             $table->id();
 
             // Endpoint reference (nullable if endpoint was deleted)
@@ -67,6 +65,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('webhook_failures');
+        $this->schema->dropIfExists('webhook_failures');
     }
-};
+}
