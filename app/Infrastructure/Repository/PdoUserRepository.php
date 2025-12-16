@@ -66,15 +66,12 @@ final class PdoUserRepository implements UserRepository
         }
 
         // Update existing user
-        $model = UserModel::find($user->id);
-        if ($model) {
-            $model->update([
-                'email' => $user->email,
-                'password' => $user->password,
-                'name' => $user->name,
-                'remember_token' => $user->rememberToken,
-            ]);
-        }
+        UserModel::where('id', $user->id)->update([
+            'email' => $user->email,
+            'password' => $user->password,
+            'name' => $user->name,
+            'remember_token' => $user->rememberToken,
+        ]);
 
         return $user;
     }

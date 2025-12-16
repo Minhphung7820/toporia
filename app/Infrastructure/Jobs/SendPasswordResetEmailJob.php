@@ -22,7 +22,7 @@ final class SendPasswordResetEmailJob extends Job implements ShouldQueueInterfac
     ) {
         parent::__construct();
         $this->tries(3);
-        $this->onQueue('emails');
+        $this->onQueue('default');
     }
 
     /**

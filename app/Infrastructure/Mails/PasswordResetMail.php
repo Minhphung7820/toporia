@@ -35,7 +35,7 @@ final class PasswordResetMail extends Mailable
         $this->subject('Reset Your Password - Toporia');
 
         // Use inline HTML template (beautiful design)
-        $this->view('emails.password-reset', [
+        $this->view('password-reset', [
             'email' => $this->email,
             'resetUrl' => $resetUrl,
             'token' => $this->token,
