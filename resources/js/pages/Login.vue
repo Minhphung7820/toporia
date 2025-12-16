@@ -169,6 +169,7 @@ export default {
 .checkbox-label input[type="checkbox"] {
   width: 1rem;
   height: 1rem;
+  margin-right: 0.5rem;
   cursor: pointer;
 }
 
