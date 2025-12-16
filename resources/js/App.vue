@@ -98,9 +98,9 @@ body {
 
 .container {
   width: 100%;
-  max-width: 100%;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 0 48px;
+  padding: 0 2rem;
 }
 
 .navbar {

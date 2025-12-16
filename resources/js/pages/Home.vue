@@ -175,10 +175,9 @@ export default {
 }
 
 .container {
-  width: 100%;
-  max-width: 100%;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 0 48px;
+  padding: 0 2rem;
 }
 
 /* Hero Section */
@@ -464,10 +463,6 @@ export default {
   .info-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  .container {
-    padding: 0 32px;
-  }
 }
 
 @media (max-width: 768px) {
@@ -509,7 +504,7 @@ export default {
   }
 
   .container {
-    padding: 0 20px;
+    padding: 0 1.5rem;
   }
 }
 
