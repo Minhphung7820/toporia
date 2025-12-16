@@ -1,10 +1,5 @@
 <template>
   <div class="error-page">
-    <div class="error-background">
-      <div class="floating-shape shape-1"></div>
-      <div class="floating-shape shape-2"></div>
-      <div class="floating-shape shape-3"></div>
-    </div>
     <div class="error-content">
       <div class="error-icon">🔍</div>
       <h1 class="error-code">404</h1>
@@ -50,159 +45,85 @@ const goBack = () => {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
+  background: #fafafa;
   padding: 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-.error-background {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.floating-shape {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  animation: float 15s ease-in-out infinite;
-}
-
-.shape-1 {
-  width: 300px;
-  height: 300px;
-  top: -150px;
-  right: -150px;
-  animation-duration: 20s;
-}
-
-.shape-2 {
-  width: 200px;
-  height: 200px;
-  bottom: -100px;
-  left: -100px;
-  animation-duration: 25s;
-  animation-delay: -5s;
-}
-
-.shape-3 {
-  width: 150px;
-  height: 150px;
-  top: 50%;
-  left: 10%;
-  animation-duration: 18s;
-  animation-delay: -10s;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translate(0, 0) scale(1);
-  }
-  33% {
-    transform: translate(30px, -30px) scale(1.1);
-  }
-  66% {
-    transform: translate(-30px, 30px) scale(0.9);
-  }
 }
 
 .error-content {
   text-align: center;
-  max-width: 600px;
-  position: relative;
-  z-index: 1;
+  max-width: 500px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  padding: 60px 40px;
 }
 
 .error-icon {
-  font-size: 80px;
-  margin-bottom: 20px;
-  animation: bounce 2s ease-in-out infinite;
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+  font-size: 64px;
+  margin-bottom: 24px;
 }
 
 .error-code {
-  font-size: clamp(80px, 15vw, 160px);
-  font-weight: 900;
+  font-size: clamp(64px, 12vw, 120px);
+  font-weight: 800;
   margin: 0;
   line-height: 1;
-  text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.8) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #1a1a1a;
 }
 
 .error-title {
-  font-size: clamp(28px, 4vw, 42px);
-  font-weight: 700;
-  margin: 20px 0;
-  letter-spacing: -0.02em;
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 600;
+  margin: 16px 0;
+  color: #1a1a1a;
 }
 
 .error-message {
-  font-size: clamp(16px, 2vw, 20px);
-  margin: 20px 0 40px;
-  opacity: 0.95;
+  font-size: 16px;
+  margin: 16px 0 32px;
+  color: #666;
   line-height: 1.6;
 }
 
 .error-actions {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
-  margin-top: 40px;
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 28px;
+  padding: 12px 24px;
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
   text-decoration: none;
 }
 
 .btn-primary {
-  background: white;
-  color: #f5576c;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  background: #1a1a1a;
+  color: white;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  background: #333;
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  color: white;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid #ddd;
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-2px);
+  background: #f5f5f5;
+  border-color: #ccc;
 }
 
 .btn svg {
@@ -210,6 +131,10 @@ const goBack = () => {
 }
 
 @media (max-width: 768px) {
+  .error-content {
+    padding: 40px 24px;
+  }
+
   .error-actions {
     flex-direction: column;
     width: 100%;
@@ -221,7 +146,7 @@ const goBack = () => {
   }
 
   .error-icon {
-    font-size: 60px;
+    font-size: 48px;
   }
 }
 </style>

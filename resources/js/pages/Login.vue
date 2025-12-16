@@ -2,65 +2,39 @@
   <div class="auth-page">
     <div class="auth-container">
       <div class="auth-card">
-        <h1 class="auth-title">Login</h1>
-        <p class="auth-subtitle">Welcome back! Please login to your account.</p>
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-subtitle">Sign in to your account</p>
 
         <form @submit.prevent="handleLogin" class="auth-form">
-          <div v-if="error" class="alert alert-error">
-            {{ error }}
-          </div>
+          <div v-if="error" class="alert alert-error">{{ error }}</div>
 
           <div class="form-group">
             <label for="email">Email</label>
-            <input
-              id="email"
-              v-model="form.email"
-              type="email"
-              required
-              placeholder="your@email.com"
-              :disabled="loading"
-            />
+            <input id="email" v-model="form.email" type="email" required placeholder="you@example.com" :disabled="loading" />
             <span v-if="errors.email" class="error-text">{{ errors.email }}</span>
           </div>
 
           <div class="form-group">
             <label for="password">Password</label>
-            <input
-              id="password"
-              v-model="form.password"
-              type="password"
-              required
-              placeholder="Enter your password"
-              :disabled="loading"
-            />
+            <input id="password" v-model="form.password" type="password" required placeholder="Enter your password" :disabled="loading" />
             <span v-if="errors.password" class="error-text">{{ errors.password }}</span>
           </div>
 
           <div class="form-group checkbox-group">
-            <label>
-              <input
-                v-model="form.remember"
-                type="checkbox"
-                :disabled="loading"
-              />
-              Remember me
+            <label class="checkbox-label">
+              <input v-model="form.remember" type="checkbox" :disabled="loading" />
+              <span>Remember me</span>
             </label>
-            <router-link to="/forgot-password" class="forgot-link">
-              Forgot password?
-            </router-link>
+            <router-link to="/forgot-password" class="forgot-link">Forgot password?</router-link>
           </div>
 
           <button type="submit" class="btn btn-primary btn-block" :disabled="loading">
-            <span v-if="loading">Logging in...</span>
-            <span v-else>Login</span>
+            {{ loading ? 'Signing in...' : 'Sign in' }}
           </button>
         </form>
 
         <div class="auth-footer">
-          <p>
-            Don't have an account?
-            <router-link to="/register" class="auth-link">Sign up</router-link>
-          </p>
+          <p>Don't have an account? <router-link to="/register" class="auth-link">Sign up</router-link></p>
         </div>
       </div>
     </div>
@@ -73,45 +47,28 @@ import { useAuthStore } from '../stores/auth';
 export default {
   name: 'Login',
   setup() {
-    const authStore = useAuthStore();
-    return { authStore };
+    return { authStore: useAuthStore() };
   },
   data() {
     return {
-      form: {
-        email: '',
-        password: '',
-        remember: false,
-      },
+      form: { email: '', password: '', remember: false },
       errors: {},
       error: '',
     };
   },
   computed: {
-    loading() {
-      return this.authStore.loading;
-    },
+    loading() { return this.authStore.loading; },
   },
   methods: {
     async handleLogin() {
       this.error = '';
       this.errors = {};
-
-      const result = await this.authStore.login(
-        this.form.email,
-        this.form.password,
-        this.form.remember
-      );
-
+      const result = await this.authStore.login(this.form.email, this.form.password, this.form.remember);
       if (result.success) {
-        // Redirect to home or intended page
-        const redirect = this.$route.query.redirect || '/';
-        this.$router.push(redirect);
+        this.$router.push(this.$route.query.redirect || '/');
       } else {
         this.error = result.message || 'Login failed';
-        if (result.errors) {
-          this.errors = result.errors;
-        }
+        if (result.errors) this.errors = result.errors;
       }
     },
   },
@@ -120,99 +77,66 @@ export default {
 
 <style scoped>
 .auth-page {
-  min-height: calc(100vh - 200px);
+  min-height: calc(100vh - 120px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-.auth-page::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-  animation: rotate 20s linear infinite;
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  background: #fafafa;
 }
 
 .auth-container {
   width: 100%;
-  max-width: 450px;
-  position: relative;
-  z-index: 1;
+  max-width: 400px;
 }
 
 .auth-card {
-  background: white;
-  border-radius: 20px;
-  padding: 3rem;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #fff;
+  border-radius: 12px;
+  padding: 2.5rem;
+  border: 1px solid #e5e5e5;
 }
 
 .auth-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 0.25rem;
 }
 
 .auth-subtitle {
   color: #666;
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.auth-form {
-  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
-  color: #2c3e50;
+  color: #1a1a1a;
   font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .form-group input[type="email"],
 .form-group input[type="password"],
 .form-group input[type="text"] {
   width: 100%;
-  padding: 0.875rem 1.125rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 10px;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-  box-sizing: border-box;
-  background: #f9fafb;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+  background: #fff;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #667eea;
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #1a1a1a;
 }
 
 .form-group input:disabled {
@@ -222,8 +146,8 @@ export default {
 
 .error-text {
   display: block;
-  color: #e74c3c;
-  font-size: 0.875rem;
+  color: #dc2626;
+  font-size: 0.8rem;
   margin-top: 0.25rem;
 }
 
@@ -231,53 +155,50 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
 }
 
-.checkbox-group label {
+.checkbox-label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0;
   cursor: pointer;
+  font-size: 0.9rem;
+  color: #666;
 }
 
-.checkbox-group input[type="checkbox"] {
-  width: auto;
-  margin: 0;
+.checkbox-label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
 }
 
 .forgot-link {
-  color: #667eea;
+  color: #666;
   text-decoration: none;
   font-size: 0.875rem;
-  transition: color 0.3s;
 }
 
 .forgot-link:hover {
-  color: #764ba2;
-  text-decoration: underline;
+  color: #1a1a1a;
 }
 
 .btn {
-  padding: 0.75rem 2rem;
+  padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.3);
+  background: #1a1a1a;
+  color: #fff;
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  background: #333;
 }
 
 .btn-primary:disabled {
@@ -290,43 +211,38 @@ export default {
 }
 
 .alert {
-  padding: 1rem;
+  padding: 0.875rem 1rem;
   border-radius: 8px;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
 }
 
 .alert-error {
-  background-color: #fee;
-  color: #c33;
-  border: 1px solid #fcc;
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
 }
 
 .auth-footer {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
   text-align: center;
   color: #666;
+  font-size: 0.9rem;
 }
 
 .auth-link {
-  color: #667eea;
+  color: #1a1a1a;
   text-decoration: none;
-  font-weight: 600;
-  transition: color 0.3s;
+  font-weight: 500;
 }
 
 .auth-link:hover {
-  color: #764ba2;
   text-decoration: underline;
 }
 
 @media (max-width: 480px) {
   .auth-card {
-    padding: 2rem 1.5rem;
-  }
-
-  .auth-title {
-    font-size: 1.75rem;
+    padding: 1.5rem;
   }
 }
 </style>
-

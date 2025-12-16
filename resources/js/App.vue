@@ -3,45 +3,29 @@
     <nav class="navbar">
       <div class="container">
         <div class="nav-brand">
-          <router-link to="/" class="nav-logo">Toporia</router-link>
+          <router-link to="/" class="nav-logo">
+            <svg viewBox="0 0 32 32" fill="none" class="logo-icon">
+              <rect width="32" height="32" rx="8" fill="#1a1a1a"/>
+              <path d="M8 12h16M8 16h12M8 20h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Toporia
+          </router-link>
         </div>
 
-        <!-- Hamburger Menu Button (Mobile) -->
-        <button
-          class="hamburger"
-          :class="{ active: isMenuOpen }"
-          @click="toggleMenu"
-          aria-label="Toggle menu"
-        >
+        <button class="hamburger" :class="{ active: isMenuOpen }" @click="toggleMenu" aria-label="Toggle menu">
           <span></span>
           <span></span>
           <span></span>
         </button>
 
-        <!-- Overlay (Mobile) -->
-        <div
-          v-if="isMenuOpen"
-          class="menu-overlay"
-          @click="closeMenu"
-        ></div>
+        <div v-if="isMenuOpen" class="menu-overlay" @click="closeMenu"></div>
 
-        <!-- Navigation Menu -->
         <ul class="nav-menu" :class="{ active: isMenuOpen }">
-          <li>
-            <router-link to="/" class="nav-link" @click="closeMenu">Home</router-link>
-          </li>
-          <li>
-            <router-link to="/about" class="nav-link" @click="closeMenu">About</router-link>
-          </li>
-          <li v-if="user">
-            <router-link to="/change-password" class="nav-link" @click="closeMenu">Change Password</router-link>
-          </li>
-          <li v-if="!user">
-            <router-link to="/login" class="nav-link" @click="closeMenu">Login</router-link>
-          </li>
-          <li v-if="!user">
-            <router-link to="/register" class="nav-link" @click="closeMenu">Register</router-link>
-          </li>
+          <li><router-link to="/" class="nav-link" @click="closeMenu">Home</router-link></li>
+          <li><router-link to="/about" class="nav-link" @click="closeMenu">About</router-link></li>
+          <li v-if="user"><router-link to="/change-password" class="nav-link" @click="closeMenu">Settings</router-link></li>
+          <li v-if="!user"><router-link to="/login" class="nav-link" @click="closeMenu">Login</router-link></li>
+          <li v-if="!user"><router-link to="/register" class="nav-link nav-link-primary" @click="closeMenu">Get Started</router-link></li>
           <li v-if="user" class="user-menu">
             <span class="user-name">{{ user.name }}</span>
             <button @click="handleLogout" class="btn-logout">Logout</button>
@@ -56,7 +40,7 @@
 
     <footer class="footer">
       <div class="container">
-        <p>&copy; {{ currentYear }} Toporia Framework. All rights reserved.</p>
+        <p>&copy; {{ currentYear }} Toporia Framework</p>
       </div>
     </footer>
   </div>
@@ -68,70 +52,42 @@ import { useAuthStore } from './stores/auth';
 export default {
   name: 'App',
   data() {
-    return {
-      isMenuOpen: false,
-    };
+    return { isMenuOpen: false };
   },
   computed: {
-    currentYear() {
-      return new Date().getFullYear();
-    },
-    user() {
-      return this.authStore.user;
-    },
+    currentYear() { return new Date().getFullYear(); },
+    user() { return this.authStore.user; },
   },
   setup() {
     const authStore = useAuthStore();
-
-    // Initialize auth on app load
     authStore.initialize();
-
-    return {
-      authStore,
-    };
+    return { authStore };
   },
   watch: {
-    isMenuOpen(newVal) {
-      // Prevent body scroll when menu is open
-      if (newVal) {
-        document.body.classList.add('menu-open');
-      } else {
-        document.body.classList.remove('menu-open');
-      }
+    isMenuOpen(val) {
+      document.body.classList[val ? 'add' : 'remove']('menu-open');
     },
   },
   methods: {
-    toggleMenu() {
-      this.isMenuOpen = !this.isMenuOpen;
-    },
-    closeMenu() {
-      this.isMenuOpen = false;
-    },
+    toggleMenu() { this.isMenuOpen = !this.isMenuOpen; },
+    closeMenu() { this.isMenuOpen = false; },
     async handleLogout() {
-      try {
-        await this.authStore.logout();
-        this.closeMenu();
-        this.$router.push('/login');
-      } catch (error) {
-        console.error('Logout error:', error);
-      }
+      await this.authStore.logout();
+      this.closeMenu();
+      this.$router.push('/login');
     },
   },
 };
 </script>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.6;
-  color: #333;
-  background-color: #f5f5f5;
+  color: #1a1a1a;
+  background-color: #fafafa;
 }
 
 #app {
@@ -141,17 +97,19 @@ body {
 }
 
 .container {
-  max-width: 1200px;
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 48px;
 }
 
-/* Navbar */
 .navbar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 1rem 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 0.75rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .navbar .container {
@@ -161,141 +119,96 @@ body {
 }
 
 .nav-logo {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: white;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a1a1a;
   text-decoration: none;
-  transition: opacity 0.3s;
 }
 
-.nav-logo:hover {
-  opacity: 0.8;
-}
+.nav-logo:hover { opacity: 0.8; }
+.logo-icon { width: 32px; height: 32px; }
 
-/* Hamburger Menu Button */
 .hamburger {
   display: none;
   flex-direction: column;
   justify-content: space-around;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 0;
   z-index: 1001;
-  transition: all 0.3s ease;
 }
 
 .hamburger span {
-  width: 2rem;
-  height: 3px;
-  background: white;
-  border-radius: 10px;
-  transition: all 0.3s ease;
-  transform-origin: center;
+  width: 1.75rem;
+  height: 2px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  transition: all 0.3s;
 }
 
-.hamburger.active span:nth-child(1) {
-  transform: rotate(45deg) translate(8px, 8px);
-}
-
-.hamburger.active span:nth-child(2) {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-.hamburger.active span:nth-child(3) {
-  transform: rotate(-45deg) translate(8px, -8px);
-}
-
-.hamburger:hover span {
-  background: rgba(255, 255, 255, 0.9);
-}
+.hamburger.active span:nth-child(1) { transform: rotate(45deg) translate(6px, 6px); }
+.hamburger.active span:nth-child(2) { opacity: 0; }
+.hamburger.active span:nth-child(3) { transform: rotate(-45deg) translate(6px, -6px); }
 
 .nav-menu {
   display: flex;
   list-style: none;
-  gap: 2rem;
-  transition: all 0.3s ease;
+  gap: 0.25rem;
+  align-items: center;
 }
 
 .nav-link {
-  color: white;
+  color: #666;
   text-decoration: none;
   font-weight: 500;
-  transition: opacity 0.3s;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 6px;
+  transition: all 0.2s;
 }
 
-.nav-link:hover {
-  opacity: 0.8;
-  background-color: rgba(255, 255, 255, 0.1);
-}
+.nav-link:hover { color: #1a1a1a; background: #f5f5f5; }
+.nav-link.router-link-active { color: #1a1a1a; background: #f0f0f0; }
 
-.nav-link.router-link-active {
-  background-color: rgba(255, 255, 255, 0.2);
-  font-weight: 600;
+.nav-link-primary {
+  background: #1a1a1a !important;
+  color: #fff !important;
 }
+.nav-link-primary:hover { background: #333 !important; }
 
-.user-menu {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.user-name {
-  color: white;
-  font-weight: 500;
-}
+.user-menu { display: flex; align-items: center; gap: 0.75rem; }
+.user-name { color: #1a1a1a; font-weight: 500; font-size: 0.9rem; }
 
 .btn-logout {
-  background-color: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  background: transparent;
+  color: #666;
+  border: 1px solid #ddd;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 0.85rem;
   font-weight: 500;
-  transition: all 0.3s;
 }
+.btn-logout:hover { background: #f5f5f5; color: #1a1a1a; }
 
-.btn-logout:hover {
-  background-color: rgba(255, 255, 255, 0.3);
-}
+.main-content { flex: 1; }
 
-/* Main Content */
-.main-content {
-  flex: 1;
-  padding: 2rem 0;
-}
-
-/* Footer */
 .footer {
-  background-color: #2c3e50;
-  color: white;
+  background: #fff;
+  border-top: 1px solid #e5e5e5;
+  color: #999;
   text-align: center;
-  padding: 1.5rem 0;
-  margin-top: auto;
+  padding: 1.25rem 0;
+  font-size: 0.875rem;
 }
 
-/* Page Transitions */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* Responsive Design */
 @media (max-width: 768px) {
-  .hamburger {
-    display: flex;
-  }
+  .hamburger { display: flex; }
 
   .nav-menu {
     position: fixed;
@@ -303,110 +216,46 @@ body {
     right: -100%;
     width: 280px;
     height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #fff;
     flex-direction: column;
-    padding: 5rem 2rem 2rem;
-    gap: 0;
-    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
-    transition: right 0.3s ease-in-out;
+    padding: 5rem 1.5rem 2rem;
+    gap: 0.25rem;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    transition: right 0.3s;
     z-index: 1000;
-    overflow-y: auto;
+    align-items: stretch;
   }
 
-  .nav-menu.active {
-    right: 0;
-  }
-
-  .nav-menu li {
-    width: 100%;
-    margin-bottom: 0.5rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding-bottom: 0.5rem;
-  }
-
-  .nav-menu li:last-child {
-    border-bottom: none;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
+  .nav-menu.active { right: 0; }
+  .nav-menu li { width: 100%; }
 
   .nav-link {
     display: block;
-    width: 100%;
-    padding: 1rem;
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
     border-radius: 8px;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
   }
 
-  .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.15);
-    transform: translateX(5px);
-  }
-
-  .nav-link.router-link-active {
-    background-color: rgba(255, 255, 255, 0.25);
-    font-weight: 600;
-  }
+  .nav-link-primary { text-align: center; margin-top: 0.5rem; }
 
   .user-menu {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-    width: 100%;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid #e5e5e5;
   }
 
-  .user-name {
-    font-size: 1.1rem;
-    padding: 0.5rem 0;
-  }
+  .btn-logout { width: 100%; padding: 0.75rem; }
 
-  .btn-logout {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    font-size: 1rem;
-  }
-
-  /* Overlay when menu is open */
   .menu-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.5);
+    inset: 0;
+    background: rgba(0,0,0,0.3);
     z-index: 999;
-    animation: fadeIn 0.3s ease;
-    backdrop-filter: blur(2px);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Tablet adjustments */
-@media (max-width: 1024px) and (min-width: 769px) {
-  .nav-menu {
-    gap: 1.5rem;
   }
 
-  .nav-link {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.95rem;
-  }
-}
-
-/* Prevent body scroll when menu is open on mobile */
-@media (max-width: 768px) {
-  body.menu-open {
-    overflow: hidden;
-  }
+  body.menu-open { overflow: hidden; }
 }
 </style>
