@@ -61,7 +61,7 @@ composer test:coverage                     # Generate HTML coverage in coverage/
 make test                                  # Run tests in Docker
 
 # Static Analysis
-./vendor/bin/phpstan analyse
+./vendor/bin/phpstan analyse                       # Run static analysis
 
 # Code Generation (make:*)
 php console make:controller Name           # Create controller
@@ -126,7 +126,7 @@ resources/                # Frontend assets
 └── views/               # PHP templates (used as SPA shell)
 ```
 
-1. **Framework Layer** (`packages/framework/src/`) - Zero-dependency mini-framework with Container, Routing, Http, Events, Console, Bus, Database/ORM, Queue, Cache, Auth, Validation, Log, Realtime, Search components. Also includes `toporia/dominion` package for additional utilities.
+1. **Framework Layer** (`packages/framework/src/`) - Zero-dependency mini-framework with Container, Routing, Http, Events, Console, Bus, Database/ORM, Queue, Cache, Auth, Validation, Log, Realtime, Search components. Related packages: `toporia/dominion` (utilities) and `toporia/docura` (documentation).
 
 2. **Domain Layer** (`app/Domain/`) - Pure business logic:
    - Entities in `Domain/Entities/` (plain PHP classes with readonly properties)
@@ -372,7 +372,7 @@ Terminal::command('deploy:prepare', function () {
 - If unsure between Laravel and Toporia behavior, ALWAYS choose Toporia
 - If a method does not exist, do NOT create a Laravel-like one - use or propose the equivalent Toporia-style method
 
-**Toporia ORM supported methods** (similar names but Toporia implementation):
+**Toporia ORM supported methods** (similar method names but Toporia's own implementation - NOT Laravel/Eloquent):
 - `with()` - Eager loading relationships
 - `hasOne()`, `hasMany()`, `belongsTo()`, `belongsToMany()` - Basic relationship definitions
 - `hasOneThrough()`, `hasManyThrough()` - Through relationships
@@ -432,20 +432,21 @@ When implementing features:
 
 ## Optional Packages
 
-Toporia supports optional packages for extended functionality (in `packages/` directory):
+Toporia supports optional packages for extended functionality (source in `packages/` directory, installed via composer path repositories):
 
-- **Socialite** (`packages/socialite`) - OAuth authentication (Google, Facebook, GitHub, etc.) - See [docs/SOCIALITE.md](docs/SOCIALITE.md)
+- **Socialite** (`toporia/socialite`) - OAuth authentication (Google, Facebook, GitHub, etc.) - See [docs/SOCIALITE.md](docs/SOCIALITE.md)
   - Install: `composer require toporia/socialite` + `php console vendor:publish --tag=socialite-routes`
   - Routes: [routes/socialite.php](routes/socialite.php) (OAuth redirect/callback endpoints)
 
-- **Webhook** (`packages/webhook`) - Webhook handling and verification - See [docs/WEBHOOK.md](docs/WEBHOOK.md)
+- **Webhook** (`toporia/webhook`) - Webhook handling and verification - See [docs/WEBHOOK.md](docs/WEBHOOK.md)
   - Install: `composer require toporia/webhook` + `php console vendor:publish --tag=webhook-routes`
   - Routes: [routes/webhook.php](routes/webhook.php) (Inbound webhook endpoints)
 
-- **MongoDB** (`packages/mongodb`) - MongoDB support with ORM-like interface (requires `mongodb/mongodb` composer package and `ext-mongodb` PHP extension)
-- **API Versioning** (`packages/api-versioning`) - API versioning support
-- **Audit** (`packages/audit`) - Audit logging for models
-- **Tenancy** (`packages/tenancy`) - Multi-tenancy support
+- **Audit** (`toporia/audit`) - Audit logging for models
+- **API Versioning** (`toporia/api-versioning`) - API versioning support
+- **Tenancy** (`toporia/tenancy`) - Multi-tenancy support
+- **Dominion** (`toporia/dominion`) - Utility helpers and support classes
+- **Docura** (`toporia/docura`) - Documentation utilities
 
 **Package Installation Workflow**:
 1. Install via composer: `composer require toporia/package-name`
