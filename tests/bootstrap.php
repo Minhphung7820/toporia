@@ -20,6 +20,7 @@ define('TESTING', true);
 require_once __DIR__ . '/../vendor/autoload.php';
 
 // Load framework helpers if needed (loaded via composer autoload from toporia/framework)
+require_once __DIR__ . '/../bootstrap/helpers.php';
 
 // Set timezone for consistent test results
 date_default_timezone_set('UTC');
