@@ -26,7 +26,8 @@
         "toporia/api-versioning": "@dev",
         "toporia/tenancy": "@dev",
         "toporia/dominion": "@dev",
-        "toporia/docura": "@dev"
+        "toporia/docura": "dev-main",
+        "toporia/tabula": "dev-main"
     },
     "require-dev": {
         "jetbrains/phpstorm-stubs": "*",

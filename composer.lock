@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "86673a95a5a8d1205e05e1431817bf85",
+    "content-hash": "9f54e9c45fba6db476df041ec61d0e7b",
     "packages": [
         {
             "name": "amphp/amp",
@@ -3399,7 +3399,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/docura",
-                "reference": "89b427ab9608eedde6bad563c19346892471d103"
+                "reference": "fa8d9186c8b7dde0fcfafe1b6db8dc5698fa4407"
             },
             "require": {
                 "dompdf/dompdf": "^3.1",
@@ -3626,7 +3626,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/framework",
-                "reference": "acf06dd8eaecefdd656274f7e151d55c3e8f244c"
+                "reference": "a25373d4ddc4f3d0459d07ed9e5e82ca2797cafb"
             },
             "require": {
                 "php": ">=8.1",
@@ -3734,6 +3734,72 @@
                 "oauth",
                 "social-login",
                 "socialite",
+                "toporia"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "toporia/tabula",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/tabula",
+                "reference": "acc1521e41c547274c8c897934182b8a22bca677"
+            },
+            "require": {
+                "openspout/openspout": "^4.0",
+                "php": ">=8.1",
+                "toporia/framework": "^1.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^11.0"
+            },
+            "suggest": {
+                "phpoffice/phpspreadsheet": "For advanced Excel features (formatting, formulas, etc.)"
+            },
+            "type": "library",
+            "extra": {
+                "toporia": {
+                    "providers": [
+                        "Toporia\\Tabula\\TabulaServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\Tabula\\": "src/"
+                },
+                "files": [
+                    "helpers.php"
+                ]
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Toporia\\Tabula\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Phungtruong7820",
+                    "email": "minhphung485@gmail.com"
+                }
+            ],
+            "description": "High-performance Excel/CSV import & export for Toporia Framework - handles millions of rows",
+            "keywords": [
+                "batch-processing",
+                "csv",
+                "excel",
+                "export",
+                "import",
+                "large-files",
+                "spreadsheet",
+                "streaming",
                 "toporia"
             ],
             "transport-options": {
@@ -5803,6 +5869,7 @@
         "toporia/example-package": 20,
         "toporia/framework": 20,
         "toporia/socialite": 20,
+        "toporia/tabula": 20,
         "toporia/tenancy": 20,
         "toporia/webhook": 20
     },
