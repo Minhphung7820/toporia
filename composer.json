@@ -19,7 +19,13 @@
         "elasticsearch/elasticsearch": "^8.13",
         "phpoffice/phpspreadsheet": "^5.2",
         "openspout/openspout": "^4.28",
-        "mongodb/mongodb": "^0.2.0"
+        "toporia/example-package": "@dev",
+        "toporia/socialite": "@dev",
+        "toporia/webhook": "@dev",
+        "toporia/audit": "@dev",
+        "toporia/api-versioning": "@dev",
+        "toporia/tenancy": "@dev",
+        "toporia/dominion": "@dev"
     },
     "require-dev": {
         "jetbrains/phpstorm-stubs": "*",
@@ -28,7 +34,6 @@
         "fakerphp/faker": "^1.24"
     },
     "suggest": {
-        "mongodb/mongodb": "Required for MongoDB support (toporia/mongodb package)",
         "ext-mongodb": "Required for MongoDB PHP extension",
         "ext-redis": "Required for Redis Pub/Sub broker and cache driver",
         "ext-rdkafka": "Required for high-performance Kafka broker",
@@ -52,7 +57,10 @@
     "repositories": [
         {
             "type": "path",
-            "url": "packages/framework"
+            "url": "packages/*",
+            "options": {
+                "symlink": true
+            }
         }
     ],
     "config": {

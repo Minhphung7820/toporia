@@ -1776,6 +1776,12 @@ if (!function_exists('response')) {
      */
     function response(mixed $content = '', int $status = 200, array $headers = []): \Toporia\Framework\Http\Response
     {
+        // Return JsonResponse for array/object content
+        if (is_array($content) || is_object($content)) {
+            return new \Toporia\Framework\Http\JsonResponse($content, $status, $headers);
+        }
+
+        // Return regular Response for string/HTML content
         $response = new \Toporia\Framework\Http\Response();
 
         // Set headers first
@@ -1783,13 +1789,9 @@ if (!function_exists('response')) {
             $response->header($key, $value);
         }
 
-        if (is_array($content) || is_object($content)) {
-            $response->json($content, $status);
-        } else {
-            $response->setStatus($status);
-            if ($content !== '') {
-                $response->html((string) $content, $status);
-            }
+        $response->setStatus($status);
+        if ($content !== '') {
+            $response->html((string) $content, $status);
         }
 
         return $response;

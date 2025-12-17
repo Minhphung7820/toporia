@@ -88,6 +88,24 @@ const router = createRouter({
 
 // Navigation guard
 router.beforeEach(async (to, from, next) => {
+    // Skip Vue Router for backend routes (let server handle them)
+    const backendPaths = ['/api/', '/auth/socialite/'];
+    const isBackendRoute = backendPaths.some(path => to.path.startsWith(path));
+
+    if (isBackendRoute) {
+        // If this is initial page load (from.matched.length === 0),
+        // abort Vue Router and let browser handle it naturally
+        if (from.matched.length === 0) {
+            // Initial navigation - abort Vue Router
+            next(false);
+            return;
+        }
+
+        // For navigation from another page, do full page load
+        window.location.replace(to.fullPath);
+        return;
+    }
+
     const authStore = useAuthStore();
 
     // Ensure auth is initialized

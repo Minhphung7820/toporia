@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e72357475109b0cad43c167152410faf",
+    "content-hash": "4c4bc376b5698289f6ec9fe44d6e3156",
     "packages": [
         {
             "name": "amphp/amp",
@@ -919,66 +919,6 @@
                 "source": "https://github.com/MarkBaker/PHPMatrix/tree/3.0.1"
             },
             "time": "2022-12-02T22:17:43+00:00"
-        },
-        {
-            "name": "mongodb/mongodb",
-            "version": "0.2.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/mongodb/mongo-php-library.git",
-                "reference": "98e14e8dc9a0c35e864baf999dc12433e937accd"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/mongodb/mongo-php-library/zipball/98e14e8dc9a0c35e864baf999dc12433e937accd",
-                "reference": "98e14e8dc9a0c35e864baf999dc12433e937accd",
-                "shasum": ""
-            },
-            "require": {
-                "ext-mongodb": ">=0.6.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "0.2.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "MongoDB\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "Apache-2.0"
-            ],
-            "authors": [
-                {
-                    "name": "Jeremy Mikola",
-                    "email": "jmikola@gmail.com"
-                },
-                {
-                    "name": "Hannes Magnusson",
-                    "email": "bjori@mongodb.com"
-                },
-                {
-                    "name": "Derick Rethans",
-                    "email": "github@derickrethans.nl"
-                }
-            ],
-            "description": "MongoDB driver library",
-            "homepage": "https://jira.mongodb.org/browse/PHPLIB",
-            "keywords": [
-                "database",
-                "driver",
-                "mongodb",
-                "persistence"
-            ],
-            "support": {
-                "issues": "https://github.com/mongodb/mongo-php-library/issues",
-                "source": "https://github.com/mongodb/mongo-php-library/tree/0.2.0"
-            },
-            "time": "2015-05-12T23:33:27+00:00"
         },
         {
             "name": "mtdowling/jmespath.php",
@@ -2537,12 +2477,247 @@
             "time": "2024-12-23T08:48:59+00:00"
         },
         {
+            "name": "toporia/api-versioning",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/api-versioning",
+                "reference": "81f334ba3684b4ff7c6134dc04c12cc9fbb18d51"
+            },
+            "require": {
+                "php": "^8.1",
+                "toporia/framework": "^1.0"
+            },
+            "type": "library",
+            "extra": {
+                "toporia": {
+                    "providers": [
+                        "Toporia\\ApiVersioning\\ApiVersioningServiceProvider"
+                    ],
+                    "config": {
+                        "api": "config/api.php"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\ApiVersioning\\": "src/"
+                },
+                "files": [
+                    "src/helpers.php"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Phungtruong7820",
+                    "email": "minhphung485@gmail.com"
+                }
+            ],
+            "description": "API versioning support for Toporia Framework",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "toporia/audit",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/audit",
+                "reference": "b43bd8ed23e096622d0e6c0b36238c35c6cfbbf3"
+            },
+            "require": {
+                "php": "^8.1",
+                "toporia/framework": "^1.0"
+            },
+            "type": "library",
+            "extra": {
+                "toporia": {
+                    "providers": [
+                        "Toporia\\Audit\\AuditServiceProvider"
+                    ],
+                    "config": {
+                        "audit": "config/audit.php"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\Audit\\": "src/"
+                },
+                "files": [
+                    "src/helpers.php"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Phungtruong7820",
+                    "email": "minhphung485@gmail.com"
+                }
+            ],
+            "description": "Audit logging for Toporia Framework",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "toporia/dominion",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/dominion",
+                "reference": "f45fc6569849e28ad8920341c484324b8a58f163"
+            },
+            "require": {
+                "php": ">=8.1",
+                "toporia/framework": "^1.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^11.0"
+            },
+            "type": "library",
+            "extra": {
+                "toporia": {
+                    "providers": [
+                        "Toporia\\Dominion\\DominionServiceProvider"
+                    ],
+                    "config": {
+                        "dominion": "config/dominion.php"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\Dominion\\": "src/"
+                },
+                "files": [
+                    "helpers.php"
+                ]
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Toporia\\Dominion\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Phungtruong7820",
+                    "email": "minhphung485@gmail.com"
+                }
+            ],
+            "description": "Enterprise-grade Role-Based Access Control (RBAC) package for Toporia Framework",
+            "keywords": [
+                "access-control",
+                "acl",
+                "authorization",
+                "dominion",
+                "permissions",
+                "rbac",
+                "roles",
+                "toporia"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "toporia/example-package",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/example-package",
+                "reference": "57c75431c1eb0512a55210254ad846efe1d24343"
+            },
+            "require": {
+                "php": ">=8.1"
+            },
+            "type": "library",
+            "extra": {
+                "toporia": {
+                    "providers": [
+                        "Toporia\\ExamplePackage\\ExampleServiceProvider"
+                    ],
+                    "config": {
+                        "example": "config/example.php"
+                    },
+                    "routes": [
+                        {
+                            "path": "routes/web.php",
+                            "middleware": [
+                                "web"
+                            ],
+                            "prefix": "example",
+                            "namespace": "Toporia\\ExamplePackage\\Controllers"
+                        },
+                        {
+                            "path": "routes/api.php",
+                            "middleware": [
+                                "api"
+                            ],
+                            "prefix": "api/example",
+                            "namespace": "Toporia\\ExamplePackage\\Controllers"
+                        }
+                    ],
+                    "middleware": {
+                        "groups": {
+                            "web": [
+                                "Toporia\\ExamplePackage\\Middleware\\ExampleWebMiddleware"
+                            ],
+                            "api": [
+                                "Toporia\\ExamplePackage\\Middleware\\ExampleApiMiddleware"
+                            ]
+                        },
+                        "aliases": {
+                            "example.check": "Toporia\\ExamplePackage\\Middleware\\ExampleCheckMiddleware"
+                        }
+                    },
+                    "commands": [
+                        "Toporia\\ExamplePackage\\Console\\ExampleCommand"
+                    ],
+                    "aliases": {
+                        "ExampleService": "Toporia\\ExamplePackage\\ExampleService"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\ExamplePackage\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Toporia Framework",
+                    "email": "dev@toporia.com"
+                }
+            ],
+            "description": "Example Toporia package demonstrating full auto-discovery capabilities",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "toporia/framework",
             "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/framework",
-                "reference": "f4666df924160c7ef888c5d1718b08e9c429dee5"
+                "reference": "186ac0736bd7396c574ffd2837cae8f52070a28b"
             },
             "require": {
                 "php": ">=8.1",
@@ -2591,6 +2766,157 @@
             ],
             "description": "Toporia Framework - A modern PHP framework with Clean Architecture",
             "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "toporia/socialite",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/socialite",
+                "reference": "15aed7c79820034d9372f9c5bca0f3af2653ccc0"
+            },
+            "require": {
+                "php": ">=8.1",
+                "toporia/framework": "^1.0"
+            },
+            "type": "library",
+            "extra": {
+                "toporia": {
+                    "providers": [
+                        "Toporia\\Socialite\\SocialiteServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\Socialite\\": "src/"
+                },
+                "files": [
+                    "helpers.php"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Phungtruong7820",
+                    "email": "minhphung485@gmail.com"
+                }
+            ],
+            "description": "OAuth social authentication for Toporia Framework",
+            "keywords": [
+                "authentication",
+                "facebook",
+                "github",
+                "google",
+                "oauth",
+                "social-login",
+                "socialite",
+                "toporia"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "toporia/tenancy",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/tenancy",
+                "reference": "3de96c96014de8652931cb05ec43cdc7af669a78"
+            },
+            "require": {
+                "php": "^8.1",
+                "toporia/framework": "^1.0"
+            },
+            "type": "library",
+            "extra": {
+                "toporia": {
+                    "providers": [
+                        "Toporia\\Tenancy\\TenancyServiceProvider"
+                    ],
+                    "config": {
+                        "tenancy": "config/tenancy.php"
+                    }
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\Tenancy\\": "src/"
+                },
+                "files": [
+                    "src/helpers.php"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Phungtruong7820",
+                    "email": "minhphung485@gmail.com"
+                }
+            ],
+            "description": "Multi-tenancy support for Toporia Framework",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "toporia/webhook",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "packages/webhook",
+                "reference": "0cd1a9b826fec3202e41a06c564d0acb59c582a1"
+            },
+            "require": {
+                "php": ">=8.1",
+                "toporia/framework": "^1.0"
+            },
+            "type": "library",
+            "extra": {
+                "toporia": {
+                    "providers": [
+                        "Toporia\\Webhook\\WebhookServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Toporia\\Webhook\\": "src/"
+                },
+                "files": [
+                    "helpers.php"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Phungtruong7820",
+                    "email": "minhphung485@gmail.com"
+                }
+            ],
+            "description": "Webhook dispatching and receiving for Toporia Framework",
+            "keywords": [
+                "http",
+                "inbound",
+                "outbound",
+                "signature",
+                "toporia",
+                "webhook"
+            ],
+            "transport-options": {
+                "symlink": true,
                 "relative": true
             }
         }
@@ -4612,7 +4938,14 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "toporia/framework": 20
+        "toporia/api-versioning": 20,
+        "toporia/audit": 20,
+        "toporia/dominion": 20,
+        "toporia/example-package": 20,
+        "toporia/framework": 20,
+        "toporia/socialite": 20,
+        "toporia/tenancy": 20,
+        "toporia/webhook": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,

@@ -13,6 +13,11 @@ use Toporia\Framework\Support\Accessors\Route;
 use App\Presentation\Http\Controllers\AppController;
 use App\Presentation\Http\Controllers\TestController;
 use App\Presentation\Http\Controllers\RealtimeDemoController;
+use App\Presentation\Http\Controllers\OAuthController;
+
+// OAuth Success/Error Handlers (called by Socialite package)
+Route::get('/auth/socialite/success', [OAuthController::class, 'success'])->name('oauth.success');
+Route::get('/auth/socialite/error', [OAuthController::class, 'error'])->name('oauth.error');
 
 // Realtime Demo Page - WebSocket + Redis Notification Demo
 Route::get('/realtime-demo', [RealtimeDemoController::class, 'index']);
