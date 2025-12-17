@@ -168,10 +168,11 @@ resources/                # Frontend assets
 - [public/index.php](public/index.php) → [bootstrap/app.php](bootstrap/app.php) - Entry point and bootstrap
 - [bootstrap/helpers.php](bootstrap/helpers.php) - Global helper functions (50+ helpers)
 - [routes/web.php](routes/web.php), [routes/api.php](routes/api.php) - Web and API routes
+- [routes/terminal.php](routes/terminal.php) - Closure-based console commands
 - [routes/webhook.php](routes/webhook.php), [routes/socialite.php](routes/socialite.php) - Optional package routes
 - [app/Infrastructure/Providers/RouteServiceProvider.php](app/Infrastructure/Providers/RouteServiceProvider.php) - Route loading logic
 - [config/middleware.php](config/middleware.php) - Middleware groups and aliases
-- [app/Presentation/Console/Kernel.php](app/Presentation/Console/Kernel.php) - Register console commands
+- [config/commands.php](config/commands.php) - Register console commands
 - [config/observers.php](config/observers.php) - Register model observers
 - [vite.config.js](vite.config.js) - Vite configuration for frontend build
 - [resources/js/main.js](resources/js/main.js) - Vue app entry point
@@ -295,6 +296,8 @@ $users = UserModel::with(['posts', 'profile'])->get(); // Eager loading
 
 ### Console Commands
 
+**Class-based Commands** (for complex commands):
+
 ```php
 final class MyCommand extends Command
 {
@@ -309,7 +312,45 @@ final class MyCommand extends Command
 }
 ```
 
-Register in [app/Presentation/Console/Kernel.php](app/Presentation/Console/Kernel.php).
+Register in [config/commands.php](config/commands.php).
+
+**Closure-based Commands** (for simple commands in [routes/terminal.php](routes/terminal.php)):
+
+```php
+use Toporia\Framework\Support\Accessors\Terminal;
+
+// Simple command with argument
+Terminal::command('mail:send {user}', function (string $user) {
+    $this->info("Sending email to: {$user}");
+})->describe('Send marketing email');
+
+// With dependency injection
+Terminal::command('db:stats', function (DatabaseManager $db) {
+    $stats = $db->getStats();
+    $this->table(['Metric', 'Value'], $stats);
+})->describe('Display database statistics');
+
+// With options
+Terminal::command('cache:clear {--tags=* : Tags to clear}', function () {
+    $tags = $this->option('tags');
+    // Clear cache logic
+})->describe('Clear cache with optional tags');
+
+// Command chaining (orchestration)
+Terminal::command('deploy:prepare', function () {
+    $this->call('config:cache');
+    $this->call('route:cache');
+    $this->call('migrate', ['--force' => true]);
+    $this->info('Deployment ready!');
+})->describe('Prepare deployment');
+```
+
+**Key Features**:
+- Automatic dependency injection via type hints
+- Access to all Command methods: `$this->info()`, `$this->ask()`, `$this->table()`, `$this->call()`
+- Support for arguments and options with Laravel-like syntax
+- Fluent API with `->describe()` for help text
+- Perfect for quick utilities, maintenance tasks, and command orchestration
 
 ## Code Conventions
 
