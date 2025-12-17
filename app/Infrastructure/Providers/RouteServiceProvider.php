@@ -7,13 +7,18 @@ namespace App\Infrastructure\Providers;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Foundation\Application;
+use Toporia\Framework\Foundation\PackageManifest;
 use Toporia\Framework\Routing\Router;
 
 /**
  * Route Service Provider
  *
- * This provider is responsible for loading application routes with middleware groups.
- * Routes are separated by type (web, api) and each gets appropriate middleware.
+ * This provider is responsible for loading application and package routes.
+ *
+ * Route Loading Order (important for catch-all routes):
+ * 1. API routes (specific paths, loaded first)
+ * 2. Package routes (auto-discovered from packages)
+ * 3. Web routes (may include catch-all, loaded last)
  */
 class RouteServiceProvider extends ServiceProvider
 {
@@ -32,16 +37,13 @@ class RouteServiceProvider extends ServiceProvider
         $middlewareConfig = $container->get('config')->get('middleware', []);
         $middlewareGroups = $middlewareConfig['groups'] ?? [];
 
-        // Load API routes FIRST (before web routes) to ensure they match before catch-all
+        // STEP 1: Load API routes FIRST (specific paths before catch-all)
         $this->loadApiRoutes($app, $router, $middlewareGroups['api'] ?? []);
 
-        // Load webhook routes (no prefix, no middleware group by default)
-        $this->loadWebhookRoutes($app, $router);
+        // STEP 2: Load package routes (auto-discovered from packages)
+        $this->loadPackageRoutes($container, $router);
 
-        // Load socialite routes (no prefix, no middleware group by default)
-        $this->loadSocialiteRoutes($app, $router);
-
-        // Load web routes with 'web' middleware group (catch-all should be last)
+        // STEP 3: Load web routes LAST (may contain SPA catch-all route)
         $this->loadWebRoutes($app, $router, $middlewareGroups['web'] ?? []);
     }
 
@@ -89,31 +91,83 @@ class RouteServiceProvider extends ServiceProvider
     }
 
     /**
-     * Load webhook routes.
+     * Load routes from packages auto-discovered via PackageManifest.
      *
-     * @param Application $app
+     * This method loads all routes registered by packages in their composer.json
+     * under extra.toporia.routes configuration. Routes are loaded with their
+     * specified middleware, prefix, and namespace.
+     *
+     * Performance: O(N) where N = number of package route files
+     *
+     * @param ContainerInterface $container
      * @param Router $router
      * @return void
      */
-    protected function loadWebhookRoutes(Application $app, Router $router): void
+    protected function loadPackageRoutes(ContainerInterface $container, Router $router): void
     {
-        $path = $app->path('routes/webhook.php');
-        if (file_exists($path)) {
-            require $path;
+        // Get package manifest singleton (performance: reuse across all providers)
+        $manifest = $container->get(PackageManifest::class);
+
+        // Get all package routes
+        $packageRoutes = $manifest->routes();
+
+        if (empty($packageRoutes)) {
+            return;
+        }
+
+        // Load each package's routes
+        foreach ($packageRoutes as $packageName => $routes) {
+            if (!is_array($routes)) {
+                continue;
+            }
+
+            foreach ($routes as $routeConfig) {
+                $this->loadPackageRouteFile($router, $routeConfig);
+            }
         }
     }
 
     /**
-     * Load socialite routes.
+     * Load a single route file from a package.
      *
-     * @param Application $app
      * @param Router $router
+     * @param array<string, mixed> $routeConfig Route configuration
      * @return void
      */
-    protected function loadSocialiteRoutes(Application $app, Router $router): void
+    protected function loadPackageRouteFile(Router $router, array $routeConfig): void
     {
-        $path = $app->path('routes/socialite.php');
-        if (file_exists($path)) {
+        $path = $routeConfig['path'] ?? null;
+
+        if (!$path || !file_exists($path)) {
+            return;
+        }
+
+        // Build route group attributes
+        $attributes = [];
+
+        if (!empty($routeConfig['middleware'])) {
+            $attributes['middleware'] = (array) $routeConfig['middleware'];
+        }
+
+        if (!empty($routeConfig['prefix'])) {
+            $attributes['prefix'] = $routeConfig['prefix'];
+        }
+
+        if (!empty($routeConfig['namespace'])) {
+            $attributes['namespace'] = $routeConfig['namespace'];
+        }
+
+        if (!empty($routeConfig['name'])) {
+            $attributes['name'] = $routeConfig['name'];
+        }
+
+        // Load route file within group (if attributes exist)
+        if (!empty($attributes)) {
+            $router->group($attributes, function (Router $router) use ($path) {
+                require $path;
+            });
+        } else {
+            // Load directly if no group attributes
             require $path;
         }
     }
