@@ -251,7 +251,8 @@ const populateForm = (postData) => {
   form.slug = postData.slug || '';
   form.excerpt = postData.excerpt || '';
   form.content = postData.content || '';
-  form.category_id = postData.category_id || '';
+  // Ensure category_id is a number for proper select matching
+  form.category_id = postData.category_id ? Number(postData.category_id) : '';
   form.tags = postData.tags?.map((t) => t.name) || [];
   form.featured_image = postData.featured_image || '';
   form.is_featured = postData.is_featured || false;
@@ -316,7 +317,7 @@ watch(post, (newPost) => {
   if (newPost) {
     populateForm(newPost);
   }
-});
+}, { immediate: true });
 
 onMounted(async () => {
   await Promise.all([
@@ -324,6 +325,10 @@ onMounted(async () => {
     categoriesStore.fetchSelectOptions(),
   ]);
   categories.value = categoriesStore.selectOptions;
+  // Populate form after data is loaded
+  if (postsStore.currentPost) {
+    populateForm(postsStore.currentPost);
+  }
 });
 </script>
 
@@ -507,6 +512,7 @@ onMounted(async () => {
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
 .sidebar-section h3 {
@@ -516,12 +522,23 @@ onMounted(async () => {
   margin: 0 0 12px 0;
 }
 
-.sidebar-section select {
+.sidebar-section select,
+.sidebar-section input,
+.sidebar-section textarea {
   width: 100%;
+  max-width: 100%;
   padding: 8px 12px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-size: 14px;
+  box-sizing: border-box;
+}
+
+.sidebar-section input:focus,
+.sidebar-section textarea:focus,
+.sidebar-section select:focus {
+  outline: none;
+  border-color: #667eea;
 }
 
 .status-section .status-info {
@@ -588,10 +605,12 @@ onMounted(async () => {
 
 .datetime-input {
   width: 100%;
+  max-width: 100%;
   padding: 8px 12px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 .danger-zone {

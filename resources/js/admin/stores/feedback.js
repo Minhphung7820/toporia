@@ -13,6 +13,16 @@ export const useFeedbackStore = defineStore('admin-feedback', {
       lastPage: 1,
       perPage: 20,
       total: 0,
+      from: 0,
+      to: 0,
+    },
+    pendingPagination: {
+      currentPage: 1,
+      lastPage: 1,
+      perPage: 20,
+      total: 0,
+      from: 0,
+      to: 0,
     },
     filters: {
       search: '',
@@ -45,12 +55,16 @@ export const useFeedbackStore = defineStore('admin-feedback', {
         };
         const response = await feedback.list(params);
         if (response.data.success) {
-          this.items = response.data.data.items;
+          const data = response.data.data;
+          // Paginator returns { data: [...], current_page, last_page, per_page, total, from, to }
+          this.items = data.data || [];
           this.pagination = {
-            currentPage: response.data.data.current_page,
-            lastPage: response.data.data.last_page,
-            perPage: response.data.data.per_page,
-            total: response.data.data.total,
+            currentPage: data.current_page || 1,
+            lastPage: data.last_page || 1,
+            perPage: data.per_page || 20,
+            total: data.total || 0,
+            from: data.from || 0,
+            to: data.to || 0,
           };
         }
       } catch (error) {
@@ -60,13 +74,27 @@ export const useFeedbackStore = defineStore('admin-feedback', {
       }
     },
 
+    setPerPage(perPage) {
+      this.pagination.perPage = perPage;
+    },
+
     async fetchPending(page = 1) {
       this.loading = true;
       try {
-        const params = { page, per_page: 20 };
+        const params = { page, per_page: this.pendingPagination.perPage };
         const response = await feedback.pending(params);
         if (response.data.success) {
-          this.pendingItems = response.data.data.items;
+          const data = response.data.data;
+          // Paginator returns { data: [...], current_page, last_page, per_page, total, from, to }
+          this.pendingItems = data.data || [];
+          this.pendingPagination = {
+            currentPage: data.current_page || 1,
+            lastPage: data.last_page || 1,
+            perPage: data.per_page || 20,
+            total: data.total || 0,
+            from: data.from || 0,
+            to: data.to || 0,
+          };
         }
       } catch (error) {
         this.error = error.response?.data?.message || 'Failed to fetch pending feedback';
@@ -81,7 +109,9 @@ export const useFeedbackStore = defineStore('admin-feedback', {
         const params = { page, per_page: 20 };
         const response = await feedback.myAssigned(params);
         if (response.data.success) {
-          this.myAssigned = response.data.data.items;
+          const data = response.data.data;
+          // Paginator returns { data: [...], current_page, last_page, per_page, total, from, to }
+          this.myAssigned = data.data || [];
         }
       } catch (error) {
         this.error = error.response?.data?.message || 'Failed to fetch assigned feedback';

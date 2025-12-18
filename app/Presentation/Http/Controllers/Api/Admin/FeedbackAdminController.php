@@ -43,7 +43,7 @@ final class FeedbackAdminController extends BaseController
         $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 20), 100);
 
-        $result = $this->feedbackAdminService->getAllFeedback($filters, $page, $perPage);
+        $result = $this->feedbackAdminService->getPaginated($filters, $page, $perPage);
 
         return $this->json($result);
     }
@@ -58,7 +58,7 @@ final class FeedbackAdminController extends BaseController
         $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 20), 100);
 
-        $result = $this->feedbackAdminService->getPendingFeedback($page, $perPage);
+        $result = $this->feedbackAdminService->getPending($page, $perPage);
 
         return $this->json($result);
     }

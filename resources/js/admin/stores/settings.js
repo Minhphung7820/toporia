@@ -45,10 +45,11 @@ export const useSettingsStore = defineStore('admin-settings', {
       try {
         const response = await settings.groups();
         if (response.data.success) {
-          this.groups = response.data.data;
+          this.groups = Array.isArray(response.data.data) ? response.data.data : [];
         }
       } catch (error) {
         console.error('Failed to fetch groups:', error);
+        this.groups = [];
       }
     },
 

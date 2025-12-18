@@ -139,8 +139,12 @@
         v-if="pagination.lastPage > 1"
         :current-page="pagination.currentPage"
         :last-page="pagination.lastPage"
+        :per-page="pagination.perPage"
         :total="pagination.total"
+        :from="pagination.from"
+        :to="pagination.to"
         @page-change="goToPage"
+        @per-page-change="onPerPageChange"
       />
 
       <ConfirmDialog
@@ -158,31 +162,57 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
-import Pagination from '../../../components/shared/Pagination.vue';
+import Pagination from '../../components/shared/Pagination.vue';
 import ConfirmDialog from '../../components/shared/ConfirmDialog.vue';
 import { useFeedbackStore } from '../../stores/feedback';
 import { debounce } from 'lodash-es';
 
+const route = useRoute();
+const router = useRouter();
 const store = useFeedbackStore();
 
 const filters = ref({ search: '', status: '', priority: '', type: '' });
 const showDeleteDialog = ref(false);
 const itemToDelete = ref(null);
 
-const feedbackItems = computed(() => store.items);
+const feedbackItems = computed(() => store.items || []);
 const pagination = computed(() => store.pagination);
 const loading = computed(() => store.loading);
 const statistics = computed(() => store.statistics);
+
+// Sync filters to URL
+const updateUrl = (params) => {
+  const query = { ...route.query };
+  Object.keys(params).forEach((key) => {
+    if (params[key] !== '' && params[key] !== null && params[key] !== undefined) {
+      query[key] = String(params[key]);
+    } else {
+      delete query[key];
+    }
+  });
+  router.replace({ query });
+};
 
 const debouncedSearch = debounce(() => applyFilters(), 300);
 
 const applyFilters = () => {
   store.setFilters(filters.value);
+  updateUrl({ ...filters.value, page: 1 });
   store.fetchFeedback(1);
 };
 
-const goToPage = (page) => store.fetchFeedback(page);
+const goToPage = (page) => {
+  updateUrl({ page });
+  store.fetchFeedback(page);
+};
+
+const onPerPageChange = (perPage) => {
+  store.setPerPage(perPage);
+  updateUrl({ per_page: perPage, page: 1 });
+  store.fetchFeedback(1);
+};
 
 const formatDate = (date) => {
   if (!date) return '-';
@@ -211,8 +241,19 @@ const deleteFeedback = async () => {
   }
 };
 
+// Initialize from URL params
 onMounted(() => {
-  store.fetchFeedback(1);
+  const page = parseInt(route.query.page) || 1;
+  const perPage = parseInt(route.query.per_page) || 20;
+  const search = route.query.search || '';
+  const status = route.query.status || '';
+  const priority = route.query.priority || '';
+  const type = route.query.type || '';
+
+  filters.value = { search, status, priority, type };
+  store.setFilters(filters.value);
+  store.setPerPage(perPage);
+  store.fetchFeedback(page);
   store.fetchStatistics();
 });
 </script>

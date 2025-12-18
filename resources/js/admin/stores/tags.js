@@ -10,6 +10,8 @@ export const useTagsStore = defineStore('admin-tags', {
       lastPage: 1,
       perPage: 20,
       total: 0,
+      from: 0,
+      to: 0,
     },
     filters: {
       search: '',
@@ -40,12 +42,16 @@ export const useTagsStore = defineStore('admin-tags', {
         };
         const response = await tags.list(params);
         if (response.data.success) {
-          this.items = response.data.data.items;
+          const data = response.data.data;
+          // Paginator returns { data: [...], current_page, last_page, per_page, total, from, to }
+          this.items = data.data || [];
           this.pagination = {
-            currentPage: response.data.data.current_page,
-            lastPage: response.data.data.last_page,
-            perPage: response.data.data.per_page,
-            total: response.data.data.total,
+            currentPage: data.current_page || 1,
+            lastPage: data.last_page || 1,
+            perPage: data.per_page || 20,
+            total: data.total || 0,
+            from: data.from || 0,
+            to: data.to || 0,
           };
         }
       } catch (error) {
@@ -53,6 +59,10 @@ export const useTagsStore = defineStore('admin-tags', {
       } finally {
         this.loading = false;
       }
+    },
+
+    setPerPage(perPage) {
+      this.pagination.perPage = perPage;
     },
 
     async fetchStatistics() {
@@ -128,26 +138,6 @@ export const useTagsStore = defineStore('admin-tags', {
         return response.data;
       } catch (error) {
         this.error = error.response?.data?.message || 'Failed to bulk delete';
-        throw error;
-      }
-    },
-
-    async mergeTags(targetId, sourceIds) {
-      try {
-        const response = await tags.merge(targetId, sourceIds);
-        if (response.data.success) {
-          // Remove merged tags from list
-          this.items = this.items.filter((t) => !sourceIds.includes(t.id));
-          // Update target tag if in list
-          const targetIndex = this.items.findIndex((t) => t.id === targetId);
-          if (targetIndex !== -1 && response.data.data) {
-            this.items[targetIndex] = response.data.data;
-          }
-          this.selectedIds = [];
-        }
-        return response.data;
-      } catch (error) {
-        this.error = error.response?.data?.message || 'Failed to merge tags';
         throw error;
       }
     },

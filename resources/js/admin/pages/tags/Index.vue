@@ -69,8 +69,12 @@
         v-if="pagination.lastPage > 1"
         :current-page="pagination.currentPage"
         :last-page="pagination.lastPage"
+        :per-page="pagination.perPage"
         :total="pagination.total"
+        :from="pagination.from"
+        :to="pagination.to"
         @page-change="goToPage"
+        @per-page-change="onPerPageChange"
       />
 
       <!-- Create/Edit Modal -->
@@ -129,12 +133,15 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
-import Pagination from '../../../components/shared/Pagination.vue';
+import Pagination from '../../components/shared/Pagination.vue';
 import ConfirmDialog from '../../components/shared/ConfirmDialog.vue';
 import { useTagsStore } from '../../stores/tags';
 import { debounce } from 'lodash-es';
 
+const route = useRoute();
+const router = useRouter();
 const store = useTagsStore();
 
 const filters = ref({ search: '' });
@@ -148,19 +155,42 @@ const saving = ref(false);
 
 const tagForm = reactive({ name: '', slug: '' });
 
-const tags = computed(() => store.items);
+const tags = computed(() => store.items || []);
 const pagination = computed(() => store.pagination);
 const loading = computed(() => store.loading);
-const selectedIds = computed(() => store.selectedIds);
+const selectedIds = computed(() => store.selectedIds || []);
 const selectedCount = computed(() => store.selectedCount);
 const unusedCount = computed(() => store.unusedTagsCount);
 
+// Sync filters to URL
+const updateUrl = (params) => {
+  const query = { ...route.query };
+  Object.keys(params).forEach((key) => {
+    if (params[key] !== '' && params[key] !== null && params[key] !== undefined) {
+      query[key] = String(params[key]);
+    } else {
+      delete query[key];
+    }
+  });
+  router.replace({ query });
+};
+
 const debouncedSearch = debounce(() => {
   store.setFilters(filters.value);
+  updateUrl({ ...filters.value, page: 1 });
   store.fetchTags(1);
 }, 300);
 
-const goToPage = (page) => store.fetchTags(page);
+const goToPage = (page) => {
+  updateUrl({ page });
+  store.fetchTags(page);
+};
+
+const onPerPageChange = (perPage) => {
+  store.setPerPage(perPage);
+  updateUrl({ per_page: perPage, page: 1 });
+  store.fetchTags(1);
+};
 const toggleSelection = (id) => store.toggleSelection(id);
 
 const editTag = (tag) => {
@@ -218,8 +248,16 @@ const mergeTags = async () => {
 
 const cleanupTags = () => store.cleanupUnusedTags();
 
+// Initialize from URL params
 onMounted(() => {
-  store.fetchTags(1);
+  const page = parseInt(route.query.page) || 1;
+  const perPage = parseInt(route.query.per_page) || 20;
+  const search = route.query.search || '';
+
+  filters.value = { search };
+  store.setFilters(filters.value);
+  store.setPerPage(perPage);
+  store.fetchTags(page);
   store.fetchStatistics();
 });
 </script>

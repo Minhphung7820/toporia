@@ -4,87 +4,54 @@ declare(strict_types=1);
 
 namespace App\Application\Services\Admin;
 
-use App\Domain\Contracts\Repository\CommentRepository;
+use App\Infrastructure\Repository\Admin\CommentAdminRepository;
 use App\Infrastructure\Persistence\Models\AdminActivityLogModel;
 
 /**
- * Comment Admin Service - Handles admin comment moderation.
+ * Comment Admin Service
  *
- * Following Service pattern with consistent return format.
+ * Handles admin comment moderation with repository pattern.
  */
 final class CommentAdminService
 {
     public function __construct(
-        private readonly CommentRepository $commentRepository
+        private readonly CommentAdminRepository $commentRepository
     ) {}
 
     /**
-     * Get all comments with filters.
-     *
-     * @param array $filters Filter criteria
-     * @param int $page Page number
-     * @param int $perPage Comments per page
-     * @return array{success: bool, data?: array, message: string}
+     * Get paginated comments with filters.
      */
-    public function getAllComments(array $filters = [], int $page = 1, int $perPage = 20): array
+    public function getPaginated(array $filters = [], int $page = 1, int $perPage = 20): array
     {
-        $offset = ($page - 1) * $perPage;
-        $comments = $this->commentRepository->findWithFilters($filters, $perPage, $offset);
-        $total = $this->commentRepository->countAll();
+        $paginator = $this->commentRepository->getPaginated($filters, $perPage, $page);
 
         return [
             'success' => true,
-            'data' => [
-                'comments' => array_map(fn($comment) => $comment->toArray(), $comments),
-                'pagination' => [
-                    'total' => $total,
-                    'page' => $page,
-                    'per_page' => $perPage,
-                    'total_pages' => (int) ceil($total / $perPage),
-                ],
-            ],
+            'data' => $paginator->toArray(),
             'message' => 'Comments retrieved successfully',
         ];
     }
 
     /**
      * Get pending comments.
-     *
-     * @param int $page Page number
-     * @param int $perPage Comments per page
-     * @return array{success: bool, data?: array, message: string}
      */
-    public function getPendingComments(int $page = 1, int $perPage = 20): array
+    public function getPending(int $page = 1, int $perPage = 20): array
     {
-        $offset = ($page - 1) * $perPage;
-        $comments = $this->commentRepository->findPending($perPage, $offset);
-        $total = $this->commentRepository->countPending();
+        $paginator = $this->commentRepository->getPending($perPage, $page);
 
         return [
             'success' => true,
-            'data' => [
-                'comments' => array_map(fn($comment) => $comment->toArray(), $comments),
-                'pagination' => [
-                    'total' => $total,
-                    'page' => $page,
-                    'per_page' => $perPage,
-                    'total_pages' => (int) ceil($total / $perPage),
-                ],
-            ],
+            'data' => $paginator->toArray(),
             'message' => 'Pending comments retrieved successfully',
         ];
     }
 
     /**
      * Approve a comment.
-     *
-     * @param int $commentId Comment ID
-     * @param int $userId Admin user ID
-     * @return array{success: bool, message: string}
      */
     public function approveComment(int $commentId, int $userId): array
     {
-        $comment = $this->commentRepository->findById($commentId);
+        $comment = $this->commentRepository->find($commentId);
 
         if (!$comment) {
             return ['success' => false, 'message' => 'Comment not found'];
@@ -92,7 +59,6 @@ final class CommentAdminService
 
         $this->commentRepository->approve($commentId);
 
-        // Log activity
         AdminActivityLogModel::log(
             $userId,
             AdminActivityLogModel::ACTION_APPROVE,
@@ -109,14 +75,10 @@ final class CommentAdminService
 
     /**
      * Reject a comment.
-     *
-     * @param int $commentId Comment ID
-     * @param int $userId Admin user ID
-     * @return array{success: bool, message: string}
      */
     public function rejectComment(int $commentId, int $userId): array
     {
-        $comment = $this->commentRepository->findById($commentId);
+        $comment = $this->commentRepository->find($commentId);
 
         if (!$comment) {
             return ['success' => false, 'message' => 'Comment not found'];
@@ -124,7 +86,6 @@ final class CommentAdminService
 
         $this->commentRepository->reject($commentId);
 
-        // Log activity
         AdminActivityLogModel::log(
             $userId,
             AdminActivityLogModel::ACTION_REJECT,
@@ -141,10 +102,6 @@ final class CommentAdminService
 
     /**
      * Bulk approve comments.
-     *
-     * @param array $ids Comment IDs
-     * @param int $userId Admin user ID
-     * @return array{success: bool, data?: array, message: string}
      */
     public function bulkApprove(array $ids, int $userId): array
     {
@@ -154,7 +111,6 @@ final class CommentAdminService
 
         $count = $this->commentRepository->bulkApprove($ids);
 
-        // Log activity
         AdminActivityLogModel::log(
             $userId,
             AdminActivityLogModel::ACTION_APPROVE,
@@ -170,10 +126,6 @@ final class CommentAdminService
 
     /**
      * Bulk reject comments.
-     *
-     * @param array $ids Comment IDs
-     * @param int $userId Admin user ID
-     * @return array{success: bool, data?: array, message: string}
      */
     public function bulkReject(array $ids, int $userId): array
     {
@@ -183,7 +135,6 @@ final class CommentAdminService
 
         $count = $this->commentRepository->bulkReject($ids);
 
-        // Log activity
         AdminActivityLogModel::log(
             $userId,
             AdminActivityLogModel::ACTION_REJECT,
@@ -199,22 +150,17 @@ final class CommentAdminService
 
     /**
      * Delete a comment.
-     *
-     * @param int $commentId Comment ID
-     * @param int $userId Admin user ID
-     * @return array{success: bool, message: string}
      */
     public function deleteComment(int $commentId, int $userId): array
     {
-        $comment = $this->commentRepository->findById($commentId);
+        $comment = $this->commentRepository->find($commentId);
 
         if (!$comment) {
             return ['success' => false, 'message' => 'Comment not found'];
         }
 
-        $this->commentRepository->delete($comment);
+        $this->commentRepository->delete($commentId);
 
-        // Log activity
         AdminActivityLogModel::log(
             $userId,
             AdminActivityLogModel::ACTION_DELETE,
@@ -231,10 +177,6 @@ final class CommentAdminService
 
     /**
      * Bulk delete comments.
-     *
-     * @param array $ids Comment IDs
-     * @param int $userId Admin user ID
-     * @return array{success: bool, data?: array, message: string}
      */
     public function bulkDelete(array $ids, int $userId): array
     {
@@ -244,7 +186,6 @@ final class CommentAdminService
 
         $count = $this->commentRepository->bulkDelete($ids);
 
-        // Log activity
         AdminActivityLogModel::log(
             $userId,
             AdminActivityLogModel::ACTION_DELETE,
@@ -260,18 +201,12 @@ final class CommentAdminService
 
     /**
      * Get comment statistics.
-     *
-     * @return array{success: bool, data?: array, message: string}
      */
     public function getStatistics(): array
     {
         return [
             'success' => true,
-            'data' => [
-                'total' => $this->commentRepository->countAll(),
-                'pending' => $this->commentRepository->countPending(),
-                'approved' => $this->commentRepository->countApproved(),
-            ],
+            'data' => $this->commentRepository->getStatistics(),
             'message' => 'Statistics retrieved successfully',
         ];
     }

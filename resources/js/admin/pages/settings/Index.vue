@@ -143,6 +143,7 @@ const hasUnsavedChanges = computed(() => store.hasUnsavedChanges);
 const getSettingValue = (key) => store.getSettingValue(key);
 
 const formatGroupName = (group) => {
+  if (!group || typeof group !== 'string') return '';
   return group.charAt(0).toUpperCase() + group.slice(1).replace(/_/g, ' ');
 };
 

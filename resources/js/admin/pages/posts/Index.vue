@@ -137,12 +137,29 @@
       </div>
 
       <!-- Pagination -->
+      <div v-if="paginationType === 'cursor'" class="cursor-pagination">
+        <div class="cursor-info">
+          Showing {{ posts.length }} posts
+        </div>
+        <button
+          v-if="cursor.hasMore"
+          @click="loadMore"
+          :disabled="loadingMore"
+          class="btn btn-secondary load-more-btn"
+        >
+          {{ loadingMore ? 'Loading...' : 'Load More' }}
+        </button>
+      </div>
       <Pagination
-        v-if="pagination.lastPage > 1"
+        v-else-if="pagination.lastPage > 1"
         :current-page="pagination.currentPage"
         :last-page="pagination.lastPage"
+        :per-page="pagination.perPage"
         :total="pagination.total"
+        :from="pagination.from"
+        :to="pagination.to"
         @page-change="goToPage"
+        @per-page-change="onPerPageChange"
       />
 
       <!-- Delete Confirmation Modal -->
@@ -161,12 +178,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
-import Pagination from '../../../components/shared/Pagination.vue';
+import Pagination from '../../components/shared/Pagination.vue';
 import ConfirmDialog from '../../components/shared/ConfirmDialog.vue';
 import { usePostsStore } from '../../stores/posts';
 import { debounce } from 'lodash-es';
 
+const route = useRoute();
+const router = useRouter();
 const store = usePostsStore();
 
 const filters = ref({
@@ -178,9 +198,25 @@ const filters = ref({
 const showDeleteDialog = ref(false);
 const postToDelete = ref(null);
 
-const posts = computed(() => store.items);
+const posts = computed(() => store.items || []);
 const pagination = computed(() => store.pagination);
+const paginationType = computed(() => store.paginationType);
+const cursor = computed(() => store.cursor);
 const loading = computed(() => store.loading);
+const loadingMore = computed(() => store.loadingMore);
+
+// Sync filters to URL
+const updateUrl = (params) => {
+  const query = { ...route.query };
+  Object.keys(params).forEach((key) => {
+    if (params[key] !== '' && params[key] !== null && params[key] !== undefined) {
+      query[key] = String(params[key]);
+    } else {
+      delete query[key];
+    }
+  });
+  router.replace({ query });
+};
 
 const debouncedSearch = debounce(() => {
   applyFilters();
@@ -188,26 +224,58 @@ const debouncedSearch = debounce(() => {
 
 const applyFilters = () => {
   store.setFilters(filters.value);
-  store.fetchPosts(1);
+  loadedPages.value = 1;
+  // Clear cursor, count, scroll when filters change
+  updateUrl({ ...filters.value, cursor: undefined, count: undefined, scroll: undefined });
+  store.fetchPostsCursor(null, true); // Reset and fetch with cursor pagination
 };
 
 const goToPage = (page) => {
+  updateUrl({ page });
   store.fetchPosts(page);
 };
 
+const onPerPageChange = (perPage) => {
+  store.setPerPage(perPage);
+  updateUrl({ per_page: perPage, page: 1 });
+  store.fetchPosts(1);
+};
+
+// Track how many pages have been loaded
+const loadedPages = ref(1);
+
+const loadMore = async () => {
+  await store.loadMore();
+  loadedPages.value++;
+  // Save state to URL for F5 restore
+  saveScrollPosition();
+  updateUrl({
+    cursor: store.cursor.next || undefined,
+    count: loadedPages.value
+  });
+};
+
 const getStatusClass = (post) => {
-  if (post.published_at) {
-    const pubDate = new Date(post.published_at);
-    if (pubDate > new Date()) return 'badge-scheduled';
+  // Check scheduled first (has scheduled_at in future and not published)
+  if (post.scheduled_at && !post.is_published) {
+    const schedDate = new Date(post.scheduled_at);
+    if (schedDate > new Date()) return 'badge-scheduled';
+  }
+  // Check published (is_published flag OR published_at in past)
+  if (post.is_published || (post.published_at && new Date(post.published_at) <= new Date())) {
     return 'badge-published';
   }
   return 'badge-draft';
 };
 
 const getStatusLabel = (post) => {
-  if (post.published_at) {
-    const pubDate = new Date(post.published_at);
-    if (pubDate > new Date()) return 'Scheduled';
+  // Check scheduled first
+  if (post.scheduled_at && !post.is_published) {
+    const schedDate = new Date(post.scheduled_at);
+    if (schedDate > new Date()) return 'Scheduled';
+  }
+  // Check published
+  if (post.is_published || (post.published_at && new Date(post.published_at) <= new Date())) {
     return 'Published';
   }
   return 'Draft';
@@ -247,8 +315,51 @@ const deletePost = async () => {
   }
 };
 
-onMounted(() => {
-  store.fetchPosts(1);
+// Restore scroll position after data load
+const restoreScrollPosition = () => {
+  const savedScroll = route.query.scroll;
+  if (savedScroll) {
+    setTimeout(() => {
+      window.scrollTo({ top: parseInt(savedScroll), behavior: 'instant' });
+    }, 100);
+  }
+};
+
+// Save scroll position before leaving or on load more
+const saveScrollPosition = () => {
+  const scrollY = Math.round(window.scrollY);
+  if (scrollY > 0) {
+    updateUrl({ scroll: scrollY });
+  }
+};
+
+// Initialize from URL params
+onMounted(async () => {
+  const perPage = parseInt(route.query.per_page) || 20;
+  const search = route.query.search || '';
+  const status = route.query.status || '';
+  const isFeatured = route.query.is_featured || '';
+  const savedCursor = route.query.cursor || null;
+  const loadCount = parseInt(route.query.count) || 1; // Number of pages to load
+
+  filters.value = { search, status, is_featured: isFeatured };
+  store.setFilters(filters.value);
+  store.setPerPage(perPage);
+
+  // If we have a saved cursor, load multiple pages to restore state
+  if (savedCursor && loadCount > 1) {
+    // Load pages sequentially until we reach the saved position
+    for (let i = 0; i < loadCount; i++) {
+      if (i === 0) {
+        await store.fetchPostsCursor(null, true);
+      } else if (store.cursor.next) {
+        await store.fetchPostsCursor(store.cursor.next, false);
+      }
+    }
+    restoreScrollPosition();
+  } else {
+    await store.fetchPostsCursor(null, true);
+  }
 });
 </script>
 
@@ -481,6 +592,39 @@ onMounted(() => {
   color: #ef4444;
 }
 
+.cursor-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+}
+
+.cursor-info {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.load-more-btn {
+  padding: 10px 24px;
+  font-size: 14px;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .filters-bar {
     flex-direction: column;
@@ -496,6 +640,12 @@ onMounted(() => {
 
   .data-table {
     min-width: 800px;
+  }
+
+  .cursor-pagination {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
   }
 }
 </style>

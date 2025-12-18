@@ -169,14 +169,12 @@ final class PdoUserRepository implements UserRepository
      */
     public function countByRole(): array
     {
-        $results = UserModel::query()
-            ->selectRaw('role, COUNT(*) as count')
-            ->groupBy('role')
-            ->get();
-
+        // Get distinct roles and count each separately to avoid GROUP BY issues
+        $roles = ['user', 'editor', 'admin'];
         $counts = [];
-        foreach ($results as $row) {
-            $counts[$row->role ?? 'user'] = (int) $row->count;
+
+        foreach ($roles as $role) {
+            $counts[$role] = UserModel::where('role', $role)->count();
         }
 
         return $counts;

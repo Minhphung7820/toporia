@@ -34,10 +34,14 @@ final class CategoryAdminController extends BaseController
         $filters = [
             'search' => $request->query('search'),
             'parent_id' => $request->query('parent_id'),
+            'is_active' => $request->query('is_active'),
         ];
         $filters = array_filter($filters, fn($v) => $v !== null && $v !== '');
 
-        $result = $this->categoryAdminService->getAllCategories($filters);
+        $page = (int) $request->query('page', 1);
+        $perPage = min((int) $request->query('per_page', 20), 100);
+
+        $result = $this->categoryAdminService->getPaginated($filters, $page, $perPage);
 
         return $this->json($result);
     }

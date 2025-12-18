@@ -14,7 +14,6 @@
  */
 
 import axios from 'axios';
-import router from '../router';
 
 // CSRF token management
 const CSRF_COOKIE_ENDPOINT = '/api/csrf-cookie';
@@ -110,7 +109,7 @@ http.interceptors.request.use(
 /**
  * Response Interceptor
  * - Centralized error handling
- * - Auto redirect to error pages
+ * - Auto redirect to error pages using window.location (works across all Vue apps)
  */
 http.interceptors.response.use(
   response => {
@@ -122,7 +121,7 @@ http.interceptors.response.use(
     if (!error.response) {
       // Network error (no response from server)
       console.error('[HTTP] Network error:', error.message);
-      router.push({ name: 'error-network' }).catch(() => { });
+      // Let component handle network errors - don't redirect
       return Promise.reject(error);
     }
 
@@ -145,22 +144,21 @@ http.interceptors.response.use(
 
       case 403:
         // Forbidden - Authenticated but not authorized
-        // Use full page redirect to ensure proper navigation across different Vue apps (main/admin)
         console.warn('[HTTP] Forbidden (403)');
         window.location.href = '/error/403';
         break;
 
       case 404:
-        // Not Found
-        console.warn('[HTTP] Not Found (404)');
-        router.push({ name: 'error-404' }).catch(() => { });
+        // Not Found - Let component handle this (API 404 is normal for CRUD operations)
+        console.warn('[HTTP] Not Found (404):', data);
         break;
 
       case 419:
-        // CSRF token
+        // CSRF token mismatch - Refresh the page to get new token
         console.warn('[HTTP] CSRF token mismatch (419)');
         csrfCookiePromise = null; // Reset CSRF cache
-        router.push({ name: 'error-419' }).catch(() => { });
+        // Reload current page to refresh CSRF token
+        window.location.reload();
         break;
 
       case 422:
@@ -172,22 +170,21 @@ http.interceptors.response.use(
       case 429:
         // Too Many Requests - Rate limiting
         console.warn('[HTTP] Too Many Requests (429)');
-        router.push({ name: 'error-429' }).catch(() => { });
+        // Let component handle this with a toast/alert
         break;
 
       case 500:
       case 502:
       case 503:
       case 504:
-        // Server errors
+        // Server errors - Use full page redirect
         console.error('[HTTP] Server Error:', status, data);
-        router.push({ name: 'error-500' }).catch(() => { });
+        window.location.href = '/error/500';
         break;
 
       default:
-        // Other errors
+        // Other errors - Log and let component handle
         console.error('[HTTP] Error:', status, data);
-        router.push({ name: 'error-generic', params: { code: status } }).catch(() => { });
     }
 
     // Always reject to allow component-level error handling if needed

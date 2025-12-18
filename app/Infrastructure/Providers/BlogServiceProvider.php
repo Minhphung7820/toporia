@@ -38,6 +38,14 @@ use App\Application\Services\Admin\UserAdminService;
 use App\Application\Services\Admin\SettingsService;
 use App\Application\Services\Admin\FeedbackAdminService;
 
+// Admin Repositories
+use App\Infrastructure\Repository\Admin\PostAdminRepository;
+use App\Infrastructure\Repository\Admin\CommentAdminRepository;
+use App\Infrastructure\Repository\Admin\CategoryAdminRepository;
+use App\Infrastructure\Repository\Admin\TagAdminRepository;
+use App\Infrastructure\Repository\Admin\UserAdminRepository;
+use App\Infrastructure\Repository\Admin\FeedbackAdminRepository;
+
 /**
  * Blog Service Provider
  *
@@ -152,6 +160,14 @@ class BlogServiceProvider extends ServiceProvider
      */
     protected function registerAdminServices(ContainerInterface $container): void
     {
+        // Register Admin Repositories
+        $container->singleton(PostAdminRepository::class, fn() => new PostAdminRepository());
+        $container->singleton(CommentAdminRepository::class, fn() => new CommentAdminRepository());
+        $container->singleton(CategoryAdminRepository::class, fn() => new CategoryAdminRepository());
+        $container->singleton(TagAdminRepository::class, fn() => new TagAdminRepository());
+        $container->singleton(UserAdminRepository::class, fn() => new UserAdminRepository());
+        $container->singleton(FeedbackAdminRepository::class, fn() => new FeedbackAdminRepository());
+
         // DashboardService
         $container->singleton(DashboardService::class, function ($c) {
             return new DashboardService(
@@ -164,37 +180,35 @@ class BlogServiceProvider extends ServiceProvider
         // PostAdminService
         $container->singleton(PostAdminService::class, function ($c) {
             return new PostAdminService(
-                $c->get(PostRepository::class),
-                $c->get(TagRepository::class),
-                $c->get(CategoryRepository::class)
+                $c->get(PostAdminRepository::class)
             );
         });
 
         // CommentAdminService
         $container->singleton(CommentAdminService::class, function ($c) {
             return new CommentAdminService(
-                $c->get(CommentRepository::class)
+                $c->get(CommentAdminRepository::class)
             );
         });
 
         // CategoryAdminService
         $container->singleton(CategoryAdminService::class, function ($c) {
             return new CategoryAdminService(
-                $c->get(CategoryRepository::class)
+                $c->get(CategoryAdminRepository::class)
             );
         });
 
         // TagAdminService
         $container->singleton(TagAdminService::class, function ($c) {
             return new TagAdminService(
-                $c->get(TagRepository::class)
+                $c->get(TagAdminRepository::class)
             );
         });
 
         // UserAdminService
         $container->singleton(UserAdminService::class, function ($c) {
             return new UserAdminService(
-                $c->get(\App\Domain\Contracts\Repository\UserRepository::class)
+                $c->get(UserAdminRepository::class)
             );
         });
 
@@ -206,7 +220,7 @@ class BlogServiceProvider extends ServiceProvider
         // FeedbackAdminService
         $container->singleton(FeedbackAdminService::class, function ($c) {
             return new FeedbackAdminService(
-                $c->get(FeedbackRepository::class)
+                $c->get(FeedbackAdminRepository::class)
             );
         });
     }

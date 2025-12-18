@@ -316,6 +316,7 @@ onMounted(async () => {
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 
 .sidebar-section h3 {
@@ -325,12 +326,23 @@ onMounted(async () => {
   margin: 0 0 12px 0;
 }
 
-.sidebar-section select {
+.sidebar-section select,
+.sidebar-section input,
+.sidebar-section textarea {
   width: 100%;
+  max-width: 100%;
   padding: 8px 12px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-size: 14px;
+  box-sizing: border-box;
+}
+
+.sidebar-section input:focus,
+.sidebar-section textarea:focus,
+.sidebar-section select:focus {
+  outline: none;
+  border-color: #667eea;
 }
 
 .checkbox-label {
@@ -349,10 +361,12 @@ onMounted(async () => {
 
 .datetime-input {
   width: 100%;
+  max-width: 100%;
   padding: 8px 12px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 .error-message {

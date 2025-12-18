@@ -155,8 +155,12 @@
         v-if="pagination.lastPage > 1"
         :current-page="pagination.currentPage"
         :last-page="pagination.lastPage"
+        :per-page="pagination.perPage"
         :total="pagination.total"
+        :from="pagination.from"
+        :to="pagination.to"
         @page-change="goToPage"
+        @per-page-change="onPerPageChange"
       />
 
       <!-- Delete Confirmation Modal -->
@@ -175,12 +179,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
-import Pagination from '../../../components/shared/Pagination.vue';
+import Pagination from '../../components/shared/Pagination.vue';
 import ConfirmDialog from '../../components/shared/ConfirmDialog.vue';
 import { useCommentsStore } from '../../stores/comments';
 import { debounce } from 'lodash-es';
 
+const route = useRoute();
+const router = useRouter();
 const store = useCommentsStore();
 
 const filters = ref({
@@ -191,16 +198,31 @@ const filters = ref({
 const showDeleteDialog = ref(false);
 const commentToDelete = ref(null);
 
-const comments = computed(() => store.items);
+const comments = computed(() => store.items || []);
 const pagination = computed(() => store.pagination);
 const loading = computed(() => store.loading);
-const selectedIds = computed(() => store.selectedIds);
+const selectedIds = computed(() => store.selectedIds || []);
 const selectedCount = computed(() => store.selectedCount);
 const pendingCount = computed(() => store.pendingCount);
 
 const isAllSelected = computed(() => {
-  return comments.value.length > 0 && selectedIds.value.length === comments.value.length;
+  const items = comments.value;
+  const selected = selectedIds.value;
+  return items.length > 0 && selected.length === items.length;
 });
+
+// Sync filters to URL
+const updateUrl = (params) => {
+  const query = { ...route.query };
+  Object.keys(params).forEach((key) => {
+    if (params[key] !== '' && params[key] !== null && params[key] !== undefined) {
+      query[key] = String(params[key]);
+    } else {
+      delete query[key];
+    }
+  });
+  router.replace({ query });
+};
 
 const debouncedSearch = debounce(() => {
   applyFilters();
@@ -208,11 +230,19 @@ const debouncedSearch = debounce(() => {
 
 const applyFilters = () => {
   store.setFilters(filters.value);
+  updateUrl({ ...filters.value, page: 1 });
   store.fetchComments(1);
 };
 
 const goToPage = (page) => {
+  updateUrl({ page });
   store.fetchComments(page);
+};
+
+const onPerPageChange = (perPage) => {
+  store.setPerPage(perPage);
+  updateUrl({ per_page: perPage, page: 1 });
+  store.fetchComments(1);
 };
 
 const toggleSelection = (id) => {
@@ -293,8 +323,17 @@ const deleteComment = async () => {
   }
 };
 
+// Initialize from URL params
 onMounted(() => {
-  store.fetchComments(1);
+  const page = parseInt(route.query.page) || 1;
+  const perPage = parseInt(route.query.per_page) || 20;
+  const search = route.query.search || '';
+  const status = route.query.status || '';
+
+  filters.value = { search, status };
+  store.setFilters(filters.value);
+  store.setPerPage(perPage);
+  store.fetchComments(page);
   store.fetchStatistics();
 });
 </script>

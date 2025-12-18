@@ -41,7 +41,7 @@ final class UserAdminController extends BaseController
         $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 20), 100);
 
-        $result = $this->userAdminService->getAllUsers($filters, $page, $perPage);
+        $result = $this->userAdminService->getPaginated($filters, $page, $perPage);
 
         return $this->json($result);
     }

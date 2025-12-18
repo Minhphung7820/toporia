@@ -41,7 +41,7 @@ final class CommentAdminController extends BaseController
         $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 20), 100);
 
-        $result = $this->commentAdminService->getAllComments($filters, $page, $perPage);
+        $result = $this->commentAdminService->getPaginated($filters, $page, $perPage);
 
         return $this->json($result);
     }
@@ -56,7 +56,7 @@ final class CommentAdminController extends BaseController
         $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 20), 100);
 
-        $result = $this->commentAdminService->getPendingComments($page, $perPage);
+        $result = $this->commentAdminService->getPending($page, $perPage);
 
         return $this->json($result);
     }

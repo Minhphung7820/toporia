@@ -27,6 +27,10 @@ final class PostAdminController extends BaseController
     /**
      * Get all posts with filters.
      *
+     * Supports both offset and cursor pagination:
+     * - Offset: ?page=1&per_page=20 (traditional, slower on deep pages)
+     * - Cursor: ?cursor=xxx&per_page=20 (fast, O(1) performance)
+     *
      * GET /api/admin/posts
      */
     public function index(Request $request): JsonResponseInterface
@@ -36,13 +40,21 @@ final class PostAdminController extends BaseController
             'category_id' => $request->query('category_id'),
             'author_id' => $request->query('author_id'),
             'search' => $request->query('search'),
+            'is_featured' => $request->query('is_featured'),
         ];
-        $filters = array_filter($filters);
+        // Filter out empty values but keep '0' and 'false' for is_featured
+        $filters = array_filter($filters, fn($v) => $v !== null && $v !== '');
 
-        $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 20), 100);
+        $cursor = $request->query('cursor');
 
-        $result = $this->postAdminService->getAllPosts($filters, $page, $perPage);
+        // Use cursor pagination if cursor is provided or explicitly requested
+        if ($cursor !== null || $request->query('pagination') === 'cursor') {
+            $result = $this->postAdminService->getCursorPaginated($filters, $perPage, $cursor);
+        } else {
+            $page = (int) $request->query('page', 1);
+            $result = $this->postAdminService->getPaginated($filters, $page, $perPage);
+        }
 
         return $this->json($result);
     }

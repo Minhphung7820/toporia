@@ -39,7 +39,7 @@ final class TagAdminController extends BaseController
         $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 50), 100);
 
-        $result = $this->tagAdminService->getAllTags($filters, $page, $perPage);
+        $result = $this->tagAdminService->getPaginated($filters, $page, $perPage);
 
         return $this->json($result);
     }
@@ -129,27 +129,6 @@ final class TagAdminController extends BaseController
         $userId = Auth::user()->getAuthIdentifier();
 
         $result = $this->tagAdminService->bulkDelete($ids, $userId);
-
-        if (!$result['success']) {
-            return $this->json($result, 422);
-        }
-
-        return $this->json($result);
-    }
-
-    /**
-     * Merge tags.
-     *
-     * POST /api/admin/tags/merge
-     */
-    public function merge(Request $request): JsonResponseInterface
-    {
-        $data = $request->json();
-        $targetId = (int) ($data['target_id'] ?? 0);
-        $sourceIds = $data['source_ids'] ?? [];
-        $userId = Auth::user()->getAuthIdentifier();
-
-        $result = $this->tagAdminService->mergeTags($targetId, $sourceIds, $userId);
 
         if (!$result['success']) {
             return $this->json($result, 422);

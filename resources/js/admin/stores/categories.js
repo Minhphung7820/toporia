@@ -11,6 +11,8 @@ export const useCategoriesStore = defineStore('admin-categories', {
       lastPage: 1,
       perPage: 20,
       total: 0,
+      from: 0,
+      to: 0,
     },
     filters: {
       search: '',
@@ -40,12 +42,16 @@ export const useCategoriesStore = defineStore('admin-categories', {
         };
         const response = await categories.list(params);
         if (response.data.success) {
-          this.items = response.data.data.items;
+          const data = response.data.data;
+          // Paginator returns { data: [...], current_page, last_page, per_page, total, from, to }
+          this.items = data.data || [];
           this.pagination = {
-            currentPage: response.data.data.current_page,
-            lastPage: response.data.data.last_page,
-            perPage: response.data.data.per_page,
-            total: response.data.data.total,
+            currentPage: data.current_page || 1,
+            lastPage: data.last_page || 1,
+            perPage: data.per_page || 20,
+            total: data.total || 0,
+            from: data.from || 0,
+            to: data.to || 0,
           };
         }
       } catch (error) {
@@ -55,11 +61,15 @@ export const useCategoriesStore = defineStore('admin-categories', {
       }
     },
 
+    setPerPage(perPage) {
+      this.pagination.perPage = perPage;
+    },
+
     async fetchSelectOptions(excludeId = null) {
       try {
         const response = await categories.selectOptions(excludeId);
         if (response.data.success) {
-          this.selectOptions = response.data.data;
+          this.selectOptions = response.data.data?.options || response.data.data || [];
         }
       } catch (error) {
         console.error('Failed to fetch select options:', error);
