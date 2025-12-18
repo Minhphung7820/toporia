@@ -22,6 +22,7 @@
 
         <ul class="nav-menu" :class="{ active: isMenuOpen }">
           <li><router-link to="/" class="nav-link" @click="closeMenu">Home</router-link></li>
+          <li><router-link to="/blog" class="nav-link" @click="closeMenu">Blog</router-link></li>
           <li><router-link to="/about" class="nav-link" @click="closeMenu">About</router-link></li>
           <li v-if="user"><router-link to="/change-password" class="nav-link" @click="closeMenu">Settings</router-link></li>
           <li v-if="!user"><router-link to="/login" class="nav-link" @click="closeMenu">Login</router-link></li>

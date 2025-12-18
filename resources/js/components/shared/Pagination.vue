@@ -1,40 +1,39 @@
 <template>
-  <nav class="flex items-center justify-center gap-1">
+  <nav v-if="totalPages > 1" class="pagination">
     <!-- Previous Button -->
     <button
       @click="goToPage(currentPage - 1)"
       :disabled="currentPage === 1"
-      class="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="page-btn nav-btn"
     >
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
+      <span class="nav-text">Previous</span>
     </button>
 
     <!-- Page Numbers -->
-    <template v-for="page in pages" :key="page">
-      <button
-        v-if="page !== '...'"
-        @click="goToPage(page)"
-        :class="[
-          'px-4 py-2 rounded-lg border text-sm font-medium',
-          page === currentPage
-            ? 'bg-blue-600 text-white border-blue-600'
-            : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-        ]"
-      >
-        {{ page }}
-      </button>
-      <span v-else class="px-2 py-2 text-gray-500">...</span>
-    </template>
+    <div class="page-numbers">
+      <template v-for="page in pages" :key="page">
+        <button
+          v-if="page !== '...'"
+          @click="goToPage(page)"
+          :class="['page-btn', { 'is-active': page === currentPage }]"
+        >
+          {{ page }}
+        </button>
+        <span v-else class="page-ellipsis">...</span>
+      </template>
+    </div>
 
     <!-- Next Button -->
     <button
       @click="goToPage(currentPage + 1)"
       :disabled="currentPage === totalPages"
-      class="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="page-btn nav-btn"
     >
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <span class="nav-text">Next</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
       </svg>
     </button>
@@ -115,3 +114,105 @@ const goToPage = (page) => {
   }
 };
 </script>
+
+<style scoped>
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 32px;
+}
+
+.page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled):not(.is-active) {
+  background: #f5f5f5;
+  border-color: #ccc;
+  color: #1a1a1a;
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-btn.is-active {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+  color: #fff;
+}
+
+/* Navigation buttons */
+.nav-btn {
+  gap: 6px;
+  padding: 0 16px;
+}
+
+.nav-btn svg {
+  flex-shrink: 0;
+}
+
+.nav-text {
+  font-weight: 500;
+}
+
+/* Ellipsis */
+.page-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: #999;
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .pagination {
+    gap: 4px;
+  }
+
+  .page-btn {
+    min-width: 36px;
+    height: 36px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .nav-btn {
+    padding: 0 10px;
+  }
+
+  .nav-text {
+    display: none;
+  }
+
+  .page-ellipsis {
+    width: 32px;
+    height: 36px;
+  }
+}
+</style>

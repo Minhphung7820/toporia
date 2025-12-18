@@ -41,7 +41,9 @@ final class PdoCategoryRepository implements CategoryRepository
      */
     public function findAll(): array
     {
-        $models = CategoryModel::ordered()->get();
+        $models = CategoryModel::query()
+            ->orderBy('sort_order', 'asc')
+            ->get();
 
         return $models->map(fn(CategoryModel $model) => $this->toDomain($model))->all();
     }
@@ -51,7 +53,10 @@ final class PdoCategoryRepository implements CategoryRepository
      */
     public function findActive(): array
     {
-        $models = CategoryModel::active()->ordered()->get();
+        $models = CategoryModel::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order', 'asc')
+            ->get();
 
         return $models->map(fn(CategoryModel $model) => $this->toDomain($model))->all();
     }
@@ -61,7 +66,11 @@ final class PdoCategoryRepository implements CategoryRepository
      */
     public function findRoots(): array
     {
-        $models = CategoryModel::roots()->active()->ordered()->get();
+        $models = CategoryModel::query()
+            ->whereNull('parent_id')
+            ->where('is_active', true)
+            ->orderBy('sort_order', 'asc')
+            ->get();
 
         return $models->map(fn(CategoryModel $model) => $this->toDomain($model))->all();
     }
@@ -85,9 +94,10 @@ final class PdoCategoryRepository implements CategoryRepository
      */
     public function findWithPostCount(): array
     {
-        $models = CategoryModel::active()
+        $models = CategoryModel::query()
+            ->where('is_active', true)
             ->withCount('posts')
-            ->ordered()
+            ->orderBy('sort_order', 'asc')
             ->get();
 
         $result = [];
@@ -157,7 +167,9 @@ final class PdoCategoryRepository implements CategoryRepository
      */
     public function countActive(): int
     {
-        return CategoryModel::active()->count();
+        return CategoryModel::query()
+            ->where('is_active', true)
+            ->count();
     }
 
     /**

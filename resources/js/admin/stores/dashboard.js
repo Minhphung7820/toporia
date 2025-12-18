@@ -45,10 +45,12 @@ export const useDashboardStore = defineStore('admin-dashboard', {
       try {
         const response = await dashboard.activity(limit);
         if (response.data.success) {
-          this.activity = response.data.data;
+          // API returns { activities: [...] }
+          this.activity = response.data.data?.activities || [];
         }
       } catch (error) {
         console.error('Failed to fetch activity:', error);
+        this.activity = [];
       } finally {
         this.loading.activity = false;
       }
@@ -59,10 +61,12 @@ export const useDashboardStore = defineStore('admin-dashboard', {
       try {
         const response = await dashboard.popularPosts(limit);
         if (response.data.success) {
-          this.popularPosts = response.data.data;
+          // API returns { posts: [...] }
+          this.popularPosts = response.data.data?.posts || [];
         }
       } catch (error) {
         console.error('Failed to fetch popular posts:', error);
+        this.popularPosts = [];
       } finally {
         this.loading.popularPosts = false;
       }
@@ -73,10 +77,12 @@ export const useDashboardStore = defineStore('admin-dashboard', {
       try {
         const response = await dashboard.recentComments(limit);
         if (response.data.success) {
-          this.recentComments = response.data.data;
+          // API returns { comments: [...] }
+          this.recentComments = response.data.data?.comments || [];
         }
       } catch (error) {
         console.error('Failed to fetch recent comments:', error);
+        this.recentComments = [];
       } finally {
         this.loading.recentComments = false;
       }

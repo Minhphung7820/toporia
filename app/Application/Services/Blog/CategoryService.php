@@ -132,6 +132,8 @@ final class CategoryService
 
     /**
      * Build category tree recursively.
+     *
+     * Returns a flat structure with children embedded for Vue compatibility.
      */
     private function buildCategoryTree(\App\Domain\Entities\Category $category): array
     {
@@ -144,9 +146,9 @@ final class CategoryService
             }
         }
 
-        return [
-            'category' => $category->toArray(),
+        // Flatten structure: merge category data with children
+        return array_merge($category->toArray(), [
             'children' => $childrenTree,
-        ];
+        ]);
     }
 }

@@ -36,10 +36,10 @@ composer install && cp .env.example .env && php console key:generate
 php -S localhost:8000 -t public            # Start dev server
 
 # Frontend (Vue 3 SPA)
-npm install                                # Install Node dependencies
-npm run dev                                # Start Vite dev server (HMR)
-npm run build                              # Build for production
-npm run preview                            # Preview production build
+pnpm install                               # Install Node dependencies
+pnpm run dev                               # Start Vite dev server (HMR)
+pnpm run build                             # Build for production
+pnpm run preview                           # Preview production build
 
 # Docker Utilities
 make shell                                 # Access PHP container shell
@@ -60,7 +60,7 @@ composer test:coverage                     # Generate HTML coverage in coverage/
 ./vendor/bin/phpunit --filter testMethodName       # Single test method
 make test                                  # Run tests in Docker
 
-# Static Analysis
+# Static Analysis (if phpstan.neon exists)
 ./vendor/bin/phpstan analyse                       # Run static analysis
 
 # Code Generation (make:*)
@@ -155,12 +155,13 @@ resources/                # Frontend assets
    - Console commands in `Presentation/Console/Commands/`
 
 6. **Frontend Layer** (`resources/js/`) - Vue 3 SPA:
-   - **Stack**: Vue 3 (Composition API), Vue Router 4, Pinia, Vite 7
+   - **Stack**: Vue 3 (Composition API), Vue Router 4, Pinia, Vite 7, Axios
    - **Architecture**: Single Page Application (SPA) with client-side routing
    - **Integration**: Backend serves API routes ([routes/api.php](routes/api.php)), frontend consumes them
    - **Build**: Vite bundles JS/CSS to [public/build/](public/build/)
    - **Entry Point**: [resources/js/main.js](resources/js/main.js) mounted in [resources/views/app.php](resources/views/app.php)
    - **Pages**: Vue components in [resources/js/pages/](resources/js/pages/) (Home, Login, Dashboard, etc.)
+   - **Admin Panel**: Full admin system in [resources/js/admin/](resources/js/admin/) with layout, pages, stores, and shared components
    - **Routing**: Vue Router handles client-side navigation, web routes have catch-all for SPA fallback
 
 ### Key Files

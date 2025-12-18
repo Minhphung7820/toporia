@@ -32,6 +32,12 @@ final class ValidateJsonRequest extends AbstractMiddleware
 
         // Check Content-Type header
         $contentType = $request->header('content-type');
+
+        // Allow multipart/form-data for file uploads
+        if ($contentType && str_contains($contentType, 'multipart/form-data')) {
+            return null; // Continue to next middleware - file upload
+        }
+
         if ($contentType && !str_contains($contentType, 'application/json')) {
             $response->json([
                 'error' => 'Invalid Content-Type. Expected application/json'

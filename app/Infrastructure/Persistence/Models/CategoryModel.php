@@ -31,6 +31,7 @@ class CategoryModel extends Model
         'image',
         'is_active',
         'sort_order',
+        'parent_id',
     ];
 
     protected static array $casts = [

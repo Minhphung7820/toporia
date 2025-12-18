@@ -305,6 +305,26 @@ final class PdoFeedbackRepository implements FeedbackRepository
     }
 
     /**
+     * {@inheritdoc}
+     *
+     * Optimized: Single query for all feedback counts.
+     */
+    public function getStatistics(): array
+    {
+        $result = FeedbackModel::getConnection()->selectOne("
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+            FROM feedback
+        ");
+
+        return [
+            'total' => (int) ($result['total'] ?? 0),
+            'pending' => (int) ($result['pending'] ?? 0),
+        ];
+    }
+
+    /**
      * Map database model to domain entity.
      */
     private function toDomain(FeedbackModel $model): Feedback

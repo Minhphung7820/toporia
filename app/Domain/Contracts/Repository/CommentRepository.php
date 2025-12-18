@@ -179,4 +179,11 @@ interface CommentRepository
      * @return int Count of comments
      */
     public function countByPost(int $postId, bool $approvedOnly = true): int;
+
+    /**
+     * Get aggregated statistics in a single query.
+     *
+     * @return array{total: int, pending: int, approved: int}
+     */
+    public function getStatistics(): array;
 }

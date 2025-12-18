@@ -1,31 +1,27 @@
 <template>
-  <div class="bg-white rounded-lg shadow p-6">
-    <h3 class="text-lg font-bold mb-4">Tags</h3>
+  <div class="tag-cloud">
+    <h3 class="widget-title">Popular Tags</h3>
 
     <!-- Loading State -->
-    <div v-if="loading" class="flex flex-wrap gap-2">
-      <div v-for="i in 10" :key="i" class="animate-pulse">
-        <div class="h-6 bg-gray-200 rounded-full w-16"></div>
-      </div>
+    <div v-if="loading" class="tags-skeleton">
+      <div v-for="i in 8" :key="i" class="tag-skeleton"></div>
     </div>
 
     <!-- Tags Cloud -->
-    <div v-else-if="tags.length > 0" class="flex flex-wrap gap-2">
+    <div v-else-if="tags.length > 0" class="tags-list">
       <router-link
         v-for="item in tags"
         :key="item.tag?.id || item.id"
         :to="{ name: 'blog-tag', params: { slug: item.tag?.slug || item.slug } }"
-        :class="[
-          'px-3 py-1 rounded-full text-sm transition',
-          getTagClass(item.weight || 1)
-        ]"
+        :class="['tag-item', `weight-${getWeight(item.weight || 1)}`]"
       >
-        #{{ item.tag?.name || item.name }}
+        <span class="tag-hash">#</span>{{ item.tag?.name || item.name }}
+        <span v-if="item.count" class="tag-count">{{ item.count }}</span>
       </router-link>
     </div>
 
     <!-- Empty State -->
-    <p v-else class="text-gray-500 text-sm">No tags found</p>
+    <p v-else class="empty-text">No tags found</p>
   </div>
 </template>
 
@@ -41,17 +37,144 @@ defineProps({
   },
 });
 
-// Get tag class based on weight (1-5)
-const getTagClass = (weight) => {
-  const classes = {
-    1: 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-    2: 'bg-gray-200 text-gray-700 hover:bg-gray-300',
-    3: 'bg-blue-100 text-blue-700 hover:bg-blue-200',
-    4: 'bg-blue-200 text-blue-800 hover:bg-blue-300',
-    5: 'bg-blue-500 text-white hover:bg-blue-600',
-  };
-
-  const roundedWeight = Math.min(5, Math.max(1, Math.round(weight)));
-  return classes[roundedWeight];
+// Get weight class (1-5)
+const getWeight = (weight) => {
+  return Math.min(5, Math.max(1, Math.round(weight)));
 };
 </script>
+
+<style scoped>
+.tag-cloud {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.widget-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 16px;
+}
+
+/* Tags List */
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.tag-hash {
+  opacity: 0.6;
+  margin-right: 1px;
+}
+
+.tag-count {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* Weight variations */
+.tag-item.weight-1 {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.tag-item.weight-1:hover {
+  background: #e5e5e5;
+  color: #1a1a1a;
+}
+
+.tag-item.weight-2 {
+  background: #e5e5e5;
+  color: #444;
+}
+
+.tag-item.weight-2:hover {
+  background: #d5d5d5;
+  color: #1a1a1a;
+}
+
+.tag-item.weight-3 {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.tag-item.weight-3:hover {
+  background: #333;
+}
+
+.tag-item.weight-4 {
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 14px;
+}
+
+.tag-item.weight-4:hover {
+  background: #333;
+}
+
+.tag-item.weight-5 {
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tag-item.weight-5:hover {
+  background: #333;
+}
+
+/* Empty State */
+.empty-text {
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+}
+
+/* Loading Skeleton */
+.tags-skeleton {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-skeleton {
+  height: 32px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e5e5e5 25%, #f0f0f0 50%, #e5e5e5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.tag-skeleton:nth-child(1) { width: 70px; }
+.tag-skeleton:nth-child(2) { width: 90px; }
+.tag-skeleton:nth-child(3) { width: 60px; }
+.tag-skeleton:nth-child(4) { width: 80px; }
+.tag-skeleton:nth-child(5) { width: 75px; }
+.tag-skeleton:nth-child(6) { width: 65px; }
+.tag-skeleton:nth-child(7) { width: 85px; }
+.tag-skeleton:nth-child(8) { width: 55px; }
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+</style>

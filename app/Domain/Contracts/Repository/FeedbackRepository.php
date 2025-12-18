@@ -176,4 +176,11 @@ interface FeedbackRepository
      * @return int Number of deleted items
      */
     public function bulkDelete(array $ids): int;
+
+    /**
+     * Get aggregated statistics in a single query.
+     *
+     * @return array{total: int, pending: int}
+     */
+    public function getStatistics(): array;
 }

@@ -7,16 +7,18 @@ namespace App\Application\Services\Admin;
 use App\Domain\Contracts\Repository\PostRepository;
 use App\Domain\Contracts\Repository\CommentRepository;
 use App\Domain\Contracts\Repository\FeedbackRepository;
-use App\Domain\Contracts\Repository\UserRepository;
 use App\Infrastructure\Persistence\Models\AdminActivityLogModel;
 
 /**
  * Dashboard Service - Provides admin dashboard data.
  *
  * Following Service pattern with consistent return format.
+ * Uses caching for expensive statistics queries on large datasets (1M+ rows).
  */
 final class DashboardService
 {
+    private const STATS_CACHE_TTL = 60; // Cache statistics for 60 seconds
+
     public function __construct(
         private readonly PostRepository $postRepository,
         private readonly CommentRepository $commentRepository,
@@ -26,17 +28,26 @@ final class DashboardService
     /**
      * Get dashboard statistics.
      *
+     * Optimized: Uses caching + aggregated statistics methods.
+     * - Cache for 60 seconds to avoid repeated expensive queries
+     * - Single query per table instead of multiple COUNT queries
+     *
      * @return array{success: bool, data?: array, message: string}
      */
     public function getStatistics(): array
     {
-        $postStats = $this->postRepository->getStatistics();
-        $pendingComments = $this->commentRepository->countPending();
-        $pendingFeedback = $this->feedbackRepository->countPending();
+        // Use cache for expensive COUNT queries on large tables
+        $stats = cache()->remember('dashboard:statistics', self::STATS_CACHE_TTL, function () {
+            // Single query for all post statistics
+            $postStats = $this->postRepository->getStatistics();
 
-        return [
-            'success' => true,
-            'data' => [
+            // Single query for all comment statistics
+            $commentStats = $this->commentRepository->getStatistics();
+
+            // Single query for all feedback statistics
+            $feedbackStats = $this->feedbackRepository->getStatistics();
+
+            return [
                 'posts' => [
                     'total' => $postStats['total'],
                     'published' => $postStats['published'],
@@ -47,19 +58,24 @@ final class DashboardService
                     'total' => $postStats['total_views'],
                 ],
                 'comments' => [
-                    'total' => $this->commentRepository->countAll(),
-                    'pending' => $pendingComments,
-                    'approved' => $this->commentRepository->countApproved(),
+                    'total' => $commentStats['total'],
+                    'pending' => $commentStats['pending'],
+                    'approved' => $commentStats['approved'],
                 ],
                 'feedback' => [
-                    'total' => $this->feedbackRepository->countAll(),
-                    'pending' => $pendingFeedback,
+                    'total' => $feedbackStats['total'],
+                    'pending' => $feedbackStats['pending'],
                 ],
                 'alerts' => [
-                    'pending_comments' => $pendingComments,
-                    'pending_feedback' => $pendingFeedback,
+                    'pending_comments' => $commentStats['pending'],
+                    'pending_feedback' => $feedbackStats['pending'],
                 ],
-            ],
+            ];
+        });
+
+        return [
+            'success' => true,
+            'data' => $stats,
             'message' => 'Statistics retrieved successfully',
         ];
     }

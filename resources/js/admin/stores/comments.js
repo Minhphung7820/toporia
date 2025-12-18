@@ -41,6 +41,17 @@ export const useCommentsStore = defineStore('admin-comments', {
   },
 
   actions: {
+    // Transform comment from API to UI format
+    transformComment(comment) {
+      return {
+        ...comment,
+        // Convert is_approved (boolean) to status (string)
+        status: comment.is_approved ? 'approved' : 'pending',
+        // Map commentable (polymorphic) to post for display
+        post: comment.commentable || null,
+      };
+    },
+
     async fetchComments(page = 1) {
       this.loading = true;
       this.error = null;
@@ -56,7 +67,8 @@ export const useCommentsStore = defineStore('admin-comments', {
         if (response.data.success) {
           const data = response.data.data;
           // Paginator returns { data: [...], current_page, last_page, per_page, total, from, to }
-          this.items = data.data || [];
+          // Transform items to add status and post fields
+          this.items = (data.data || []).map((c) => this.transformComment(c));
           this.pagination = {
             currentPage: data.current_page || 1,
             lastPage: data.last_page || 1,
@@ -85,7 +97,8 @@ export const useCommentsStore = defineStore('admin-comments', {
         if (response.data.success) {
           const data = response.data.data;
           // Paginator returns { data: [...], current_page, last_page, per_page, total, from, to }
-          this.pendingItems = data.data || [];
+          // Transform items to add status and post fields
+          this.pendingItems = (data.data || []).map((c) => this.transformComment(c));
           this.pendingPagination = {
             currentPage: data.current_page || 1,
             lastPage: data.last_page || 1,

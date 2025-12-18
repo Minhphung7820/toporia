@@ -179,7 +179,7 @@ http.interceptors.response.use(
       case 504:
         // Server errors - Use full page redirect
         console.error('[HTTP] Server Error:', status, data);
-        window.location.href = '/error/500';
+        // window.location.href = '/error/500';
         break;
 
       default:

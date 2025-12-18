@@ -1,9 +1,20 @@
 <template>
   <AdminLayout>
     <div class="dashboard">
+      <!-- Page Header -->
       <div class="page-header">
-        <h1>Dashboard</h1>
-        <p>Welcome back! Here's what's happening with your blog.</p>
+        <div class="header-content">
+          <h1>Dashboard</h1>
+          <p>Welcome back! Here's an overview of your blog performance.</p>
+        </div>
+        <div class="header-actions">
+          <router-link to="/admin/posts/create" class="btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            New Post
+          </router-link>
+        </div>
       </div>
 
       <!-- Statistics Cards -->
@@ -14,6 +25,7 @@
           :change="statistics?.posts?.change"
           icon="posts"
           color="blue"
+          :loading="loading.statistics"
         />
         <StatCard
           title="Total Views"
@@ -21,6 +33,7 @@
           :change="statistics?.views?.change"
           icon="views"
           color="green"
+          :loading="loading.statistics"
         />
         <StatCard
           title="Comments"
@@ -28,6 +41,7 @@
           :change="statistics?.comments?.change"
           icon="comments"
           color="purple"
+          :loading="loading.statistics"
         />
         <StatCard
           title="Active Users"
@@ -35,92 +49,137 @@
           :change="statistics?.users?.change"
           icon="users"
           color="orange"
+          :loading="loading.statistics"
         />
       </div>
 
-      <!-- Charts and Activity -->
-      <div class="dashboard-grid">
-        <div class="chart-section">
-          <div class="section-header">
-            <h2>Views Overview</h2>
-            <div class="period-selector">
-              <button
-                v-for="period in periods"
-                :key="period.value"
-                :class="{ active: selectedPeriod === period.value }"
-                @click="changePeriod(period.value)"
-              >
-                {{ period.label }}
-              </button>
-            </div>
-          </div>
-          <ViewsChart :data="charts" :loading="loading.charts" />
-        </div>
-
-        <div class="activity-section">
-          <div class="section-header">
-            <h2>Recent Activity</h2>
-            <router-link to="/admin/comments" class="view-all">View all</router-link>
-          </div>
-          <ActivityFeed :items="activity" :loading="loading.activity" />
-        </div>
-      </div>
-
-      <!-- Popular Posts and Recent Comments -->
-      <div class="dashboard-grid">
-        <div class="popular-posts-section">
-          <div class="section-header">
-            <h2>Popular Posts</h2>
-            <router-link to="/admin/posts" class="view-all">View all</router-link>
-          </div>
-          <div class="posts-list">
-            <div v-if="loading.popularPosts" class="loading-placeholder">
-              <div v-for="i in 5" :key="i" class="skeleton-item"></div>
-            </div>
-            <div v-else-if="popularPosts.length === 0" class="empty-state">
-              No posts yet
-            </div>
-            <div v-else v-for="post in popularPosts" :key="post.id" class="post-item">
-              <div class="post-info">
-                <router-link :to="`/admin/posts/${post.id}/edit`" class="post-title">
-                  {{ post.title }}
-                </router-link>
-                <span class="post-meta">{{ formatDate(post.published_at) }}</span>
+      <!-- Main Content Grid -->
+      <div class="main-grid">
+        <!-- Left Column -->
+        <div class="main-column">
+          <!-- Chart Section -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Views Overview</h2>
+              <div class="period-selector">
+                <button
+                  v-for="period in periods"
+                  :key="period.value"
+                  :class="{ active: selectedPeriod === period.value }"
+                  @click="changePeriod(period.value)"
+                >
+                  {{ period.label }}
+                </button>
               </div>
-              <div class="post-views">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
+            </div>
+            <div class="card-body">
+              <ViewsChart :data="charts" :loading="loading.charts" />
+            </div>
+          </div>
+
+          <!-- Popular Posts Section -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Popular Posts</h2>
+              <router-link to="/admin/posts" class="view-all">View all</router-link>
+            </div>
+            <div class="card-body">
+              <div v-if="loading.popularPosts" class="loading-placeholder">
+                <div v-for="i in 5" :key="i" class="skeleton-item"></div>
+              </div>
+              <div v-else-if="popularPosts.length === 0" class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                  <path d="M14 2v6h6"/>
                 </svg>
-                {{ formatNumber(post.views_count) }}
+                <p>No posts yet</p>
+              </div>
+              <div v-else class="posts-list">
+                <div v-for="(post, index) in popularPosts" :key="post.id" class="post-item">
+                  <div class="post-rank">{{ index + 1 }}</div>
+                  <div class="post-info">
+                    <router-link :to="`/admin/posts/${post.id}/edit`" class="post-title">
+                      {{ post.title }}
+                    </router-link>
+                    <span class="post-meta">{{ formatDate(post.published_at) }}</span>
+                  </div>
+                  <div class="post-views">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    {{ formatNumber(post.views_count || post.views) }}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="recent-comments-section">
-          <div class="section-header">
-            <h2>Recent Comments</h2>
-            <router-link to="/admin/comments" class="view-all">View all</router-link>
-          </div>
-          <div class="comments-list">
-            <div v-if="loading.recentComments" class="loading-placeholder">
-              <div v-for="i in 5" :key="i" class="skeleton-item"></div>
+        <!-- Right Column -->
+        <div class="side-column">
+          <!-- Quick Stats -->
+          <div class="card quick-stats-card">
+            <div class="card-header">
+              <h2>Quick Stats</h2>
             </div>
-            <div v-else-if="recentComments.length === 0" class="empty-state">
-              No comments yet
-            </div>
-            <div v-else v-for="comment in recentComments" :key="comment.id" class="comment-item">
-              <div class="comment-avatar">
-                {{ getInitials(comment.author_name || comment.user?.name || 'A') }}
+            <div class="card-body">
+              <div class="quick-stat-item">
+                <span class="stat-label">Today's Views</span>
+                <span class="stat-value">{{ formatNumber(quickStats?.today_views || 0) }}</span>
               </div>
-              <div class="comment-content">
-                <div class="comment-header">
-                  <span class="comment-author">{{ comment.author_name || comment.user?.name }}</span>
-                  <span class="comment-date">{{ formatRelative(comment.created_at) }}</span>
+              <div class="quick-stat-item">
+                <span class="stat-label">Pending Comments</span>
+                <span class="stat-value warning">{{ quickStats?.new_comments || statistics?.comments?.pending || 0 }}</span>
+              </div>
+              <div class="quick-stat-item">
+                <span class="stat-label">New Feedback</span>
+                <span class="stat-value">{{ quickStats?.new_feedback || statistics?.feedback?.pending || 0 }}</span>
+              </div>
+              <div class="quick-stat-item">
+                <span class="stat-label">Scheduled Posts</span>
+                <span class="stat-value">{{ quickStats?.scheduled_posts || statistics?.posts?.scheduled || 0 }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Recent Activity</h2>
+              <router-link to="/admin/comments" class="view-all">View all</router-link>
+            </div>
+            <div class="card-body">
+              <ActivityFeed :items="activity" :loading="loading.activity" />
+            </div>
+          </div>
+
+          <!-- Recent Comments -->
+          <div class="card">
+            <div class="card-header">
+              <h2>Recent Comments</h2>
+              <router-link to="/admin/comments" class="view-all">View all</router-link>
+            </div>
+            <div class="card-body">
+              <div v-if="loading.recentComments" class="loading-placeholder">
+                <div v-for="i in 3" :key="i" class="skeleton-item small"></div>
+              </div>
+              <div v-else-if="recentComments.length === 0" class="empty-state small">
+                <p>No comments yet</p>
+              </div>
+              <div v-else class="comments-list">
+                <div v-for="comment in recentComments.slice(0, 4)" :key="comment.id" class="comment-item">
+                  <div class="comment-avatar">
+                    {{ getInitials(comment.author_name || comment.user?.name || 'A') }}
+                  </div>
+                  <div class="comment-content">
+                    <div class="comment-header">
+                      <span class="comment-author">{{ comment.author_name || comment.user?.name }}</span>
+                      <span class="comment-date">{{ formatRelative(comment.created_at) }}</span>
+                    </div>
+                    <p class="comment-text">{{ truncate(comment.content, 80) }}</p>
+                  </div>
                 </div>
-                <p class="comment-text">{{ truncate(comment.content, 100) }}</p>
-                <span class="comment-post">on {{ comment.post?.title }}</span>
               </div>
             </div>
           </div>
@@ -128,42 +187,58 @@
       </div>
 
       <!-- Quick Actions -->
-      <div class="quick-actions">
-        <h2>Quick Actions</h2>
-        <div class="actions-grid">
-          <router-link to="/admin/posts/create" class="action-card">
-            <div class="action-icon blue">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </div>
-            <span>New Post</span>
-          </router-link>
-          <router-link to="/admin/categories/create" class="action-card">
-            <div class="action-icon green">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
-              </svg>
-            </div>
-            <span>New Category</span>
-          </router-link>
-          <router-link to="/admin/comments/pending" class="action-card">
-            <div class="action-icon purple">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-              </svg>
-            </div>
-            <span>Pending Comments</span>
-          </router-link>
-          <router-link to="/admin/settings" class="action-card">
-            <div class="action-icon orange">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
-              </svg>
-            </div>
-            <span>Settings</span>
-          </router-link>
+      <div class="card">
+        <div class="card-header">
+          <h2>Quick Actions</h2>
+        </div>
+        <div class="card-body">
+          <div class="actions-grid">
+            <router-link to="/admin/posts/create" class="action-card">
+              <div class="action-icon blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </div>
+              <div class="action-info">
+                <span class="action-title">New Post</span>
+                <span class="action-desc">Create a new blog post</span>
+              </div>
+            </router-link>
+            <router-link to="/admin/categories/create" class="action-card">
+              <div class="action-icon green">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                </svg>
+              </div>
+              <div class="action-info">
+                <span class="action-title">New Category</span>
+                <span class="action-desc">Organize your content</span>
+              </div>
+            </router-link>
+            <router-link to="/admin/comments/pending" class="action-card">
+              <div class="action-icon purple">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                </svg>
+              </div>
+              <div class="action-info">
+                <span class="action-title">Pending Comments</span>
+                <span class="action-desc">Review and moderate</span>
+              </div>
+            </router-link>
+            <router-link to="/admin/settings" class="action-card">
+              <div class="action-icon orange">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+                </svg>
+              </div>
+              <div class="action-info">
+                <span class="action-title">Settings</span>
+                <span class="action-desc">Configure your site</span>
+              </div>
+            </router-link>
+          </div>
         </div>
       </div>
     </div>
@@ -188,10 +263,11 @@ const periods = [
 ];
 
 const statistics = computed(() => store.statistics);
-const activity = computed(() => store.activity);
-const popularPosts = computed(() => store.popularPosts);
-const recentComments = computed(() => store.recentComments);
+const activity = computed(() => store.activity || []);
+const popularPosts = computed(() => store.popularPosts || []);
+const recentComments = computed(() => store.recentComments || []);
 const charts = computed(() => store.charts);
+const quickStats = computed(() => store.quickStats);
 const loading = computed(() => store.loading);
 
 const changePeriod = async (period) => {
@@ -226,6 +302,7 @@ const formatRelative = (date) => {
 
 const formatNumber = (num) => {
   if (!num) return '0';
+  if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B';
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
   return num.toString();
@@ -253,76 +330,136 @@ onMounted(() => {
 
 <style scoped>
 .dashboard {
-  max-width: 1400px;
+  width: 100%;
 }
 
+/* Page Header */
 .page-header {
-  margin-bottom: 32px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 16px;
 }
 
-.page-header h1 {
-  font-size: 28px;
+.header-content h1 {
+  font-size: 26px;
   font-weight: 700;
-  color: #1f2937;
-  margin: 0 0 8px 0;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.025em;
 }
 
-.page-header p {
-  color: #6b7280;
+.header-content p {
+  color: #64748b;
   margin: 0;
+  font-size: 15px;
 }
 
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+/* Stats Grid */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-  margin-bottom: 32px;
+  gap: 20px;
+  margin-bottom: 28px;
 }
 
-.dashboard-grid {
+/* Main Grid Layout */
+.main-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 380px;
   gap: 24px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
-.chart-section,
-.activity-section,
-.popular-posts-section,
-.recent-comments-section {
+.main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Card Styles */
+.card {
   background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
 }
 
-.section-header {
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  padding: 18px 22px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.section-header h2 {
-  font-size: 18px;
+.card-header h2 {
+  font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: #0f172a;
   margin: 0;
 }
 
+.card-body {
+  padding: 18px 22px;
+}
+
+.view-all {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.view-all:hover {
+  color: #1d4ed8;
+}
+
+/* Period Selector */
 .period-selector {
   display: flex;
-  gap: 4px;
-  background: #f3f4f6;
-  padding: 4px;
+  gap: 2px;
+  background: #f1f5f9;
+  padding: 3px;
   border-radius: 8px;
 }
 
 .period-selector button {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: #64748b;
   font-size: 13px;
   font-weight: 500;
   border-radius: 6px;
@@ -332,85 +469,158 @@ onMounted(() => {
 
 .period-selector button.active {
   background: #fff;
-  color: #1f2937;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.view-all {
-  color: #4f46e5;
-  text-decoration: none;
+.period-selector button:hover:not(.active) {
+  color: #334155;
+}
+
+/* Quick Stats Card */
+.quick-stats-card .card-body {
+  padding: 12px 22px 18px;
+}
+
+.quick-stat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.quick-stat-item:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
   font-size: 14px;
-  font-weight: 500;
+  color: #64748b;
 }
 
-.view-all:hover {
-  text-decoration: underline;
+.stat-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
 }
 
-.posts-list,
-.comments-list {
+.stat-value.warning {
+  color: #ea580c;
+}
+
+/* Posts List */
+.posts-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .post-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  background: #f9fafb;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  transition: background 0.2s;
+}
+
+.post-item:hover {
+  background: #f1f5f9;
+}
+
+.post-rank {
+  width: 28px;
+  height: 28px;
+  background: #e2e8f0;
   border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.post-item:first-child .post-rank {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.post-item:nth-child(2) .post-rank {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.post-item:nth-child(3) .post-rank {
+  background: #fed7aa;
+  color: #c2410c;
 }
 
 .post-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .post-title {
-  color: #1f2937;
+  display: block;
+  color: #0f172a;
   text-decoration: none;
   font-weight: 500;
   font-size: 14px;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .post-title:hover {
-  color: #4f46e5;
+  color: #2563eb;
 }
 
 .post-meta {
-  color: #9ca3af;
+  color: #94a3b8;
   font-size: 12px;
 }
 
 .post-views {
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: #6b7280;
+  gap: 5px;
+  color: #64748b;
   font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.post-views svg {
+  opacity: 0.7;
+}
+
+/* Comments List */
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .comment-item {
   display: flex;
   gap: 12px;
-  padding: 12px;
-  background: #f9fafb;
-  border-radius: 8px;
 }
 
 .comment-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -429,39 +639,39 @@ onMounted(() => {
 
 .comment-author {
   font-weight: 500;
-  font-size: 14px;
-  color: #1f2937;
+  font-size: 13px;
+  color: #0f172a;
 }
 
 .comment-date {
-  color: #9ca3af;
+  color: #94a3b8;
   font-size: 12px;
 }
 
 .comment-text {
-  color: #6b7280;
+  color: #64748b;
   font-size: 13px;
-  margin: 0 0 4px 0;
-  line-height: 1.4;
+  margin: 0;
+  line-height: 1.5;
 }
 
-.comment-post {
-  color: #9ca3af;
-  font-size: 12px;
-}
-
+/* Loading & Empty States */
 .loading-placeholder {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .skeleton-item {
-  height: 60px;
-  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  height: 56px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
-  border-radius: 8px;
+  border-radius: 12px;
+}
+
+.skeleton-item.small {
+  height: 48px;
 }
 
 @keyframes shimmer {
@@ -474,25 +684,29 @@ onMounted(() => {
 }
 
 .empty-state {
-  text-align: center;
-  padding: 32px;
-  color: #9ca3af;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #94a3b8;
 }
 
-.quick-actions {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.empty-state svg {
+  margin-bottom: 12px;
+  opacity: 0.5;
 }
 
-.quick-actions h2 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-  margin: 0 0 20px 0;
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
 }
 
+.empty-state.small {
+  padding: 24px 16px;
+}
+
+/* Actions Grid */
 .actions-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -501,51 +715,75 @@ onMounted(() => {
 
 .action-card {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 24px;
-  background: #f9fafb;
-  border-radius: 12px;
+  gap: 14px;
+  padding: 18px 20px;
+  background: #f8fafc;
+  border-radius: 14px;
   text-decoration: none;
   transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
 .action-card:hover {
-  background: #f3f4f6;
+  background: #fff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transform: translateY(-2px);
 }
 
 .action-icon {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  flex-shrink: 0;
 }
 
 .action-icon.blue {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: #eff6ff;
+  color: #2563eb;
 }
 
 .action-icon.green {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: #ecfdf5;
+  color: #059669;
 }
 
 .action-icon.purple {
-  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  background: #f5f3ff;
+  color: #7c3aed;
 }
 
 .action-icon.orange {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: #fff7ed;
+  color: #ea580c;
 }
 
-.action-card span {
+.action-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.action-title {
   font-size: 14px;
-  font-weight: 500;
-  color: #374151;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.action-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+  .main-grid {
+    grid-template-columns: 1fr 340px;
+  }
 }
 
 @media (max-width: 1200px) {
@@ -553,8 +791,13 @@ onMounted(() => {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .dashboard-grid {
+  .main-grid {
     grid-template-columns: 1fr;
+  }
+
+  .side-column {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .actions-grid {
@@ -563,11 +806,55 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .page-header {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .header-content h1 {
+    font-size: 20px;
+  }
+
+  .header-content p {
+    display: none;
+  }
+
+  .btn-primary {
+    padding: 8px 14px;
+    font-size: 13px;
+    gap: 6px;
+  }
+
+  .btn-primary svg {
+    width: 16px;
+    height: 16px;
+  }
+
   .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .side-column {
     grid-template-columns: 1fr;
   }
 
   .actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-header,
+  .card-body {
+    padding: 14px 16px;
+  }
+
+  .action-card {
+    padding: 14px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
     grid-template-columns: 1fr;
   }
 }

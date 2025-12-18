@@ -6,7 +6,9 @@ namespace App\Infrastructure\Repository;
 
 use App\Domain\Contracts\Repository\TagRepository;
 use App\Domain\Entities\Tag;
+use App\Infrastructure\Persistence\Models\PostModel;
 use App\Infrastructure\Persistence\Models\TagModel;
+use Toporia\Framework\Support\Accessors\QueryBuilder;
 use Toporia\Framework\Support\Str;
 
 /**
@@ -82,15 +84,19 @@ final class PdoTagRepository implements TagRepository
      */
     public function findByPost(int $postId): array
     {
-        // Get tags through the taggables pivot table
-        $models = TagModel::query()
-            ->whereHas('posts', function ($query) use ($postId) {
-                $query->where('posts.id', $postId);
-            })
-            ->orderBy('name', 'asc')
-            ->get();
+        // Get tags through the taggables polymorphic pivot table using raw SQL
+        // since TagModel doesn't have a direct 'posts' relationship
+        $taggableType = PostModel::class;
 
-        return $models->map(fn(TagModel $model) => $this->toDomain($model))->all();
+        $rows = QueryBuilder::getConnection()->select(
+            "SELECT t.* FROM tags t
+             INNER JOIN taggables tg ON tg.tag_id = t.id
+             WHERE tg.taggable_type = ? AND tg.taggable_id = ?
+             ORDER BY t.name ASC",
+            [$taggableType, $postId]
+        );
+
+        return array_map(fn(QueryBuilder $row) => $this->rowToDomain($row), $rows);
     }
 
     /**
@@ -360,6 +366,24 @@ final class PdoTagRepository implements TagRepository
             usageCount: $model->usage_count ?? 0,
             createdAt: $model->created_at ? new \DateTimeImmutable($model->created_at) : null,
             updatedAt: $model->updated_at ? new \DateTimeImmutable($model->updated_at) : null
+        );
+    }
+
+    /**
+     * Map raw database row to domain entity.
+     */
+    private function rowToDomain(object $row): Tag
+    {
+        return new Tag(
+            id: (int) $row->id,
+            name: $row->name,
+            slug: $row->slug ?? '',
+            description: $row->description ?? null,
+            color: $row->color ?? '#6366f1',
+            isActive: (bool) ($row->is_active ?? true),
+            usageCount: (int) ($row->usage_count ?? 0),
+            createdAt: isset($row->created_at) ? new \DateTimeImmutable($row->created_at) : null,
+            updatedAt: isset($row->updated_at) ? new \DateTimeImmutable($row->updated_at) : null
         );
     }
 }

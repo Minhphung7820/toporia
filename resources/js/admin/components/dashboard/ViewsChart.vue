@@ -56,6 +56,7 @@ const getBarHeight = (value) => {
 };
 
 const formatValue = (val) => {
+  if (val >= 1000000000) return (val / 1000000000).toFixed(1) + 'B';
   if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
   if (val >= 1000) return (val / 1000).toFixed(1) + 'K';
   return val.toString();
@@ -63,7 +64,6 @@ const formatValue = (val) => {
 
 const formatLabel = (label) => {
   if (!label) return '';
-  // For date labels, show short format
   if (label.includes('-')) {
     const date = new Date(label);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -74,7 +74,7 @@ const formatLabel = (label) => {
 
 <style scoped>
 .chart-container {
-  height: 250px;
+  height: 280px;
 }
 
 .chart-loading,
@@ -84,16 +84,16 @@ const formatLabel = (label) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: #94a3b8;
 }
 
 .chart-skeleton {
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 @keyframes shimmer {
@@ -107,7 +107,7 @@ const formatLabel = (label) => {
 
 .chart-empty svg {
   margin-bottom: 12px;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .chart-empty p {
@@ -117,7 +117,7 @@ const formatLabel = (label) => {
 
 .chart-wrapper {
   height: 100%;
-  padding-top: 20px;
+  padding-top: 28px;
 }
 
 .chart-bars {
@@ -125,8 +125,8 @@ const formatLabel = (label) => {
   align-items: flex-end;
   justify-content: space-between;
   height: 100%;
-  gap: 8px;
-  padding-bottom: 30px;
+  gap: 10px;
+  padding-bottom: 36px;
 }
 
 .chart-bar-wrapper {
@@ -141,27 +141,29 @@ const formatLabel = (label) => {
 
 .chart-bar {
   width: 100%;
-  max-width: 40px;
-  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
-  border-radius: 6px 6px 0 0;
+  max-width: 48px;
+  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 8px 8px 0 0;
   position: relative;
-  transition: height 0.3s ease;
+  transition: all 0.3s ease;
   cursor: pointer;
   min-height: 4px;
 }
 
 .chart-bar:hover {
-  opacity: 0.9;
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  transform: scaleY(1.02);
+  transform-origin: bottom;
 }
 
 .bar-value {
   position: absolute;
-  top: -24px;
+  top: -26px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: #475569;
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -173,9 +175,29 @@ const formatLabel = (label) => {
 
 .bar-label {
   position: absolute;
-  bottom: -24px;
-  font-size: 11px;
-  color: #9ca3af;
+  bottom: -28px;
+  font-size: 12px;
+  color: #64748b;
   white-space: nowrap;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .chart-container {
+    height: 220px;
+  }
+
+  .chart-bars {
+    gap: 6px;
+  }
+
+  .chart-bar {
+    max-width: 32px;
+    border-radius: 6px 6px 0 0;
+  }
+
+  .bar-label {
+    font-size: 10px;
+  }
 }
 </style>

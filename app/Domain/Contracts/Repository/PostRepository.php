@@ -205,4 +205,36 @@ interface PostRepository
      * @return void
      */
     public function syncCategories(int $postId, array $categoryIds): void;
+
+    /**
+     * Find published posts with cursor pagination (optimized for large datasets).
+     *
+     * @param int $limit Number of posts per page
+     * @param string|null $cursor Cursor for pagination (published_at timestamp)
+     * @param string $direction 'next' or 'prev'
+     * @return array{posts: Post[], next_cursor: string|null, prev_cursor: string|null, has_more: bool}
+     */
+    public function findPublishedWithCursor(int $limit = 10, ?string $cursor = null, string $direction = 'next'): array;
+
+    /**
+     * Find posts by category with cursor pagination.
+     *
+     * @param int $categoryId Category ID
+     * @param int $limit Number of posts per page
+     * @param string|null $cursor Cursor for pagination
+     * @param string $direction 'next' or 'prev'
+     * @return array{posts: Post[], next_cursor: string|null, prev_cursor: string|null, has_more: bool}
+     */
+    public function findByCategoryWithCursor(int $categoryId, int $limit = 10, ?string $cursor = null, string $direction = 'next'): array;
+
+    /**
+     * Find posts by tag with cursor pagination.
+     *
+     * @param int $tagId Tag ID
+     * @param int $limit Number of posts per page
+     * @param string|null $cursor Cursor for pagination
+     * @param string $direction 'next' or 'prev'
+     * @return array{posts: Post[], next_cursor: string|null, prev_cursor: string|null, has_more: bool}
+     */
+    public function findByTagWithCursor(int $tagId, int $limit = 10, ?string $cursor = null, string $direction = 'next'): array;
 }

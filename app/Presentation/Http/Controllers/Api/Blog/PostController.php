@@ -24,16 +24,17 @@ final class PostController extends BaseController
     }
 
     /**
-     * Get published posts with pagination.
+     * Get published posts with cursor pagination.
      *
      * GET /api/blog/posts
      */
     public function index(Request $request): JsonResponseInterface
     {
-        $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 10), 50);
+        $cursor = $request->query('cursor');
+        $direction = $request->query('direction', 'next');
 
-        $result = $this->postService->getPublishedPosts($page, $perPage);
+        $result = $this->postService->getPublishedPosts($perPage, $cursor, $direction);
 
         return $this->json($result);
     }
@@ -111,16 +112,17 @@ final class PostController extends BaseController
     }
 
     /**
-     * Get posts by category.
+     * Get posts by category with cursor pagination.
      *
      * GET /api/blog/categories/{slug}/posts
      */
     public function byCategory(string $slug, Request $request): JsonResponseInterface
     {
-        $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 10), 50);
+        $cursor = $request->query('cursor');
+        $direction = $request->query('direction', 'next');
 
-        $result = $this->postService->getPostsByCategory($slug, $page, $perPage);
+        $result = $this->postService->getPostsByCategory($slug, $perPage, $cursor, $direction);
 
         if (!$result['success']) {
             return $this->json($result, 404);
@@ -130,16 +132,17 @@ final class PostController extends BaseController
     }
 
     /**
-     * Get posts by tag.
+     * Get posts by tag with cursor pagination.
      *
      * GET /api/blog/tags/{slug}/posts
      */
     public function byTag(string $slug, Request $request): JsonResponseInterface
     {
-        $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 10), 50);
+        $cursor = $request->query('cursor');
+        $direction = $request->query('direction', 'next');
 
-        $result = $this->postService->getPostsByTag($slug, $page, $perPage);
+        $result = $this->postService->getPostsByTag($slug, $perPage, $cursor, $direction);
 
         if (!$result['success']) {
             return $this->json($result, 404);

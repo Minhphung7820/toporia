@@ -51,7 +51,7 @@ final class CommentController extends BaseController
         $data['post_id'] = $postId;
 
         $userId = Auth::check() ? Auth::user()->getAuthIdentifier() : null;
-        $ipAddress = $request->getClientIp();
+        $ipAddress = $request->ip();
 
         $result = $this->commentService->createComment($data, $userId, $ipAddress);
 
@@ -72,7 +72,7 @@ final class CommentController extends BaseController
         $data = $request->json();
 
         $userId = Auth::check() ? Auth::user()->getAuthIdentifier() : null;
-        $ipAddress = $request->getClientIp();
+        $ipAddress = $request->ip();
 
         $result = $this->commentService->createReply($commentId, $data, $userId, $ipAddress);
 

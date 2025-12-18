@@ -18,12 +18,12 @@ export const useBlogStore = defineStore('blog', {
     relatedPosts: [],
     searchResults: [],
 
-    // Pagination
+    // Cursor Pagination
     pagination: {
-      total: 0,
-      page: 1,
+      nextCursor: null,
+      prevCursor: null,
+      hasMore: false,
       perPage: 10,
-      totalPages: 0,
     },
 
     // Categories
@@ -60,7 +60,9 @@ export const useBlogStore = defineStore('blog', {
   getters: {
     isLoading: (state) => Object.values(state.loading).some(Boolean),
 
-    hasMorePages: (state) => state.pagination.page < state.pagination.totalPages,
+    hasMorePages: (state) => state.pagination.hasMore,
+
+    hasPrevPage: (state) => !!state.pagination.prevCursor,
 
     formattedCategories: (state) => {
       return state.categories.map(cat => ({
@@ -79,23 +81,23 @@ export const useBlogStore = defineStore('blog', {
 
   actions: {
     /**
-     * Fetch published posts
+     * Fetch published posts with cursor pagination
      */
-    async fetchPosts(page = 1, perPage = 10) {
+    async fetchPosts(cursor = null, direction = 'next', perPage = 10) {
       this.loading.posts = true;
       this.error = null;
 
       try {
-        const response = await posts.list(page, perPage);
+        const response = await posts.list(perPage, cursor, direction);
         const data = response.data;
 
         if (data.success) {
           this.posts = data.data.posts;
           this.pagination = {
-            total: data.data.pagination.total,
-            page: data.data.pagination.page,
+            nextCursor: data.data.pagination.next_cursor,
+            prevCursor: data.data.pagination.prev_cursor,
+            hasMore: data.data.pagination.has_more,
             perPage: data.data.pagination.per_page,
-            totalPages: data.data.pagination.total_pages,
           };
         }
       } catch (error) {
@@ -248,19 +250,25 @@ export const useBlogStore = defineStore('blog', {
     },
 
     /**
-     * Fetch posts by category
+     * Fetch posts by category with cursor pagination
      */
-    async fetchPostsByCategory(categorySlug, page = 1, perPage = 10) {
+    async fetchPostsByCategory(categorySlug, cursor = null, direction = 'next', perPage = 10) {
       this.loading.posts = true;
       this.error = null;
 
       try {
-        const response = await posts.byCategory(categorySlug, page, perPage);
+        const response = await posts.byCategory(categorySlug, perPage, cursor, direction);
         const data = response.data;
 
         if (data.success) {
           this.posts = data.data.posts;
           this.currentCategory = data.data.category;
+          this.pagination = {
+            nextCursor: data.data.pagination.next_cursor,
+            prevCursor: data.data.pagination.prev_cursor,
+            hasMore: data.data.pagination.has_more,
+            perPage: data.data.pagination.per_page,
+          };
         }
       } catch (error) {
         this.error = error.response?.data?.message || 'Category not found';
@@ -271,19 +279,25 @@ export const useBlogStore = defineStore('blog', {
     },
 
     /**
-     * Fetch posts by tag
+     * Fetch posts by tag with cursor pagination
      */
-    async fetchPostsByTag(tagSlug, page = 1, perPage = 10) {
+    async fetchPostsByTag(tagSlug, cursor = null, direction = 'next', perPage = 10) {
       this.loading.posts = true;
       this.error = null;
 
       try {
-        const response = await posts.byTag(tagSlug, page, perPage);
+        const response = await posts.byTag(tagSlug, perPage, cursor, direction);
         const data = response.data;
 
         if (data.success) {
           this.posts = data.data.posts;
           this.currentTag = data.data.tag;
+          this.pagination = {
+            nextCursor: data.data.pagination.next_cursor,
+            prevCursor: data.data.pagination.prev_cursor,
+            hasMore: data.data.pagination.has_more,
+            perPage: data.data.pagination.per_page,
+          };
         }
       } catch (error) {
         this.error = error.response?.data?.message || 'Tag not found';
@@ -430,10 +444,10 @@ export const useBlogStore = defineStore('blog', {
       this.error = null;
       this.searchQuery = '';
       this.pagination = {
-        total: 0,
-        page: 1,
+        nextCursor: null,
+        prevCursor: null,
+        hasMore: false,
         perPage: 10,
-        totalPages: 0,
       };
     },
   },

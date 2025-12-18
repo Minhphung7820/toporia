@@ -1,254 +1,250 @@
 <template>
   <div class="rich-editor">
-    <div class="editor-toolbar">
-      <button type="button" @click="execCommand('bold')" title="Bold">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z" />
-          <path d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z" />
-        </svg>
-      </button>
-      <button type="button" @click="execCommand('italic')" title="Italic">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="19" y1="4" x2="10" y2="4" />
-          <line x1="14" y1="20" x2="5" y2="20" />
-          <line x1="15" y1="4" x2="9" y2="20" />
-        </svg>
-      </button>
-      <button type="button" @click="execCommand('underline')" title="Underline">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3" />
-          <line x1="4" y1="21" x2="20" y2="21" />
-        </svg>
-      </button>
-      <span class="separator"></span>
-      <button type="button" @click="execCommand('insertUnorderedList')" title="Bullet List">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="8" y1="6" x2="21" y2="6" />
-          <line x1="8" y1="12" x2="21" y2="12" />
-          <line x1="8" y1="18" x2="21" y2="18" />
-          <circle cx="4" cy="6" r="1" fill="currentColor" />
-          <circle cx="4" cy="12" r="1" fill="currentColor" />
-          <circle cx="4" cy="18" r="1" fill="currentColor" />
-        </svg>
-      </button>
-      <button type="button" @click="execCommand('insertOrderedList')" title="Numbered List">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="10" y1="6" x2="21" y2="6" />
-          <line x1="10" y1="12" x2="21" y2="12" />
-          <line x1="10" y1="18" x2="21" y2="18" />
-          <text x="2" y="8" font-size="8" fill="currentColor">1</text>
-          <text x="2" y="14" font-size="8" fill="currentColor">2</text>
-          <text x="2" y="20" font-size="8" fill="currentColor">3</text>
-        </svg>
-      </button>
-      <span class="separator"></span>
-      <select @change="formatBlock($event)">
-        <option value="">Format</option>
-        <option value="h1">Heading 1</option>
-        <option value="h2">Heading 2</option>
-        <option value="h3">Heading 3</option>
-        <option value="p">Paragraph</option>
-        <option value="blockquote">Quote</option>
-      </select>
-      <span class="separator"></span>
-      <button type="button" @click="insertLink" title="Insert Link">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
-        </svg>
-      </button>
-      <button type="button" @click="insertImage" title="Insert Image">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
-        </svg>
-      </button>
-    </div>
-    <div
-      ref="editor"
-      class="editor-content"
-      contenteditable="true"
-      @input="handleInput"
-      @paste="handlePaste"
-    ></div>
+    <Ckeditor
+      v-model="content"
+      :editor="editor"
+      :config="editorConfig"
+      @ready="onReady"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch } from 'vue';
+import { Ckeditor } from '@ckeditor/ckeditor5-vue';
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
+import '@ckeditor/ckeditor5-build-classic/build/ckeditor.js';
 
 const props = defineProps({
   modelValue: {
     type: String,
     default: '',
   },
+  placeholder: {
+    type: String,
+    default: 'Start writing your content...',
+  },
 });
 
 const emit = defineEmits(['update:modelValue']);
 
-const editor = ref(null);
+const editor = ClassicEditor;
+const content = ref(props.modelValue);
 
-const execCommand = (command, value = null) => {
-  document.execCommand(command, false, value);
-  editor.value?.focus();
+// Get CSRF token from cookie
+const getCsrfToken = () => {
+  const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
 };
 
-const formatBlock = (event) => {
-  const tag = event.target.value;
-  if (tag) {
-    document.execCommand('formatBlock', false, `<${tag}>`);
-  }
-  event.target.value = '';
-  editor.value?.focus();
+const editorConfig = {
+  licenseKey: 'GPL',
+  placeholder: props.placeholder,
+  toolbar: {
+    items: [
+      'heading',
+      '|',
+      'bold',
+      'italic',
+      'underline',
+      'strikethrough',
+      '|',
+      'bulletedList',
+      'numberedList',
+      '|',
+      'outdent',
+      'indent',
+      '|',
+      'blockQuote',
+      'insertTable',
+      '|',
+      'link',
+      'imageUpload',
+      'mediaEmbed',
+      '|',
+      'undo',
+      'redo',
+    ],
+  },
+  heading: {
+    options: [
+      { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+      { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+      { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+      { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' },
+      { model: 'heading4', view: 'h4', title: 'Heading 4', class: 'ck-heading_heading4' },
+    ],
+  },
+  image: {
+    toolbar: ['imageTextAlternative', 'imageStyle:inline', 'imageStyle:block', 'imageStyle:side'],
+  },
+  table: {
+    contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells'],
+  },
+  link: {
+    addTargetToExternalLinks: true,
+    defaultProtocol: 'https://',
+  },
+  simpleUpload: {
+    uploadUrl: '/api/admin/upload',
+    withCredentials: true,
+    headers: {
+      'X-XSRF-TOKEN': getCsrfToken(),
+    },
+  },
 };
 
-const insertLink = () => {
-  const url = prompt('Enter URL:');
-  if (url) {
-    document.execCommand('createLink', false, url);
-  }
-  editor.value?.focus();
+const onReady = () => {
+  // Editor is ready
 };
 
-const insertImage = () => {
-  const url = prompt('Enter image URL:');
-  if (url) {
-    document.execCommand('insertImage', false, url);
-  }
-  editor.value?.focus();
-};
+// Sync content to parent
+watch(content, (newValue) => {
+  emit('update:modelValue', newValue);
+});
 
-const handleInput = () => {
-  emit('update:modelValue', editor.value?.innerHTML || '');
-};
-
-const handlePaste = (event) => {
-  event.preventDefault();
-  const text = event.clipboardData?.getData('text/plain') || '';
-  document.execCommand('insertText', false, text);
-};
-
+// Sync from parent
 watch(
   () => props.modelValue,
   (newValue) => {
-    if (editor.value && editor.value.innerHTML !== newValue) {
-      editor.value.innerHTML = newValue;
+    if (newValue !== content.value) {
+      content.value = newValue;
     }
   }
 );
-
-onMounted(() => {
-  if (editor.value && props.modelValue) {
-    editor.value.innerHTML = props.modelValue;
-  }
-});
 </script>
 
-<style scoped>
+<style>
+/* CKEditor custom styles */
 .rich-editor {
-  border: 1px solid #e5e7eb;
   border-radius: 8px;
   overflow: hidden;
 }
 
-.editor-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  flex-wrap: wrap;
+.rich-editor .ck.ck-editor {
+  width: 100%;
 }
 
-.editor-toolbar button {
-  padding: 6px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  color: #6b7280;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.editor-toolbar button:hover {
-  background: #e5e7eb;
-  color: #1f2937;
-}
-
-.editor-toolbar select {
-  padding: 4px 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  font-size: 13px;
-  background: #fff;
-}
-
-.separator {
-  width: 1px;
-  height: 20px;
-  background: #e5e7eb;
-  margin: 0 4px;
-}
-
-.editor-content {
+.rich-editor .ck.ck-editor__main > .ck-editor__editable {
   min-height: 300px;
-  padding: 16px;
-  outline: none;
-  font-size: 14px;
+  border-color: #e5e7eb;
+}
+
+.rich-editor .ck.ck-editor__main > .ck-editor__editable:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.rich-editor .ck.ck-toolbar {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+  border-radius: 8px 8px 0 0;
+}
+
+.rich-editor .ck.ck-button {
+  border-radius: 4px;
+}
+
+.rich-editor .ck.ck-button:hover {
+  background: #e5e7eb;
+}
+
+.rich-editor .ck.ck-button.ck-on {
+  background: #667eea;
+  color: #fff;
+}
+
+/* Content styles */
+.rich-editor .ck-content h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin: 0.67em 0;
+}
+
+.rich-editor .ck-content h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0.75em 0;
+}
+
+.rich-editor .ck-content h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.83em 0;
+}
+
+.rich-editor .ck-content h4 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 1em 0;
+}
+
+.rich-editor .ck-content p {
+  margin: 0 0 1em 0;
   line-height: 1.6;
 }
 
-.editor-content:focus {
-  background: #fff;
-}
-
-.editor-content h1 {
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0 0 16px 0;
-}
-
-.editor-content h2 {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-}
-
-.editor-content h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0 0 8px 0;
-}
-
-.editor-content p {
-  margin: 0 0 12px 0;
-}
-
-.editor-content blockquote {
-  border-left: 3px solid #667eea;
-  margin: 0 0 12px 0;
-  padding-left: 16px;
+.rich-editor .ck-content blockquote {
+  border-left: 4px solid #667eea;
+  padding-left: 1em;
+  margin: 1em 0;
   color: #6b7280;
   font-style: italic;
 }
 
-.editor-content ul,
-.editor-content ol {
-  margin: 0 0 12px 0;
-  padding-left: 24px;
+.rich-editor .ck-content ul,
+.rich-editor .ck-content ol {
+  padding-left: 1.5em;
+  margin: 1em 0;
 }
 
-.editor-content a {
+.rich-editor .ck-content a {
   color: #667eea;
+  text-decoration: underline;
 }
 
-.editor-content img {
+.rich-editor .ck-content img {
   max-width: 100%;
   height: auto;
   border-radius: 8px;
+}
+
+.rich-editor .ck-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+.rich-editor .ck-content table td,
+.rich-editor .ck-content table th {
+  border: 1px solid #e5e7eb;
+  padding: 0.5em;
+}
+
+.rich-editor .ck-content table th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+.rich-editor .ck-content code {
+  background: #f1f5f9;
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.9em;
+}
+
+.rich-editor .ck-content pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.rich-editor .ck-content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
 }
 </style>

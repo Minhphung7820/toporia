@@ -18,6 +18,7 @@ use App\Presentation\Http\Controllers\Api\Admin\TagAdminController;
 use App\Presentation\Http\Controllers\Api\Admin\UserAdminController;
 use App\Presentation\Http\Controllers\Api\Admin\SettingsAdminController;
 use App\Presentation\Http\Controllers\Api\Admin\FeedbackAdminController;
+use App\Presentation\Http\Controllers\Api\Admin\UploadController;
 
 // =========================================================================
 // ADMIN API ROUTES
@@ -108,5 +109,8 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'admin']], function 
     Route::post('/feedback/{id}/notes', [FeedbackAdminController::class, 'addNotes']);
     Route::delete('/feedback/{id}', [FeedbackAdminController::class, 'destroy']);
     Route::post('/feedback/bulk-delete', [FeedbackAdminController::class, 'bulkDelete']);
+
+    // File Upload
+    Route::post('/upload', [UploadController::class, 'upload']);
 
 });

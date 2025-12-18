@@ -91,7 +91,7 @@ const uploadFile = async (file) => {
   formData.append('file', file);
 
   try {
-    const response = await http.post('/api/upload', formData, {
+    const response = await http.post('/admin/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -100,19 +100,13 @@ const uploadFile = async (file) => {
       },
     });
 
-    if (response.data.success) {
-      emit('update:modelValue', response.data.data.url);
+    if (response.data.url || response.data.uploaded) {
+      emit('update:modelValue', response.data.url);
     } else {
-      error.value = response.data.message || 'Upload failed';
+      error.value = response.data.error?.message || response.data.message || 'Upload failed';
     }
   } catch (err) {
-    error.value = err.response?.data?.message || 'Upload failed';
-    // Fallback: use local URL for preview (in development)
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      emit('update:modelValue', e.target?.result);
-    };
-    reader.readAsDataURL(file);
+    error.value = err.response?.data?.error?.message || err.response?.data?.message || 'Upload failed';
   } finally {
     uploading.value = false;
     progress.value = 0;

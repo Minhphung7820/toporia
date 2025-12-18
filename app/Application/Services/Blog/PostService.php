@@ -22,27 +22,26 @@ final class PostService
     ) {}
 
     /**
-     * Get published posts with pagination.
+     * Get published posts with cursor pagination (optimized).
      *
-     * @param int $page Page number
      * @param int $perPage Posts per page
+     * @param string|null $cursor Cursor for pagination
+     * @param string $direction 'next' or 'prev'
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getPublishedPosts(int $page = 1, int $perPage = 10): array
+    public function getPublishedPosts(int $perPage = 10, ?string $cursor = null, string $direction = 'next'): array
     {
-        $offset = ($page - 1) * $perPage;
-        $posts = $this->postRepository->findPublished($perPage, $offset);
-        $total = $this->postRepository->countPublished();
+        $result = $this->postRepository->findPublishedWithCursor($perPage, $cursor, $direction);
 
         return [
             'success' => true,
             'data' => [
-                'posts' => array_map(fn($post) => $post->toArray(), $posts),
+                'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
                 'pagination' => [
-                    'total' => $total,
-                    'page' => $page,
+                    'next_cursor' => $result['next_cursor'],
+                    'prev_cursor' => $result['prev_cursor'],
+                    'has_more' => $result['has_more'],
                     'per_page' => $perPage,
-                    'total_pages' => (int) ceil($total / $perPage),
                 ],
             ],
             'message' => 'Posts retrieved successfully',
@@ -168,14 +167,15 @@ final class PostService
     }
 
     /**
-     * Get posts by category.
+     * Get posts by category with cursor pagination.
      *
      * @param string $categorySlug Category slug
-     * @param int $page Page number
      * @param int $perPage Posts per page
+     * @param string|null $cursor Cursor for pagination
+     * @param string $direction 'next' or 'prev'
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getPostsByCategory(string $categorySlug, int $page = 1, int $perPage = 10): array
+    public function getPostsByCategory(string $categorySlug, int $perPage = 10, ?string $cursor = null, string $direction = 'next'): array
     {
         $category = $this->categoryRepository->findBySlug($categorySlug);
 
@@ -186,28 +186,34 @@ final class PostService
             ];
         }
 
-        $offset = ($page - 1) * $perPage;
-        $posts = $this->postRepository->findByCategory($category->id, $perPage, $offset);
+        $result = $this->postRepository->findByCategoryWithCursor($category->id, $perPage, $cursor, $direction);
 
         return [
             'success' => true,
             'data' => [
                 'category' => $category->toArray(),
-                'posts' => array_map(fn($post) => $post->toArray(), $posts),
+                'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
+                'pagination' => [
+                    'next_cursor' => $result['next_cursor'],
+                    'prev_cursor' => $result['prev_cursor'],
+                    'has_more' => $result['has_more'],
+                    'per_page' => $perPage,
+                ],
             ],
             'message' => 'Posts retrieved successfully',
         ];
     }
 
     /**
-     * Get posts by tag.
+     * Get posts by tag with cursor pagination.
      *
      * @param string $tagSlug Tag slug
-     * @param int $page Page number
      * @param int $perPage Posts per page
+     * @param string|null $cursor Cursor for pagination
+     * @param string $direction 'next' or 'prev'
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getPostsByTag(string $tagSlug, int $page = 1, int $perPage = 10): array
+    public function getPostsByTag(string $tagSlug, int $perPage = 10, ?string $cursor = null, string $direction = 'next'): array
     {
         $tag = $this->tagRepository->findBySlug($tagSlug);
 
@@ -218,14 +224,19 @@ final class PostService
             ];
         }
 
-        $offset = ($page - 1) * $perPage;
-        $posts = $this->postRepository->findByTag($tag->id, $perPage, $offset);
+        $result = $this->postRepository->findByTagWithCursor($tag->id, $perPage, $cursor, $direction);
 
         return [
             'success' => true,
             'data' => [
                 'tag' => $tag->toArray(),
-                'posts' => array_map(fn($post) => $post->toArray(), $posts),
+                'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
+                'pagination' => [
+                    'next_cursor' => $result['next_cursor'],
+                    'prev_cursor' => $result['prev_cursor'],
+                    'has_more' => $result['has_more'],
+                    'per_page' => $perPage,
+                ],
             ],
             'message' => 'Posts retrieved successfully',
         ];

@@ -294,6 +294,28 @@ final class PdoCommentRepository implements CommentRepository
     }
 
     /**
+     * {@inheritdoc}
+     *
+     * Optimized: Single query for all comment counts.
+     */
+    public function getStatistics(): array
+    {
+        $result = CommentModel::getConnection()->selectOne("
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN is_approved = 0 THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN is_approved = 1 THEN 1 ELSE 0 END) as approved
+            FROM comments
+        ");
+
+        return [
+            'total' => (int) ($result['total'] ?? 0),
+            'pending' => (int) ($result['pending'] ?? 0),
+            'approved' => (int) ($result['approved'] ?? 0),
+        ];
+    }
+
+    /**
      * Map database model to domain entity.
      */
     private function toDomain(CommentModel $model): Comment

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Repository\Admin;
 
 use App\Infrastructure\Persistence\Models\CommentModel;
+use App\Infrastructure\Persistence\Models\PostModel;
 use Toporia\Framework\Repository\BaseRepository;
 use Toporia\Framework\Support\Pagination\Paginator;
 
@@ -19,14 +20,20 @@ final class CommentAdminRepository extends BaseRepository
 
     /**
      * Get paginated comments with optional filters.
+     * Loads post info via raw query since commentable_type stores 'Post' instead of full class name.
      */
     public function getPaginated(array $filters = [], int $perPage = 20, int $page = 1): Paginator
     {
-        return $this
-            ->with(['user', 'commentable'])
+        $paginator = $this
+            ->with(['user'])
             ->applyFilters($filters)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage, $page);
+
+        // Manually load post data for each comment
+        $this->loadPostsForComments($paginator->items());
+
+        return $paginator;
     }
 
     /**
@@ -34,11 +41,53 @@ final class CommentAdminRepository extends BaseRepository
      */
     public function getPending(int $perPage = 20, int $page = 1): Paginator
     {
-        return $this
-            ->with(['user', 'commentable'])
+        $paginator = $this
+            ->with(['user'])
             ->scope(fn($q) => $q->where('is_approved', false))
             ->orderBy('created_at', 'desc')
             ->paginate($perPage, $page);
+
+        // Manually load post data for each comment
+        $this->loadPostsForComments($paginator->items());
+
+        return $paginator;
+    }
+
+    /**
+     * Manually load posts for comments since morphTo doesn't work with 'Post' type.
+     *
+     * @param iterable $comments Comments collection or array
+     */
+    private function loadPostsForComments(iterable $comments): void
+    {
+        // Collect all post IDs
+        $postIds = [];
+        $commentsList = [];
+
+        foreach ($comments as $comment) {
+            $commentsList[] = $comment;
+            if ($comment->commentable_id) {
+                $postIds[] = $comment->commentable_id;
+            }
+        }
+
+        if (empty($postIds)) {
+            return;
+        }
+
+        // Load all posts at once
+        $posts = PostModel::whereIn('id', array_unique($postIds))->get();
+        $postsById = [];
+        foreach ($posts as $post) {
+            $postsById[$post->id] = $post;
+        }
+
+        // Set commentable relation on each comment
+        foreach ($commentsList as $comment) {
+            if ($comment->commentable_id && isset($postsById[$comment->commentable_id])) {
+                $comment->setRelation('commentable', $postsById[$comment->commentable_id]);
+            }
+        }
     }
 
     protected function applyFilters(array $filters): static
@@ -55,8 +104,16 @@ final class CommentAdminRepository extends BaseRepository
                 }
 
                 if (!empty($filters['post_id'])) {
-                    $query->where('commentable_type', 'App\\Infrastructure\\Persistence\\Models\\PostModel')
-                          ->where('commentable_id', (int) $filters['post_id']);
+                    $query->where('commentable_id', (int) $filters['post_id']);
+                }
+
+                // Map status filter to is_approved boolean
+                if (!empty($filters['status'])) {
+                    if ($filters['status'] === 'approved') {
+                        $query->where('is_approved', true);
+                    } elseif ($filters['status'] === 'pending' || $filters['status'] === 'rejected') {
+                        $query->where('is_approved', false);
+                    }
                 }
             });
         }

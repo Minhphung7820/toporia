@@ -11,12 +11,18 @@ import http from './http';
  */
 export const posts = {
   /**
-   * Get published posts with pagination
-   * @param {number} page - Page number
+   * Get published posts with cursor pagination
    * @param {number} perPage - Items per page
+   * @param {string|null} cursor - Cursor for pagination
+   * @param {string} direction - 'next' or 'prev'
    */
-  list(page = 1, perPage = 10) {
-    return http.get('/blog/posts', { params: { page, per_page: perPage } });
+  list(perPage = 10, cursor = null, direction = 'next') {
+    const params = { per_page: perPage };
+    if (cursor) {
+      params.cursor = cursor;
+      params.direction = direction;
+    }
+    return http.get('/blog/posts', { params });
   },
 
   /**
@@ -79,23 +85,35 @@ export const posts = {
   },
 
   /**
-   * Get posts by category
+   * Get posts by category with cursor pagination
    * @param {string} categorySlug - Category slug
-   * @param {number} page - Page number
    * @param {number} perPage - Items per page
+   * @param {string|null} cursor - Cursor for pagination
+   * @param {string} direction - 'next' or 'prev'
    */
-  byCategory(categorySlug, page = 1, perPage = 10) {
-    return http.get(`/blog/categories/${categorySlug}/posts`, { params: { page, per_page: perPage } });
+  byCategory(categorySlug, perPage = 10, cursor = null, direction = 'next') {
+    const params = { per_page: perPage };
+    if (cursor) {
+      params.cursor = cursor;
+      params.direction = direction;
+    }
+    return http.get(`/blog/categories/${categorySlug}/posts`, { params });
   },
 
   /**
-   * Get posts by tag
+   * Get posts by tag with cursor pagination
    * @param {string} tagSlug - Tag slug
-   * @param {number} page - Page number
    * @param {number} perPage - Items per page
+   * @param {string|null} cursor - Cursor for pagination
+   * @param {string} direction - 'next' or 'prev'
    */
-  byTag(tagSlug, page = 1, perPage = 10) {
-    return http.get(`/blog/tags/${tagSlug}/posts`, { params: { page, per_page: perPage } });
+  byTag(tagSlug, perPage = 10, cursor = null, direction = 'next') {
+    const params = { per_page: perPage };
+    if (cursor) {
+      params.cursor = cursor;
+      params.direction = direction;
+    }
+    return http.get(`/blog/tags/${tagSlug}/posts`, { params });
   },
 };
 
