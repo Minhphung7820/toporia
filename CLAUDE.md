@@ -442,6 +442,8 @@ Toporia supports optional packages for extended functionality (source in `packag
   - Install: `composer require toporia/webhook` + `php console vendor:publish --tag=webhook-routes`
   - Routes: [routes/webhook.php](routes/webhook.php) (Inbound webhook endpoints)
 
+- **Tabula** (`toporia/tabula`) - High-performance Excel/CSV import & export (handles millions of rows)
+- **MongoDB** (`toporia/mongodb`) - MongoDB ODM with embedded documents, references, and aggregation pipelines
 - **Audit** (`toporia/audit`) - Audit logging for models
 - **API Versioning** (`toporia/api-versioning`) - API versioning support
 - **Tenancy** (`toporia/tenancy`) - Multi-tenancy support
