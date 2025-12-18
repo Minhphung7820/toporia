@@ -11,6 +11,7 @@ use App\Infrastructure\Services\Kafka\KafkaTopicService;
 use App\Infrastructure\Services\Kafka\KafkaHealthChecker;
 use App\Infrastructure\Services\Kafka\KafkaClusterIdFixer;
 use Toporia\Framework\Container\Contracts\ContainerInterface;
+use Toporia\Framework\Database\ORM\Relations\Relation;
 use Toporia\Framework\Foundation\ServiceProvider;
 use Toporia\Framework\Realtime\RealtimeManager;
 use Toporia\Framework\RateLimit\{RateLimiter, Limit};
@@ -78,6 +79,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(ContainerInterface $container): void
     {
+        // Load morph map for polymorphic relationships
+        Relation::loadMorphMapFromConfig();
+
         // Set RateLimiter instance for named limiters
         $limiter = $container->get(\Toporia\Framework\RateLimit\Contracts\RateLimiterInterface::class);
         RateLimiter::setLimiter($limiter);

@@ -35,10 +35,9 @@ return [
     |
     */
     'map' => [
-        // Add your morph type mappings here
-        // 'post' => App\Models\Post::class,
-        // 'video' => App\Models\Video::class,
-        // 'comment' => App\Models\Comment::class,
+        // Polymorphic type mappings
+        'Post' => \App\Infrastructure\Persistence\Models\PostModel::class,
+        'User' => \App\Infrastructure\Persistence\Models\UserModel::class,
     ],
 
     /*
