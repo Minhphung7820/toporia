@@ -7,6 +7,13 @@ import ForgotPassword from '../pages/ForgotPassword.vue';
 import ResetPassword from '../pages/ResetPassword.vue';
 import ChangePassword from '../pages/ChangePassword.vue';
 
+// Blog pages
+import BlogIndex from '../pages/blog/Index.vue';
+import BlogPost from '../pages/blog/Show.vue';
+import BlogCategory from '../pages/blog/Category.vue';
+import BlogTag from '../pages/blog/Tag.vue';
+import BlogSearch from '../pages/blog/Search.vue';
+
 // Error pages
 import Error403 from '../pages/errors/Error403.vue';
 import Error404 from '../pages/errors/Error404.vue';
@@ -54,6 +61,33 @@ const routes = [
         name: 'change-password',
         component: ChangePassword,
         meta: { requiresAuth: true },
+    },
+
+    // Blog routes
+    {
+        path: '/blog',
+        name: 'blog',
+        component: BlogIndex,
+    },
+    {
+        path: '/blog/search',
+        name: 'blog-search',
+        component: BlogSearch,
+    },
+    {
+        path: '/blog/category/:slug',
+        name: 'blog-category',
+        component: BlogCategory,
+    },
+    {
+        path: '/blog/tag/:slug',
+        name: 'blog-tag',
+        component: BlogTag,
+    },
+    {
+        path: '/blog/:slug',
+        name: 'blog-post',
+        component: BlogPost,
     },
 
     // Error pages

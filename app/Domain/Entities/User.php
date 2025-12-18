@@ -27,18 +27,28 @@ final class User implements FrameworkAuthenticatable
 {
     /**
      * @param int|null $id User ID
+     * @param string $name Full name
      * @param string $email Email address
      * @param string $password Hashed password
-     * @param string $name Full name
+     * @param string $role User role (admin, editor, user)
+     * @param \DateTimeImmutable|null $emailVerifiedAt Email verification timestamp
+     * @param string|null $avatar Avatar URL
+     * @param string|null $bio User bio
+     * @param string|null $website User website
      * @param string|null $rememberToken Remember me token
      * @param \DateTimeImmutable|null $createdAt Creation timestamp
      * @param \DateTimeImmutable|null $updatedAt Last update timestamp
      */
     public function __construct(
         public readonly ?int $id,
+        public readonly string $name,
         public readonly string $email,
         public readonly string $password,
-        public readonly string $name,
+        public readonly string $role = 'user',
+        public readonly ?\DateTimeImmutable $emailVerifiedAt = null,
+        public readonly ?string $avatar = null,
+        public readonly ?string $bio = null,
+        public readonly ?string $website = null,
         public readonly ?string $rememberToken = null,
         public readonly ?\DateTimeImmutable $createdAt = null,
         public readonly ?\DateTimeImmutable $updatedAt = null
@@ -103,9 +113,14 @@ final class User implements FrameworkAuthenticatable
     {
         return new self(
             $id,
+            $this->name,
             $this->email,
             $this->password,
-            $this->name,
+            $this->role,
+            $this->emailVerifiedAt,
+            $this->avatar,
+            $this->bio,
+            $this->website,
             $this->rememberToken,
             $this->createdAt ?? new \DateTimeImmutable(),
             new \DateTimeImmutable()
@@ -121,8 +136,13 @@ final class User implements FrameworkAuthenticatable
     {
         return [
             'id' => $this->id,
-            'email' => $this->email,
             'name' => $this->name,
+            'email' => $this->email,
+            'role' => $this->role,
+            'email_verified_at' => $this->emailVerifiedAt?->format('Y-m-d H:i:s'),
+            'avatar' => $this->avatar,
+            'bio' => $this->bio,
+            'website' => $this->website,
             'created_at' => $this->createdAt?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updatedAt?->format('Y-m-d H:i:s'),
         ];
@@ -149,9 +169,14 @@ final class User implements FrameworkAuthenticatable
     {
         return new self(
             $this->id,
+            $this->name,
             $this->email,
             $this->password,
-            $this->name,
+            $this->role,
+            $this->emailVerifiedAt,
+            $this->avatar,
+            $this->bio,
+            $this->website,
             $token,
             $this->createdAt,
             $this->updatedAt
@@ -168,9 +193,14 @@ final class User implements FrameworkAuthenticatable
     {
         return new self(
             $this->id,
+            $this->name,
             $this->email,
             $password,
-            $this->name,
+            $this->role,
+            $this->emailVerifiedAt,
+            $this->avatar,
+            $this->bio,
+            $this->website,
             $this->rememberToken,
             $this->createdAt,
             new \DateTimeImmutable()
@@ -187,9 +217,14 @@ final class User implements FrameworkAuthenticatable
     {
         return new self(
             $this->id,
+            $this->name,
             $this->email,
             $this->password,
-            $this->name,
+            $this->role,
+            $this->emailVerifiedAt,
+            $this->avatar,
+            $this->bio,
+            $this->website,
             $this->rememberToken,
             $createdAt,
             $this->updatedAt
@@ -206,12 +241,47 @@ final class User implements FrameworkAuthenticatable
     {
         return new self(
             $this->id,
+            $this->name,
             $this->email,
             $this->password,
-            $this->name,
+            $this->role,
+            $this->emailVerifiedAt,
+            $this->avatar,
+            $this->bio,
+            $this->website,
             $this->rememberToken,
             $this->createdAt,
             $updatedAt
         );
+    }
+
+    /**
+     * Check if user has admin role.
+     *
+     * @return bool
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user has editor role.
+     *
+     * @return bool
+     */
+    public function isEditor(): bool
+    {
+        return $this->role === 'editor';
+    }
+
+    /**
+     * Get the user's role.
+     *
+     * @return string
+     */
+    public function getRole(): string
+    {
+        return $this->role;
     }
 }

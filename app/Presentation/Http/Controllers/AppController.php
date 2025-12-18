@@ -26,4 +26,17 @@ final class AppController extends BaseController
     {
         return view('app');
     }
+
+    /**
+     * Serve the Admin SPA application.
+     *
+     * This method returns the admin view which contains the Vue.js admin application.
+     * Admin Vue Router will handle client-side routing for /admin/* routes.
+     *
+     * @return string
+     */
+    public function admin(): string
+    {
+        return view('admin');
+    }
 }

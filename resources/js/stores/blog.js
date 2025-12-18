@@ -1,0 +1,440 @@
+/**
+ * Blog Store
+ *
+ * Pinia store for managing blog state (posts, categories, tags).
+ */
+
+import { defineStore } from 'pinia';
+import { posts, categories, tags } from '../services/blog';
+
+export const useBlogStore = defineStore('blog', {
+  state: () => ({
+    // Posts
+    posts: [],
+    currentPost: null,
+    featuredPosts: [],
+    popularPosts: [],
+    latestPosts: [],
+    relatedPosts: [],
+    searchResults: [],
+
+    // Pagination
+    pagination: {
+      total: 0,
+      page: 1,
+      perPage: 10,
+      totalPages: 0,
+    },
+
+    // Categories
+    categories: [],
+    categoriesTree: [],
+    currentCategory: null,
+
+    // Tags
+    tags: [],
+    popularTags: [],
+    tagCloud: [],
+    currentTag: null,
+
+    // Loading states
+    loading: {
+      posts: false,
+      post: false,
+      featured: false,
+      popular: false,
+      latest: false,
+      related: false,
+      search: false,
+      categories: false,
+      tags: false,
+    },
+
+    // Error state
+    error: null,
+
+    // Search
+    searchQuery: '',
+  }),
+
+  getters: {
+    isLoading: (state) => Object.values(state.loading).some(Boolean),
+
+    hasMorePages: (state) => state.pagination.page < state.pagination.totalPages,
+
+    formattedCategories: (state) => {
+      return state.categories.map(cat => ({
+        ...cat,
+        url: `/blog/category/${cat.slug}`,
+      }));
+    },
+
+    formattedTags: (state) => {
+      return state.tags.map(tag => ({
+        ...tag,
+        url: `/blog/tag/${tag.slug}`,
+      }));
+    },
+  },
+
+  actions: {
+    /**
+     * Fetch published posts
+     */
+    async fetchPosts(page = 1, perPage = 10) {
+      this.loading.posts = true;
+      this.error = null;
+
+      try {
+        const response = await posts.list(page, perPage);
+        const data = response.data;
+
+        if (data.success) {
+          this.posts = data.data.posts;
+          this.pagination = {
+            total: data.data.pagination.total,
+            page: data.data.pagination.page,
+            perPage: data.data.pagination.per_page,
+            totalPages: data.data.pagination.total_pages,
+          };
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch posts';
+        console.error('Failed to fetch posts:', error);
+      } finally {
+        this.loading.posts = false;
+      }
+    },
+
+    /**
+     * Fetch single post by slug
+     */
+    async fetchPost(slug) {
+      this.loading.post = true;
+      this.error = null;
+      this.currentPost = null;
+
+      try {
+        const response = await posts.getBySlug(slug);
+        const data = response.data;
+
+        if (data.success) {
+          this.currentPost = {
+            ...data.data.post,
+            tags: data.data.tags || [],
+            category: data.data.category || null,
+          };
+
+          // Increment views (fire and forget)
+          if (this.currentPost.id) {
+            posts.incrementViews(this.currentPost.id).catch(() => { });
+          }
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Post not found';
+        console.error('Failed to fetch post:', error);
+      } finally {
+        this.loading.post = false;
+      }
+    },
+
+    /**
+     * Fetch featured posts
+     */
+    async fetchFeaturedPosts(limit = 5) {
+      this.loading.featured = true;
+
+      try {
+        const response = await posts.featured(limit);
+        const data = response.data;
+
+        if (data.success) {
+          this.featuredPosts = data.data.posts;
+        }
+      } catch (error) {
+        console.error('Failed to fetch featured posts:', error);
+      } finally {
+        this.loading.featured = false;
+      }
+    },
+
+    /**
+     * Fetch popular posts
+     */
+    async fetchPopularPosts(limit = 10) {
+      this.loading.popular = true;
+
+      try {
+        const response = await posts.popular(limit);
+        const data = response.data;
+
+        if (data.success) {
+          this.popularPosts = data.data.posts;
+        }
+      } catch (error) {
+        console.error('Failed to fetch popular posts:', error);
+      } finally {
+        this.loading.popular = false;
+      }
+    },
+
+    /**
+     * Fetch latest posts
+     */
+    async fetchLatestPosts(limit = 10) {
+      this.loading.latest = true;
+
+      try {
+        const response = await posts.latest(limit);
+        const data = response.data;
+
+        if (data.success) {
+          this.latestPosts = data.data.posts;
+        }
+      } catch (error) {
+        console.error('Failed to fetch latest posts:', error);
+      } finally {
+        this.loading.latest = false;
+      }
+    },
+
+    /**
+     * Fetch related posts
+     */
+    async fetchRelatedPosts(postId, limit = 4) {
+      this.loading.related = true;
+      this.relatedPosts = [];
+
+      try {
+        const response = await posts.related(postId, limit);
+        const data = response.data;
+
+        if (data.success) {
+          this.relatedPosts = data.data.posts;
+        }
+      } catch (error) {
+        console.error('Failed to fetch related posts:', error);
+      } finally {
+        this.loading.related = false;
+      }
+    },
+
+    /**
+     * Search posts
+     */
+    async searchPosts(query, page = 1, perPage = 10) {
+      if (!query || query.trim().length < 2) {
+        this.searchResults = [];
+        return;
+      }
+
+      this.loading.search = true;
+      this.searchQuery = query;
+      this.error = null;
+
+      try {
+        const response = await posts.search(query, page, perPage);
+        const data = response.data;
+
+        if (data.success) {
+          this.searchResults = data.data.posts;
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Search failed';
+        console.error('Search failed:', error);
+      } finally {
+        this.loading.search = false;
+      }
+    },
+
+    /**
+     * Fetch posts by category
+     */
+    async fetchPostsByCategory(categorySlug, page = 1, perPage = 10) {
+      this.loading.posts = true;
+      this.error = null;
+
+      try {
+        const response = await posts.byCategory(categorySlug, page, perPage);
+        const data = response.data;
+
+        if (data.success) {
+          this.posts = data.data.posts;
+          this.currentCategory = data.data.category;
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Category not found';
+        console.error('Failed to fetch posts by category:', error);
+      } finally {
+        this.loading.posts = false;
+      }
+    },
+
+    /**
+     * Fetch posts by tag
+     */
+    async fetchPostsByTag(tagSlug, page = 1, perPage = 10) {
+      this.loading.posts = true;
+      this.error = null;
+
+      try {
+        const response = await posts.byTag(tagSlug, page, perPage);
+        const data = response.data;
+
+        if (data.success) {
+          this.posts = data.data.posts;
+          this.currentTag = data.data.tag;
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Tag not found';
+        console.error('Failed to fetch posts by tag:', error);
+      } finally {
+        this.loading.posts = false;
+      }
+    },
+
+    /**
+     * Fetch categories
+     */
+    async fetchCategories() {
+      this.loading.categories = true;
+
+      try {
+        const response = await categories.list();
+        const data = response.data;
+
+        if (data.success) {
+          this.categories = data.data.categories;
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      } finally {
+        this.loading.categories = false;
+      }
+    },
+
+    /**
+     * Fetch categories tree
+     */
+    async fetchCategoriesTree() {
+      this.loading.categories = true;
+
+      try {
+        const response = await categories.tree();
+        const data = response.data;
+
+        if (data.success) {
+          this.categoriesTree = data.data.tree;
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories tree:', error);
+      } finally {
+        this.loading.categories = false;
+      }
+    },
+
+    /**
+     * Fetch all tags
+     */
+    async fetchTags() {
+      this.loading.tags = true;
+
+      try {
+        const response = await tags.list();
+        const data = response.data;
+
+        if (data.success) {
+          this.tags = data.data.tags;
+        }
+      } catch (error) {
+        console.error('Failed to fetch tags:', error);
+      } finally {
+        this.loading.tags = false;
+      }
+    },
+
+    /**
+     * Fetch popular tags
+     */
+    async fetchPopularTags(limit = 20) {
+      this.loading.tags = true;
+
+      try {
+        const response = await tags.popular(limit);
+        const data = response.data;
+
+        if (data.success) {
+          this.popularTags = data.data.tags;
+        }
+      } catch (error) {
+        console.error('Failed to fetch popular tags:', error);
+      } finally {
+        this.loading.tags = false;
+      }
+    },
+
+    /**
+     * Fetch tag cloud
+     */
+    async fetchTagCloud(limit = 50) {
+      this.loading.tags = true;
+
+      try {
+        const response = await tags.cloud(limit);
+        const data = response.data;
+
+        if (data.success) {
+          this.tagCloud = data.data.tags;
+        }
+      } catch (error) {
+        console.error('Failed to fetch tag cloud:', error);
+      } finally {
+        this.loading.tags = false;
+      }
+    },
+
+    /**
+     * Clear current post
+     */
+    clearCurrentPost() {
+      this.currentPost = null;
+      this.relatedPosts = [];
+    },
+
+    /**
+     * Clear search results
+     */
+    clearSearch() {
+      this.searchResults = [];
+      this.searchQuery = '';
+    },
+
+    /**
+     * Reset store state
+     */
+    reset() {
+      this.posts = [];
+      this.currentPost = null;
+      this.featuredPosts = [];
+      this.popularPosts = [];
+      this.latestPosts = [];
+      this.relatedPosts = [];
+      this.searchResults = [];
+      this.categories = [];
+      this.categoriesTree = [];
+      this.currentCategory = null;
+      this.tags = [];
+      this.popularTags = [];
+      this.tagCloud = [];
+      this.currentTag = null;
+      this.error = null;
+      this.searchQuery = '';
+      this.pagination = {
+        total: 0,
+        page: 1,
+        perPage: 10,
+        totalPages: 0,
+      };
+    },
+  },
+});

@@ -138,14 +138,16 @@ http.interceptors.response.use(
 
       case 401:
         // Unauthorized - Not authenticated
+        // Use full page redirect to ensure proper navigation across different Vue apps (main/admin)
         console.warn('[HTTP] Unauthorized (401)');
-        router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } }).catch(() => { });
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
         break;
 
       case 403:
         // Forbidden - Authenticated but not authorized
+        // Use full page redirect to ensure proper navigation across different Vue apps (main/admin)
         console.warn('[HTTP] Forbidden (403)');
-        router.push({ name: 'error-403' }).catch(() => { });
+        window.location.href = '/error/403';
         break;
 
       case 404:

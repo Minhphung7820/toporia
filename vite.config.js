@@ -22,9 +22,7 @@ export default defineConfig({
     toporiaVitePlugin({
       input: [
         'resources/js/app.js',
-        // Add more entry points here:
-        // 'resources/js/admin.js',
-        // 'resources/css/app.css',
+        'resources/js/admin.js',
       ],
       manifestPath: 'public/build/.vite/manifest.json',
       publicDir: 'public',
@@ -41,6 +39,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         app: 'resources/js/app.js',
+        admin: 'resources/js/admin.js',
       },
       output: {
         entryFileNames: 'assets/[name]-[hash].js',

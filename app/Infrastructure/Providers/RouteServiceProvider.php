@@ -36,14 +36,23 @@ class RouteServiceProvider extends ServiceProvider
         // Load middleware configuration
         $middlewareConfig = $container->get('config')->get('middleware', []);
         $middlewareGroups = $middlewareConfig['groups'] ?? [];
+        $middlewareAliases = $middlewareConfig['aliases'] ?? [];
+
+        // Set middleware aliases for short name resolution (e.g., 'auth' => Authenticate::class)
+        if (!empty($middlewareAliases)) {
+            $router->setMiddlewareAliases($middlewareAliases);
+        }
 
         // STEP 1: Load API routes FIRST (specific paths before catch-all)
         $this->loadApiRoutes($app, $router, $middlewareGroups['api'] ?? []);
 
-        // STEP 2: Load package routes (auto-discovered from packages)
+        // STEP 2: Load Admin API routes (requires auth + admin middleware)
+        $this->loadAdminRoutes($app, $router, $middlewareGroups['api'] ?? []);
+
+        // STEP 3: Load package routes (auto-discovered from packages)
         $this->loadPackageRoutes($container, $router);
 
-        // STEP 3: Load web routes LAST (may contain SPA catch-all route)
+        // STEP 4: Load web routes LAST (may contain SPA catch-all route)
         $this->loadWebRoutes($app, $router, $middlewareGroups['web'] ?? []);
     }
 
@@ -87,6 +96,34 @@ class RouteServiceProvider extends ServiceProvider
             if (file_exists($path)) {
                 require $path;
             }
+        });
+    }
+
+    /**
+     * Load Admin API routes.
+     *
+     * Admin routes are loaded within the api prefix and require
+     * authentication and admin role middleware.
+     *
+     * @param Application $app
+     * @param Router $router
+     * @param array $middleware Base API middleware
+     * @return void
+     */
+    protected function loadAdminRoutes(Application $app, Router $router, array $middleware): void
+    {
+        $path = $app->path('routes/admin.php');
+
+        if (!file_exists($path)) {
+            return;
+        }
+
+        $router->group([
+            'prefix' => 'api',
+            'middleware' => $middleware,
+            'namespace' => 'App\\Presentation\\Http\\Controllers\\Api\\Admin',
+        ], function (Router $router) use ($path) {
+            require $path;
         });
     }
 

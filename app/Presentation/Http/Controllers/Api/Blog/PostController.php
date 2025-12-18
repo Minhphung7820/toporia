@@ -1,0 +1,186 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Presentation\Http\Controllers\Api\Blog;
+
+use App\Application\Services\Blog\PostService;
+use App\Presentation\Http\Controllers\BaseController;
+use Toporia\Framework\Http\Contracts\JsonResponseInterface;
+use Toporia\Framework\Http\Request;
+use Toporia\Framework\Http\Response;
+
+/**
+ * Post Controller - Public blog post endpoints.
+ */
+final class PostController extends BaseController
+{
+    public function __construct(
+        Request $request,
+        Response $response,
+        private readonly PostService $postService
+    ) {
+        parent::__construct($request, $response);
+    }
+
+    /**
+     * Get published posts with pagination.
+     *
+     * GET /api/blog/posts
+     */
+    public function index(Request $request): JsonResponseInterface
+    {
+        $page = (int) $request->query('page', 1);
+        $perPage = min((int) $request->query('per_page', 10), 50);
+
+        $result = $this->postService->getPublishedPosts($page, $perPage);
+
+        return $this->json($result);
+    }
+
+    /**
+     * Get a single post by slug.
+     *
+     * GET /api/blog/posts/{slug}
+     */
+    public function show(string $slug): JsonResponseInterface
+    {
+        $result = $this->postService->getPostBySlug($slug);
+
+        if (!$result['success']) {
+            return $this->json($result, 404);
+        }
+
+        return $this->json($result);
+    }
+
+    /**
+     * Get featured posts.
+     *
+     * GET /api/blog/posts/featured
+     */
+    public function featured(Request $request): JsonResponseInterface
+    {
+        $limit = min((int) $request->query('limit', 5), 20);
+
+        $result = $this->postService->getFeaturedPosts($limit);
+
+        return $this->json($result);
+    }
+
+    /**
+     * Get most viewed posts.
+     *
+     * GET /api/blog/posts/popular
+     */
+    public function popular(Request $request): JsonResponseInterface
+    {
+        $limit = min((int) $request->query('limit', 10), 50);
+
+        $result = $this->postService->getMostViewedPosts($limit);
+
+        return $this->json($result);
+    }
+
+    /**
+     * Get latest posts.
+     *
+     * GET /api/blog/posts/latest
+     */
+    public function latest(Request $request): JsonResponseInterface
+    {
+        $limit = min((int) $request->query('limit', 10), 50);
+
+        $result = $this->postService->getLatestPosts($limit);
+
+        return $this->json($result);
+    }
+
+    /**
+     * Get related posts.
+     *
+     * GET /api/blog/posts/{id}/related
+     */
+    public function related(int $id, Request $request): JsonResponseInterface
+    {
+        $limit = min((int) $request->query('limit', 4), 10);
+
+        $result = $this->postService->getRelatedPosts($id, $limit);
+
+        return $this->json($result);
+    }
+
+    /**
+     * Get posts by category.
+     *
+     * GET /api/blog/categories/{slug}/posts
+     */
+    public function byCategory(string $slug, Request $request): JsonResponseInterface
+    {
+        $page = (int) $request->query('page', 1);
+        $perPage = min((int) $request->query('per_page', 10), 50);
+
+        $result = $this->postService->getPostsByCategory($slug, $page, $perPage);
+
+        if (!$result['success']) {
+            return $this->json($result, 404);
+        }
+
+        return $this->json($result);
+    }
+
+    /**
+     * Get posts by tag.
+     *
+     * GET /api/blog/tags/{slug}/posts
+     */
+    public function byTag(string $slug, Request $request): JsonResponseInterface
+    {
+        $page = (int) $request->query('page', 1);
+        $perPage = min((int) $request->query('per_page', 10), 50);
+
+        $result = $this->postService->getPostsByTag($slug, $page, $perPage);
+
+        if (!$result['success']) {
+            return $this->json($result, 404);
+        }
+
+        return $this->json($result);
+    }
+
+    /**
+     * Search posts.
+     *
+     * GET /api/blog/search
+     */
+    public function search(Request $request): JsonResponseInterface
+    {
+        $query = $request->query('q', '');
+        $page = (int) $request->query('page', 1);
+        $perPage = min((int) $request->query('per_page', 10), 50);
+
+        $result = $this->postService->searchPosts($query, $page, $perPage);
+
+        if (!$result['success']) {
+            return $this->json($result, 400);
+        }
+
+        return $this->json($result);
+    }
+
+    /**
+     * Increment post views.
+     *
+     * POST /api/blog/posts/{id}/views
+     */
+    public function incrementViews(int $id): JsonResponseInterface
+    {
+        $result = $this->postService->incrementViews($id);
+
+        if (!$result['success']) {
+            return $this->json($result, 404);
+        }
+
+        return $this->json($result);
+    }
+}

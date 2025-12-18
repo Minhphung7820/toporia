@@ -63,4 +63,52 @@ interface UserRepository
      * @return bool True if deleted.
      */
     public function delete(User $user): bool;
+
+    /**
+     * Find users with filters.
+     *
+     * @param array $filters Filter criteria
+     * @param int $limit Number of users to return
+     * @param int $offset Offset for pagination
+     * @return User[] Array of users
+     */
+    public function findWithFilters(array $filters = [], int $limit = 20, int $offset = 0): array;
+
+    /**
+     * Count all users.
+     *
+     * @return int Total count of users
+     */
+    public function countAll(): int;
+
+    /**
+     * Update user role.
+     *
+     * @param int $userId User ID
+     * @param string $role New role
+     * @return void
+     */
+    public function updateRole(int $userId, string $role): void;
+
+    /**
+     * Count verified users.
+     *
+     * @return int Count of verified users
+     */
+    public function countVerified(): int;
+
+    /**
+     * Count users by role.
+     *
+     * @return array<string, int> Counts keyed by role
+     */
+    public function countByRole(): array;
+
+    /**
+     * Count recent registrations.
+     *
+     * @param int $days Number of days to look back
+     * @return int Count of recent registrations
+     */
+    public function countRecentRegistrations(int $days = 30): int;
 }

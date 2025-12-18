@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 use App\Presentation\Http\Middleware\AddSecurityHeaders;
+use App\Presentation\Http\Middleware\AdminMiddleware;
 use App\Presentation\Http\Middleware\Authenticate;
 use App\Presentation\Http\Middleware\LogRequest;
 use App\Presentation\Http\Middleware\ValidateJsonRequest;
@@ -75,6 +76,7 @@ return [
         // Authentication & Authorization
         'auth' => Authenticate::class,  // Uses 'web' guard by default
         'auth:api' => fn($container) => new Authenticate('api'),  // Uses 'api' guard
+        'admin' => AdminMiddleware::class,  // Check admin role
 
         // Request/Response handling
         'log' => LogRequest::class,
@@ -88,8 +90,5 @@ return [
         // Add more aliases here as needed
         // 'guest' => GuestMiddleware::class,
         // 'verified' => EnsureEmailIsVerified::class,
-        // 'throttle' => ThrottleRequests::class,  // Note: Requires RateLimiter instance
-        // 'admin' => AdminMiddleware::class,
-        // 'cors' => HandleCors::class,
     ],
 ];
