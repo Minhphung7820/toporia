@@ -207,7 +207,7 @@ final class UserAdminService
             return ['success' => false, 'message' => 'User not found'];
         }
 
-        $validRoles = ['user', 'editor', 'admin'];
+        $validRoles = ['user', 'moderator', 'admin'];
         if (!in_array($role, $validRoles)) {
             return ['success' => false, 'message' => 'Invalid role'];
         }

@@ -111,4 +111,12 @@ interface UserRepository
      * @return int Count of recent registrations
      */
     public function countRecentRegistrations(int $days = 30): int;
+
+    /**
+     * Mark user's email as verified.
+     *
+     * @param int $userId User ID
+     * @return bool True if updated
+     */
+    public function markEmailAsVerified(int $userId): bool;
 }

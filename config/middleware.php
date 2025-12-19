@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 use App\Presentation\Http\Middleware\AddSecurityHeaders;
 use App\Presentation\Http\Middleware\AdminMiddleware;
+use App\Presentation\Http\Middleware\AdminOnlyMiddleware;
 use App\Presentation\Http\Middleware\Authenticate;
 use App\Presentation\Http\Middleware\LogRequest;
 use App\Presentation\Http\Middleware\ValidateJsonRequest;
@@ -76,7 +77,8 @@ return [
         // Authentication & Authorization
         'auth' => Authenticate::class,  // Uses 'web' guard by default
         'auth:api' => fn($container) => new Authenticate('api'),  // Uses 'api' guard
-        'admin' => AdminMiddleware::class,  // Check admin role
+        'admin' => AdminMiddleware::class,  // Check admin/editor role (admin panel access)
+        'admin.only' => AdminOnlyMiddleware::class,  // Check admin role only (excludes editors)
 
         // Request/Response handling
         'log' => LogRequest::class,

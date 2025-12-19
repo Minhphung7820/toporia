@@ -13,6 +13,7 @@ use App\Domain\Contracts\Repository\CommentRepository;
 use App\Domain\Contracts\Repository\CategoryRepository;
 use App\Domain\Contracts\Repository\TagRepository;
 use App\Domain\Contracts\Repository\FeedbackRepository;
+use App\Domain\Contracts\Repository\UserRepository;
 
 // Infrastructure Repository Implementations
 use App\Infrastructure\Repository\PdoPostRepository;
@@ -118,7 +119,8 @@ class BlogServiceProvider extends ServiceProvider
             return new PostService(
                 $c->get(PostRepository::class),
                 $c->get(TagRepository::class),
-                $c->get(CategoryRepository::class)
+                $c->get(CategoryRepository::class),
+                $c->get(UserRepository::class)
             );
         });
 

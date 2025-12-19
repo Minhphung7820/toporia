@@ -45,7 +45,7 @@
         <select v-model="filters.role" @change="applyFilters">
           <option value="">All Roles</option>
           <option value="admin">Admin</option>
-          <option value="editor">Editor</option>
+          <option value="moderator">Moderator</option>
           <option value="user">User</option>
         </select>
         <select v-model="filters.verified" @change="applyFilters">
@@ -92,7 +92,7 @@
                   class="role-select"
                 >
                   <option value="admin">Admin</option>
-                  <option value="editor">Editor</option>
+                  <option value="moderator">Moderator</option>
                   <option value="user">User</option>
                 </select>
               </td>

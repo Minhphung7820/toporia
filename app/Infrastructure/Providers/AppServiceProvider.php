@@ -61,6 +61,7 @@ class AppServiceProvider extends ServiceProvider
         $container->singleton(\App\Application\Services\ForgotPasswordService::class);
         $container->singleton(\App\Application\Services\ResetPasswordService::class);
         $container->singleton(\App\Application\Services\ChangePasswordService::class);
+        $container->singleton(\App\Application\Services\EmailVerificationService::class);
         // Issue CSRF Cookie Service - inject production flag
         $container->singleton(\App\Application\Services\IssueCsrfCookieService::class, function ($c) {
             $isProduction = env('APP_ENV') === 'production';

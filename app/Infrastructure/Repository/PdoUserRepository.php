@@ -170,7 +170,7 @@ final class PdoUserRepository implements UserRepository
     public function countByRole(): array
     {
         // Get distinct roles and count each separately to avoid GROUP BY issues
-        $roles = ['user', 'editor', 'admin'];
+        $roles = ['user', 'moderator', 'admin'];
         $counts = [];
 
         foreach ($roles as $role) {
@@ -188,6 +188,16 @@ final class PdoUserRepository implements UserRepository
         $date = (new \DateTimeImmutable())->modify("-{$days} days")->format('Y-m-d H:i:s');
 
         return UserModel::where('created_at', '>=', $date)->count();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function markEmailAsVerified(int $userId): bool
+    {
+        return UserModel::where('id', $userId)->update([
+            'email_verified_at' => date('Y-m-d H:i:s'),
+        ]) > 0;
     }
 
     /**

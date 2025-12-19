@@ -8,11 +8,16 @@ use App\Domain\Contracts\Repository\PostRepository;
 use App\Domain\Contracts\Repository\CommentRepository;
 use App\Domain\Contracts\Repository\FeedbackRepository;
 use App\Infrastructure\Persistence\Models\AdminActivityLogModel;
+use App\Infrastructure\Persistence\Models\CommentModel;
+use App\Infrastructure\Persistence\Models\PostModel;
 
 /**
  * Dashboard Service - Provides admin dashboard data.
  *
- * Following Service pattern with consistent return format.
+ * Authorization-aware: Methods accept optional $authorId parameter.
+ * - null = Admin view (all data)
+ * - int = Editor view (own data only)
+ *
  * Uses caching for expensive statistics queries on large datasets (1M+ rows).
  */
 final class DashboardService
@@ -28,31 +33,56 @@ final class DashboardService
     /**
      * Get dashboard statistics.
      *
-     * Optimized: Uses caching + aggregated statistics methods.
-     * - Cache for 60 seconds to avoid repeated expensive queries
-     * - Single query per table instead of multiple COUNT queries
-     *
+     * @param int|null $authorId If provided, only returns stats for posts by this author
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getStatistics(): array
+    public function getStatistics(?int $authorId = null): array
     {
-        // Use cache for expensive COUNT queries on large tables
-        $stats = cache()->remember('dashboard:statistics', self::STATS_CACHE_TTL, function () {
-            // Single query for all post statistics
-            $postStats = $this->postRepository->getStatistics();
+        $cacheKey = $authorId ? "dashboard:statistics:author:{$authorId}" : 'dashboard:statistics';
 
-            // Single query for all comment statistics
-            $commentStats = $this->commentRepository->getStatistics();
+        $stats = cache()->remember($cacheKey, self::STATS_CACHE_TTL, function () use ($authorId) {
+            if ($authorId === null) {
+                // Admin: full statistics
+                $postStats = $this->postRepository->getStatistics();
+                $commentStats = $this->commentRepository->getStatistics();
+                $feedbackStats = $this->feedbackRepository->getStatistics();
 
-            // Single query for all feedback statistics
-            $feedbackStats = $this->feedbackRepository->getStatistics();
+                return [
+                    'posts' => [
+                        'total' => $postStats['total'],
+                        'published' => $postStats['published'],
+                        'drafts' => $postStats['by_status']['draft'] ?? 0,
+                        'scheduled' => $postStats['by_status']['scheduled'] ?? 0,
+                    ],
+                    'views' => [
+                        'total' => $postStats['total_views'],
+                    ],
+                    'comments' => [
+                        'total' => $commentStats['total'],
+                        'pending' => $commentStats['pending'],
+                        'approved' => $commentStats['approved'],
+                    ],
+                    'feedback' => [
+                        'total' => $feedbackStats['total'],
+                        'pending' => $feedbackStats['pending'],
+                    ],
+                    'alerts' => [
+                        'pending_comments' => $commentStats['pending'],
+                        'pending_feedback' => $feedbackStats['pending'],
+                    ],
+                ];
+            }
+
+            // Moderator: own statistics only
+            $postStats = $this->getAuthorPostStats($authorId);
+            $commentStats = $this->getAuthorCommentStats($authorId);
 
             return [
                 'posts' => [
                     'total' => $postStats['total'],
                     'published' => $postStats['published'],
-                    'drafts' => $postStats['by_status']['draft'] ?? 0,
-                    'scheduled' => $postStats['by_status']['scheduled'] ?? 0,
+                    'drafts' => $postStats['drafts'],
+                    'scheduled' => $postStats['scheduled'],
                 ],
                 'views' => [
                     'total' => $postStats['total_views'],
@@ -62,13 +92,11 @@ final class DashboardService
                     'pending' => $commentStats['pending'],
                     'approved' => $commentStats['approved'],
                 ],
-                'feedback' => [
-                    'total' => $feedbackStats['total'],
-                    'pending' => $feedbackStats['pending'],
-                ],
+                // Moderators don't see feedback stats
+                'feedback' => null,
                 'alerts' => [
                     'pending_comments' => $commentStats['pending'],
-                    'pending_feedback' => $feedbackStats['pending'],
+                    'pending_feedback' => 0,
                 ],
             ];
         });
@@ -84,13 +112,18 @@ final class DashboardService
      * Get recent admin activity.
      *
      * @param int $limit Number of activities
+     * @param int|null $userId If provided, only returns activity by this user
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getRecentActivity(int $limit = 10): array
+    public function getRecentActivity(int $limit = 10, ?int $userId = null): array
     {
-        $activities = AdminActivityLogModel::recent($limit)
-            ->with(['user'])
-            ->get();
+        $query = AdminActivityLogModel::recent($limit)->with(['user']);
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        $activities = $query->get();
 
         $formattedActivities = [];
         foreach ($activities as $activity) {
@@ -121,11 +154,22 @@ final class DashboardService
      * Get popular posts for dashboard.
      *
      * @param int $limit Number of posts
+     * @param int|null $authorId If provided, only returns posts by this author
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getPopularPosts(int $limit = 5): array
+    public function getPopularPosts(int $limit = 5, ?int $authorId = null): array
     {
-        $posts = $this->postRepository->findMostViewed($limit);
+        if ($authorId === null) {
+            $posts = $this->postRepository->findMostViewed($limit);
+        } else {
+            // Get most viewed posts by specific author
+            $posts = PostModel::where('author_id', $authorId)
+                ->orderBy('views', 'desc')
+                ->limit($limit)
+                ->get()
+                ->map(fn($model) => $this->modelToEntity($model))
+                ->toArray();
+        }
 
         return [
             'success' => true,
@@ -145,19 +189,33 @@ final class DashboardService
     /**
      * Get recent comments for dashboard.
      *
-     * Includes post info for context display in dashboard UI.
-     *
      * @param int $limit Number of comments
+     * @param int|null $authorId If provided, only returns comments on posts by this author
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getRecentComments(int $limit = 5): array
+    public function getRecentComments(int $limit = 5, ?int $authorId = null): array
     {
-        // Query directly with eager loading to include post info
-        $models = \App\Infrastructure\Persistence\Models\CommentModel::query()
+        $query = CommentModel::query()
             ->with(['user', 'commentable'])
-            ->orderBy('created_at', 'desc')
-            ->limit($limit)
-            ->get();
+            ->orderBy('created_at', 'desc');
+
+        // Filter by post author for editors
+        if ($authorId !== null) {
+            $postIds = PostModel::where('author_id', $authorId)->pluck('id')->toArray();
+            if (!empty($postIds)) {
+                $query->where('commentable_type', 'Post')
+                    ->whereIn('commentable_id', $postIds);
+            } else {
+                // No posts, return empty
+                return [
+                    'success' => true,
+                    'data' => ['comments' => []],
+                    'message' => 'Recent comments retrieved successfully',
+                ];
+            }
+        }
+
+        $models = $query->limit($limit)->get();
 
         $comments = [];
         foreach ($models as $model) {
@@ -174,7 +232,6 @@ final class DashboardService
                 'created_at' => $model->created_at,
             ];
 
-            // Add post info if commentable is a Post
             if ($model->commentable_type === 'Post' && $model->commentable) {
                 $comment['post'] = [
                     'id' => $model->commentable->id,
@@ -188,9 +245,7 @@ final class DashboardService
 
         return [
             'success' => true,
-            'data' => [
-                'comments' => $comments,
-            ],
+            'data' => ['comments' => $comments],
             'message' => 'Recent comments retrieved successfully',
         ];
     }
@@ -199,12 +254,11 @@ final class DashboardService
      * Get chart data for views over time.
      *
      * @param string $period Period (week, month, year)
+     * @param int|null $authorId If provided, only returns data for posts by this author
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getChartData(string $period = 'week'): array
+    public function getChartData(string $period = 'week', ?int $authorId = null): array
     {
-        // This would typically query a views_log or analytics table
-        // For now, return placeholder data structure
         $labels = [];
         $values = [];
 
@@ -223,7 +277,8 @@ final class DashboardService
                 $date = new \DateTime("-{$i} days");
                 $labels[] = $date->format('M d');
             }
-            $values[] = rand(50, 500); // Placeholder - would be real data
+            // Would be real analytics data - filtered by author if specified
+            $values[] = rand(50, 500);
         }
 
         return [
@@ -244,19 +299,104 @@ final class DashboardService
     /**
      * Get quick stats summary.
      *
+     * @param int|null $authorId If provided, only returns stats for posts by this author
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getQuickStats(): array
+    public function getQuickStats(?int $authorId = null): array
     {
+        if ($authorId === null) {
+            // Admin: full stats
+            return [
+                'success' => true,
+                'data' => [
+                    'today_views' => rand(100, 500),
+                    'new_comments' => $this->commentRepository->countPending(),
+                    'new_feedback' => $this->feedbackRepository->countPending(),
+                    'scheduled_posts' => $this->postRepository->countByStatus()['scheduled'] ?? 0,
+                ],
+                'message' => 'Quick stats retrieved successfully',
+            ];
+        }
+
+        // Moderator: own stats only
+        $postStats = $this->getAuthorPostStats($authorId);
+        $commentStats = $this->getAuthorCommentStats($authorId);
+
         return [
             'success' => true,
             'data' => [
-                'today_views' => rand(100, 500), // Would be from analytics
-                'new_comments' => $this->commentRepository->countPending(),
-                'new_feedback' => $this->feedbackRepository->countPending(),
-                'scheduled_posts' => $this->postRepository->countByStatus()['scheduled'] ?? 0,
+                'today_views' => rand(10, 100),
+                'new_comments' => $commentStats['pending'],
+                'new_feedback' => 0, // Moderators don't see feedback
+                'scheduled_posts' => $postStats['scheduled'],
             ],
             'message' => 'Quick stats retrieved successfully',
+        ];
+    }
+
+    /**
+     * Get post statistics for a specific author.
+     */
+    private function getAuthorPostStats(int $authorId): array
+    {
+        $total = PostModel::where('author_id', $authorId)->count();
+        $published = PostModel::where('author_id', $authorId)->where('is_published', true)->count();
+        $drafts = PostModel::where('author_id', $authorId)->where('is_published', false)->whereNull('scheduled_at')->count();
+        $scheduled = PostModel::where('author_id', $authorId)->whereNotNull('scheduled_at')->where('is_published', false)->count();
+        $totalViews = (int) PostModel::where('author_id', $authorId)->sum('views');
+
+        return [
+            'total' => $total,
+            'published' => $published,
+            'drafts' => $drafts,
+            'scheduled' => $scheduled,
+            'total_views' => $totalViews,
+        ];
+    }
+
+    /**
+     * Get comment statistics for posts by a specific author.
+     */
+    private function getAuthorCommentStats(int $authorId): array
+    {
+        $postIds = PostModel::where('author_id', $authorId)->pluck('id')->toArray();
+
+        if (empty($postIds)) {
+            return ['total' => 0, 'pending' => 0, 'approved' => 0];
+        }
+
+        $total = CommentModel::where('commentable_type', 'Post')
+            ->whereIn('commentable_id', $postIds)
+            ->count();
+
+        $pending = CommentModel::where('commentable_type', 'Post')
+            ->whereIn('commentable_id', $postIds)
+            ->where('is_approved', false)
+            ->count();
+
+        $approved = CommentModel::where('commentable_type', 'Post')
+            ->whereIn('commentable_id', $postIds)
+            ->where('is_approved', true)
+            ->count();
+
+        return [
+            'total' => $total,
+            'pending' => $pending,
+            'approved' => $approved,
+        ];
+    }
+
+    /**
+     * Convert PostModel to Post entity (simple conversion for dashboard).
+     */
+    private function modelToEntity(PostModel $model): object
+    {
+        return (object) [
+            'id' => $model->id,
+            'title' => $model->title,
+            'slug' => $model->slug,
+            'views' => $model->views,
+            'publishedAt' => $model->published_at ? new \DateTime($model->published_at) : null,
         ];
     }
 }

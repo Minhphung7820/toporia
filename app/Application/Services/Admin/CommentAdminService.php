@@ -34,10 +34,14 @@ final class CommentAdminService
 
     /**
      * Get pending comments.
+     *
+     * @param int $page
+     * @param int $perPage
+     * @param int|null $postAuthorId If provided, only returns pending comments on posts by this author
      */
-    public function getPending(int $page = 1, int $perPage = 20): array
+    public function getPending(int $page = 1, int $perPage = 20, ?int $postAuthorId = null): array
     {
-        $paginator = $this->commentRepository->getPending($perPage, $page);
+        $paginator = $this->commentRepository->getPending($perPage, $page, $postAuthorId);
 
         return [
             'success' => true,
@@ -201,12 +205,14 @@ final class CommentAdminService
 
     /**
      * Get comment statistics.
+     *
+     * @param int|null $postAuthorId If provided, only returns stats for comments on posts by this author
      */
-    public function getStatistics(): array
+    public function getStatistics(?int $postAuthorId = null): array
     {
         return [
             'success' => true,
-            'data' => $this->commentRepository->getStatistics(),
+            'data' => $this->commentRepository->getStatistics($postAuthorId),
             'message' => 'Statistics retrieved successfully',
         ];
     }

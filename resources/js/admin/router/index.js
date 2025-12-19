@@ -3,6 +3,7 @@ import { useAuthStore } from '../../stores/auth';
 
 // Lazy load admin pages for better performance
 const Dashboard = () => import('../pages/Dashboard.vue');
+const Profile = () => import('../pages/Profile.vue');
 const PostsIndex = () => import('../pages/posts/Index.vue');
 const PostsCreate = () => import('../pages/posts/Create.vue');
 const PostsEdit = () => import('../pages/posts/Edit.vue');
@@ -18,115 +19,124 @@ const FeedbackIndex = () => import('../pages/feedback/Index.vue');
 const FeedbackShow = () => import('../pages/feedback/Show.vue');
 
 const routes = [
+  // Routes accessible by both admin and moderator
   {
     path: '/admin',
     name: 'admin-dashboard',
     component: Dashboard,
-    meta: { title: 'Dashboard' },
+    meta: { title: 'Dashboard', roles: ['admin', 'moderator'] },
   },
 
-  // Posts
+  // Profile - accessible by both admin and moderator
+  {
+    path: '/admin/profile',
+    name: 'admin-profile',
+    component: Profile,
+    meta: { title: 'My Profile', roles: ['admin', 'moderator'] },
+  },
+
+  // Posts - accessible by both admin and moderator
   {
     path: '/admin/posts',
     name: 'admin-posts',
     component: PostsIndex,
-    meta: { title: 'Posts' },
+    meta: { title: 'Posts', roles: ['admin', 'moderator'] },
   },
   {
     path: '/admin/posts/create',
     name: 'admin-posts-create',
     component: PostsCreate,
-    meta: { title: 'Create Post' },
+    meta: { title: 'Create Post', roles: ['admin', 'moderator'] },
   },
   {
     path: '/admin/posts/:id/edit',
     name: 'admin-posts-edit',
     component: PostsEdit,
-    meta: { title: 'Edit Post' },
+    meta: { title: 'Edit Post', roles: ['admin', 'moderator'] },
   },
 
-  // Comments
+  // Comments - accessible by both admin and moderator
   {
     path: '/admin/comments',
     name: 'admin-comments',
     component: CommentsIndex,
-    meta: { title: 'Comments' },
+    meta: { title: 'Comments', roles: ['admin', 'moderator'] },
   },
   {
     path: '/admin/comments/pending',
     name: 'admin-comments-pending',
     component: CommentsPending,
-    meta: { title: 'Pending Comments' },
+    meta: { title: 'Pending Comments', roles: ['admin', 'moderator'] },
   },
 
-  // Categories
+  // Categories - Admin only
   {
     path: '/admin/categories',
     name: 'admin-categories',
     component: CategoriesIndex,
-    meta: { title: 'Categories' },
+    meta: { title: 'Categories', roles: ['admin'] },
   },
   {
     path: '/admin/categories/create',
     name: 'admin-categories-create',
     component: CategoriesForm,
-    meta: { title: 'Create Category' },
+    meta: { title: 'Create Category', roles: ['admin'] },
   },
   {
     path: '/admin/categories/:id/edit',
     name: 'admin-categories-edit',
     component: CategoriesForm,
-    meta: { title: 'Edit Category' },
+    meta: { title: 'Edit Category', roles: ['admin'] },
   },
 
-  // Tags
+  // Tags - Admin only
   {
     path: '/admin/tags',
     name: 'admin-tags',
     component: TagsIndex,
-    meta: { title: 'Tags' },
+    meta: { title: 'Tags', roles: ['admin'] },
   },
 
-  // Users
+  // Users - Admin only
   {
     path: '/admin/users',
     name: 'admin-users',
     component: UsersIndex,
-    meta: { title: 'Users' },
+    meta: { title: 'Users', roles: ['admin'] },
   },
   {
     path: '/admin/users/create',
     name: 'admin-users-create',
     component: UsersForm,
-    meta: { title: 'Create User' },
+    meta: { title: 'Create User', roles: ['admin'] },
   },
   {
     path: '/admin/users/:id/edit',
     name: 'admin-users-edit',
     component: UsersForm,
-    meta: { title: 'Edit User' },
+    meta: { title: 'Edit User', roles: ['admin'] },
   },
 
-  // Settings
+  // Settings - Admin only
   {
     path: '/admin/settings',
     name: 'admin-settings',
     component: SettingsIndex,
-    meta: { title: 'Settings' },
+    meta: { title: 'Settings', roles: ['admin'] },
   },
 
-  // Feedback
+  // Feedback - Admin only
   {
     path: '/admin/feedback',
     name: 'admin-feedback',
     component: FeedbackIndex,
-    meta: { title: 'Feedback' },
+    meta: { title: 'Feedback', roles: ['admin'] },
   },
   {
     path: '/admin/feedback/:id',
     name: 'admin-feedback-show',
     component: FeedbackShow,
-    meta: { title: 'Feedback Details' },
+    meta: { title: 'Feedback Details', roles: ['admin'] },
   },
 ];
 
@@ -160,6 +170,21 @@ router.beforeEach(async (to, from, next) => {
 
   // Check admin role (admin or editor) - redirect to 403 error page
   if (!authStore.hasAdminAccess) {
+    window.location.href = '/error/403';
+    return;
+  }
+
+  // Check route-specific role requirements
+  const allowedRoles = to.meta.roles || ['admin', 'moderator'];
+  const userRole = authStore.userRole;
+
+  if (!allowedRoles.includes(userRole)) {
+    // User doesn't have permission for this specific route
+    // Redirect moderator to dashboard instead of 403 (better UX)
+    if (authStore.isModerator) {
+      next({ name: 'admin-dashboard' });
+      return;
+    }
     window.location.href = '/error/403';
     return;
   }

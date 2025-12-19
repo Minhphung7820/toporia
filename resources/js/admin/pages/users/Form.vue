@@ -50,7 +50,7 @@
           <label for="role">Role</label>
           <select id="role" v-model="form.role">
             <option value="user">User</option>
-            <option value="editor">Editor</option>
+            <option value="moderator">Moderator</option>
             <option value="admin">Admin</option>
           </select>
         </div>

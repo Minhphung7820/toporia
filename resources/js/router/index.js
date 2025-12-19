@@ -5,7 +5,8 @@ import Login from '../pages/Login.vue';
 import Register from '../pages/Register.vue';
 import ForgotPassword from '../pages/ForgotPassword.vue';
 import ResetPassword from '../pages/ResetPassword.vue';
-import ChangePassword from '../pages/ChangePassword.vue';
+import VerifyEmail from '../pages/VerifyEmail.vue';
+import Settings from '../pages/Settings.vue';
 
 // Blog pages
 import BlogIndex from '../pages/blog/Index.vue';
@@ -58,10 +59,20 @@ const routes = [
         meta: { requiresGuest: true },
     },
     {
-        path: '/change-password',
-        name: 'change-password',
-        component: ChangePassword,
+        path: '/verify-email/:id/:hash',
+        name: 'verify-email',
+        component: VerifyEmail,
+    },
+    {
+        path: '/settings',
+        name: 'settings',
+        component: Settings,
         meta: { requiresAuth: true },
+    },
+    // Redirect old change-password route to settings
+    {
+        path: '/change-password',
+        redirect: { name: 'settings' },
     },
 
     // Blog routes

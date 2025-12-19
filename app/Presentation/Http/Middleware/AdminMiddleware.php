@@ -19,7 +19,7 @@ final class AdminMiddleware implements MiddlewareInterface
     /**
      * Allowed roles that can access admin routes.
      */
-    private const ADMIN_ROLES = ['admin', 'editor'];
+    private const ADMIN_ROLES = ['admin', 'moderator'];
 
     /**
      * Handle admin role check.

@@ -266,13 +266,13 @@ final class User implements FrameworkAuthenticatable
     }
 
     /**
-     * Check if user has editor role.
+     * Check if user has moderator role.
      *
      * @return bool
      */
-    public function isEditor(): bool
+    public function isModerator(): bool
     {
-        return $this->role === 'editor';
+        return $this->role === 'moderator';
     }
 
     /**

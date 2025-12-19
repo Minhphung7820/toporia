@@ -7,6 +7,7 @@ namespace App\Application\Services\Blog;
 use App\Domain\Contracts\Repository\PostRepository;
 use App\Domain\Contracts\Repository\TagRepository;
 use App\Domain\Contracts\Repository\CategoryRepository;
+use App\Domain\Contracts\Repository\UserRepository;
 
 /**
  * Post Service - Handles blog post operations for the public site.
@@ -18,7 +19,8 @@ final class PostService
     public function __construct(
         private readonly PostRepository $postRepository,
         private readonly TagRepository $tagRepository,
-        private readonly CategoryRepository $categoryRepository
+        private readonly CategoryRepository $categoryRepository,
+        private readonly UserRepository $userRepository
     ) {}
 
     /**
@@ -36,7 +38,7 @@ final class PostService
         return [
             'success' => true,
             'data' => [
-                'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
+                'posts' => $this->enrichPostsWithAuthors($result['posts']),
                 'pagination' => [
                     'next_cursor' => $result['next_cursor'],
                     'prev_cursor' => $result['prev_cursor'],
@@ -78,10 +80,19 @@ final class PostService
             ? $this->categoryRepository->findById($post->categoryId)
             : null;
 
+        // Get author information
+        $author = $post->authorId
+            ? $this->userRepository->findById($post->authorId)
+            : null;
+
+        $postData = $post->toArray();
+        $postData['author_name'] = $author?->name;
+        $postData['author_avatar'] = $author?->avatar;
+
         return [
             'success' => true,
             'data' => [
-                'post' => $post->toArray(),
+                'post' => $postData,
                 'tags' => array_map(fn($tag) => $tag->toArray(), $tags),
                 'category' => $category?->toArray(),
             ],
@@ -102,7 +113,7 @@ final class PostService
         return [
             'success' => true,
             'data' => [
-                'posts' => array_map(fn($post) => $post->toArray(), $posts),
+                'posts' => $this->enrichPostsWithAuthors($posts),
             ],
             'message' => 'Featured posts retrieved successfully',
         ];
@@ -121,7 +132,7 @@ final class PostService
         return [
             'success' => true,
             'data' => [
-                'posts' => array_map(fn($post) => $post->toArray(), $posts),
+                'posts' => $this->enrichPostsWithAuthors($posts),
             ],
             'message' => 'Popular posts retrieved successfully',
         ];
@@ -140,7 +151,7 @@ final class PostService
         return [
             'success' => true,
             'data' => [
-                'posts' => array_map(fn($post) => $post->toArray(), $posts),
+                'posts' => $this->enrichPostsWithAuthors($posts),
             ],
             'message' => 'Latest posts retrieved successfully',
         ];
@@ -160,7 +171,7 @@ final class PostService
         return [
             'success' => true,
             'data' => [
-                'posts' => array_map(fn($post) => $post->toArray(), $posts),
+                'posts' => $this->enrichPostsWithAuthors($posts),
             ],
             'message' => 'Related posts retrieved successfully',
         ];
@@ -192,7 +203,7 @@ final class PostService
             'success' => true,
             'data' => [
                 'category' => $category->toArray(),
-                'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
+                'posts' => $this->enrichPostsWithAuthors($result['posts']),
                 'pagination' => [
                     'next_cursor' => $result['next_cursor'],
                     'prev_cursor' => $result['prev_cursor'],
@@ -230,7 +241,7 @@ final class PostService
             'success' => true,
             'data' => [
                 'tag' => $tag->toArray(),
-                'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
+                'posts' => $this->enrichPostsWithAuthors($result['posts']),
                 'pagination' => [
                     'next_cursor' => $result['next_cursor'],
                     'prev_cursor' => $result['prev_cursor'],
@@ -279,7 +290,7 @@ final class PostService
             'success' => true,
             'data' => [
                 'query' => $trimmedQuery,
-                'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
+                'posts' => $this->enrichPostsWithAuthors($result['posts']),
                 'pagination' => [
                     'next_cursor' => $result['next_cursor'],
                     'prev_cursor' => $result['prev_cursor'],
@@ -320,5 +331,48 @@ final class PostService
             'success' => true,
             'message' => 'View recorded',
         ];
+    }
+
+    /**
+     * Enrich posts array with author information.
+     * Batch fetches authors to avoid N+1 queries.
+     *
+     * @param array $posts Array of Post entities
+     * @return array Array of post data with author info
+     */
+    private function enrichPostsWithAuthors(array $posts): array
+    {
+        if (empty($posts)) {
+            return [];
+        }
+
+        // Collect unique author IDs
+        $authorIds = [];
+        foreach ($posts as $post) {
+            if ($post->authorId !== null && !in_array($post->authorId, $authorIds, true)) {
+                $authorIds[] = $post->authorId;
+            }
+        }
+
+        // Batch fetch authors
+        $authorsMap = [];
+        foreach ($authorIds as $authorId) {
+            $author = $this->userRepository->findById($authorId);
+            if ($author) {
+                $authorsMap[$authorId] = $author;
+            }
+        }
+
+        // Enrich posts with author info
+        $enrichedPosts = [];
+        foreach ($posts as $post) {
+            $postData = $post->toArray();
+            $author = $authorsMap[$post->authorId] ?? null;
+            $postData['author_name'] = $author?->name;
+            $postData['author_avatar'] = $author?->avatar;
+            $enrichedPosts[] = $postData;
+        }
+
+        return $enrichedPosts;
     }
 }

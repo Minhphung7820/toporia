@@ -5,7 +5,19 @@
         <h1 class="auth-title">Create account</h1>
         <p class="auth-subtitle">Start your journey with Toporia</p>
 
-        <form @submit.prevent="handleRegister" class="auth-form">
+        <!-- Registration success - verification required -->
+        <div v-if="registrationSuccess" class="alert alert-success">
+          <div class="success-icon">✓</div>
+          <div class="success-content">
+            <strong>Account created successfully!</strong>
+            <p>We've sent a verification link to <strong>{{ form.email }}</strong>. Please check your inbox and click the link to activate your account.</p>
+            <router-link to="/login" class="btn btn-primary btn-block" style="margin-top: 1rem;">
+              Go to Login
+            </router-link>
+          </div>
+        </div>
+
+        <form v-else @submit.prevent="handleRegister" class="auth-form">
           <div v-if="error" class="alert alert-error">{{ error }}</div>
 
           <div class="form-group">
@@ -58,6 +70,7 @@ export default {
       form: { name: '', email: '', password: '', password_confirmation: '' },
       errors: {},
       error: '',
+      registrationSuccess: false,
     };
   },
   computed: {
@@ -67,9 +80,17 @@ export default {
     async handleRegister() {
       this.error = '';
       this.errors = {};
+      this.registrationSuccess = false;
+
       const result = await this.authStore.register(this.form);
       if (result.success) {
-        this.$router.push('/');
+        // Show verification message instead of redirecting
+        if (result.requires_verification) {
+          this.registrationSuccess = true;
+        } else {
+          // Fallback for cases where verification is not required
+          this.$router.push('/login');
+        }
       } else {
         this.error = result.message || 'Registration failed';
         if (result.errors) this.errors = result.errors;
@@ -134,6 +155,39 @@ export default {
 
 .alert { padding: 0.875rem 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; }
 .alert-error { background-color: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+
+.alert-success {
+  background-color: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.success-icon {
+  width: 48px;
+  height: 48px;
+  background: #22c55e;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin: 0 auto 1rem;
+}
+
+.success-content strong {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.success-content p {
+  margin: 0;
+  line-height: 1.5;
+  color: #15803d;
+}
 
 .auth-footer { margin-top: 1.5rem; text-align: center; color: #666; font-size: 0.9rem; }
 .auth-link { color: #1a1a1a; text-decoration: none; font-weight: 500; }

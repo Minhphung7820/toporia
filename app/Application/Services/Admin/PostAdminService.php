@@ -124,17 +124,17 @@ final class PostAdminService
             'title' => $data['title'],
             'slug' => $slug,
             'content' => $content,
-            'excerpt' => $data['excerpt'] ?: null,
-            'featured_image' => $data['featured_image'] ?: null,
+            'excerpt' => ($data['excerpt'] ?? null) ?: null,
+            'featured_image' => ($data['featured_image'] ?? null) ?: null,
             'views' => 0,
             'reading_time' => $readingTime,
             'is_published' => false,
             'is_featured' => $data['is_featured'] ?? false,
             'author_id' => $authorId,
             'category_id' => $categoryId,
-            'meta_title' => $data['meta_title'] ?: null,
-            'meta_description' => $data['meta_description'] ?: null,
-            'meta_keywords' => $data['meta_keywords'] ?: null,
+            'meta_title' => ($data['meta_title'] ?? null) ?: null,
+            'meta_description' => ($data['meta_description'] ?? null) ?: null,
+            'meta_keywords' => $data['meta_keywords'] ?? null,
         ]);
 
         // Sync tags

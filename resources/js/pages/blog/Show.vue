@@ -165,7 +165,13 @@
             <aside class="content-sidebar">
               <!-- Author Card -->
               <div class="author-card">
-                <div class="author-avatar">
+                <img
+                  v-if="post.author_avatar"
+                  :src="post.author_avatar"
+                  :alt="post.author_name || 'Author'"
+                  class="author-avatar author-avatar-image"
+                />
+                <div v-else class="author-avatar">
                   {{ getInitials(post.author_name || 'Admin') }}
                 </div>
                 <div class="author-info">
@@ -794,6 +800,11 @@ onUnmounted(() => {
   justify-content: center;
   font-weight: 600;
   font-size: 16px;
+  flex-shrink: 0;
+}
+
+.author-avatar-image {
+  object-fit: cover;
 }
 
 .author-info {

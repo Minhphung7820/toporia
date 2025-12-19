@@ -24,10 +24,10 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Check if user has admin access (admin or editor role)
+     * Check if user has admin access (admin or moderator role)
      */
     hasAdminAccess: (state) => {
-      const adminRoles = ['admin', 'editor'];
+      const adminRoles = ['admin', 'moderator'];
       return state.user !== null && adminRoles.includes(state.user.role);
     },
 
@@ -39,10 +39,10 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Check if user is editor
+     * Check if user is moderator
      */
-    isEditor: (state) => {
-      return state.user?.role === 'editor';
+    isModerator: (state) => {
+      return state.user?.role === 'moderator';
     },
 
     /**
@@ -128,6 +128,15 @@ export const useAuthStore = defineStore('auth', {
           this.user = result.user;
           return { success: true, user: this.user };
         }
+        // Handle unverified email case
+        if (result.requires_verification) {
+          return {
+            success: false,
+            requires_verification: true,
+            email: result.email,
+            message: result.message || 'Please verify your email address',
+          };
+        }
         return { success: false, message: result.message || 'Login failed' };
       } catch (error) {
         console.error('Login error:', error);
@@ -144,9 +153,13 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true;
       try {
         const result = await authService.register(data);
-        if (result.success && result.user) {
-          this.user = result.user;
-          return { success: true, user: this.user };
+        if (result.success) {
+          // Don't set user - registration now requires email verification
+          return {
+            success: true,
+            requires_verification: result.requires_verification || false,
+            message: result.message,
+          };
         }
         return { success: false, message: result.message || 'Registration failed', errors: result.errors };
       } catch (error) {
@@ -221,6 +234,63 @@ export const useAuthStore = defineStore('auth', {
         return result;
       } catch (error) {
         console.error('Change password error:', error);
+        return { success: false, message: 'An error occurred' };
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    /**
+     * Update profile (authenticated)
+     */
+    async updateProfile(data) {
+      this.loading = true;
+      try {
+        const result = await authService.updateProfile(data);
+        if (result.success && result.user) {
+          this.user = result.user;
+        }
+        return result;
+      } catch (error) {
+        console.error('Update profile error:', error);
+        return { success: false, message: 'An error occurred' };
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    /**
+     * Update avatar (authenticated)
+     */
+    async updateAvatar(file) {
+      this.loading = true;
+      try {
+        const result = await authService.updateAvatar(file);
+        if (result.success && result.user) {
+          this.user = result.user;
+        }
+        return result;
+      } catch (error) {
+        console.error('Update avatar error:', error);
+        return { success: false, message: 'An error occurred' };
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    /**
+     * Remove avatar (authenticated)
+     */
+    async removeAvatar() {
+      this.loading = true;
+      try {
+        const result = await authService.removeAvatar();
+        if (result.success && result.user) {
+          this.user = result.user;
+        }
+        return result;
+      } catch (error) {
+        console.error('Remove avatar error:', error);
         return { success: false, message: 'An error occurred' };
       } finally {
         this.loading = false;

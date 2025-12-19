@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Presentation\Http\Controllers\Api\Admin;
 
 use App\Application\Services\Admin\PostAdminService;
+use App\Application\Services\AuthorizationService;
 use App\Presentation\Http\Controllers\BaseController;
 use Toporia\Framework\Http\Contracts\JsonResponseInterface;
 use Toporia\Framework\Http\Request;
@@ -13,13 +14,18 @@ use Toporia\Framework\Support\Accessors\Auth;
 
 /**
  * Post Admin Controller - Admin post management endpoints.
+ *
+ * Authorization:
+ * - Admin: Can manage all posts
+ * - Moderator: Can only manage their own posts
  */
 final class PostAdminController extends BaseController
 {
     public function __construct(
         Request $request,
         Response $response,
-        private readonly PostAdminService $postAdminService
+        private readonly PostAdminService $postAdminService,
+        private readonly AuthorizationService $authService
     ) {
         parent::__construct($request, $response);
     }
@@ -27,14 +33,13 @@ final class PostAdminController extends BaseController
     /**
      * Get all posts with filters.
      *
-     * Supports both offset and cursor pagination:
-     * - Offset: ?page=1&per_page=20 (traditional, slower on deep pages)
-     * - Cursor: ?cursor=xxx&per_page=20 (fast, O(1) performance)
+     * Admin sees all posts, Moderator sees only their own.
      *
      * GET /api/admin/posts
      */
     public function index(Request $request): JsonResponseInterface
     {
+        $user = Auth::user();
         $filters = [
             'status' => $request->query('status'),
             'category_id' => $request->query('category_id'),
@@ -42,6 +47,12 @@ final class PostAdminController extends BaseController
             'search' => $request->query('search'),
             'is_featured' => $request->query('is_featured'),
         ];
+
+        // Moderator can only see their own posts
+        if ($this->authService->isModerator($user)) {
+            $filters['author_id'] = $this->authService->getUserId($user);
+        }
+
         // Filter out empty values but keep '0' and 'false' for is_featured
         $filters = array_filter($filters, fn($v) => $v !== null && $v !== '');
 
@@ -66,6 +77,16 @@ final class PostAdminController extends BaseController
      */
     public function show(int $id): JsonResponseInterface
     {
+        $user = Auth::user();
+
+        // Check authorization
+        if (!$this->authService->canViewPost($user, $id)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'You do not have permission to view this post'
+            ], 403);
+        }
+
         $result = $this->postAdminService->getPost($id);
 
         if (!$result['success']) {
@@ -101,8 +122,18 @@ final class PostAdminController extends BaseController
      */
     public function update(int $id, Request $request): JsonResponseInterface
     {
+        $user = Auth::user();
+
+        // Check authorization
+        if (!$this->authService->canUpdatePost($user, $id)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'You do not have permission to update this post'
+            ], 403);
+        }
+
         $data = $request->json();
-        $userId = Auth::user()->getAuthIdentifier();
+        $userId = $this->authService->getUserId($user);
 
         $result = $this->postAdminService->updatePost($id, $data, $userId);
 
@@ -121,8 +152,17 @@ final class PostAdminController extends BaseController
      */
     public function destroy(int $id): JsonResponseInterface
     {
-        $userId = Auth::user()->getAuthIdentifier();
+        $user = Auth::user();
 
+        // Check authorization
+        if (!$this->authService->canDeletePost($user, $id)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'You do not have permission to delete this post'
+            ], 403);
+        }
+
+        $userId = $this->authService->getUserId($user);
         $result = $this->postAdminService->deletePost($id, $userId);
 
         if (!$result['success']) {
@@ -139,8 +179,17 @@ final class PostAdminController extends BaseController
      */
     public function publish(int $id): JsonResponseInterface
     {
-        $userId = Auth::user()->getAuthIdentifier();
+        $user = Auth::user();
 
+        // Check authorization
+        if (!$this->authService->canPublishPost($user, $id)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'You do not have permission to publish this post'
+            ], 403);
+        }
+
+        $userId = $this->authService->getUserId($user);
         $result = $this->postAdminService->publishPost($id, $userId);
 
         if (!$result['success']) {
@@ -157,8 +206,17 @@ final class PostAdminController extends BaseController
      */
     public function unpublish(int $id): JsonResponseInterface
     {
-        $userId = Auth::user()->getAuthIdentifier();
+        $user = Auth::user();
 
+        // Check authorization
+        if (!$this->authService->canPublishPost($user, $id)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'You do not have permission to unpublish this post'
+            ], 403);
+        }
+
+        $userId = $this->authService->getUserId($user);
         $result = $this->postAdminService->unpublishPost($id, $userId);
 
         if (!$result['success']) {
@@ -175,9 +233,19 @@ final class PostAdminController extends BaseController
      */
     public function schedule(int $id, Request $request): JsonResponseInterface
     {
+        $user = Auth::user();
+
+        // Check authorization
+        if (!$this->authService->canPublishPost($user, $id)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'You do not have permission to schedule this post'
+            ], 403);
+        }
+
         $data = $request->json();
         $scheduledAt = $data['scheduled_at'] ?? '';
-        $userId = Auth::user()->getAuthIdentifier();
+        $userId = $this->authService->getUserId($user);
 
         $result = $this->postAdminService->schedulePost($id, $scheduledAt, $userId);
 
@@ -191,6 +259,7 @@ final class PostAdminController extends BaseController
 
     /**
      * Toggle featured status.
+     * Admin only - protected by admin.only middleware.
      *
      * POST /api/admin/posts/{id}/toggle-featured
      */

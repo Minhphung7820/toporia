@@ -5,8 +5,25 @@
         <h1 class="auth-title">Welcome back</h1>
         <p class="auth-subtitle">Sign in to your account</p>
 
+        <!-- Email verification required message -->
+        <div v-if="requiresVerification" class="alert alert-warning verification-alert">
+          <div class="verification-message">
+            <strong>Email verification required</strong>
+            <p>Please verify your email address before logging in.</p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline btn-sm"
+            :disabled="resendLoading || resendCooldown > 0"
+            @click="resendVerification"
+          >
+            {{ resendLoading ? 'Sending...' : resendCooldown > 0 ? `Resend (${resendCooldown}s)` : 'Resend email' }}
+          </button>
+          <p v-if="resendSuccess" class="resend-success">Verification email sent!</p>
+        </div>
+
         <form @submit.prevent="handleLogin" class="auth-form">
-          <div v-if="error" class="alert alert-error">{{ error }}</div>
+          <div v-if="error && !requiresVerification" class="alert alert-error">{{ error }}</div>
 
           <div class="form-group">
             <label for="email">Email</label>
@@ -68,6 +85,7 @@
 
 <script>
 import { useAuthStore } from '../stores/auth';
+import axios from 'axios';
 
 export default {
   name: 'Login',
@@ -79,6 +97,11 @@ export default {
       form: { email: '', password: '', remember: false },
       errors: {},
       error: '',
+      requiresVerification: false,
+      verificationEmail: '',
+      resendLoading: false,
+      resendSuccess: false,
+      resendCooldown: 0,
     };
   },
   computed: {
@@ -94,13 +117,46 @@ export default {
     async handleLogin() {
       this.error = '';
       this.errors = {};
+      this.requiresVerification = false;
+      this.resendSuccess = false;
+
       const result = await this.authStore.login(this.form.email, this.form.password, this.form.remember);
       if (result.success) {
         this.$router.push(this.$route.query.redirect || '/');
+      } else if (result.requires_verification) {
+        this.requiresVerification = true;
+        this.verificationEmail = result.email || this.form.email;
       } else {
         this.error = result.message || 'Login failed';
         if (result.errors) this.errors = result.errors;
       }
+    },
+    async resendVerification() {
+      if (this.resendLoading || this.resendCooldown > 0) return;
+
+      this.resendLoading = true;
+      this.resendSuccess = false;
+
+      try {
+        await axios.post('/api/auth/resend-verification', {
+          email: this.verificationEmail,
+        });
+        this.resendSuccess = true;
+        this.startCooldown();
+      } catch (err) {
+        this.error = err.response?.data?.message || 'Failed to resend verification email';
+      } finally {
+        this.resendLoading = false;
+      }
+    },
+    startCooldown() {
+      this.resendCooldown = 60;
+      const timer = setInterval(() => {
+        this.resendCooldown--;
+        if (this.resendCooldown <= 0) {
+          clearInterval(timer);
+        }
+      }, 1000);
     },
   },
 };
@@ -253,6 +309,61 @@ export default {
   background-color: #fef2f2;
   color: #dc2626;
   border: 1px solid #fecaca;
+}
+
+.alert-warning {
+  background-color: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.verification-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.verification-message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.verification-message strong {
+  font-size: 0.95rem;
+}
+
+.verification-message p {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.btn-outline {
+  background: transparent;
+  color: #b45309;
+  border: 1px solid #b45309;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: #b45309;
+  color: #fff;
+}
+
+.btn-outline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.resend-success {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #059669;
 }
 
 .auth-footer {

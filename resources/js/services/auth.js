@@ -227,5 +227,69 @@ export const authService = {
     });
     return response.json();
   },
+
+  /**
+   * Update profile (authenticated)
+   */
+  async updateProfile(data) {
+    // Ensure CSRF cookie is set
+    await ensureCsrfCookie();
+
+    const response = await fetch(`${API_BASE}/profile`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (result.success) {
+      this.clearCache();
+    }
+    return result;
+  },
+
+  /**
+   * Update avatar (authenticated)
+   */
+  async updateAvatar(file) {
+    // Ensure CSRF cookie is set
+    await ensureCsrfCookie();
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await fetch(`${API_BASE}/avatar`, {
+      method: 'POST',
+      headers: {
+        [CSRF_HEADER_NAME]: getCsrfToken(),
+      },
+      credentials: 'include',
+      body: formData,
+    });
+    const result = await response.json();
+    if (result.success) {
+      this.clearCache();
+    }
+    return result;
+  },
+
+  /**
+   * Remove avatar (authenticated)
+   */
+  async removeAvatar() {
+    // Ensure CSRF cookie is set
+    await ensureCsrfCookie();
+
+    const response = await fetch(`${API_BASE}/avatar`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+      credentials: 'include',
+    });
+    const result = await response.json();
+    if (result.success) {
+      this.clearCache();
+    }
+    return result;
+  },
 };
 

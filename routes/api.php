@@ -35,6 +35,13 @@ Route::post('/auth/refresh', [AuthController::class, 'refresh']);
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
+Route::post('/auth/avatar', [AuthController::class, 'updateAvatar']);
+Route::delete('/auth/avatar', [AuthController::class, 'removeAvatar']);
+
+// Email verification
+Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail']);
+Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification']);
 
 // Posts
 Route::get('/blog/posts', [BlogPostController::class, 'index']);

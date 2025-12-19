@@ -59,13 +59,13 @@
               <span>{{ user?.email }}</span>
             </div>
             <div class="dropdown-divider"></div>
-            <a href="/profile" class="dropdown-item">
+            <router-link to="/admin/profile" class="dropdown-item" @click="showUserMenu = false">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
                 <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
               Profile
-            </a>
+            </router-link>
             <router-link to="/admin/settings" class="dropdown-item" @click="showUserMenu = false">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
                 <circle cx="12" cy="12" r="3" />

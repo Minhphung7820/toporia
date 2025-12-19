@@ -6,7 +6,6 @@ namespace App\Application\Services;
 
 use App\Domain\Contracts\Repository\UserRepository;
 use App\Domain\Entities\User;
-use Toporia\Framework\Support\Accessors\Auth;
 
 /**
  * Register User Service
@@ -17,14 +16,15 @@ use Toporia\Framework\Support\Accessors\Auth;
 final class RegisterUserService
 {
     public function __construct(
-        private readonly UserRepository $userRepository
+        private readonly UserRepository $userRepository,
+        private readonly EmailVerificationService $emailVerificationService
     ) {}
 
     /**
      * Register a new user.
      *
      * @param array{name: string, email: string, password: string, password_confirmation: string} $data
-     * @return array{success: bool, user?: User, errors?: array<string, string>}
+     * @return array{success: bool, user?: User, errors?: array<string, string>, requires_verification?: bool}
      */
     public function execute(array $data): array
     {
@@ -48,7 +48,7 @@ final class RegisterUserService
             ];
         }
 
-        // Create new user
+        // Create new user (email NOT verified yet)
         $hashedPassword = password_hash($data['password'], PASSWORD_DEFAULT);
         $user = new User(
             id: null,
@@ -59,13 +59,15 @@ final class RegisterUserService
 
         $savedUser = $this->userRepository->save($user);
 
-        // Auto login after registration
-        Auth::login($savedUser);
+        // Send verification email (don't auto-login - require email verification first)
+        $verificationResult = $this->emailVerificationService->sendVerificationEmail($savedUser);
 
         return [
             'success' => true,
             'user' => $savedUser,
-            'message' => 'Registration successful'
+            'message' => 'Registration successful. Please check your email to verify your account.',
+            'requires_verification' => true,
+            'verification_url' => $verificationResult['verification_url'] ?? null, // For dev/testing
         ];
     }
 
