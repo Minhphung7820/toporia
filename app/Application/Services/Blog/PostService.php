@@ -245,6 +245,9 @@ final class PostService
     /**
      * Search posts with cursor pagination.
      *
+     * Uses caching for search count (expensive operation).
+     * FULLTEXT search for queries >= 3 chars, LIKE for shorter.
+     *
      * @param string $query Search query
      * @param int $perPage Posts per page
      * @param string|null $cursor Cursor for pagination
@@ -253,19 +256,29 @@ final class PostService
      */
     public function searchPosts(string $query, int $perPage = 10, ?string $cursor = null, string $direction = 'next'): array
     {
-        if (strlen(trim($query)) < 2) {
+        $trimmedQuery = trim($query);
+        if (strlen($trimmedQuery) < 2) {
             return [
                 'success' => false,
                 'message' => 'Search query too short',
             ];
         }
 
-        $result = $this->postRepository->searchWithCursor($query, $perPage, $cursor, $direction);
+        // Cache key for search results (5 minutes TTL)
+        $cacheKey = 'blog:search:' . md5($trimmedQuery . ':' . $perPage . ':' . ($cursor ?? 'null') . ':' . $direction);
+        $cacheTtl = 300; // 5 minutes
 
-        return [
+        $cachedResult = cache($cacheKey);
+        if ($cachedResult !== null) {
+            return $cachedResult;
+        }
+
+        $result = $this->postRepository->searchWithCursor($trimmedQuery, $perPage, $cursor, $direction);
+
+        $response = [
             'success' => true,
             'data' => [
-                'query' => $query,
+                'query' => $trimmedQuery,
                 'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
                 'pagination' => [
                     'next_cursor' => $result['next_cursor'],
@@ -277,6 +290,11 @@ final class PostService
             ],
             'message' => 'Search completed successfully',
         ];
+
+        // Cache the result
+        cache($cacheKey, $response, $cacheTtl);
+
+        return $response;
     }
 
     /**

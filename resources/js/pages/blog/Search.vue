@@ -67,7 +67,7 @@
         <div v-else-if="searchResults.length > 0">
           <div class="results-header">
             <h2 class="results-title">
-              Found <span class="highlight">{{ searchPagination.total }}</span> results for "{{ currentQuery }}"
+              Search results for "<span class="highlight">{{ currentQuery }}</span>"
             </h2>
           </div>
 

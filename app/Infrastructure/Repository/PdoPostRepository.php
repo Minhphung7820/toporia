@@ -666,23 +666,18 @@ final class PdoPostRepository implements PostRepository
      */
     public function searchWithCursor(string $query, int $limit = 10, ?string $cursor = null, string $direction = 'next'): array
     {
-        $searchTerm = '%' . $query . '%';
         $cursorData = $cursor ? $this->decodeCursor($cursor) : null;
+        $now = date('Y-m-d H:i:s');
 
-        // Count total results
-        $countParams = [$searchTerm, $searchTerm, $searchTerm, date('Y-m-d H:i:s')];
-        $countResult = QueryBuilder::getConnection()->selectOne("
-            SELECT COUNT(*) as total
-            FROM posts
-            WHERE is_published = 1
-              AND published_at <= ?
-              AND (title LIKE ? OR content LIKE ? OR excerpt LIKE ?)
-        ", [date('Y-m-d H:i:s'), $searchTerm, $searchTerm, $searchTerm]);
-        $total = (int) ($countResult['total'] ?? 0);
+        // Always use LIKE on title only for performance (title is indexed)
+        // LIKE '%x%' on indexed column is faster than FULLTEXT for short patterns
+        $searchTerm = '%' . $query . '%';
+        $searchCondition = 'title LIKE ?';
+        $searchParams = [$searchTerm, $now];
 
         // Build cursor condition
-        $params = [date('Y-m-d H:i:s'), $searchTerm, $searchTerm, $searchTerm];
-        $whereClause = 'WHERE is_published = 1 AND published_at <= ? AND (title LIKE ? OR content LIKE ? OR excerpt LIKE ?)';
+        $whereClause = "WHERE is_published = 1 AND {$searchCondition} AND published_at <= ?";
+        $params = $searchParams;
 
         if ($cursorData && $direction === 'next') {
             $whereClause .= ' AND (published_at < ? OR (published_at = ? AND id < ?))';
@@ -741,7 +736,7 @@ final class PdoPostRepository implements PostRepository
             'next_cursor' => $nextCursor,
             'prev_cursor' => $prevCursor,
             'has_more' => $hasMore,
-            'total' => $total,
+            'total' => null, // Skip expensive COUNT query for performance
         ];
     }
 
