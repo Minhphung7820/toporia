@@ -27,8 +27,8 @@
         :class="{ 'has-children': hasChildren }"
       >
         <span class="category-name">{{ category.name }}</span>
-        <span v-if="category.post_count !== undefined" class="category-count">
-          {{ category.post_count }}
+        <span v-if="displayCount > 0" class="category-count">
+          ({{ displayCount }})
         </span>
       </router-link>
     </div>
@@ -63,6 +63,11 @@ const isExpanded = ref(props.depth < 1); // Auto-expand first level
 
 const hasChildren = computed(() => {
   return props.category.children && props.category.children.length > 0;
+});
+
+// Use total_count (includes children) if available, fallback to post_count
+const displayCount = computed(() => {
+  return props.category.total_count ?? props.category.post_count ?? 0;
 });
 
 const toggleExpanded = () => {
@@ -149,13 +154,10 @@ const toggleExpanded = () => {
 }
 
 .category-count {
-  font-size: 12px;
+  font-size: 13px;
   color: #999;
-  background: #f5f5f5;
-  padding: 2px 8px;
-  border-radius: 10px;
   flex-shrink: 0;
-  margin-left: 8px;
+  margin-left: 4px;
 }
 
 .children-list {

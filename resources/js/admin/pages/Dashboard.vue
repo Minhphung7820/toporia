@@ -160,25 +160,52 @@
               <h2>Recent Comments</h2>
               <router-link to="/admin/comments" class="view-all">View all</router-link>
             </div>
-            <div class="card-body">
+            <div class="card-body comments-card-body">
               <div v-if="loading.recentComments" class="loading-placeholder">
                 <div v-for="i in 3" :key="i" class="skeleton-item small"></div>
               </div>
               <div v-else-if="recentComments.length === 0" class="empty-state small">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                </svg>
                 <p>No comments yet</p>
               </div>
-              <div v-else class="comments-list">
-                <div v-for="comment in recentComments.slice(0, 4)" :key="comment.id" class="comment-item">
-                  <div class="comment-avatar">
-                    {{ getInitials(comment.author_name || comment.user?.name || 'A') }}
-                  </div>
-                  <div class="comment-content">
-                    <div class="comment-header">
-                      <span class="comment-author">{{ comment.author_name || comment.user?.name }}</span>
-                      <span class="comment-date">{{ formatRelative(comment.created_at) }}</span>
+              <div v-else class="recent-comments-list">
+                <div v-for="comment in recentComments.slice(0, 4)" :key="comment.id" class="recent-comment-card">
+                  <!-- Comment Header: Author + Time -->
+                  <div class="rc-header">
+                    <div class="rc-author-info">
+                      <div class="rc-avatar" :class="getAvatarColor(comment.author_name || comment.user?.name)">
+                        {{ getInitials(comment.author_name || comment.user?.name || 'A') }}
+                      </div>
+                      <div class="rc-author-details">
+                        <span class="rc-author-name">{{ comment.author_name || comment.user?.name || 'Anonymous' }}</span>
+                        <span class="rc-time">{{ formatRelative(comment.created_at) }}</span>
+                      </div>
                     </div>
-                    <p class="comment-text">{{ truncate(comment.content, 80) }}</p>
+                    <span v-if="comment.status === 'pending'" class="rc-status pending">Pending</span>
+                    <span v-else-if="comment.status === 'approved'" class="rc-status approved">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </span>
                   </div>
+
+                  <!-- Comment Content -->
+                  <p class="rc-content">{{ truncate(comment.content, 100) }}</p>
+
+                  <!-- Post Reference -->
+                  <router-link
+                    v-if="comment.post"
+                    :to="`/admin/posts/${comment.post.id}/edit`"
+                    class="rc-post-link"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    <span>{{ truncate(comment.post.title, 40) }}</span>
+                  </router-link>
                 </div>
               </div>
             </div>
@@ -323,6 +350,13 @@ const truncate = (text, length) => {
   return text.slice(0, length) + '...';
 };
 
+const getAvatarColor = (name) => {
+  if (!name) return 'avatar-blue';
+  const colors = ['avatar-blue', 'avatar-purple', 'avatar-green', 'avatar-orange', 'avatar-pink'];
+  const index = name.charCodeAt(0) % colors.length;
+  return colors[index];
+};
+
 onMounted(() => {
   store.fetchAll();
 });
@@ -382,11 +416,11 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
-/* Stats Grid */
+/* Stats Grid - aligned with main-grid columns */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  grid-template-columns: 1fr 1fr 1fr 380px;
+  gap: 24px;
   margin-bottom: 28px;
   max-width: 100%;
 }
@@ -609,23 +643,48 @@ onMounted(() => {
   opacity: 0.7;
 }
 
-/* Comments List */
-.comments-list {
+/* Recent Comments - New Design */
+.comments-card-body {
+  padding: 16px 18px !important;
+}
+
+.recent-comments-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.comment-item {
+.recent-comment-card {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 14px 16px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.recent-comment-card:hover {
+  background: #fff;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.rc-header {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
 
-.comment-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+.rc-author-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rc-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   color: #fff;
   display: flex;
   align-items: center;
@@ -635,34 +694,109 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.comment-content {
-  flex: 1;
-  min-width: 0;
+.rc-avatar.avatar-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
-.comment-header {
+.rc-avatar.avatar-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.rc-avatar.avatar-green {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.rc-avatar.avatar-orange {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.rc-avatar.avatar-pink {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+}
+
+.rc-author-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rc-author-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.rc-time {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.rc-status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.rc-status.pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.rc-status.approved {
+  background: #d1fae5;
+  color: #059669;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
 }
 
-.comment-author {
-  font-weight: 500;
+.rc-content {
   font-size: 13px;
-  color: #0f172a;
-}
-
-.comment-date {
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.comment-text {
-  color: #64748b;
-  font-size: 13px;
-  margin: 0;
+  color: #475569;
   line-height: 1.5;
+  margin: 0 0 10px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rc-post-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+  text-decoration: none;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  max-width: 100%;
+}
+
+.rc-post-link:hover {
+  color: #2563eb;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.rc-post-link svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.rc-post-link span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Loading & Empty States */
@@ -791,6 +925,10 @@ onMounted(() => {
 
 /* Responsive */
 @media (max-width: 1400px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr 1fr 340px;
+  }
+
   .main-grid {
     grid-template-columns: 1fr 340px;
   }

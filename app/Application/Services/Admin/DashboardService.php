@@ -145,17 +145,51 @@ final class DashboardService
     /**
      * Get recent comments for dashboard.
      *
+     * Includes post info for context display in dashboard UI.
+     *
      * @param int $limit Number of comments
      * @return array{success: bool, data?: array, message: string}
      */
     public function getRecentComments(int $limit = 5): array
     {
-        $comments = $this->commentRepository->findRecent($limit);
+        // Query directly with eager loading to include post info
+        $models = \App\Infrastructure\Persistence\Models\CommentModel::query()
+            ->with(['user', 'commentable'])
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+
+        $comments = [];
+        foreach ($models as $model) {
+            $comment = [
+                'id' => $model->id,
+                'content' => $model->content,
+                'author_name' => $model->author_name,
+                'user' => $model->user ? [
+                    'id' => $model->user->id,
+                    'name' => $model->user->name,
+                    'avatar' => $model->user->avatar,
+                ] : null,
+                'status' => $model->is_approved ? 'approved' : 'pending',
+                'created_at' => $model->created_at,
+            ];
+
+            // Add post info if commentable is a Post
+            if ($model->commentable_type === 'Post' && $model->commentable) {
+                $comment['post'] = [
+                    'id' => $model->commentable->id,
+                    'title' => $model->commentable->title,
+                    'slug' => $model->commentable->slug,
+                ];
+            }
+
+            $comments[] = $comment;
+        }
 
         return [
             'success' => true,
             'data' => [
-                'comments' => array_map(fn($comment) => $comment->toArray(), $comments),
+                'comments' => $comments,
             ],
             'message' => 'Recent comments retrieved successfully',
         ];

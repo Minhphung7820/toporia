@@ -155,6 +155,24 @@ export const categories = {
   withCounts() {
     return http.get('/blog/categories/with-counts');
   },
+
+  /**
+   * Get categories with published posts only
+   * @param {number|null} limit - Max categories to return
+   */
+  withPosts(limit = null) {
+    const params = {};
+    if (limit) params.limit = limit;
+    return http.get('/blog/categories/with-posts', { params });
+  },
+
+  /**
+   * Get categories tree with published post counts
+   * Returns hierarchical tree with post_count and total_count
+   */
+  treeWithCounts() {
+    return http.get('/blog/categories/tree-with-counts');
+  },
 };
 
 /**

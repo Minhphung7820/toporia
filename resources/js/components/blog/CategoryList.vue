@@ -8,7 +8,7 @@
     </div>
 
     <!-- Categories Tree -->
-    <ul v-else-if="categories.length > 0" class="category-tree">
+    <ul v-else-if="categories.length > 0" class="category-list">
       <CategoryItem
         v-for="category in categories"
         :key="category.id"
@@ -17,8 +17,20 @@
       />
     </ul>
 
+    <!-- View All Link -->
+    <router-link
+      v-if="!loading && categories.length > 0"
+      to="/blog/categories"
+      class="view-all-link"
+    >
+      View all categories
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 5l7 7-7 7" />
+      </svg>
+    </router-link>
+
     <!-- Empty State -->
-    <p v-else class="empty-text">No categories found</p>
+    <p v-else-if="!loading && categories.length === 0" class="empty-text">No categories found</p>
   </div>
 </template>
 
@@ -52,18 +64,47 @@ defineProps({
   margin-bottom: 16px;
 }
 
-.category-tree {
+.category-list {
   list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.view-all-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.view-all-link:hover {
+  color: #1a1a1a;
+}
+
+.view-all-link svg {
+  transition: transform 0.15s;
+}
+
+.view-all-link:hover svg {
+  transform: translateX(2px);
 }
 
 .skeleton-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .skeleton-item {
-  height: 16px;
+  height: 20px;
   background: linear-gradient(90deg, #f0f0f0 25%, #e5e5e5 50%, #f0f0f0 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
@@ -88,5 +129,7 @@ defineProps({
 .empty-text {
   color: #999;
   font-size: 14px;
+  text-align: center;
+  padding: 16px 0;
 }
 </style>

@@ -55,7 +55,9 @@ Route::post('/blog/comments/{commentId}/like', [BlogCommentController::class, 'l
 // Categories
 Route::get('/blog/categories', [BlogCategoryController::class, 'index']);
 Route::get('/blog/categories/tree', [BlogCategoryController::class, 'tree']);
+Route::get('/blog/categories/tree-with-counts', [BlogCategoryController::class, 'treeWithCounts']);
 Route::get('/blog/categories/with-counts', [BlogCategoryController::class, 'withCounts']);
+Route::get('/blog/categories/with-posts', [BlogCategoryController::class, 'withPosts']);
 Route::get('/blog/categories/{slug}', [BlogCategoryController::class, 'show']);
 Route::get('/blog/categories/{slug}/posts', [BlogPostController::class, 'byCategory']);
 

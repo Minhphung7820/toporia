@@ -119,7 +119,7 @@ final class CategoryService
      */
     public function getCategoriesWithPostCounts(): array
     {
-        $categories = $this->categoryRepository->findWithPostCounts();
+        $categories = $this->categoryRepository->findWithPostCount();
 
         return [
             'success' => true,
@@ -127,6 +127,67 @@ final class CategoryService
                 'categories' => $categories,
             ],
             'message' => 'Categories with post counts retrieved successfully',
+        ];
+    }
+
+    /**
+     * Get categories with published posts only.
+     *
+     * Returns categories that have at least one published post,
+     * sorted by post count (most posts first).
+     *
+     * @param int|null $limit Max categories to return
+     * @return array{success: bool, data?: array, message: string}
+     */
+    public function getCategoriesWithPublishedPosts(?int $limit = null): array
+    {
+        $categoriesData = $this->categoryRepository->findWithPublishedPostCount($limit);
+
+        $categories = array_map(function ($item) {
+            $categoryArray = $item['category']->toArray();
+            $categoryArray['post_count'] = $item['published_post_count'];
+            return $categoryArray;
+        }, $categoriesData);
+
+        return [
+            'success' => true,
+            'data' => [
+                'categories' => $categories,
+                'total' => count($categoriesData),
+            ],
+            'message' => 'Categories retrieved successfully',
+        ];
+    }
+
+    /**
+     * Get categories tree with published post counts.
+     *
+     * Returns hierarchical tree where each node has post_count.
+     * Only includes categories with published posts (or parents of such categories).
+     *
+     * @return array{success: bool, data?: array, message: string}
+     */
+    public function getCategoriesTreeWithCounts(): array
+    {
+        $categoriesData = $this->categoryRepository->findAllWithPublishedPostCount();
+
+        // Build lookup maps
+        $categoryMap = [];
+        $countMap = [];
+        foreach ($categoriesData as $item) {
+            $categoryMap[$item['category']->id] = $item['category'];
+            $countMap[$item['category']->id] = $item['published_post_count'];
+        }
+
+        // Build tree structure
+        $tree = $this->buildTreeWithCounts($categoryMap, $countMap);
+
+        return [
+            'success' => true,
+            'data' => [
+                'tree' => $tree,
+            ],
+            'message' => 'Categories tree retrieved successfully',
         ];
     }
 
@@ -150,5 +211,78 @@ final class CategoryService
         return array_merge($category->toArray(), [
             'children' => $childrenTree,
         ]);
+    }
+
+    /**
+     * Build tree with post counts from flat category map.
+     *
+     * @param array<int, \App\Domain\Entities\Category> $categoryMap
+     * @param array<int, int> $countMap
+     * @return array
+     */
+    private function buildTreeWithCounts(array $categoryMap, array $countMap): array
+    {
+        // Group by parent_id
+        // Categories without valid parent in map are treated as roots
+        $byParent = [];
+        foreach ($categoryMap as $id => $category) {
+            $parentId = $category->parentId;
+
+            // If parent doesn't exist in map or is circular, treat as root
+            if ($parentId === null || !isset($categoryMap[$parentId]) || $parentId === $id) {
+                $parentId = 0; // Root level
+            }
+
+            $byParent[$parentId][$id] = $category;
+        }
+
+        // Recursively build tree starting from roots (parent_id = 0)
+        return $this->buildChildrenWithCounts($byParent, $countMap, 0, []);
+    }
+
+    /**
+     * Build children array with counts recursively.
+     *
+     * @param array $byParent Categories grouped by parent_id
+     * @param array<int, int> $countMap Post counts by category_id
+     * @param int $parentId Current parent ID
+     * @param array $visited Track visited IDs to prevent infinite loops
+     * @return array
+     */
+    private function buildChildrenWithCounts(array $byParent, array $countMap, int $parentId, array $visited): array
+    {
+        $result = [];
+
+        if (!isset($byParent[$parentId])) {
+            return $result;
+        }
+
+        foreach ($byParent[$parentId] as $id => $category) {
+            // Prevent circular references
+            if (isset($visited[$id])) {
+                continue;
+            }
+
+            $newVisited = $visited;
+            $newVisited[$id] = true;
+
+            $children = $this->buildChildrenWithCounts($byParent, $countMap, $id, $newVisited);
+
+            // Calculate total count (own posts + children's posts)
+            $ownCount = $countMap[$id] ?? 0;
+            $childrenCount = array_sum(array_column($children, 'total_count'));
+            $totalCount = $ownCount + $childrenCount;
+
+            // Only include if has posts (directly or via children)
+            if ($totalCount > 0) {
+                $node = $category->toArray();
+                $node['post_count'] = $ownCount;
+                $node['total_count'] = $totalCount;
+                $node['children'] = $children;
+                $result[] = $node;
+            }
+        }
+
+        return $result;
     }
 }

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '../../stores/auth';
 
 // Lazy load admin pages for better performance
 const Dashboard = () => import('../pages/Dashboard.vue');
@@ -134,10 +135,39 @@ const router = createRouter({
   routes,
 });
 
-// Update page title on navigation
-router.beforeEach((to, from, next) => {
+// Auth check flag - prevents rendering admin UI before auth check completes
+let authChecked = false;
+
+// Navigation guard - check auth AND role BEFORE rendering any admin page
+router.beforeEach(async (to, from, next) => {
+  // Update page title
   document.title = to.meta.title ? `${to.meta.title} - Admin` : 'Admin';
+
+  const authStore = useAuthStore();
+
+  // Initialize auth if not already done
+  if (!authStore.initialized) {
+    await authStore.initialize();
+  }
+
+  authChecked = true;
+
+  // Check authentication - redirect to login
+  if (!authStore.isAuthenticated) {
+    window.location.href = `/login?redirect=${encodeURIComponent(to.fullPath)}`;
+    return;
+  }
+
+  // Check admin role (admin or editor) - redirect to 403 error page
+  if (!authStore.hasAdminAccess) {
+    window.location.href = '/error/403';
+    return;
+  }
+
   next();
 });
+
+// Export auth check status for use in components
+export const isAuthChecked = () => authChecked;
 
 export default router;

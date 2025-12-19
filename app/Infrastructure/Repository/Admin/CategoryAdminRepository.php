@@ -38,7 +38,7 @@ final class CategoryAdminRepository extends BaseRepository
                     $search = $filters['search'];
                     $query->where(function ($q) use ($search) {
                         $q->where('name', 'LIKE', "%{$search}%")
-                          ->orWhere('slug', 'LIKE', "%{$search}%");
+                            ->orWhere('slug', 'LIKE', "%{$search}%");
                     });
                 }
 

@@ -74,4 +74,30 @@ final class CategoryController extends BaseController
 
         return $this->json($result);
     }
+
+    /**
+     * Get categories with published posts only.
+     *
+     * GET /api/blog/categories/with-posts
+     */
+    public function withPosts(Request $request): JsonResponseInterface
+    {
+        $limit = $request->query('limit') ? (int) $request->query('limit') : null;
+
+        $result = $this->categoryService->getCategoriesWithPublishedPosts($limit);
+
+        return $this->json($result);
+    }
+
+    /**
+     * Get categories tree with published post counts.
+     *
+     * GET /api/blog/categories/tree-with-counts
+     */
+    public function treeWithCounts(): JsonResponseInterface
+    {
+        $result = $this->categoryService->getCategoriesTreeWithCounts();
+
+        return $this->json($result);
+    }
 }

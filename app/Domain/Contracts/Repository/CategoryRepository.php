@@ -136,4 +136,20 @@ interface CategoryRepository
      * @return void
      */
     public function updateSortOrder(int $categoryId, int $sortOrder): void;
+
+    /**
+     * Find categories with published post count (only categories with posts > 0).
+     *
+     * @param int|null $limit Max categories to return (null = all)
+     * @return array<int, array{category: Category, published_post_count: int}> Categories with published counts
+     */
+    public function findWithPublishedPostCount(?int $limit = null): array;
+
+    /**
+     * Get all active categories with their published post counts.
+     * Returns flat array with all categories (for building tree in service layer).
+     *
+     * @return array<int, array{category: Category, published_post_count: int}> All categories with counts
+     */
+    public function findAllWithPublishedPostCount(): array;
 }

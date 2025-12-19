@@ -56,6 +56,16 @@ class CategoryModel extends Model
     }
 
     /**
+     * Published posts in this category.
+     */
+    public function publishedPosts()
+    {
+        return $this->hasMany(PostModel::class, 'category_id')
+            ->where('is_published', true)
+            ->where('published_at', '<=', date('Y-m-d H:i:s'));
+    }
+
+    /**
      * Posts in this category (many-to-many via pivot).
      */
     public function allPosts()

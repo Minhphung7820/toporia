@@ -366,6 +366,47 @@ export const useBlogStore = defineStore('blog', {
     },
 
     /**
+     * Fetch categories with published posts only
+     */
+    async fetchCategoriesWithPosts(limit = null) {
+      this.loading.categories = true;
+
+      try {
+        const response = await categories.withPosts(limit);
+        const data = response.data;
+
+        if (data.success) {
+          this.categoriesTree = data.data.categories;
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories with posts:', error);
+      } finally {
+        this.loading.categories = false;
+      }
+    },
+
+    /**
+     * Fetch categories tree with published post counts
+     * Returns hierarchical tree with post_count and total_count
+     */
+    async fetchCategoriesTreeWithCounts() {
+      this.loading.categories = true;
+
+      try {
+        const response = await categories.treeWithCounts();
+        const data = response.data;
+
+        if (data.success) {
+          this.categoriesTree = data.data.tree;
+        }
+      } catch (error) {
+        console.error('Failed to fetch categories tree with counts:', error);
+      } finally {
+        this.loading.categories = false;
+      }
+    },
+
+    /**
      * Fetch all tags
      */
     async fetchTags() {

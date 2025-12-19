@@ -7,6 +7,7 @@ namespace App\Infrastructure\Repository;
 use App\Domain\Contracts\Repository\CategoryRepository;
 use App\Domain\Entities\Category;
 use App\Infrastructure\Persistence\Models\CategoryModel;
+use Toporia\Framework\Support\Accessors\QueryBuilder;
 
 /**
  * PDO Category Repository Implementation
@@ -223,9 +224,91 @@ final class PdoCategoryRepository implements CategoryRepository
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function findWithPublishedPostCount(?int $limit = null): array
+    {
+        // Step 1: Get distinct category_ids that have published posts
+        // This is fast because it uses idx_posts_category and idx_posts_published_id indexes
+        $limitClause = $limit !== null ? "LIMIT {$limit}" : '';
+
+        $categoryIds = QueryBuilder::getConnection()->select("
+            SELECT DISTINCT category_id
+            FROM posts
+            WHERE is_published = 1
+              AND published_at <= NOW()
+              AND category_id IS NOT NULL
+            {$limitClause}
+        ");
+
+        if (empty($categoryIds)) {
+            return [];
+        }
+
+        // Extract IDs
+        $ids = array_column($categoryIds, 'category_id');
+
+        // Step 2: Get categories by IDs (very fast, uses PRIMARY key)
+        $models = CategoryModel::query()
+            ->where('is_active', true)
+            ->whereIn('id', $ids)
+            ->orderBy('sort_order', 'asc')
+            ->get();
+
+        $result = [];
+        foreach ($models as $model) {
+            $result[] = [
+                'category' => $this->toDomain($model),
+                'published_post_count' => 0,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function findAllWithPublishedPostCount(): array
+    {
+        // Step 1: Get published post counts per category (fast with index)
+        $counts = QueryBuilder::getConnection()->select("
+            SELECT category_id, COUNT(*) as post_count
+            FROM posts
+            WHERE is_published = 1
+              AND published_at <= NOW()
+              AND category_id IS NOT NULL
+            GROUP BY category_id
+        ");
+
+        // Build count map
+        $countMap = [];
+        foreach ($counts as $row) {
+            $countMap[(int) $row['category_id']] = (int) $row['post_count'];
+        }
+
+        // Step 2: Get all active categories
+        $models = CategoryModel::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('name', 'asc')
+            ->get();
+
+        $result = [];
+        foreach ($models as $model) {
+            $result[] = [
+                'category' => $this->toDomain($model),
+                'published_post_count' => $countMap[$model->id] ?? 0,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Map database model to domain entity.
      */
-    private function toDomain(CategoryModel $model): Category
+    private function toDomain(object $model): Category
     {
         return new Category(
             id: $model->id,

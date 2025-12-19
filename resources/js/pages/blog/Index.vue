@@ -196,7 +196,7 @@ onMounted(async () => {
     blogStore.fetchPosts(cursor, direction, 10),
     blogStore.fetchFeaturedPosts(4),
     blogStore.fetchPopularPosts(5),
-    blogStore.fetchCategoriesTree(),
+    blogStore.fetchCategoriesTreeWithCounts(), // Hierarchical tree with post counts
     blogStore.fetchTagCloud(30),
   ]);
 });

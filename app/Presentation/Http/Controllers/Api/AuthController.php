@@ -53,11 +53,7 @@ final class AuthController extends BaseController
             return $this->json([
                 'success' => true,
                 'message' => $result['message'],
-                'user' => [
-                    'id' => $result['user']->getAuthIdentifier(),
-                    'email' => $result['user']->email,
-                    'name' => $result['user']->name,
-                ]
+                'user' => $this->formatUserResponse($result['user'])
             ], 201);
         }
 
@@ -82,11 +78,7 @@ final class AuthController extends BaseController
             return $this->json([
                 'success' => true,
                 'message' => $result['message'],
-                'user' => [
-                    'id' => $result['user']->getAuthIdentifier(),
-                    'email' => $result['user']->email,
-                    'name' => $result['user']->name,
-                ]
+                'user' => $this->formatUserResponse($result['user'])
             ], 200);
         }
 
@@ -114,11 +106,7 @@ final class AuthController extends BaseController
 
         return $this->json([
             'success' => true,
-            'user' => [
-                'id' => $user->getAuthIdentifier(),
-                'email' => $user->email,
-                'name' => $user->name,
-            ]
+            'user' => $this->formatUserResponse($user)
         ]);
     }
 
@@ -219,5 +207,28 @@ final class AuthController extends BaseController
 
         $statusCode = $result['success'] ? 200 : 422;
         return $this->json($result, $statusCode);
+    }
+
+    /**
+     * Format user data for API response.
+     *
+     * Returns essential user info including role and avatar for FE auth checks.
+     *
+     * @param mixed $user User entity
+     * @return array<string, mixed>
+     */
+    private function formatUserResponse(mixed $user): array
+    {
+        return [
+            'id' => $user->getAuthIdentifier(),
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'avatar' => $user->avatar,
+            'bio' => $user->bio,
+            'website' => $user->website,
+            'email_verified_at' => $user->emailVerifiedAt?->format('Y-m-d H:i:s'),
+            'created_at' => $user->createdAt?->format('Y-m-d H:i:s'),
+        ];
     }
 }

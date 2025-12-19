@@ -10,6 +10,7 @@ import ChangePassword from '../pages/ChangePassword.vue';
 // Blog pages
 import BlogIndex from '../pages/blog/Index.vue';
 import BlogPost from '../pages/blog/Show.vue';
+import BlogCategories from '../pages/blog/Categories.vue';
 import BlogCategory from '../pages/blog/Category.vue';
 import BlogTag from '../pages/blog/Tag.vue';
 import BlogSearch from '../pages/blog/Search.vue';
@@ -73,6 +74,11 @@ const routes = [
         path: '/blog/search',
         name: 'blog-search',
         component: BlogSearch,
+    },
+    {
+        path: '/blog/categories',
+        name: 'blog-categories',
+        component: BlogCategories,
     },
     {
         path: '/blog/category/:slug',

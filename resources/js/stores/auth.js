@@ -24,6 +24,35 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
+     * Check if user has admin access (admin or editor role)
+     */
+    hasAdminAccess: (state) => {
+      const adminRoles = ['admin', 'editor'];
+      return state.user !== null && adminRoles.includes(state.user.role);
+    },
+
+    /**
+     * Check if user is admin
+     */
+    isAdmin: (state) => {
+      return state.user?.role === 'admin';
+    },
+
+    /**
+     * Check if user is editor
+     */
+    isEditor: (state) => {
+      return state.user?.role === 'editor';
+    },
+
+    /**
+     * Get user role
+     */
+    userRole: (state) => {
+      return state.user?.role || null;
+    },
+
+    /**
      * Get user name
      */
     userName: (state) => {
