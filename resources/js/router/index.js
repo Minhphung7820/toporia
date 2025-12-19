@@ -129,7 +129,8 @@ const router = createRouter({
 // Navigation guard
 router.beforeEach(async (to, from, next) => {
     // Skip Vue Router for backend routes (let server handle them)
-    const backendPaths = ['/api/', '/auth/socialite/'];
+    // /admin is a separate SPA served by the backend
+    const backendPaths = ['/api/', '/auth/socialite/', '/admin'];
     const isBackendRoute = backendPaths.some(path => to.path.startsWith(path));
 
     if (isBackendRoute) {
@@ -142,7 +143,7 @@ router.beforeEach(async (to, from, next) => {
         }
 
         // For navigation from another page, do full page load
-        window.location.replace(to.fullPath);
+        window.location.href = to.fullPath;
         return;
     }
 
