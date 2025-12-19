@@ -55,6 +55,12 @@ export const useBlogStore = defineStore('blog', {
 
     // Search
     searchQuery: '',
+    searchPagination: {
+      nextCursor: null,
+      prevCursor: null,
+      hasMore: false,
+      total: 0,
+    },
   }),
 
   getters: {
@@ -222,11 +228,17 @@ export const useBlogStore = defineStore('blog', {
     },
 
     /**
-     * Search posts
+     * Search posts with cursor pagination
      */
-    async searchPosts(query, page = 1, perPage = 10) {
+    async searchPosts(query, perPage = 10, cursor = null, direction = 'next') {
       if (!query || query.trim().length < 2) {
         this.searchResults = [];
+        this.searchPagination = {
+          nextCursor: null,
+          prevCursor: null,
+          hasMore: false,
+          total: 0,
+        };
         return;
       }
 
@@ -235,11 +247,17 @@ export const useBlogStore = defineStore('blog', {
       this.error = null;
 
       try {
-        const response = await posts.search(query, page, perPage);
+        const response = await posts.search(query, perPage, cursor, direction);
         const data = response.data;
 
         if (data.success) {
           this.searchResults = data.data.posts;
+          this.searchPagination = {
+            nextCursor: data.data.pagination.next_cursor,
+            prevCursor: data.data.pagination.prev_cursor,
+            hasMore: data.data.pagination.has_more,
+            total: data.data.pagination.total,
+          };
         }
       } catch (error) {
         this.error = error.response?.data?.message || 'Search failed';

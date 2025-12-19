@@ -662,6 +662,90 @@ final class PdoPostRepository implements PostRepository
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function searchWithCursor(string $query, int $limit = 10, ?string $cursor = null, string $direction = 'next'): array
+    {
+        $searchTerm = '%' . $query . '%';
+        $cursorData = $cursor ? $this->decodeCursor($cursor) : null;
+
+        // Count total results
+        $countParams = [$searchTerm, $searchTerm, $searchTerm, date('Y-m-d H:i:s')];
+        $countResult = QueryBuilder::getConnection()->selectOne("
+            SELECT COUNT(*) as total
+            FROM posts
+            WHERE is_published = 1
+              AND published_at <= ?
+              AND (title LIKE ? OR content LIKE ? OR excerpt LIKE ?)
+        ", [date('Y-m-d H:i:s'), $searchTerm, $searchTerm, $searchTerm]);
+        $total = (int) ($countResult['total'] ?? 0);
+
+        // Build cursor condition
+        $params = [date('Y-m-d H:i:s'), $searchTerm, $searchTerm, $searchTerm];
+        $whereClause = 'WHERE is_published = 1 AND published_at <= ? AND (title LIKE ? OR content LIKE ? OR excerpt LIKE ?)';
+
+        if ($cursorData && $direction === 'next') {
+            $whereClause .= ' AND (published_at < ? OR (published_at = ? AND id < ?))';
+            $params[] = $cursorData['published_at'];
+            $params[] = $cursorData['published_at'];
+            $params[] = $cursorData['id'];
+        } elseif ($cursorData && $direction === 'prev') {
+            $whereClause .= ' AND (published_at > ? OR (published_at = ? AND id > ?))';
+            $params[] = $cursorData['published_at'];
+            $params[] = $cursorData['published_at'];
+            $params[] = $cursorData['id'];
+        }
+
+        $fetchLimit = $limit + 1;
+        $orderBy = $direction === 'prev' ? 'ASC' : 'DESC';
+
+        $rows = QueryBuilder::getConnection()->select("
+            SELECT id, title, slug, excerpt, featured_image, views, published_at,
+                   reading_time, is_featured, author_id, category_id,
+                   meta_title, meta_description, meta_keywords, scheduled_at,
+                   created_at, updated_at, content, is_published
+            FROM posts
+            {$whereClause}
+            ORDER BY published_at {$orderBy}, id {$orderBy}
+            LIMIT ?
+        ", [...$params, $fetchLimit]);
+
+        if ($direction === 'prev') {
+            $rows = array_reverse($rows);
+        }
+
+        $hasMore = count($rows) > $limit;
+        if ($hasMore) {
+            array_pop($rows);
+        }
+
+        $posts = array_map(fn($row) => $this->rowToDomain($row), $rows);
+
+        $nextCursor = null;
+        $prevCursor = null;
+
+        if (!empty($rows)) {
+            $firstPost = $rows[0];
+            $lastPost = $rows[count($rows) - 1];
+
+            if ($hasMore) {
+                $nextCursor = $this->encodeCursor($lastPost['published_at'], (int)$lastPost['id']);
+            }
+            if ($cursorData) {
+                $prevCursor = $this->encodeCursor($firstPost['published_at'], (int)$firstPost['id']);
+            }
+        }
+
+        return [
+            'posts' => $posts,
+            'next_cursor' => $nextCursor,
+            'prev_cursor' => $prevCursor,
+            'has_more' => $hasMore,
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Map database model to domain entity.
      */
     private function toDomain(PostModel $model): Post

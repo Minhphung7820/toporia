@@ -243,14 +243,15 @@ final class PostService
     }
 
     /**
-     * Search posts.
+     * Search posts with cursor pagination.
      *
      * @param string $query Search query
-     * @param int $page Page number
      * @param int $perPage Posts per page
+     * @param string|null $cursor Cursor for pagination
+     * @param string $direction 'next' or 'prev'
      * @return array{success: bool, data?: array, message: string}
      */
-    public function searchPosts(string $query, int $page = 1, int $perPage = 10): array
+    public function searchPosts(string $query, int $perPage = 10, ?string $cursor = null, string $direction = 'next'): array
     {
         if (strlen(trim($query)) < 2) {
             return [
@@ -259,14 +260,20 @@ final class PostService
             ];
         }
 
-        $offset = ($page - 1) * $perPage;
-        $posts = $this->postRepository->search($query, $perPage, $offset);
+        $result = $this->postRepository->searchWithCursor($query, $perPage, $cursor, $direction);
 
         return [
             'success' => true,
             'data' => [
                 'query' => $query,
-                'posts' => array_map(fn($post) => $post->toArray(), $posts),
+                'posts' => array_map(fn($post) => $post->toArray(), $result['posts']),
+                'pagination' => [
+                    'next_cursor' => $result['next_cursor'],
+                    'prev_cursor' => $result['prev_cursor'],
+                    'has_more' => $result['has_more'],
+                    'per_page' => $perPage,
+                    'total' => $result['total'],
+                ],
             ],
             'message' => 'Search completed successfully',
         ];

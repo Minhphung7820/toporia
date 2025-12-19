@@ -237,4 +237,15 @@ interface PostRepository
      * @return array{posts: Post[], next_cursor: string|null, prev_cursor: string|null, has_more: bool}
      */
     public function findByTagWithCursor(int $tagId, int $limit = 10, ?string $cursor = null, string $direction = 'next'): array;
+
+    /**
+     * Search posts with cursor pagination.
+     *
+     * @param string $query Search query
+     * @param int $limit Number of posts per page
+     * @param string|null $cursor Cursor for pagination
+     * @param string $direction 'next' or 'prev'
+     * @return array{posts: Post[], next_cursor: string|null, prev_cursor: string|null, has_more: bool, total: int}
+     */
+    public function searchWithCursor(string $query, int $limit = 10, ?string $cursor = null, string $direction = 'next'): array;
 }

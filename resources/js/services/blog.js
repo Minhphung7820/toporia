@@ -67,13 +67,19 @@ export const posts = {
   },
 
   /**
-   * Search posts
+   * Search posts with cursor pagination
    * @param {string} query - Search query
-   * @param {number} page - Page number
    * @param {number} perPage - Items per page
+   * @param {string|null} cursor - Cursor for pagination
+   * @param {string} direction - 'next' or 'prev'
    */
-  search(query, page = 1, perPage = 10) {
-    return http.get('/blog/search', { params: { q: query, page, per_page: perPage } });
+  search(query, perPage = 10, cursor = null, direction = 'next') {
+    const params = { q: query, per_page: perPage };
+    if (cursor) {
+      params.cursor = cursor;
+      params.direction = direction;
+    }
+    return http.get('/blog/search', { params });
   },
 
   /**

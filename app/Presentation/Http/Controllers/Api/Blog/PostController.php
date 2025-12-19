@@ -152,17 +152,18 @@ final class PostController extends BaseController
     }
 
     /**
-     * Search posts.
+     * Search posts with cursor pagination.
      *
      * GET /api/blog/search
      */
     public function search(Request $request): JsonResponseInterface
     {
         $query = $request->query('q', '');
-        $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 10), 50);
+        $cursor = $request->query('cursor');
+        $direction = $request->query('direction', 'next');
 
-        $result = $this->postService->searchPosts($query, $page, $perPage);
+        $result = $this->postService->searchPosts($query, $perPage, $cursor, $direction);
 
         if (!$result['success']) {
             return $this->json($result, 400);
