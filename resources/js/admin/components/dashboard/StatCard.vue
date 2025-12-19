@@ -84,6 +84,9 @@ const formatValue = (val) => {
   padding: 20px 24px;
   border: 1px solid #e2e8f0;
   transition: all 0.2s ease;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .stat-card:hover {
@@ -187,6 +190,61 @@ const formatValue = (val) => {
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .stat-card {
+    padding: 16px 18px;
+    border-radius: 12px;
+  }
+
+  .stat-header {
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+
+  .stat-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .stat-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .stat-title {
+    font-size: 11px;
+  }
+
+  .stat-value {
+    font-size: 24px;
+  }
+
+  .stat-change {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+
+  .stat-change svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-card {
+    padding: 14px 16px;
+  }
+
+  .stat-header {
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-size: 22px;
   }
 }
 </style>

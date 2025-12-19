@@ -406,4 +406,140 @@ onMounted(() => {
   display: flex;
   gap: 8px;
 }
+
+@media (max-width: 768px) {
+  .comments-pending {
+    max-width: 100%;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .page-header h1 {
+    font-size: 20px;
+  }
+
+  .page-header .btn {
+    text-align: center;
+    justify-content: center;
+  }
+
+  .bulk-actions-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .bulk-actions-bar span {
+    width: 100%;
+    margin-bottom: 4px;
+  }
+
+  .comment-card {
+    padding: 16px;
+  }
+
+  .comment-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .author-info {
+    width: calc(100% - 30px);
+  }
+
+  .comment-meta {
+    width: 100%;
+    text-align: left;
+    display: flex;
+    gap: 8px;
+  }
+
+  .comment-date {
+    display: inline;
+  }
+
+  .comment-body {
+    padding: 12px;
+  }
+
+  .comment-actions {
+    flex-wrap: wrap;
+  }
+
+  .comment-actions .btn {
+    flex: 1;
+    min-width: 80px;
+    justify-content: center;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .page-header h1 {
+    font-size: 18px;
+  }
+
+  .bulk-actions-bar {
+    padding: 10px 12px;
+  }
+
+  .btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .comment-card {
+    padding: 14px;
+  }
+
+  .author-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .author-name {
+    font-size: 14px;
+  }
+
+  .author-email {
+    font-size: 12px;
+  }
+
+  .comment-meta {
+    font-size: 12px;
+  }
+
+  .comment-body {
+    padding: 10px;
+  }
+
+  .comment-body p {
+    font-size: 14px;
+  }
+
+  .comment-actions {
+    gap: 6px;
+  }
+
+  .comment-actions .btn {
+    padding: 8px 10px;
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .comment-actions .btn svg {
+    width: 14px;
+    height: 14px;
+  }
+}
 </style>

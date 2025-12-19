@@ -331,6 +331,8 @@ onMounted(() => {
 <style scoped>
 .dashboard {
   width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 /* Page Header */
@@ -386,6 +388,7 @@ onMounted(() => {
   grid-template-columns: repeat(4, 1fr);
   gap: 20px;
   margin-bottom: 28px;
+  max-width: 100%;
 }
 
 /* Main Grid Layout */
@@ -394,18 +397,21 @@ onMounted(() => {
   grid-template-columns: 1fr 380px;
   gap: 24px;
   margin-bottom: 24px;
+  max-width: 100%;
 }
 
 .main-column {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0;
 }
 
 .side-column {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0;
 }
 
 /* Card Styles */
@@ -413,6 +419,8 @@ onMounted(() => {
   background: #fff;
   border-radius: 16px;
   border: 1px solid #e2e8f0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .card-header {
@@ -432,6 +440,8 @@ onMounted(() => {
 
 .card-body {
   padding: 18px 22px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .view-all {
@@ -809,18 +819,28 @@ onMounted(() => {
   .page-header {
     flex-direction: row;
     align-items: center;
+    gap: 12px;
+  }
+
+  .header-content {
+    min-width: 0;
+    flex: 1;
   }
 
   .header-content h1 {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .header-content p {
     display: none;
   }
 
+  .header-actions {
+    flex-shrink: 0;
+  }
+
   .btn-primary {
-    padding: 8px 14px;
+    padding: 8px 12px;
     font-size: 13px;
     gap: 6px;
   }
@@ -848,14 +868,79 @@ onMounted(() => {
     padding: 14px 16px;
   }
 
+  .card-header h2 {
+    font-size: 14px;
+  }
+
   .action-card {
     padding: 14px 16px;
+  }
+
+  .period-selector {
+    padding: 2px;
+  }
+
+  .period-selector button {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .post-item {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .post-rank {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .post-title {
+    font-size: 13px;
+  }
+
+  .post-views {
+    font-size: 12px;
   }
 }
 
 @media (max-width: 480px) {
+  .page-header {
+    margin-bottom: 20px;
+  }
+
   .stats-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .main-grid {
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .main-column,
+  .side-column {
+    gap: 16px;
+  }
+
+  .card {
+    border-radius: 12px;
+  }
+
+  .card-header,
+  .card-body {
+    padding: 12px 14px;
+  }
+
+  .btn-primary span {
+    display: none;
+  }
+
+  .btn-primary {
+    padding: 10px;
   }
 }
 </style>

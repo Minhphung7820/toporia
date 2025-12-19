@@ -626,26 +626,119 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .page-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .page-header > div {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .page-header h1 {
+    font-size: 18px;
+  }
+
+  .page-header p {
+    display: none;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
   .filters-bar {
     flex-direction: column;
+    gap: 10px;
   }
 
   .search-input {
     max-width: none;
   }
 
+  .filters-bar select {
+    width: 100%;
+  }
+
   .table-container {
     overflow-x: auto;
+    border-radius: 10px;
   }
 
   .data-table {
-    min-width: 800px;
+    min-width: 700px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 10px 12px;
+    font-size: 13px;
   }
 
   .cursor-pagination {
     flex-direction: column;
     gap: 12px;
     text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header {
+    margin-bottom: 16px;
+  }
+
+  .btn span {
+    display: none;
+  }
+
+  .btn {
+    padding: 10px;
+  }
+
+  .filters-bar {
+    margin-bottom: 16px;
+  }
+
+  .data-table {
+    min-width: 600px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .post-title-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .badge {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .actions {
+    gap: 2px;
+  }
+
+  .btn-icon {
+    padding: 4px;
+  }
+
+  .btn-icon svg {
+    width: 14px;
+    height: 14px;
   }
 }
 </style>

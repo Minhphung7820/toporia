@@ -124,6 +124,7 @@ const removeImage = () => {
 <style scoped>
 .image-upload {
   width: 100%;
+  max-width: 100%;
 }
 
 .image-preview {

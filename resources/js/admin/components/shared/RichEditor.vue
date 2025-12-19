@@ -119,10 +119,16 @@ watch(
 .rich-editor {
   border-radius: 8px;
   overflow: hidden;
+  max-width: 100%;
 }
 
 .rich-editor .ck.ck-editor {
   width: 100%;
+  max-width: 100%;
+}
+
+.rich-editor .ck.ck-editor__top {
+  max-width: 100%;
 }
 
 .rich-editor .ck.ck-editor__main > .ck-editor__editable {
@@ -139,6 +145,11 @@ watch(
   background: #f9fafb;
   border-color: #e5e7eb;
   border-radius: 8px 8px 0 0;
+  flex-wrap: wrap;
+}
+
+.rich-editor .ck.ck-toolbar__items {
+  flex-wrap: wrap !important;
 }
 
 .rich-editor .ck.ck-button {

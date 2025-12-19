@@ -125,6 +125,13 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .admin-content {
     padding: 16px;
+    margin-top: 56px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-content {
+    padding: 12px;
   }
 }
 </style>

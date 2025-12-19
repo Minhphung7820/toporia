@@ -162,4 +162,23 @@ onMounted(async () => {
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-secondary { background: #f3f4f6; color: #374151; }
 .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; }
+
+@media (max-width: 768px) {
+  .user-form { max-width: 100%; }
+  .page-header h1 { font-size: 20px; }
+  .form-container { padding: 16px; border-radius: 10px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group input, .form-group select { padding: 12px; font-size: 16px; }
+  .form-actions { flex-direction: column-reverse; gap: 10px; }
+  .form-actions .btn { width: 100%; justify-content: center; padding: 12px 16px; }
+}
+
+@media (max-width: 480px) {
+  .page-header { margin-bottom: 16px; }
+  .page-header h1 { font-size: 18px; }
+  .page-header p { font-size: 13px; }
+  .form-container { padding: 14px; }
+  .form-group label { font-size: 13px; }
+  .hint { font-size: 11px; }
+}
 </style>

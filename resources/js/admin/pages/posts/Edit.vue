@@ -335,6 +335,8 @@ onMounted(async () => {
 <style scoped>
 .post-edit {
   max-width: 1400px;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .loading-state {
@@ -458,6 +460,7 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 24px;
+  max-width: 100%;
 }
 
 .form-main {
@@ -465,6 +468,9 @@ onMounted(async () => {
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .form-group {
@@ -487,11 +493,13 @@ onMounted(async () => {
 .form-group textarea,
 .form-group select {
   width: 100%;
+  max-width: 100%;
   padding: 10px 12px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-size: 14px;
   transition: border-color 0.2s ease;
+  box-sizing: border-box;
 }
 
 .form-group input:focus,
@@ -505,6 +513,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .sidebar-section {
@@ -634,6 +644,123 @@ onMounted(async () => {
 @media (max-width: 1024px) {
   .form-layout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .page-header > div:first-child {
+    width: 100%;
+  }
+
+  .page-header h1 {
+    font-size: 20px;
+  }
+
+  .page-header p {
+    max-width: 100%;
+    font-size: 13px;
+  }
+
+  .header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .header-actions .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .header-actions .btn-link {
+    padding: 8px 10px;
+  }
+
+  .form-main {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .sidebar-section {
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .sidebar-section h3 {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+
+  .status-section .stats {
+    gap: 12px;
+  }
+
+  .stat {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header {
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .page-header h1 {
+    font-size: 18px;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .header-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .header-actions .btn-link {
+    width: auto;
+    margin-right: auto;
+  }
+
+  .form-main {
+    padding: 14px;
+  }
+
+  .form-group label {
+    font-size: 13px;
+  }
+
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .form-sidebar {
+    gap: 12px;
+  }
+
+  .sidebar-section {
+    padding: 12px;
+  }
+
+  .btn-danger {
+    padding: 10px 16px;
+    font-size: 13px;
   }
 }
 </style>

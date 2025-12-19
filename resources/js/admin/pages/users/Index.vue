@@ -276,4 +276,43 @@ onMounted(() => {
 .btn-icon { padding: 6px; background: transparent; border: none; border-radius: 6px; color: #6b7280; cursor: pointer; text-decoration: none; display: inline-flex; }
 .btn-icon:hover { background: #f3f4f6; color: #1f2937; }
 .btn-icon.text-red:hover { color: #ef4444; }
+
+@media (max-width: 768px) {
+  .page-header { flex-direction: row; align-items: center; gap: 12px; }
+  .page-header > div { min-width: 0; flex: 1; }
+  .page-header h1 { font-size: 18px; }
+  .page-header p { display: none; }
+  .btn { padding: 8px 12px; font-size: 13px; }
+  .btn svg { width: 16px; height: 16px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .stat-item { padding: 12px; }
+  .stat-value { font-size: 20px; }
+  .stat-label { font-size: 11px; }
+  .filters-bar { flex-direction: column; gap: 10px; }
+  .search-input { max-width: none; }
+  .filters-bar select { width: 100%; }
+  .table-container { overflow-x: auto; border-radius: 10px; }
+  .data-table { min-width: 600px; }
+  .data-table th, .data-table td { padding: 10px 12px; font-size: 13px; }
+  .user-avatar { width: 32px; height: 32px; font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  .page-header { margin-bottom: 16px; }
+  .btn span { display: none; }
+  .btn { padding: 10px; }
+  .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .stat-item { padding: 10px; }
+  .stat-value { font-size: 18px; }
+  .filters-bar { margin-bottom: 16px; }
+  .data-table { min-width: 550px; }
+  .data-table th, .data-table td { padding: 8px 10px; font-size: 12px; }
+  .user-cell { gap: 8px; }
+  .user-avatar { width: 28px; height: 28px; font-size: 10px; }
+  .user-name { font-size: 13px; }
+  .role-select { padding: 3px 6px; font-size: 11px; }
+  .badge { padding: 2px 6px; font-size: 10px; }
+  .btn-icon { padding: 4px; }
+  .btn-icon svg { width: 14px; height: 14px; }
+}
 </style>

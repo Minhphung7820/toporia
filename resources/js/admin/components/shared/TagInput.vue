@@ -67,6 +67,7 @@ const handleBackspace = () => {
 <style scoped>
 .tag-input {
   width: 100%;
+  max-width: 100%;
 }
 
 .tags-container {
@@ -79,6 +80,8 @@ const handleBackspace = () => {
   background: #fff;
   min-height: 42px;
   cursor: text;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .tags-container:focus-within {

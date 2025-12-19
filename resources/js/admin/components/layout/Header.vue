@@ -422,8 +422,24 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .admin-header {
-    height: 64px;
-    padding: 0 16px;
+    height: 56px;
+    padding: 0 12px;
+  }
+
+  .header-left {
+    gap: 8px;
+  }
+
+  .menu-toggle {
+    padding: 8px;
+  }
+
+  .header-right {
+    gap: 2px;
+  }
+
+  .header-btn {
+    padding: 8px;
   }
 
   .user-name {
@@ -433,11 +449,41 @@ onUnmounted(() => {
   .user-btn {
     padding: 4px;
     border: none;
+    gap: 0;
+  }
+
+  .user-btn svg {
+    display: none;
   }
 
   .user-avatar {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .user-dropdown {
+    right: -8px;
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-header {
+    padding: 0 8px;
+  }
+
+  .header-btn {
+    padding: 6px;
+  }
+
+  .menu-toggle {
+    padding: 6px;
+  }
+
+  .menu-toggle svg {
+    width: 20px;
+    height: 20px;
   }
 }
 </style>

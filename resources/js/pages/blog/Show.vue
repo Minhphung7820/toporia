@@ -156,11 +156,7 @@
               </div>
 
               <!-- Comments Section -->
-              <section id="comments" class="comments-section">
-                <h2 class="comments-title">
-                  Comments
-                  <span class="comments-count">({{ commentsCount }})</span>
-                </h2>
+              <section id="comments">
                 <CommentList :post-id="post.id" />
               </section>
             </div>
@@ -230,7 +226,6 @@ const post = computed(() => blogStore.currentPost);
 const relatedPosts = computed(() => blogStore.relatedPosts);
 const loading = computed(() => blogStore.loading);
 const error = computed(() => blogStore.error);
-const commentsCount = computed(() => commentsStore.commentsCount);
 
 // Methods
 const truncateTitle = (title) => {
@@ -761,26 +756,6 @@ onUnmounted(() => {
   border-radius: 4px;
   font-size: 12px;
   white-space: nowrap;
-}
-
-/* Comments Section */
-.comments-section {
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  padding: 32px;
-}
-
-.comments-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin-bottom: 24px;
-}
-
-.comments-count {
-  color: #999;
-  font-weight: 500;
 }
 
 /* Sidebar */

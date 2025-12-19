@@ -117,21 +117,24 @@ final class PostAdminService
         $wordCount = str_word_count(strip_tags($content));
         $readingTime = max(1, (int) ceil($wordCount / 200));
 
+        // Convert empty strings to null for nullable fields
+        $categoryId = !empty($data['category_id']) ? (int) $data['category_id'] : null;
+
         $post = $this->postRepository->create([
             'title' => $data['title'],
             'slug' => $slug,
             'content' => $content,
-            'excerpt' => $data['excerpt'] ?? null,
-            'featured_image' => $data['featured_image'] ?? null,
+            'excerpt' => $data['excerpt'] ?: null,
+            'featured_image' => $data['featured_image'] ?: null,
             'views' => 0,
             'reading_time' => $readingTime,
             'is_published' => false,
             'is_featured' => $data['is_featured'] ?? false,
             'author_id' => $authorId,
-            'category_id' => $data['category_id'] ?? null,
-            'meta_title' => $data['meta_title'] ?? null,
-            'meta_description' => $data['meta_description'] ?? null,
-            'meta_keywords' => $data['meta_keywords'] ?? null,
+            'category_id' => $categoryId,
+            'meta_title' => $data['meta_title'] ?: null,
+            'meta_description' => $data['meta_description'] ?: null,
+            'meta_keywords' => $data['meta_keywords'] ?: null,
         ]);
 
         // Sync tags
@@ -185,18 +188,24 @@ final class PostAdminService
         $wordCount = str_word_count(strip_tags($content ?? ''));
         $readingTime = max(1, (int) ceil($wordCount / 200));
 
+        // Convert empty strings to null for nullable fields
+        // Use array_key_exists to distinguish between "not provided" and "provided as empty"
+        $categoryId = array_key_exists('category_id', $data)
+            ? (!empty($data['category_id']) ? (int) $data['category_id'] : null)
+            : $post->category_id;
+
         $updatedPost = $this->postRepository->update($postId, [
             'title' => $data['title'],
             'slug' => $slug,
             'content' => $content,
-            'excerpt' => $data['excerpt'] ?? $post->excerpt,
-            'featured_image' => $data['featured_image'] ?? $post->featured_image,
+            'excerpt' => array_key_exists('excerpt', $data) ? ($data['excerpt'] ?: null) : $post->excerpt,
+            'featured_image' => array_key_exists('featured_image', $data) ? ($data['featured_image'] ?: null) : $post->featured_image,
             'reading_time' => $readingTime,
             'is_featured' => $data['is_featured'] ?? $post->is_featured,
-            'category_id' => $data['category_id'] ?? $post->category_id,
-            'meta_title' => $data['meta_title'] ?? $post->meta_title,
-            'meta_description' => $data['meta_description'] ?? $post->meta_description,
-            'meta_keywords' => $data['meta_keywords'] ?? $post->meta_keywords,
+            'category_id' => $categoryId,
+            'meta_title' => array_key_exists('meta_title', $data) ? ($data['meta_title'] ?: null) : $post->meta_title,
+            'meta_description' => array_key_exists('meta_description', $data) ? ($data['meta_description'] ?: null) : $post->meta_description,
+            'meta_keywords' => array_key_exists('meta_keywords', $data) ? ($data['meta_keywords'] ?: null) : $post->meta_keywords,
         ]);
 
         // Sync tags

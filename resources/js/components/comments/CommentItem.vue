@@ -457,35 +457,45 @@ onUnmounted(() => {
 .replies-container {
   margin-left: 52px;
   padding-left: 0;
-  margin-top: 12px;
+  margin-top: 16px;
   position: relative;
+}
+
+/* Reply items positioning */
+.comment-item.is-reply {
+  position: relative;
+  margin-top: 16px;
+}
+
+.comment-item.is-reply:first-child {
+  margin-top: 0;
 }
 
 /* Thread connector - L-shaped line for each reply */
 .thread-connector {
   position: absolute;
   left: -32px;
-  top: 0;
+  top: -16px;
   width: 20px;
-  height: 20px;
-  border-bottom: 1px solid #e0e0e0;
-  border-left: 1px solid #e0e0e0;
-  border-bottom-left-radius: 10px;
+  height: 36px;
+  border-left: 2px solid #e0e0e0;
+  border-bottom: 2px solid #e0e0e0;
+  border-bottom-left-radius: 12px;
+  border-right: none;
+  border-top: none;
+  background: #fff;
 }
 
-/* Extend the vertical line for replies that have siblings below */
-.comment-item.is-reply {
-  position: relative;
-}
-
-.comment-item.is-reply:not(:last-child)::before {
+/* Vertical continuation line for non-last siblings */
+.comment-item.is-reply:not(:last-child)::after {
   content: '';
   position: absolute;
   left: -32px;
   top: 20px;
   bottom: -16px;
-  width: 1px;
+  width: 2px;
   background: #e0e0e0;
+  z-index: 0;
 }
 
 /* Responsive */
@@ -516,11 +526,15 @@ onUnmounted(() => {
 
   .thread-connector {
     left: -24px;
-    width: 16px;
+    width: 14px;
+    height: 30px;
+    top: -12px;
   }
 
-  .comment-item.is-reply:not(:last-child)::before {
+  .comment-item.is-reply:not(:last-child)::after {
     left: -24px;
+    top: 18px;
+    bottom: -12px;
   }
 }
 </style>

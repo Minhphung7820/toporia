@@ -1,16 +1,5 @@
 <template>
-  <div class="comments-section">
-    <!-- Comment Form (at top) -->
-    <CommentForm
-      v-if="!replyingTo"
-      :post-id="postId"
-      @submitted="handleCommentSubmitted"
-      class="comment-form-wrapper"
-    />
-
-    <!-- Divider -->
-    <div class="section-divider"></div>
-
+  <div class="comments-wrapper">
     <!-- Comments Header -->
     <div class="comments-header">
       <h3 class="comments-title">
@@ -43,6 +32,14 @@
         </Transition>
       </div>
     </div>
+
+    <!-- Comment Form -->
+    <CommentForm
+      v-if="!replyingTo"
+      :post-id="postId"
+      @submitted="handleCommentSubmitted"
+      class="comment-form-section"
+    />
 
     <!-- Loading State -->
     <div v-if="loading.fetch" class="loading-comments">
@@ -241,20 +238,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.comments-section {
-  margin-top: 48px;
-}
-
-/* Comment Form Wrapper */
-.comment-form-wrapper {
-  margin-bottom: 24px;
-}
-
-/* Divider */
-.section-divider {
-  height: 1px;
-  background: #e5e5e5;
-  margin: 24px 0;
+.comments-wrapper {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 32px;
 }
 
 /* Comments Header */
@@ -263,6 +251,13 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 24px;
+}
+
+/* Comment Form Section */
+.comment-form-section {
+  margin-bottom: 32px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid #e5e5e5;
 }
 
 .comments-title {
@@ -519,8 +514,8 @@ onUnmounted(() => {
 
 /* Responsive */
 @media (max-width: 640px) {
-  .comments-section {
-    margin-top: 32px;
+  .comments-wrapper {
+    padding: 20px;
   }
 
   .comments-header {
@@ -531,6 +526,11 @@ onUnmounted(() => {
 
   .comments-title {
     font-size: 18px;
+  }
+
+  .comment-form-section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
   }
 
   .modal-content {
