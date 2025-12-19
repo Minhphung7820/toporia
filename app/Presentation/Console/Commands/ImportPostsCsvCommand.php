@@ -13,16 +13,20 @@ use App\Infrastructure\Imports\PostsImport;
  *
  * Imports posts from CSV file using Tabula.
  * Optimized for large datasets with batch processing.
+ *
+ * Supports parallel import with --parallel option for ~4-6x speedup.
  */
 final class ImportPostsCsvCommand extends Command
 {
-    protected string $signature = 'posts:import {file=storage/app/posts.csv : CSV file path}';
+    protected string $signature = 'posts:import {file=storage/app/posts.csv : CSV file path} {--parallel=0 : Number of parallel workers (0=sequential)} {--driver=process : Concurrency driver (process, fork, sync)}';
 
     protected string $description = 'Import posts from CSV file using Tabula';
 
     public function handle(): int
     {
         $filePath = $this->argument('file');
+        $workers = (int) $this->option('parallel');
+        $driver = $this->option('driver') ?? 'process';
 
         if (!file_exists($filePath)) {
             $this->error("File not found: {$filePath}");
@@ -31,31 +35,44 @@ final class ImportPostsCsvCommand extends Command
 
         $fileSize = filesize($filePath);
         $this->info("Importing posts from: {$filePath}");
-        $this->line("  File size: " . $this->formatBytes($fileSize));
-        $this->line('');
+        $this->output?->writeln("  File size: " . $this->formatBytes($fileSize));
+
+        if ($workers > 0) {
+            $this->output?->writeln("  Mode: Parallel ({$workers} workers, {$driver} driver)");
+        } else {
+            $this->output?->writeln("  Mode: Sequential");
+        }
+
+        $this->newLine();
 
         $startTime = microtime(true);
 
         try {
-            $import = PostsImport::make();
+            $import = $workers > 0
+                ? PostsImport::parallel($workers, $driver)
+                : PostsImport::make();
+
             $result = Tabula::import($import, $filePath);
 
             $elapsed = microtime(true) - $startTime;
+            $peakMemory = memory_get_peak_usage(true);
 
-            $this->line('');
+            $this->newLine();
             $this->success(sprintf(
                 "Import completed in %s",
                 $this->formatTime($elapsed)
             ));
-            $this->line(sprintf("  Rows processed: %s", number_format($result->getTotalRows())));
-            $this->line(sprintf("  Rows imported: %s", number_format($result->getSuccessRows())));
+            $this->output?->writeln(sprintf("  Rows processed: %s", number_format($result->getTotalRows())));
+            $this->output?->writeln(sprintf("  Rows imported: %s", number_format($result->getSuccessRows())));
 
             if ($result->getFailedRows() > 0) {
                 $this->warn(sprintf("  Failed rows: %s", number_format($result->getFailedRows())));
             }
 
+            $this->output?->writeln(sprintf("  Peak memory: %s", $this->formatBytes($peakMemory)));
+
             $rate = $result->getTotalRows() / $elapsed;
-            $this->line(sprintf("  Rate: %.0f rows/sec", $rate));
+            $this->output?->writeln(sprintf("  Rate: %.0f rows/sec", $rate));
 
         } catch (\Throwable $e) {
             $this->error("Import failed: " . $e->getMessage());
