@@ -32,15 +32,9 @@ return [
     |
     */
 
-    // Excel commands
-    'export:excel' => App\Presentation\Console\Commands\ExportExcelCommand::class,
-    'import:excel' => App\Presentation\Console\Commands\ImportExcelCommand::class,
-
-    // Posts commands
-    'import:posts' => App\Presentation\Console\Commands\ImportPostsCommand::class,
-    'export:posts' => App\Presentation\Console\Commands\ExportPostsCommand::class,
     'posts:generate-csv' => App\Presentation\Console\Commands\GeneratePostsCsvCommand::class,
     'posts:import' => App\Presentation\Console\Commands\ImportPostsCsvCommand::class,
+    'posts:export' => App\Presentation\Console\Commands\ExportPostsCsvCommand::class,
 
     // Email commands
     'email:daily' => App\Presentation\Console\Commands\SendDailyEmailCommand::class,
