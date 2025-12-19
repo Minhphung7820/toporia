@@ -39,6 +39,8 @@ return [
     // Posts commands
     'import:posts' => App\Presentation\Console\Commands\ImportPostsCommand::class,
     'export:posts' => App\Presentation\Console\Commands\ExportPostsCommand::class,
+    'posts:generate-csv' => App\Presentation\Console\Commands\GeneratePostsCsvCommand::class,
+    'posts:import' => App\Presentation\Console\Commands\ImportPostsCsvCommand::class,
 
     // Email commands
     'email:daily' => App\Presentation\Console\Commands\SendDailyEmailCommand::class,

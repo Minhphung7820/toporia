@@ -38,17 +38,15 @@ final class DatabaseSeeder extends Seeder
      */
     protected function seed(): void
     {
-        // Seed users first (they might be referenced by other tables)
-        $this->call(UserSeeder::class);
-
-        // Then seed other data
-        // $this->call(ProductSeeder::class);
-
-        // Seed polymorphic relationships (posts, videos, comments, images)
-        // $this->call(PolymorphicRelationshipsSeeder::class);
+        // Seed blog data (users, categories, tags)
+        $this->call(BlogSeeder::class);
 
         // Seed relationship testing data (countries, cities, authors, books, etc.)
-        $this->call(RelationshipTestSeeder::class);
+        // $this->call(RelationshipTestSeeder::class);
+
+        // Note: Posts are imported separately via CSV for performance
+        // Run: php console posts:generate-csv 1000000
+        // Then: php console posts:import
     }
 
     /**

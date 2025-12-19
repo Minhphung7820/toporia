@@ -10,9 +10,16 @@ use App\Domain\Contracts\Repository\CategoryRepository;
  * Category Service - Handles category operations for the public site.
  *
  * Following Service pattern with consistent return format.
+ * Includes caching for expensive tree operations with 3M+ posts.
  */
 final class CategoryService
 {
+    /**
+     * Cache TTL for category tree with counts (5 minutes).
+     * This is acceptable because post counts don't need real-time accuracy.
+     */
+    private const CACHE_TTL_TREE_COUNTS = 300;
+
     public function __construct(
         private readonly CategoryRepository $categoryRepository
     ) {}
@@ -165,10 +172,20 @@ final class CategoryService
      * Returns hierarchical tree where each node has post_count.
      * Only includes categories with published posts (or parents of such categories).
      *
+     * Performance: Cached for 5 minutes to avoid expensive queries on 3M+ posts table.
+     *
      * @return array{success: bool, data?: array, message: string}
      */
     public function getCategoriesTreeWithCounts(): array
     {
+        // Try cache first (5 minute TTL is acceptable for post counts)
+        $cacheKey = 'blog:categories:tree_with_counts';
+        $cached = cache($cacheKey);
+
+        if ($cached !== null) {
+            return $cached;
+        }
+
         $categoriesData = $this->categoryRepository->findAllWithPublishedPostCount();
 
         // Build lookup maps
@@ -182,13 +199,18 @@ final class CategoryService
         // Build tree structure
         $tree = $this->buildTreeWithCounts($categoryMap, $countMap);
 
-        return [
+        $result = [
             'success' => true,
             'data' => [
                 'tree' => $tree,
             ],
             'message' => 'Categories tree retrieved successfully',
         ];
+
+        // Cache for 5 minutes
+        cache($cacheKey, $result, self::CACHE_TTL_TREE_COUNTS);
+
+        return $result;
     }
 
     /**
