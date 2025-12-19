@@ -374,7 +374,7 @@ final class PdoPostRepository implements PostRepository
         // Single optimized query with conditional aggregation
         $result = PostModel::getConnection()->selectOne("
             SELECT
-                COUNT(*) as total,
+                COUNT(id) as total,
                 SUM(CASE WHEN is_published = 1 THEN 1 ELSE 0 END) as published,
                 SUM(CASE WHEN is_published = 0 AND scheduled_at IS NULL THEN 1 ELSE 0 END) as draft,
                 SUM(CASE WHEN is_published = 0 AND scheduled_at IS NOT NULL THEN 1 ELSE 0 END) as scheduled,

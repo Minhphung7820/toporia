@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Presentation\Http\Controllers;
 
-use Toporia\Framework\Http\{Request, Response, RedirectResponse};
+use Toporia\Framework\Http\{Request, RedirectResponse};
 use Toporia\Framework\Session\Store;
 use Toporia\Framework\Support\Accessors\Auth;
 use App\Infrastructure\Persistence\Models\UserModel;
@@ -120,12 +120,23 @@ final class OAuthController
     {
         return new User(
             id: $model->id,
+            name: $model->name,
             email: $model->email,
             password: $model->password,
-            name: $model->name,
-            rememberToken: null,
-            createdAt: $model->created_at ? new \DateTimeImmutable($model->created_at) : null,
-            updatedAt: $model->updated_at ? new \DateTimeImmutable($model->updated_at) : null
+            role: $model->role ?? 'user',
+            emailVerifiedAt: $model->email_verified_at
+                ? new \DateTimeImmutable($model->email_verified_at)
+                : null,
+            avatar: $model->avatar,
+            bio: $model->bio,
+            website: $model->website,
+            rememberToken: $model->remember_token,
+            createdAt: $model->created_at
+                ? new \DateTimeImmutable($model->created_at)
+                : null,
+            updatedAt: $model->updated_at
+                ? new \DateTimeImmutable($model->updated_at)
+                : null,
         );
     }
 }

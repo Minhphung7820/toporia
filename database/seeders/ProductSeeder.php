@@ -12,8 +12,8 @@ use App\Infrastructure\Persistence\Models\ReviewModel;
 use Database\Factories\CategoryFactory;
 use Database\Factories\OrderFactory;
 use Database\Factories\OrderItemFactory;
-use Database\Factories\ProductFactory;
 use Database\Factories\ReviewFactory;
+use ProductFactory;
 use Toporia\Framework\Database\Seeder;
 
 /**
