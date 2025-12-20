@@ -21,7 +21,7 @@ use App\Infrastructure\Imports\PostsImport;
  *
  * After import completes, automatically runs:
  * 1. stats:recalculate - Update pre-computed statistics
- * 2. search:index-posts --fresh - Re-index all posts to Elasticsearch
+ * 2. search:index-posts - Index new posts to Elasticsearch
  */
 final class ImportPostsCsvCommand extends Command
 {
@@ -115,7 +115,7 @@ final class ImportPostsCsvCommand extends Command
 
             // 2. Index to Elasticsearch
             $this->output?->writeln('  [2/2] Indexing to Elasticsearch...');
-            $this->call('search:index-posts', ['--fresh' => true]);
+            $this->call('search:index-posts', ['--chunk' => 1000]);
 
             $this->newLine();
             $this->success('All post-import tasks completed!');

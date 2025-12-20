@@ -42,12 +42,12 @@ final class SendDailyEmailCommand extends Command
             // Dispatch the email job to queue
             SendEmailJob::dispatch($to, $subject, $message);
 
-            $this->success("✅ Email job dispatched successfully!");
+            $this->success("Email job dispatched successfully!");
             $this->info("Run 'php console queue:work' to process the job.");
 
             return 0;
         } catch (\Throwable $e) {
-            $this->error("❌ Failed to dispatch email job: " . $e->getMessage());
+            $this->error("Failed to dispatch email job: " . $e->getMessage());
             return 1;
         }
     }

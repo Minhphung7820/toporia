@@ -39,15 +39,6 @@ final class RecalculateStatsCommand extends Command
      */
     public function handle(): int
     {
-        $this->warn('⚠️  This operation scans all posts, comments, and feedback tables.');
-        $this->warn('   On large datasets (8M+ records), this may take several minutes.');
-        $this->newLine();
-
-        if (!$this->confirm('Do you want to proceed?')) {
-            $this->info('Operation cancelled.');
-            return 0;
-        }
-
         $categoriesOnly = $this->option('categories-only');
         $dashboardOnly = $this->option('dashboard-only');
         $startTime = microtime(true);
@@ -57,19 +48,19 @@ final class RecalculateStatsCommand extends Command
             if (!$categoriesOnly) {
                 $this->info('Recalculating dashboard statistics...');
                 DashboardStatisticsModel::recalculateAll();
-                $this->writeln('  ✓ Dashboard statistics done');
+                $this->writeln('  Dashboard statistics done');
             }
 
             // Recalculate category post counts
             if (!$dashboardOnly) {
                 $this->info('Recalculating category post counts...');
                 CategoryPostCountModel::recalculateAll();
-                $this->writeln('  ✓ Category post counts done');
+                $this->writeln('  Category post counts done');
             }
 
             $elapsedTime = round(microtime(true) - $startTime, 2);
 
-            $this->success("✅ Statistics recalculated successfully in {$elapsedTime}s");
+            $this->success("Statistics recalculated successfully in {$elapsedTime}s");
 
             if ($this->option('show')) {
                 $this->showCurrentStats();
@@ -77,7 +68,7 @@ final class RecalculateStatsCommand extends Command
 
             return 0;
         } catch (\Throwable $e) {
-            $this->error('❌ Failed to recalculate statistics: ' . $e->getMessage());
+            $this->error('Failed to recalculate statistics: ' . $e->getMessage());
             return 1;
         }
     }
