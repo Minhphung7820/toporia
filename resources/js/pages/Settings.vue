@@ -565,8 +565,9 @@ const handleChangePassword = async () => {
 }
 
 .settings-container {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
+  padding: 0 1.5rem;
 }
 
 /* Header */
@@ -1041,10 +1042,57 @@ const handleChangePassword = async () => {
   display: none;
 }
 
-/* Responsive */
+/* Responsive - Tablet */
 @media (max-width: 768px) {
+  .settings-page {
+    padding: 1.5rem 0;
+  }
+
+  .settings-container {
+    padding: 0 1.5rem;
+  }
+
+  .settings-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .settings-header p {
+    font-size: 0.875rem;
+  }
+
+  .settings-nav {
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding: 0.375rem;
+  }
+
+  .nav-item {
+    flex: 1 1 auto;
+    min-width: calc(50% - 0.25rem);
+    justify-content: center;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .nav-item .nav-text {
+    display: inline;
+  }
+
   .tab-content {
     padding: 1.5rem;
+  }
+
+  .settings-section {
+    padding-bottom: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-header h2 {
+    font-size: 1.125rem;
   }
 
   .form-row {
@@ -1066,27 +1114,66 @@ const handleChangePassword = async () => {
     gap: 1rem;
   }
 
-  .settings-nav {
-    flex-wrap: wrap;
-  }
-
-  .nav-item {
-    flex: 1;
-    justify-content: center;
+  .settings-content {
+    border-radius: 12px;
   }
 }
 
+/* Responsive - Mobile */
 @media (max-width: 480px) {
   .settings-page {
-    padding: 1rem 0.75rem;
+    padding: 1rem 0;
+  }
+
+  .settings-container {
+    padding: 0 1rem;
+  }
+
+  .settings-header {
+    margin-bottom: 1rem;
+  }
+
+  .settings-header h1 {
+    font-size: 1.375rem;
+  }
+
+  .settings-nav {
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: 10px;
+  }
+
+  .nav-item {
+    min-width: calc(50% - 0.125rem);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    gap: 0.375rem;
+  }
+
+  .nav-icon {
+    width: 16px;
+    height: 16px;
   }
 
   .tab-content {
     padding: 1.25rem;
   }
 
-  .settings-header h1 {
-    font-size: 1.5rem;
+  .settings-section {
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .section-header {
+    margin-bottom: 1rem;
+  }
+
+  .section-header h2 {
+    font-size: 1rem;
+  }
+
+  .section-header p {
+    font-size: 0.8125rem;
   }
 
   .avatar-preview {
@@ -1096,6 +1183,52 @@ const handleChangePassword = async () => {
 
   .avatar-placeholder {
     font-size: 1.5rem;
+  }
+
+  .form-group label {
+    font-size: 0.8125rem;
+  }
+
+  .form-input,
+  .form-textarea,
+  .form-select {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .btn {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .settings-content {
+    border-radius: 10px;
+  }
+}
+
+/* Responsive - Extra small */
+@media (max-width: 360px) {
+  .settings-container {
+    padding: 0 0.875rem;
+  }
+
+  .settings-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .nav-item {
+    min-width: 100%;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .tab-content {
+    padding: 1rem;
+  }
+
+  .avatar-preview {
+    width: 70px;
+    height: 70px;
   }
 }
 </style>

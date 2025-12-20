@@ -218,9 +218,9 @@ watch(() => route.query, async (newQuery) => {
 }
 
 .container {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 1.5rem;
 }
 
 /* Hero Section */

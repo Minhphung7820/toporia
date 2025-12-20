@@ -44,6 +44,7 @@ Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmai
 Route::post('/auth/resend-verification', [AuthController::class, 'resendVerification']);
 
 // Posts
+Route::get('/blog/stats', [BlogPostController::class, 'stats']);
 Route::get('/blog/posts', [BlogPostController::class, 'index']);
 Route::get('/blog/posts/featured', [BlogPostController::class, 'featured']);
 Route::get('/blog/posts/popular', [BlogPostController::class, 'popular']);

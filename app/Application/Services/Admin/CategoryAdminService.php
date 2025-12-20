@@ -21,14 +21,18 @@ final class CategoryAdminService
 
     /**
      * Get paginated categories with filters.
+     *
+     * Performance: Uses pre-computed counts from category_post_counts table
+     * instead of N+1 withCount() queries.
      */
     public function getPaginated(array $filters = [], int $page = 1, int $perPage = 20): array
     {
-        $paginator = $this->categoryRepository->getPaginated($filters, $perPage, $page);
+        // Repository now returns array with pre-computed counts attached
+        $data = $this->categoryRepository->getPaginated($filters, $perPage, $page);
 
         return [
             'success' => true,
-            'data' => $paginator->toArray(),
+            'data' => $data,
             'message' => 'Categories retrieved successfully',
         ];
     }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Presentation\Http\Controllers\Api\Blog;
 
 use App\Application\Services\Blog\PostService;
+use App\Infrastructure\Persistence\Models\CategoryModel;
+use App\Infrastructure\Persistence\Models\DashboardStatisticsModel;
 use App\Presentation\Http\Controllers\BaseController;
 use Toporia\Framework\Http\Contracts\JsonResponseInterface;
 use Toporia\Framework\Http\Request;
@@ -186,5 +188,25 @@ final class PostController extends BaseController
         }
 
         return $this->json($result);
+    }
+
+    /**
+     * Get blog statistics for homepage.
+     *
+     * GET /api/blog/stats
+     */
+    public function stats(): JsonResponseInterface
+    {
+        $postStats = DashboardStatisticsModel::getPostStats();
+        $categoriesCount = CategoryModel::count();
+
+        return $this->json([
+            'success' => true,
+            'data' => [
+                'posts' => $postStats['published'],
+                'categories' => $categoriesCount,
+                'views' => $postStats['total_views'],
+            ],
+        ]);
     }
 }
