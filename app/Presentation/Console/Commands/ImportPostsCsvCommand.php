@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Presentation\Console\Commands;
 
+use App\Infrastructure\Imports\PostsImport;
+use App\Infrastructure\Persistence\Models\PostModel;
 use Toporia\Framework\Console\Command;
 use Toporia\Framework\Support\Accessors\QueryBuilder;
 use Toporia\Tabula\Tabula;
-use App\Infrastructure\Imports\PostsImport;
 
 /**
  * Import Posts CSV Command
@@ -69,6 +70,9 @@ final class ImportPostsCsvCommand extends Command
         $startTime = microtime(true);
         $triggersDropped = false;
 
+        // Get max ID before import to only index new posts later
+        $maxIdBeforeImport = PostModel::max('id') ?? 0;
+
         try {
             // Always disable triggers for bulk import performance
             $this->dropTriggers();
@@ -108,9 +112,9 @@ final class ImportPostsCsvCommand extends Command
             $this->output?->writeln('  [1/2] Recalculating statistics...');
             $this->call('stats:recalculate');
 
-            // 2. Index to Elasticsearch
-            $this->output?->writeln('  [2/2] Indexing to Elasticsearch...');
-            $this->call('search:index-posts', ['--chunk' => 1000]);
+            // 2. Index new posts to Elasticsearch (only posts added during this import)
+            $this->output?->writeln('  [2/2] Indexing new posts to Elasticsearch...');
+            $this->call('search:index-posts', ['--chunk' => 1000, '--from-id' => $maxIdBeforeImport]);
 
             $this->newLine();
             $this->success('All post-import tasks completed!');
