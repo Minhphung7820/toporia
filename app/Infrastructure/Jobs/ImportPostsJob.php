@@ -6,6 +6,7 @@ namespace App\Infrastructure\Jobs;
 
 use App\Infrastructure\Imports\PostsImport;
 use App\Infrastructure\Jobs\Middleware\LazyWithoutOverlapping;
+use App\Infrastructure\Jobs\PostImportPostProcessingJob;
 use App\Infrastructure\Persistence\Models\ImportExportJobModel;
 use App\Infrastructure\Persistence\Models\PostModel;
 use Toporia\Framework\Bus\Contracts\ShouldQueueInterface;
@@ -163,8 +164,13 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
             $triggersDropped = false;
             $this->reportProgress(85, 'Triggers restored');
 
-            // Run post-import tasks (stats recalculation, ES indexing)
-            $this->runPostImportTasks($maxIdBeforeImport);
+            // Dispatch post-import processing job (ES indexing, stats recalculation)
+            $this->reportProgress(90, 'Dispatching post-import tasks...');
+            dispatch(new PostImportPostProcessingJob($maxIdBeforeImport, 1000));
+            Log::info('PostImportPostProcessingJob dispatched', [
+                'job_id' => $this->jobId,
+                'max_id_before_import' => $maxIdBeforeImport,
+            ]);
 
             // Mark as completed
             $job->markAsCompleted();
@@ -302,89 +308,6 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
         }
 
         return $count;
-    }
-
-    /**
-     * Run post-import tasks.
-     *
-     * 1. Recalculate dashboard statistics
-     * 2. Recalculate category post counts
-     * 3. Bulk index new posts to Elasticsearch
-     */
-    private function runPostImportTasks(int $maxIdBeforeImport): void
-    {
-        // 1. Recalculate dashboard statistics
-        $this->reportProgress(90, 'Recalculating dashboard statistics...');
-        try {
-            \App\Infrastructure\Persistence\Models\DashboardStatisticsModel::recalculateAll();
-            Log::info("Dashboard statistics recalculated");
-        } catch (\Throwable $e) {
-            Log::warning("Failed to recalculate dashboard stats", ['error' => $e->getMessage()]);
-        }
-
-        // 2. Recalculate category post counts
-        $this->reportProgress(92, 'Recalculating category counts...');
-        try {
-            \App\Infrastructure\Persistence\Models\CategoryPostCountModel::recalculateAll();
-            Log::info("Category post counts recalculated");
-        } catch (\Throwable $e) {
-            Log::warning("Failed to recalculate category counts", ['error' => $e->getMessage()]);
-        }
-
-        // 3. Bulk index new posts to Elasticsearch (if available)
-        $this->reportProgress(94, 'Indexing posts to Elasticsearch...');
-        try {
-            $searchService = app(\App\Application\Services\Search\PostSearchService::class);
-            if ($searchService && $searchService->isAvailable()) {
-                $this->bulkIndexNewPosts($searchService, $maxIdBeforeImport);
-            }
-        } catch (\Throwable $e) {
-            Log::warning("Failed to index posts to Elasticsearch", ['error' => $e->getMessage()]);
-        }
-    }
-
-    /**
-     * Bulk index new posts to Elasticsearch in chunks.
-     *
-     * Uses chunked processing to avoid memory issues with large imports.
-     * Each chunk is bulk-indexed for optimal ES performance.
-     *
-     * @param \App\Application\Services\Search\PostSearchService $searchService
-     * @param int $maxIdBeforeImport Max post ID before import started
-     */
-    private function bulkIndexNewPosts($searchService, int $maxIdBeforeImport): void
-    {
-        $chunkSize = 1000;
-        $totalIndexed = 0;
-
-        // Count new posts
-        $totalNew = PostModel::where('id', '>', $maxIdBeforeImport)->count();
-
-        if ($totalNew === 0) {
-            Log::info("No new posts to index");
-            return;
-        }
-
-        Log::info("Starting ES bulk indexing", ['total' => $totalNew]);
-
-        // Process in chunks using cursor for memory efficiency
-        PostModel::where('id', '>', $maxIdBeforeImport)
-            ->orderBy('id')
-            ->chunk($chunkSize, function ($posts) use ($searchService, &$totalIndexed, $totalNew) {
-                $indexed = $searchService->bulkIndex($posts);
-                $totalIndexed += $indexed;
-
-                // Update progress (94-98% for ES indexing phase)
-                $esProgress = 94 + (int) (($totalIndexed / $totalNew) * 4);
-                $this->reportProgress($esProgress, "Indexing to ES: {$totalIndexed}/{$totalNew}");
-
-                // Memory cleanup
-                if ($totalIndexed % 10000 === 0) {
-                    gc_collect_cycles();
-                }
-            });
-
-        Log::info("ES bulk indexing completed", ['total_indexed' => $totalIndexed]);
     }
 
     /**
