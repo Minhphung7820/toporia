@@ -44,6 +44,7 @@ const breadcrumbs = computed(() => {
   }
 
   let currentPath = '/admin';
+  let hasEditOrCreate = false;
 
   pathSegments.forEach((segment, index) => {
     currentPath += `/${segment}`;
@@ -52,8 +53,13 @@ const breadcrumbs = computed(() => {
     const isParam = /^\d+$/.test(segment) || /^[a-f0-9-]{36}$/i.test(segment);
 
     if (isParam) {
-      // Don't add IDs to breadcrumbs, but modify the previous item
+      // Don't add IDs to breadcrumbs
       return;
+    }
+
+    // Track if edit/create already in path segments
+    if (segment === 'edit' || segment === 'create') {
+      hasEditOrCreate = true;
     }
 
     const label = formatLabel(segment);
@@ -65,11 +71,13 @@ const breadcrumbs = computed(() => {
     });
   });
 
-  // Handle special cases for edit/create pages
-  if (route.name?.includes('-edit')) {
-    items.push({ label: 'Edit', path: null });
-  } else if (route.name?.includes('-create')) {
-    items.push({ label: 'Create', path: null });
+  // Only add Edit/Create from route name if not already in path segments
+  if (!hasEditOrCreate) {
+    if (route.name?.includes('-edit')) {
+      items.push({ label: 'Edit', path: null });
+    } else if (route.name?.includes('-create')) {
+      items.push({ label: 'Create', path: null });
+    }
   }
 
   return items;

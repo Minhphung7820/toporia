@@ -151,8 +151,8 @@ export const tags = {
   bulkDelete(ids) {
     return http.post('/admin/tags/bulk-delete', { ids });
   },
-  merge(targetId, sourceIds) {
-    return http.post('/admin/tags/merge', { target_id: targetId, source_ids: sourceIds });
+  merge(targetTagId, sourceTagIds) {
+    return http.post('/admin/tags/merge', { target_tag_id: targetTagId, source_tag_ids: sourceTagIds });
   },
   cleanup() {
     return http.post('/admin/tags/cleanup');

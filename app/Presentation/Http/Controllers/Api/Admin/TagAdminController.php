@@ -162,4 +162,45 @@ final class TagAdminController extends BaseController
 
         return $this->json($result);
     }
+
+    /**
+     * Merge multiple tags into a target tag.
+     *
+     * POST /api/admin/tags/merge
+     *
+     * Request body:
+     * {
+     *   "target_tag_id": 1,
+     *   "source_tag_ids": [2, 3, 4]
+     * }
+     */
+    public function merge(Request $request): JsonResponseInterface
+    {
+        $data = $request->json();
+        $targetTagId = (int) ($data['target_tag_id'] ?? 0);
+        $sourceTagIds = array_map('intval', $data['source_tag_ids'] ?? []);
+        $userId = Auth::user()->getAuthIdentifier();
+
+        if ($targetTagId === 0) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Target tag is required',
+            ], 422);
+        }
+
+        if (empty($sourceTagIds)) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Source tags are required',
+            ], 422);
+        }
+
+        $result = $this->tagAdminService->mergeTags($targetTagId, $sourceTagIds, $userId);
+
+        if (!$result['success']) {
+            return $this->json($result, 422);
+        }
+
+        return $this->json($result);
+    }
 }

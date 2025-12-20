@@ -218,4 +218,58 @@ final class TagAdminService
             'message' => "{$count} unused tags deleted successfully",
         ];
     }
+
+    /**
+     * Merge multiple tags into a target tag.
+     *
+     * All posts tagged with source tags will be re-tagged with target tag.
+     * Source tags will be deleted after merge.
+     *
+     * @param int $targetTagId The tag to merge into (will be kept)
+     * @param array<int> $sourceTagIds Tags to merge from (will be deleted)
+     * @param int $userId Admin user ID
+     * @return array{success: bool, data?: array, message: string}
+     */
+    public function mergeTags(int $targetTagId, array $sourceTagIds, int $userId): array
+    {
+        // Validate target tag exists
+        $targetTag = $this->tagRepository->find($targetTagId);
+        if (!$targetTag) {
+            return ['success' => false, 'message' => 'Target tag not found'];
+        }
+
+        // Filter out target from sources
+        $sourceTagIds = array_filter($sourceTagIds, fn($id) => $id !== $targetTagId);
+
+        if (empty($sourceTagIds)) {
+            return ['success' => false, 'message' => 'No source tags to merge'];
+        }
+
+        // Validate all source tags exist
+        $sourceTags = $this->tagRepository->getTagsWithCounts($sourceTagIds);
+        if (count($sourceTags) !== count($sourceTagIds)) {
+            return ['success' => false, 'message' => 'Some source tags not found'];
+        }
+
+        // Perform merge
+        $result = $this->tagRepository->mergeTags($targetTagId, $sourceTagIds);
+
+        // Log activity
+        $sourceNames = implode(', ', array_column($sourceTags, 'name'));
+        AdminActivityLogModel::log(
+            $userId,
+            AdminActivityLogModel::ACTION_UPDATE,
+            "Merged tags [{$sourceNames}] into [{$targetTag->name}]"
+        );
+
+        return [
+            'success' => true,
+            'data' => [
+                'target_tag' => $targetTag->toArray(),
+                'merged_count' => $result['merged_count'],
+                'deleted_tags' => $result['deleted_tags'],
+            ],
+            'message' => "Successfully merged {$result['deleted_tags']} tags into {$targetTag->name}",
+        ];
+    }
 }

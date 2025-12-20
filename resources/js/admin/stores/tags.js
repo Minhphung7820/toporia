@@ -157,6 +157,23 @@ export const useTagsStore = defineStore('admin-tags', {
       }
     },
 
+    async mergeTags(targetTagId, sourceTagIds) {
+      if (!targetTagId || sourceTagIds.length === 0) return;
+      try {
+        const response = await tags.merge(targetTagId, sourceTagIds);
+        if (response.data.success) {
+          // Refresh the list after merge
+          await this.fetchTags(this.pagination.currentPage);
+          await this.fetchStatistics();
+          this.selectedIds = [];
+        }
+        return response.data;
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to merge tags';
+        throw error;
+      }
+    },
+
     toggleSelection(id) {
       const index = this.selectedIds.indexOf(id);
       if (index === -1) {
