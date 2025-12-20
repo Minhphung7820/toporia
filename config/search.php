@@ -67,6 +67,53 @@ return [
                 ],
             ],
         ],
+
+        'posts' => [
+            'name' => env('SEARCH_INDEX_POSTS', 'posts'),
+            'settings' => [
+                'number_of_shards' => (int) env('SEARCH_POSTS_SHARDS', 1),
+                'number_of_replicas' => (int) env('SEARCH_POSTS_REPLICAS', 0),
+                'analysis' => [
+                    'analyzer' => [
+                        'vietnamese_analyzer' => [
+                            'type' => 'custom',
+                            'tokenizer' => 'standard',
+                            'filter' => ['lowercase', 'asciifolding'],
+                        ],
+                    ],
+                ],
+            ],
+            'mappings' => [
+                'properties' => [
+                    'id' => ['type' => 'integer'],
+                    'title' => [
+                        'type' => 'text',
+                        'analyzer' => 'vietnamese_analyzer',
+                        'fields' => [
+                            'keyword' => ['type' => 'keyword'],
+                            'suggest' => [
+                                'type' => 'completion',
+                                'analyzer' => 'vietnamese_analyzer',
+                            ],
+                        ],
+                    ],
+                    'slug' => ['type' => 'keyword'],
+                    'content' => ['type' => 'text', 'analyzer' => 'vietnamese_analyzer'],
+                    'excerpt' => ['type' => 'text', 'analyzer' => 'vietnamese_analyzer'],
+                    'author_id' => ['type' => 'integer'],
+                    'author_name' => ['type' => 'text', 'fields' => ['keyword' => ['type' => 'keyword']]],
+                    'category_id' => ['type' => 'integer'],
+                    'category_name' => ['type' => 'text', 'fields' => ['keyword' => ['type' => 'keyword']]],
+                    'is_published' => ['type' => 'boolean'],
+                    'is_featured' => ['type' => 'boolean'],
+                    'views' => ['type' => 'integer'],
+                    'reading_time' => ['type' => 'integer'],
+                    'published_at' => ['type' => 'date', 'format' => 'yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis'],
+                    'created_at' => ['type' => 'date', 'format' => 'yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis'],
+                    'updated_at' => ['type' => 'date', 'format' => 'yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis'],
+                ],
+            ],
+        ],
     ],
 ];
 

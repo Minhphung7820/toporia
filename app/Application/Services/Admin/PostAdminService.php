@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Services\Admin;
 
+use App\Application\Services\Search\PostSearchService;
 use App\Infrastructure\Repository\Admin\PostAdminRepository;
 use App\Infrastructure\Persistence\Models\AdminActivityLogModel;
 use Toporia\Framework\Support\Str;
@@ -13,15 +14,20 @@ use Toporia\Framework\Support\Str;
  *
  * Handles admin post operations with clean architecture.
  * Uses repository pattern for data access.
+ * Uses Elasticsearch for search when available.
  */
 final class PostAdminService
 {
     public function __construct(
-        private readonly PostAdminRepository $postRepository
+        private readonly PostAdminRepository $postRepository,
+        private readonly ?PostSearchService $postSearchService = null
     ) {}
 
     /**
      * Get paginated posts with filters (offset-based).
+     *
+     * Uses Elasticsearch for search queries when available.
+     * Falls back to MySQL for filtering without search.
      *
      * @param array $filters Filter criteria
      * @param int $page Page number
@@ -30,6 +36,13 @@ final class PostAdminService
      */
     public function getPaginated(array $filters = [], int $page = 1, int $perPage = 20): array
     {
+        // Use Elasticsearch when search query is present
+        $searchQuery = $filters['search'] ?? '';
+        if (!empty($searchQuery) && $this->postSearchService?->isAvailable()) {
+            return $this->searchWithElasticsearch($searchQuery, $filters, $perPage, ($page - 1) * $perPage);
+        }
+
+        // Use MySQL for non-search queries or when ES is unavailable
         $paginator = $this->postRepository->getPaginated($filters, $perPage, $page);
 
         return [
@@ -40,9 +53,62 @@ final class PostAdminService
     }
 
     /**
+     * Search posts using Elasticsearch.
+     *
+     * @param string $query Search query
+     * @param array $filters Additional filters
+     * @param int $limit Results per page
+     * @param int $offset Offset for pagination
+     * @return array{success: bool, data: array, message: string}
+     */
+    private function searchWithElasticsearch(string $query, array $filters, int $limit, int $offset): array
+    {
+        $esFilters = [];
+
+        // Map filters to Elasticsearch format
+        if (!empty($filters['status'])) {
+            $esFilters['status'] = $filters['status'];
+        }
+        if (!empty($filters['category_id'])) {
+            $esFilters['category_id'] = (int) $filters['category_id'];
+        }
+        if (!empty($filters['author_id'])) {
+            $esFilters['author_id'] = (int) $filters['author_id'];
+        }
+        if (isset($filters['is_featured']) && $filters['is_featured'] !== '') {
+            $esFilters['is_featured'] = (bool) $filters['is_featured'];
+        }
+
+        $result = $this->postSearchService->searchAdmin($query, $esFilters, $limit, $offset);
+
+        // Calculate pagination info
+        $total = $result['total'];
+        $currentPage = $offset > 0 ? (int) floor($offset / $limit) + 1 : 1;
+        $lastPage = $total > 0 ? (int) ceil($total / $limit) : 1;
+        $from = $total > 0 ? $offset + 1 : 0;
+        $to = min($offset + count($result['posts']), $total);
+
+        // Return format matching Paginator->toArray() for frontend compatibility
+        return [
+            'success' => true,
+            'data' => [
+                'data' => $result['posts'],  // Must be 'data' to match Paginator format
+                'total' => $total,
+                'per_page' => $limit,
+                'current_page' => $currentPage,
+                'last_page' => $lastPage,
+                'from' => $from,
+                'to' => $to,
+            ],
+            'message' => 'Posts retrieved successfully',
+        ];
+    }
+
+    /**
      * Get cursor-paginated posts with filters.
      *
-     * Ultra-fast for large datasets - O(1) performance.
+     * Uses Elasticsearch for search queries when available.
+     * Falls back to MySQL for non-search queries or when ES is unavailable.
      *
      * @param array $filters Filter criteria
      * @param int $perPage Posts per page
@@ -51,11 +117,61 @@ final class PostAdminService
      */
     public function getCursorPaginated(array $filters = [], int $perPage = 20, ?string $cursor = null): array
     {
+        // Use Elasticsearch when search query is present
+        $searchQuery = $filters['search'] ?? '';
+        if (!empty($searchQuery) && $this->postSearchService?->isAvailable()) {
+            return $this->searchWithElasticsearchCursor($searchQuery, $filters, $perPage, $cursor);
+        }
+
+        // Use MySQL for non-search queries or when ES is unavailable
         $paginator = $this->postRepository->getCursorPaginated($filters, $perPage, $cursor);
 
         return [
             'success' => true,
             'data' => $paginator->toArray(),
+            'message' => 'Posts retrieved successfully',
+        ];
+    }
+
+    /**
+     * Search posts using Elasticsearch with cursor pagination.
+     *
+     * @param string $query Search query
+     * @param array $filters Additional filters
+     * @param int $limit Results per page
+     * @param string|null $cursor Cursor for pagination
+     * @return array{success: bool, data: array, message: string}
+     */
+    private function searchWithElasticsearchCursor(string $query, array $filters, int $limit, ?string $cursor): array
+    {
+        $esFilters = [];
+
+        // Map filters to Elasticsearch format
+        if (!empty($filters['status'])) {
+            $esFilters['status'] = $filters['status'];
+        }
+        if (!empty($filters['category_id'])) {
+            $esFilters['category_id'] = (int) $filters['category_id'];
+        }
+        if (!empty($filters['author_id'])) {
+            $esFilters['author_id'] = (int) $filters['author_id'];
+        }
+        if (isset($filters['is_featured']) && $filters['is_featured'] !== '') {
+            $esFilters['is_featured'] = (bool) $filters['is_featured'];
+        }
+
+        $result = $this->postSearchService->searchAdminCursor($query, $esFilters, $limit, $cursor);
+
+        // Return format matching CursorPaginator->toArray() for frontend compatibility
+        return [
+            'success' => true,
+            'data' => [
+                'data' => $result['posts'],  // Must be 'data' to match CursorPaginator format
+                'per_page' => $limit,
+                'next_cursor' => $result['next_cursor'],
+                'prev_cursor' => $result['prev_cursor'],
+                'has_more' => $result['has_more'],
+            ],
             'message' => 'Posts retrieved successfully',
         ];
     }

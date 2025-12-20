@@ -27,9 +27,9 @@ return [
         \App\Application\Observers\ProductObserver::class,
     ],
 
-    // Add more observers here
-    // \App\Infrastructure\Persistence\Models\UserModel::class => [
-    //     \App\Observers\UserObserver::class,
-    // ],
+    // Post Model Observer - Auto-sync with Elasticsearch
+    \App\Infrastructure\Persistence\Models\PostModel::class => [
+        \App\Application\Observers\PostObserver::class,
+    ],
 ];
 

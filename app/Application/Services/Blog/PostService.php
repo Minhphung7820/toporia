@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Services\Blog;
 
+use App\Application\Services\Search\PostSearchService;
 use App\Domain\Contracts\Repository\PostRepository;
 use App\Domain\Contracts\Repository\TagRepository;
 use App\Domain\Contracts\Repository\CategoryRepository;
@@ -13,6 +14,7 @@ use App\Domain\Contracts\Repository\UserRepository;
  * Post Service - Handles blog post operations for the public site.
  *
  * Following Service pattern with consistent return format.
+ * Uses Elasticsearch for search when available, falls back to MySQL.
  */
 final class PostService
 {
@@ -20,7 +22,8 @@ final class PostService
         private readonly PostRepository $postRepository,
         private readonly TagRepository $tagRepository,
         private readonly CategoryRepository $categoryRepository,
-        private readonly UserRepository $userRepository
+        private readonly UserRepository $userRepository,
+        private readonly ?PostSearchService $postSearchService = null
     ) {}
 
     /**
@@ -103,24 +106,33 @@ final class PostService
     /**
      * Get featured posts.
      *
+     * Cached for 5 minutes to improve performance on large tables.
+     *
      * @param int $limit Number of posts
      * @return array{success: bool, data?: array, message: string}
      */
     public function getFeaturedPosts(int $limit = 5): array
     {
-        $posts = $this->postRepository->findFeatured($limit);
+        $cacheKey = "blog:featured_posts:{$limit}";
+        $cacheTtl = 300; // 5 minutes
 
-        return [
-            'success' => true,
-            'data' => [
-                'posts' => $this->enrichPostsWithAuthors($posts),
-            ],
-            'message' => 'Featured posts retrieved successfully',
-        ];
+        return cache()->remember($cacheKey, $cacheTtl, function () use ($limit) {
+            $posts = $this->postRepository->findFeatured($limit);
+
+            return [
+                'success' => true,
+                'data' => [
+                    'posts' => $this->enrichPostsWithAuthors($posts),
+                ],
+                'message' => 'Featured posts retrieved successfully',
+            ];
+        });
     }
 
     /**
      * Get most viewed posts.
+     *
+     * Uses idx_posts_published_views index for O(1) performance on 1M+ rows.
      *
      * @param int $limit Number of posts
      * @return array{success: bool, data?: array, message: string}
@@ -141,20 +153,27 @@ final class PostService
     /**
      * Get latest posts.
      *
+     * Cached for 2 minutes (shorter TTL since latest posts change more frequently).
+     *
      * @param int $limit Number of posts
      * @return array{success: bool, data?: array, message: string}
      */
     public function getLatestPosts(int $limit = 10): array
     {
-        $posts = $this->postRepository->findLatest($limit);
+        $cacheKey = "blog:latest_posts:{$limit}";
+        $cacheTtl = 120; // 2 minutes
 
-        return [
-            'success' => true,
-            'data' => [
-                'posts' => $this->enrichPostsWithAuthors($posts),
-            ],
-            'message' => 'Latest posts retrieved successfully',
-        ];
+        return cache()->remember($cacheKey, $cacheTtl, function () use ($limit) {
+            $posts = $this->postRepository->findLatest($limit);
+
+            return [
+                'success' => true,
+                'data' => [
+                    'posts' => $this->enrichPostsWithAuthors($posts),
+                ],
+                'message' => 'Latest posts retrieved successfully',
+            ];
+        });
     }
 
     /**
@@ -256,8 +275,8 @@ final class PostService
     /**
      * Search posts with cursor pagination.
      *
-     * Uses caching for search count (expensive operation).
-     * FULLTEXT search for queries >= 3 chars, LIKE for shorter.
+     * Uses Elasticsearch when available for fast full-text search.
+     * Falls back to MySQL LIKE query if Elasticsearch is unavailable.
      *
      * @param string $query Search query
      * @param int $perPage Posts per page
@@ -275,22 +294,27 @@ final class PostService
             ];
         }
 
-        // Cache key for search results (5 minutes TTL)
-        $cacheKey = 'blog:search:' . md5($trimmedQuery . ':' . $perPage . ':' . ($cursor ?? 'null') . ':' . $direction);
-        $cacheTtl = 300; // 5 minutes
-
-        $cachedResult = cache($cacheKey);
-        if ($cachedResult !== null) {
-            return $cachedResult;
+        // Try Elasticsearch first
+        if ($this->postSearchService?->isAvailable()) {
+            return $this->searchWithElasticsearch($trimmedQuery, $perPage, $cursor, $direction);
         }
 
-        $result = $this->postRepository->searchWithCursor($trimmedQuery, $perPage, $cursor, $direction);
+        // Fallback to MySQL with caching
+        return $this->searchWithMySQL($trimmedQuery, $perPage, $cursor, $direction);
+    }
 
-        $response = [
+    /**
+     * Search using Elasticsearch (fast full-text search).
+     */
+    private function searchWithElasticsearch(string $query, int $perPage, ?string $cursor, string $direction): array
+    {
+        $result = $this->postSearchService->searchPublished($query, $perPage, $cursor, $direction);
+
+        return [
             'success' => true,
             'data' => [
-                'query' => $trimmedQuery,
-                'posts' => $this->enrichPostsWithAuthors($result['posts']),
+                'query' => $query,
+                'posts' => $result['posts'], // Already enriched by Elasticsearch
                 'pagination' => [
                     'next_cursor' => $result['next_cursor'],
                     'prev_cursor' => $result['prev_cursor'],
@@ -301,11 +325,35 @@ final class PostService
             ],
             'message' => 'Search completed successfully',
         ];
+    }
 
-        // Cache the result
-        cache($cacheKey, $response, $cacheTtl);
+    /**
+     * Search using MySQL with caching (fallback).
+     */
+    private function searchWithMySQL(string $query, int $perPage, ?string $cursor, string $direction): array
+    {
+        $cacheKey = 'blog:search:' . md5($query . ':' . $perPage . ':' . ($cursor ?? 'null') . ':' . $direction);
+        $cacheTtl = 300; // 5 minutes
 
-        return $response;
+        return cache()->remember($cacheKey, $cacheTtl, function () use ($query, $perPage, $cursor, $direction) {
+            $result = $this->postRepository->searchWithCursor($query, $perPage, $cursor, $direction);
+
+            return [
+                'success' => true,
+                'data' => [
+                    'query' => $query,
+                    'posts' => $this->enrichPostsWithAuthors($result['posts']),
+                    'pagination' => [
+                        'next_cursor' => $result['next_cursor'],
+                        'prev_cursor' => $result['prev_cursor'],
+                        'has_more' => $result['has_more'],
+                        'per_page' => $perPage,
+                        'total' => $result['total'],
+                    ],
+                ],
+                'message' => 'Search completed successfully',
+            ];
+        });
     }
 
     /**

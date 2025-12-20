@@ -175,6 +175,7 @@ resources/                # Frontend assets
 - [config/middleware.php](config/middleware.php) - Middleware groups and aliases
 - [config/commands.php](config/commands.php) - Register console commands
 - [config/observers.php](config/observers.php) - Register model observers
+- [config/search.php](config/search.php) - Elasticsearch index configuration
 - [vite.config.js](vite.config.js) - Vite configuration for frontend build
 - [resources/js/main.js](resources/js/main.js) - Vue app entry point
 - [resources/js/router/index.js](resources/js/router/index.js) - Vue Router configuration
@@ -443,7 +444,9 @@ Toporia supports optional packages for extended functionality (source in `packag
   - Install: `composer require toporia/webhook` + `php console vendor:publish --tag=webhook-routes`
   - Routes: [routes/webhook.php](routes/webhook.php) (Inbound webhook endpoints)
 
-- **Tabula** (`toporia/tabula`) - High-performance Excel/CSV import & export (handles millions of rows)
+- **Tabula** (`toporia/tabula`) - High-performance Excel/CSV import & export (handles millions of rows) - See [docs/TABULA.md](docs/TABULA.md) if available
+  - Uses streaming for memory efficiency with large datasets
+  - Supports parallel chunk processing for imports
 - **MongoDB** (`toporia/mongodb`) - MongoDB ODM with embedded documents, references, and aggregation pipelines
 - **Audit** (`toporia/audit`) - Audit logging for models
 - **API Versioning** (`toporia/api-versioning`) - API versioning support

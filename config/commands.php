@@ -39,6 +39,12 @@ return [
     // Email commands
     'email:daily' => App\Presentation\Console\Commands\SendDailyEmailCommand::class,
 
+    // Statistics commands
+    'stats:recalculate' => App\Presentation\Console\Commands\RecalculateStatsCommand::class,
+
+    // Search commands
+    'search:index-posts' => App\Presentation\Console\Commands\IndexPostsCommand::class,
+
     /*
     |--------------------------------------------------------------------------
     | Auto-Discovery

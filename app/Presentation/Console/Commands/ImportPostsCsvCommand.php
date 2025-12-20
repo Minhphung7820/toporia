@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Presentation\Console\Commands;
 
 use Toporia\Framework\Console\Command;
+use Toporia\Framework\Support\Accessors\QueryBuilder;
 use Toporia\Tabula\Tabula;
 use App\Infrastructure\Imports\PostsImport;
 
@@ -15,18 +16,34 @@ use App\Infrastructure\Imports\PostsImport;
  * Optimized for large datasets with batch processing.
  *
  * Supports parallel import with --parallel option for ~4-6x speedup.
+ *
+ * IMPORTANT: Use --skip-triggers for bulk imports to avoid trigger overhead.
+ * After import, run: php console stats:recalculate
  */
 final class ImportPostsCsvCommand extends Command
 {
-    protected string $signature = 'posts:import {file=storage/app/posts.csv : CSV file path} {--parallel=0 : Number of parallel workers (0=sequential)} {--driver=process : Concurrency driver (process, fork, sync)}';
+    protected string $signature = 'posts:import {file=storage/app/posts.csv : CSV file path} {--parallel=0 : Number of parallel workers (0=sequential)} {--driver=process : Concurrency driver (process, fork, sync)} {--skip-triggers : Disable triggers during import (faster, run stats:recalculate after)}';
 
     protected string $description = 'Import posts from CSV file using Tabula';
+
+    /**
+     * Triggers to disable during import.
+     */
+    private array $postsTriggers = [
+        'trg_posts_after_insert',
+        'trg_posts_after_update',
+        'trg_posts_after_delete',
+        'trg_category_counts_after_insert',
+        'trg_category_counts_after_update',
+        'trg_category_counts_after_delete',
+    ];
 
     public function handle(): int
     {
         $filePath = $this->argument('file');
         $workers = (int) $this->option('parallel');
         $driver = $this->option('driver') ?? 'process';
+        $skipTriggers = $this->option('skip-triggers');
 
         if (!file_exists($filePath)) {
             $this->error("File not found: {$filePath}");
@@ -43,11 +60,22 @@ final class ImportPostsCsvCommand extends Command
             $this->output?->writeln("  Mode: Sequential");
         }
 
+        if ($skipTriggers) {
+            $this->output?->writeln("  Triggers: DISABLED (run stats:recalculate after import)");
+        }
+
         $this->newLine();
 
         $startTime = microtime(true);
+        $triggersDropped = false;
 
         try {
+            // Disable triggers if requested
+            if ($skipTriggers) {
+                $this->dropTriggers();
+                $triggersDropped = true;
+            }
+
             $import = $workers > 0
                 ? PostsImport::parallel($workers, $driver)
                 : PostsImport::make();
@@ -74,12 +102,212 @@ final class ImportPostsCsvCommand extends Command
             $rate = $result->getTotalRows() / $elapsed;
             $this->output?->writeln(sprintf("  Rate: %.0f rows/sec", $rate));
 
+            if ($skipTriggers) {
+                $this->newLine();
+                $this->warn("Triggers were disabled. Run: php console stats:recalculate");
+            }
+
         } catch (\Throwable $e) {
             $this->error("Import failed: " . $e->getMessage());
             return 1;
+        } finally {
+            // Restore triggers if they were dropped
+            if ($triggersDropped) {
+                $this->restoreTriggers();
+            }
         }
 
         return 0;
+    }
+
+    /**
+     * Drop triggers temporarily for faster import.
+     */
+    private function dropTriggers(): void
+    {
+        $db = QueryBuilder::getConnection();
+
+        foreach ($this->postsTriggers as $trigger) {
+            try {
+                $db->unprepared("DROP TRIGGER IF EXISTS {$trigger}");
+            } catch (\Throwable $e) {
+                // Ignore errors
+            }
+        }
+    }
+
+    /**
+     * Restore triggers after import.
+     */
+    private function restoreTriggers(): void
+    {
+        $db = QueryBuilder::getConnection();
+
+        // Recreate dashboard statistics triggers for posts
+        $db->unprepared("
+            CREATE TRIGGER trg_posts_after_insert
+            AFTER INSERT ON posts
+            FOR EACH ROW
+            BEGIN
+                UPDATE dashboard_statistics SET stat_value = stat_value + 1, updated_at = NOW() WHERE stat_key = 'posts_total';
+                UPDATE dashboard_statistics SET stat_value = stat_value + NEW.views, updated_at = NOW() WHERE stat_key = 'posts_total_views';
+
+                IF NEW.is_published = 1 THEN
+                    UPDATE dashboard_statistics SET stat_value = stat_value + 1, updated_at = NOW() WHERE stat_key = 'posts_published';
+                ELSEIF NEW.scheduled_at IS NOT NULL THEN
+                    UPDATE dashboard_statistics SET stat_value = stat_value + 1, updated_at = NOW() WHERE stat_key = 'posts_scheduled';
+                ELSE
+                    UPDATE dashboard_statistics SET stat_value = stat_value + 1, updated_at = NOW() WHERE stat_key = 'posts_draft';
+                END IF;
+            END
+        ");
+
+        $db->unprepared("
+            CREATE TRIGGER trg_posts_after_update
+            AFTER UPDATE ON posts
+            FOR EACH ROW
+            BEGIN
+                IF OLD.views != NEW.views THEN
+                    UPDATE dashboard_statistics SET stat_value = stat_value + (NEW.views - OLD.views), updated_at = NOW() WHERE stat_key = 'posts_total_views';
+                END IF;
+
+                IF OLD.is_published != NEW.is_published OR
+                   (OLD.scheduled_at IS NULL) != (NEW.scheduled_at IS NULL) THEN
+
+                    IF OLD.is_published = 1 THEN
+                        UPDATE dashboard_statistics SET stat_value = stat_value - 1, updated_at = NOW() WHERE stat_key = 'posts_published';
+                    ELSEIF OLD.scheduled_at IS NOT NULL THEN
+                        UPDATE dashboard_statistics SET stat_value = stat_value - 1, updated_at = NOW() WHERE stat_key = 'posts_scheduled';
+                    ELSE
+                        UPDATE dashboard_statistics SET stat_value = stat_value - 1, updated_at = NOW() WHERE stat_key = 'posts_draft';
+                    END IF;
+
+                    IF NEW.is_published = 1 THEN
+                        UPDATE dashboard_statistics SET stat_value = stat_value + 1, updated_at = NOW() WHERE stat_key = 'posts_published';
+                    ELSEIF NEW.scheduled_at IS NOT NULL THEN
+                        UPDATE dashboard_statistics SET stat_value = stat_value + 1, updated_at = NOW() WHERE stat_key = 'posts_scheduled';
+                    ELSE
+                        UPDATE dashboard_statistics SET stat_value = stat_value + 1, updated_at = NOW() WHERE stat_key = 'posts_draft';
+                    END IF;
+                END IF;
+            END
+        ");
+
+        $db->unprepared("
+            CREATE TRIGGER trg_posts_after_delete
+            AFTER DELETE ON posts
+            FOR EACH ROW
+            BEGIN
+                UPDATE dashboard_statistics SET stat_value = stat_value - 1, updated_at = NOW() WHERE stat_key = 'posts_total';
+                UPDATE dashboard_statistics SET stat_value = stat_value - OLD.views, updated_at = NOW() WHERE stat_key = 'posts_total_views';
+
+                IF OLD.is_published = 1 THEN
+                    UPDATE dashboard_statistics SET stat_value = stat_value - 1, updated_at = NOW() WHERE stat_key = 'posts_published';
+                ELSEIF OLD.scheduled_at IS NOT NULL THEN
+                    UPDATE dashboard_statistics SET stat_value = stat_value - 1, updated_at = NOW() WHERE stat_key = 'posts_scheduled';
+                ELSE
+                    UPDATE dashboard_statistics SET stat_value = stat_value - 1, updated_at = NOW() WHERE stat_key = 'posts_draft';
+                END IF;
+            END
+        ");
+
+        // Recreate category counts triggers
+        $db->unprepared("
+            CREATE TRIGGER trg_category_counts_after_insert
+            AFTER INSERT ON posts
+            FOR EACH ROW
+            BEGIN
+                IF NEW.category_id IS NOT NULL THEN
+                    INSERT IGNORE INTO category_post_counts (category_id, published_count, total_count, updated_at)
+                    VALUES (NEW.category_id, 0, 0, NOW());
+
+                    UPDATE category_post_counts
+                    SET total_count = total_count + 1, updated_at = NOW()
+                    WHERE category_id = NEW.category_id;
+
+                    IF NEW.is_published = 1 AND (NEW.published_at IS NULL OR NEW.published_at <= NOW()) THEN
+                        UPDATE category_post_counts
+                        SET published_count = published_count + 1, updated_at = NOW()
+                        WHERE category_id = NEW.category_id;
+                    END IF;
+                END IF;
+            END
+        ");
+
+        $db->unprepared("
+            CREATE TRIGGER trg_category_counts_after_update
+            AFTER UPDATE ON posts
+            FOR EACH ROW
+            BEGIN
+                DECLARE old_was_published BOOLEAN;
+                DECLARE new_is_published BOOLEAN;
+
+                SET old_was_published = (OLD.is_published = 1 AND (OLD.published_at IS NULL OR OLD.published_at <= NOW()));
+                SET new_is_published = (NEW.is_published = 1 AND (NEW.published_at IS NULL OR NEW.published_at <= NOW()));
+
+                IF OLD.category_id != NEW.category_id OR
+                   (OLD.category_id IS NULL AND NEW.category_id IS NOT NULL) OR
+                   (OLD.category_id IS NOT NULL AND NEW.category_id IS NULL) THEN
+
+                    IF OLD.category_id IS NOT NULL THEN
+                        UPDATE category_post_counts
+                        SET total_count = GREATEST(total_count - 1, 0), updated_at = NOW()
+                        WHERE category_id = OLD.category_id;
+
+                        IF old_was_published THEN
+                            UPDATE category_post_counts
+                            SET published_count = GREATEST(published_count - 1, 0), updated_at = NOW()
+                            WHERE category_id = OLD.category_id;
+                        END IF;
+                    END IF;
+
+                    IF NEW.category_id IS NOT NULL THEN
+                        INSERT IGNORE INTO category_post_counts (category_id, published_count, total_count, updated_at)
+                        VALUES (NEW.category_id, 0, 0, NOW());
+
+                        UPDATE category_post_counts
+                        SET total_count = total_count + 1, updated_at = NOW()
+                        WHERE category_id = NEW.category_id;
+
+                        IF new_is_published THEN
+                            UPDATE category_post_counts
+                            SET published_count = published_count + 1, updated_at = NOW()
+                            WHERE category_id = NEW.category_id;
+                        END IF;
+                    END IF;
+
+                ELSEIF NEW.category_id IS NOT NULL AND old_was_published != new_is_published THEN
+                    IF new_is_published THEN
+                        UPDATE category_post_counts
+                        SET published_count = published_count + 1, updated_at = NOW()
+                        WHERE category_id = NEW.category_id;
+                    ELSE
+                        UPDATE category_post_counts
+                        SET published_count = GREATEST(published_count - 1, 0), updated_at = NOW()
+                        WHERE category_id = NEW.category_id;
+                    END IF;
+                END IF;
+            END
+        ");
+
+        $db->unprepared("
+            CREATE TRIGGER trg_category_counts_after_delete
+            AFTER DELETE ON posts
+            FOR EACH ROW
+            BEGIN
+                IF OLD.category_id IS NOT NULL THEN
+                    UPDATE category_post_counts
+                    SET total_count = GREATEST(total_count - 1, 0), updated_at = NOW()
+                    WHERE category_id = OLD.category_id;
+
+                    IF OLD.is_published = 1 AND (OLD.published_at IS NULL OR OLD.published_at <= NOW()) THEN
+                        UPDATE category_post_counts
+                        SET published_count = GREATEST(published_count - 1, 0), updated_at = NOW()
+                        WHERE category_id = OLD.category_id;
+                    END IF;
+                END IF;
+            END
+        ");
     }
 
     private function formatTime(float $seconds): string

@@ -39,6 +39,10 @@ use App\Application\Services\Admin\UserAdminService;
 use App\Application\Services\Admin\SettingsService;
 use App\Application\Services\Admin\FeedbackAdminService;
 
+// Search Services
+use App\Application\Services\Search\PostSearchService;
+use Toporia\Framework\Search\SearchManager;
+
 // Admin Repositories
 use App\Infrastructure\Repository\Admin\PostAdminRepository;
 use App\Infrastructure\Repository\Admin\CommentAdminRepository;
@@ -114,13 +118,38 @@ class BlogServiceProvider extends ServiceProvider
      */
     protected function registerBlogServices(ContainerInterface $container): void
     {
-        // PostService
+        // PostSearchService - lazy singleton for Elasticsearch search
+        // Uses closure to defer SearchManager resolution until first use
+        $container->singleton(PostSearchService::class, function ($c) {
+            if (!config('search.enabled', false)) {
+                return null;
+            }
+
+            try {
+                $searchManager = $c->get(SearchManager::class);
+                return new PostSearchService($searchManager);
+            } catch (\Throwable $e) {
+                log_warning('Elasticsearch unavailable for search', ['error' => $e->getMessage()]);
+                return null;
+            }
+        });
+
+        // PostService with Elasticsearch support
         $container->singleton(PostService::class, function ($c) {
+            // Get PostSearchService - may be null if ES is unavailable
+            $postSearchService = null;
+            try {
+                $postSearchService = $c->get(PostSearchService::class);
+            } catch (\Throwable) {
+                // ES unavailable - continue without search
+            }
+
             return new PostService(
                 $c->get(PostRepository::class),
                 $c->get(TagRepository::class),
                 $c->get(CategoryRepository::class),
-                $c->get(UserRepository::class)
+                $c->get(UserRepository::class),
+                $postSearchService
             );
         });
 
@@ -179,10 +208,19 @@ class BlogServiceProvider extends ServiceProvider
             );
         });
 
-        // PostAdminService
+        // PostAdminService with Elasticsearch support
         $container->singleton(PostAdminService::class, function ($c) {
+            // Get PostSearchService - may be null if ES is unavailable
+            $postSearchService = null;
+            try {
+                $postSearchService = $c->get(PostSearchService::class);
+            } catch (\Throwable) {
+                // ES unavailable - continue without search
+            }
+
             return new PostAdminService(
-                $c->get(PostAdminRepository::class)
+                $c->get(PostAdminRepository::class),
+                $postSearchService
             );
         });
 
