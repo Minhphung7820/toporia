@@ -18,11 +18,14 @@ use App\Infrastructure\Imports\PostsImport;
  * Supports parallel import with --parallel option for ~4-6x speedup.
  *
  * IMPORTANT: Use --skip-triggers for bulk imports to avoid trigger overhead.
- * After import, run: php console stats:recalculate
+ *
+ * After import completes, automatically runs:
+ * 1. stats:recalculate - Update pre-computed statistics
+ * 2. search:index-posts --fresh - Re-index all posts to Elasticsearch
  */
 final class ImportPostsCsvCommand extends Command
 {
-    protected string $signature = 'posts:import {file=storage/app/posts.csv : CSV file path} {--parallel=0 : Number of parallel workers (0=sequential)} {--driver=process : Concurrency driver (process, fork, sync)} {--skip-triggers : Disable triggers during import (faster, run stats:recalculate after)}';
+    protected string $signature = 'posts:import {file=storage/app/posts.csv : CSV file path} {--parallel=0 : Number of parallel workers (0=sequential)} {--driver=process : Concurrency driver (process, fork, sync)} {--skip-triggers : Disable triggers during import (faster)}';
 
     protected string $description = 'Import posts from CSV file using Tabula';
 
@@ -43,7 +46,7 @@ final class ImportPostsCsvCommand extends Command
         $filePath = $this->argument('file');
         $workers = (int) $this->option('parallel');
         $driver = $this->option('driver') ?? 'process';
-        $skipTriggers = $this->option('skip-triggers');
+        $skipTriggers = $this->option('skip-triggers', false);
 
         if (!file_exists($filePath)) {
             $this->error("File not found: {$filePath}");
@@ -102,11 +105,20 @@ final class ImportPostsCsvCommand extends Command
             $rate = $result->getTotalRows() / $elapsed;
             $this->output?->writeln(sprintf("  Rate: %.0f rows/sec", $rate));
 
-            if ($skipTriggers) {
-                $this->newLine();
-                $this->warn("Triggers were disabled. Run: php console stats:recalculate");
-            }
+            // Always run post-import tasks
+            $this->newLine();
+            $this->info('Running post-import tasks...');
 
+            // 1. Recalculate statistics
+            $this->output?->writeln('  [1/2] Recalculating statistics...');
+            $this->call('stats:recalculate');
+
+            // 2. Index to Elasticsearch
+            $this->output?->writeln('  [2/2] Indexing to Elasticsearch...');
+            $this->call('search:index-posts', ['--fresh' => true]);
+
+            $this->newLine();
+            $this->success('All post-import tasks completed!');
         } catch (\Throwable $e) {
             $this->error("Import failed: " . $e->getMessage());
             return 1;
