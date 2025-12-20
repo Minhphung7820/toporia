@@ -273,12 +273,11 @@ final class ImportExportController extends BaseController
         $filePath = $result['data']['file_path'];
         $filename = $result['data']['filename'];
 
-        // Return file download response
-        return $this->response
-            ->setHeader('Content-Type', 'text/csv')
-            ->setHeader('Content-Disposition', "attachment; filename=\"{$filename}\"")
-            ->setHeader('Content-Length', (string) filesize($filePath))
-            ->setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-            ->setBody(file_get_contents($filePath));
+        // Return file download response using ResponseFactory
+        // Use application/octet-stream to force browser download instead of display
+        return response()->download($filePath, $filename, [
+            'Content-Type' => 'application/octet-stream',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+        ]);
     }
 }

@@ -92,6 +92,9 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
             $this->reportProgress(20, 'Preparing export...');
             $export = $this->createExport();
 
+            // Set total count for accurate progress tracking
+            $export->withTotalCount($totalRows);
+
             // Generate output file path
             $filename = sprintf(
                 'posts_export_%s_%s.csv',
@@ -108,7 +111,7 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
 
             // Configure progress callback
             $lastProgress = 20;
-            $export->onProgress(function (int $processed, int $total) use (&$lastProgress, $job) {
+            $export->withProgressCallback(function (int $processed, int $total) use (&$lastProgress, $totalRows) {
                 // Calculate progress (20-90% for export phase)
                 $progress = 20 + (int) (($processed / max(1, $total)) * 70);
 
@@ -117,8 +120,15 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
                     $lastProgress = $progress;
                     $this->reportProgress($progress, "Exporting: {$processed}/{$total} rows");
 
-                    // Update job record
-                    $job->updateProcessedRows($processed, $processed, 0);
+                    // Update job record directly (avoid stale $job->total_rows issue)
+                    $dbProgress = $totalRows > 0 ? (int) (($processed / $totalRows) * 100) : 0;
+                    ImportExportJobModel::where('id', $this->jobId)->update([
+                        'processed_rows' => $processed,
+                        'success_rows' => $processed,
+                        'failed_rows' => 0,
+                        'progress' => min(100, $dbProgress),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
                 }
             });
 

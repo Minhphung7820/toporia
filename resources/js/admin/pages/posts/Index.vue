@@ -359,8 +359,8 @@ const deletePost = async () => {
 
 // Import/Export handlers
 const onImportCompleted = () => {
-  showImportModal.value = false;
-  // Refresh posts list
+  // Don't close modal - let user see the completed status and click "Done"
+  // Only refresh posts list in background
   store.fetchPostsCursor(null, true);
 };
 

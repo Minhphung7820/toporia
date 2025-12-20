@@ -370,7 +370,9 @@ const cancelJob = async () => {
 
 const downloadFile = () => {
   if (!activeJob.value?.id) return;
-  window.open(`/api/admin/posts/jobs/${activeJob.value.id}/download`, '_blank');
+
+  // Use window.location to trigger download - browser will use Content-Disposition header
+  window.location.href = `/api/admin/posts/jobs/${activeJob.value.id}/download`;
 };
 
 const pollJobStatus = async () => {
