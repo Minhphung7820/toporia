@@ -67,7 +67,7 @@
         <div v-else-if="searchResults.length > 0">
           <div class="results-header">
             <h2 class="results-title">
-              Search results for "<span class="highlight">{{ currentQuery }}</span>"
+              Found <span class="highlight">{{ formatNumber(searchPagination.total) }}</span> results for "<span class="highlight">{{ currentQuery }}</span>"
             </h2>
           </div>
 
@@ -205,6 +205,12 @@ const performSearch = (query, cursor = null, direction = 'next') => {
     hasSearched.value = true;
     blogStore.searchPosts(query, 10, cursor, direction);
   }
+};
+
+// Format number with thousand separators
+const formatNumber = (num) => {
+  if (!num) return '0';
+  return num.toLocaleString();
 };
 
 // Watch query param changes (for browser back/forward)

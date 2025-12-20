@@ -380,6 +380,7 @@ final class PostSearchService
                 ['id' => ['order' => $direction === 'prev' ? 'asc' : 'desc']],
             ],
             'size' => $limit + 1, // Fetch one extra to check has_more
+            'track_total_hits' => true,
         ];
 
         if ($searchAfter) {
