@@ -28,6 +28,7 @@ use App\Presentation\Http\Controllers\Api\Admin\UserAdminController;
 use App\Presentation\Http\Controllers\Api\Admin\SettingsAdminController;
 use App\Presentation\Http\Controllers\Api\Admin\FeedbackAdminController;
 use App\Presentation\Http\Controllers\Api\Admin\UploadController;
+use App\Presentation\Http\Controllers\Api\Admin\ImportExportController;
 use Toporia\Framework\Support\Accessors\Terminal;
 use Toporia\Framework\Support\Facades\Console;
 
@@ -49,6 +50,15 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'admin']], function 
     Route::get('/dashboard/recent-comments', [DashboardController::class, 'recentComments']);
     Route::get('/dashboard/charts', [DashboardController::class, 'charts']);
     Route::get('/dashboard/quick-stats', [DashboardController::class, 'quickStats']);
+
+    // Import/Export - Must be BEFORE /posts/{id} to avoid route conflict
+    Route::post('/posts/import', [ImportExportController::class, 'import']);
+    Route::post('/posts/export', [ImportExportController::class, 'export']);
+    Route::get('/posts/jobs', [ImportExportController::class, 'jobs']);
+    Route::get('/posts/jobs/active', [ImportExportController::class, 'activeJobs']);
+    Route::get('/posts/jobs/{id}', [ImportExportController::class, 'status']);
+    Route::post('/posts/jobs/{id}/cancel', [ImportExportController::class, 'cancel']);
+    Route::get('/posts/jobs/{id}/download', [ImportExportController::class, 'download']);
 
     // Posts Management - Controller handles ownership validation for editors
     Route::get('/posts', [PostAdminController::class, 'index']);

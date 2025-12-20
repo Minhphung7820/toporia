@@ -178,6 +178,54 @@ ChannelRoute::channel('premium.{contentId}', function ($user, $contentId) {
 });
 
 // ============================================================================
+// IMPORT/EXPORT JOB CHANNELS - Real-time progress tracking
+// ============================================================================
+
+// Import job progress channel - user can only subscribe to their own jobs
+// Channel format: import.jobs.{jobId}
+ChannelRoute::channel('import.jobs.{jobId}', function ($user, $jobId) {
+    // Get user ID from authenticated user
+    $userId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
+
+    if ($userId === 0) {
+        return false;
+    }
+
+    // Check if the job belongs to the user
+    $job = \App\Infrastructure\Persistence\Models\ImportExportJobModel::find($jobId);
+
+    if (!$job) {
+        return false;
+    }
+
+    // Allow if user owns the job OR user is admin
+    $roles = $user['roles'] ?? [];
+    $isAdmin = in_array('admin', $roles, true);
+
+    return $isAdmin || (int) $job->user_id === $userId;
+}, ['guards' => ['api', 'web', 'admin']]);
+
+// Export job progress channel
+ChannelRoute::channel('export.jobs.{jobId}', function ($user, $jobId) {
+    $userId = (int) ($user['id'] ?? $user['user_id'] ?? 0);
+
+    if ($userId === 0) {
+        return false;
+    }
+
+    $job = \App\Infrastructure\Persistence\Models\ImportExportJobModel::find($jobId);
+
+    if (!$job) {
+        return false;
+    }
+
+    $roles = $user['roles'] ?? [];
+    $isAdmin = in_array('admin', $roles, true);
+
+    return $isAdmin || (int) $job->user_id === $userId;
+}, ['guards' => ['api', 'web', 'admin']]);
+
+// ============================================================================
 // EXAMPLE PATTERNS
 // ============================================================================
 

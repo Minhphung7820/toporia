@@ -6,12 +6,30 @@
           <h1>Posts</h1>
           <p>Manage your blog posts</p>
         </div>
-        <router-link to="/admin/posts/create" class="btn btn-primary">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          New Post
-        </router-link>
+        <div class="header-actions">
+          <button class="btn btn-secondary" @click="showImportModal = true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <span>Import</span>
+          </button>
+          <button class="btn btn-secondary" @click="showExportModal = true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>Export</span>
+          </button>
+          <router-link to="/admin/posts/create" class="btn btn-primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <span>New Post</span>
+          </router-link>
+        </div>
       </div>
 
       <!-- Filters -->
@@ -172,6 +190,24 @@
         @confirm="deletePost"
         @cancel="showDeleteDialog = false"
       />
+
+      <!-- Import Modal -->
+      <ImportExportModal
+        v-if="showImportModal"
+        mode="import"
+        :categories="categories"
+        @close="showImportModal = false"
+        @completed="onImportCompleted"
+      />
+
+      <!-- Export Modal -->
+      <ImportExportModal
+        v-if="showExportModal"
+        mode="export"
+        :categories="categories"
+        @close="showExportModal = false"
+        @completed="onExportCompleted"
+      />
     </div>
   </AdminLayout>
 </template>
@@ -182,12 +218,15 @@ import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
 import Pagination from '../../components/shared/Pagination.vue';
 import ConfirmDialog from '../../components/shared/ConfirmDialog.vue';
+import ImportExportModal from '../../components/shared/ImportExportModal.vue';
 import { usePostsStore } from '../../stores/posts';
+import { useCategoriesStore } from '../../stores/categories';
 import { debounce } from 'lodash-es';
 
 const route = useRoute();
 const router = useRouter();
 const store = usePostsStore();
+const categoriesStore = useCategoriesStore();
 
 const filters = ref({
   search: '',
@@ -197,8 +236,11 @@ const filters = ref({
 
 const showDeleteDialog = ref(false);
 const postToDelete = ref(null);
+const showImportModal = ref(false);
+const showExportModal = ref(false);
 
 const posts = computed(() => store.items || []);
+const categories = computed(() => categoriesStore.selectOptions || []);
 const pagination = computed(() => store.pagination);
 const paginationType = computed(() => store.paginationType);
 const cursor = computed(() => store.cursor);
@@ -315,6 +357,17 @@ const deletePost = async () => {
   }
 };
 
+// Import/Export handlers
+const onImportCompleted = () => {
+  showImportModal.value = false;
+  // Refresh posts list
+  store.fetchPostsCursor(null, true);
+};
+
+const onExportCompleted = () => {
+  // Export completed, modal will show download button
+};
+
 // Restore scroll position after data load
 const restoreScrollPosition = () => {
   const savedScroll = route.query.scroll;
@@ -345,6 +398,9 @@ onMounted(async () => {
   filters.value = { search, status, is_featured: isFeatured };
   store.setFilters(filters.value);
   store.setPerPage(perPage);
+
+  // Fetch categories for export modal
+  categoriesStore.fetchSelectOptions();
 
   // If we have a saved cursor, load multiple pages to restore state
   if (savedCursor && loadCount > 1) {
@@ -385,6 +441,11 @@ onMounted(async () => {
 .page-header p {
   color: #6b7280;
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .btn {

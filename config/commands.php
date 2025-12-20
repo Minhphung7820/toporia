@@ -45,6 +45,9 @@ return [
     // Search commands
     'search:index-posts' => App\Presentation\Console\Commands\IndexPostsCommand::class,
 
+    // Jobs commands
+    'jobs:redispatch' => App\Presentation\Console\Commands\RedispatchImportJobsCommand::class,
+
     /*
     |--------------------------------------------------------------------------
     | Auto-Discovery
