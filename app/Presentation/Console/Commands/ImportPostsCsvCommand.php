@@ -17,7 +17,7 @@ use App\Infrastructure\Imports\PostsImport;
  *
  * Supports parallel import with --parallel option for ~4-6x speedup.
  *
- * IMPORTANT: Use --skip-triggers for bulk imports to avoid trigger overhead.
+ * Triggers are automatically disabled during import for performance.
  *
  * After import completes, automatically runs:
  * 1. stats:recalculate - Update pre-computed statistics
@@ -25,7 +25,7 @@ use App\Infrastructure\Imports\PostsImport;
  */
 final class ImportPostsCsvCommand extends Command
 {
-    protected string $signature = 'posts:import {file=storage/app/posts.csv : CSV file path} {--parallel=0 : Number of parallel workers (0=sequential)} {--driver=process : Concurrency driver (process, fork, sync)} {--skip-triggers : Disable triggers during import (faster)}';
+    protected string $signature = 'posts:import {file=storage/app/posts.csv : CSV file path} {--parallel=0 : Number of parallel workers (0=sequential)} {--driver=process : Concurrency driver (process, fork, sync)}';
 
     protected string $description = 'Import posts from CSV file using Tabula';
 
@@ -46,7 +46,6 @@ final class ImportPostsCsvCommand extends Command
         $filePath = $this->argument('file');
         $workers = (int) $this->option('parallel');
         $driver = $this->option('driver') ?? 'process';
-        $skipTriggers = $this->option('skip-triggers', false);
 
         if (!file_exists($filePath)) {
             $this->error("File not found: {$filePath}");
@@ -63,9 +62,7 @@ final class ImportPostsCsvCommand extends Command
             $this->output?->writeln("  Mode: Sequential");
         }
 
-        if ($skipTriggers) {
-            $this->output?->writeln("  Triggers: DISABLED (run stats:recalculate after import)");
-        }
+        $this->output?->writeln("  Triggers: DISABLED");
 
         $this->newLine();
 
@@ -73,11 +70,9 @@ final class ImportPostsCsvCommand extends Command
         $triggersDropped = false;
 
         try {
-            // Disable triggers if requested
-            if ($skipTriggers) {
-                $this->dropTriggers();
-                $triggersDropped = true;
-            }
+            // Always disable triggers for bulk import performance
+            $this->dropTriggers();
+            $triggersDropped = true;
 
             $import = $workers > 0
                 ? PostsImport::parallel($workers, $driver)
