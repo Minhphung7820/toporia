@@ -8,7 +8,7 @@
               <rect width="32" height="32" rx="8" fill="#1a1a1a"/>
               <path d="M8 12h16M8 16h12M8 20h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
             </svg>
-            Toporia
+            {{ siteName }}
           </router-link>
         </div>
 
@@ -92,7 +92,7 @@
 
     <footer class="footer">
       <div class="container">
-        <p>&copy; {{ currentYear }} Toporia Framework</p>
+        <p>&copy; {{ currentYear }} {{ siteName }}</p>
       </div>
     </footer>
   </div>
@@ -100,6 +100,7 @@
 
 <script>
 import { useAuthStore } from './stores/auth';
+import { useSettingsStore } from './stores/settings';
 
 export default {
   name: 'App',
@@ -113,6 +114,7 @@ export default {
     currentYear() { return new Date().getFullYear(); },
     user() { return this.authStore.user; },
     hasAdminAccess() { return this.authStore.hasAdminAccess; },
+    siteName() { return this.settingsStore.siteName; },
     userInitials() {
       if (!this.user?.name) return '?';
       return this.user.name
@@ -136,12 +138,22 @@ export default {
   },
   setup() {
     const authStore = useAuthStore();
+    const settingsStore = useSettingsStore();
     authStore.initialize();
-    return { authStore };
+    settingsStore.initialize();
+    return { authStore, settingsStore };
   },
   watch: {
     isMenuOpen(val) {
       document.body.classList[val ? 'add' : 'remove']('menu-open');
+    },
+    siteName: {
+      immediate: true,
+      handler(val) {
+        if (val) {
+          document.title = val;
+        }
+      },
     },
   },
   mounted() {

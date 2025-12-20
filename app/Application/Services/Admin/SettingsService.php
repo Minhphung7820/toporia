@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Services\Admin;
 
+use App\Application\Services\SiteSettingsService;
 use App\Infrastructure\Persistence\Models\AdminActivityLogModel;
 use App\Infrastructure\Persistence\Models\SiteSettingModel;
 
@@ -58,13 +59,37 @@ final class SettingsService
                 'group' => $group,
                 'settings' => array_map(fn($s) => [
                     'key' => $s->key,
-                    'value' => $s->value,
+                    'value' => $this->castValueForDisplay($s->value, $s->type),
                     'type' => $s->type,
+                    'label' => $s->label ?? $this->formatKeyAsLabel($s->key),
                     'description' => $s->description,
                 ], $settings->all()),
             ],
             'message' => 'Settings retrieved successfully',
         ];
+    }
+
+    /**
+     * Format setting key as human-readable label.
+     * Example: 'posts_per_page' => 'Posts Per Page'
+     */
+    private function formatKeyAsLabel(string $key): string
+    {
+        return ucwords(str_replace(['_', '-'], ' ', $key));
+    }
+
+    /**
+     * Cast value for display (e.g., '1' to true for boolean).
+     */
+    private function castValueForDisplay(mixed $value, string $type): mixed
+    {
+        return match ($type) {
+            'boolean' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            'integer' => (int) $value,
+            'float' => (float) $value,
+            'json', 'array' => is_string($value) ? json_decode($value, true) : $value,
+            default => $value,
+        };
     }
 
     /**
@@ -98,6 +123,7 @@ final class SettingsService
         // Cast value based on type
         $castedValue = $this->castValue($value, $setting->type);
 
+        // setValue() triggers Observer which clears cache automatically
         SiteSettingModel::setValue($key, $castedValue);
 
         // Log activity
@@ -135,6 +161,7 @@ final class SettingsService
             }
 
             $castedValue = $this->castValue($value, $setting->type);
+            // setValue() triggers Observer which clears cache automatically
             SiteSettingModel::setValue($key, $castedValue);
             $updated++;
         }
@@ -276,6 +303,9 @@ final class SettingsService
         foreach ($defaults as $setting) {
             SiteSettingModel::setValue($setting['key'], $setting['value']);
         }
+
+        // Clear cached settings so changes take effect immediately
+        SiteSettingsService::getInstance()->clearCache();
 
         // Log activity
         $scope = $group ? "group: {$group}" : 'all settings';

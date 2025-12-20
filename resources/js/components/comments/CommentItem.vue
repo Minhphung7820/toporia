@@ -124,6 +124,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useCommentsStore } from '../../stores/comments';
+import { useSettingsStore } from '../../stores/settings';
 
 const props = defineProps({
   comment: {
@@ -147,15 +148,19 @@ const props = defineProps({
 defineEmits(['reply']);
 
 const commentsStore = useCommentsStore();
+const settingsStore = useSettingsStore();
 
 // Local state
 const showMenu = ref(false);
 
-// Max reply depth (from backend)
-const MAX_DEPTH = 3;
+// Max reply depth (from settings)
+const maxDepth = computed(() => settingsStore.commentsMaxDepth);
 
 // Computed
-const canReply = computed(() => props.depth < MAX_DEPTH - 1);
+const canReply = computed(() => {
+  // Comments must be enabled AND within depth limit
+  return settingsStore.commentsEnabled && props.depth < maxDepth.value - 1;
+});
 const loading = computed(() => commentsStore.loading);
 
 // Methods

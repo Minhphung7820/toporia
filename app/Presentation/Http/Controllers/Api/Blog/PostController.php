@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Presentation\Http\Controllers\Api\Blog;
 
 use App\Application\Services\Blog\PostService;
+use App\Application\Services\SiteSettingsService;
 use App\Infrastructure\Persistence\Models\CategoryModel;
 use App\Infrastructure\Persistence\Models\DashboardStatisticsModel;
 use App\Presentation\Http\Controllers\BaseController;
@@ -14,15 +15,21 @@ use Toporia\Framework\Http\Response;
 
 /**
  * Post Controller - Public blog post endpoints.
+ *
+ * Uses SiteSettingsService for default values (cached for performance).
+ * Settings are enforced from database, client can only request within limits.
  */
 final class PostController extends BaseController
 {
+    private SiteSettingsService $settings;
+
     public function __construct(
         Request $request,
         Response $response,
         private readonly PostService $postService
     ) {
         parent::__construct($request, $response);
+        $this->settings = SiteSettingsService::getInstance();
     }
 
     /**
@@ -32,7 +39,9 @@ final class PostController extends BaseController
      */
     public function index(Request $request): JsonResponseInterface
     {
-        $perPage = min((int) $request->query('per_page', 10), 50);
+        // Use settings default, allow override up to max 50
+        $defaultPerPage = $this->settings->postsPerPage();
+        $perPage = $this->getLimit($request, 'per_page', $defaultPerPage, 50);
         $cursor = $request->query('cursor');
         $direction = $request->query('direction', 'next');
 
@@ -64,7 +73,9 @@ final class PostController extends BaseController
      */
     public function featured(Request $request): JsonResponseInterface
     {
-        $limit = min((int) $request->query('limit', 5), 20);
+        // Use settings default, allow override up to max 20
+        $defaultLimit = $this->settings->featuredPostsCount();
+        $limit = $this->getLimit($request, 'limit', $defaultLimit, 20);
 
         $result = $this->postService->getFeaturedPosts($limit);
 
@@ -78,7 +89,9 @@ final class PostController extends BaseController
      */
     public function popular(Request $request): JsonResponseInterface
     {
-        $limit = min((int) $request->query('limit', 10), 50);
+        // Use settings default, allow override up to max 50
+        $defaultLimit = $this->settings->popularPostsCount();
+        $limit = $this->getLimit($request, 'limit', $defaultLimit, 50);
 
         $result = $this->postService->getMostViewedPosts($limit);
 
@@ -92,7 +105,9 @@ final class PostController extends BaseController
      */
     public function latest(Request $request): JsonResponseInterface
     {
-        $limit = min((int) $request->query('limit', 10), 50);
+        // Use settings default, allow override up to max 50
+        $defaultLimit = $this->settings->postsPerPage();
+        $limit = $this->getLimit($request, 'limit', $defaultLimit, 50);
 
         $result = $this->postService->getLatestPosts($limit);
 
@@ -106,7 +121,9 @@ final class PostController extends BaseController
      */
     public function related(int $id, Request $request): JsonResponseInterface
     {
-        $limit = min((int) $request->query('limit', 4), 10);
+        // Use settings default, allow override up to max 10
+        $defaultLimit = $this->settings->relatedPostsCount();
+        $limit = $this->getLimit($request, 'limit', $defaultLimit, 10);
 
         $result = $this->postService->getRelatedPosts($id, $limit);
 
@@ -120,7 +137,8 @@ final class PostController extends BaseController
      */
     public function byCategory(string $slug, Request $request): JsonResponseInterface
     {
-        $perPage = min((int) $request->query('per_page', 10), 50);
+        $defaultPerPage = $this->settings->postsPerPage();
+        $perPage = $this->getLimit($request, 'per_page', $defaultPerPage, 50);
         $cursor = $request->query('cursor');
         $direction = $request->query('direction', 'next');
 
@@ -140,7 +158,8 @@ final class PostController extends BaseController
      */
     public function byTag(string $slug, Request $request): JsonResponseInterface
     {
-        $perPage = min((int) $request->query('per_page', 10), 50);
+        $defaultPerPage = $this->settings->postsPerPage();
+        $perPage = $this->getLimit($request, 'per_page', $defaultPerPage, 50);
         $cursor = $request->query('cursor');
         $direction = $request->query('direction', 'next');
 
@@ -161,7 +180,8 @@ final class PostController extends BaseController
     public function search(Request $request): JsonResponseInterface
     {
         $query = $request->query('q', '');
-        $perPage = min((int) $request->query('per_page', 10), 50);
+        $defaultPerPage = $this->settings->postsPerPage();
+        $perPage = $this->getLimit($request, 'per_page', $defaultPerPage, 50);
         $cursor = $request->query('cursor');
         $direction = $request->query('direction', 'next');
 
@@ -208,5 +228,21 @@ final class PostController extends BaseController
                 'views' => $postStats['total_views'],
             ],
         ]);
+    }
+
+    /**
+     * Get limit from request with default and max constraints.
+     */
+    private function getLimit(Request $request, string $param, int $default, int $max): int
+    {
+        $value = $request->query($param);
+
+        // If not provided, use default from settings
+        if ($value === null || $value === '') {
+            return $default;
+        }
+
+        // Ensure within bounds: min 1, max as specified
+        return max(1, min((int) $value, $max));
     }
 }

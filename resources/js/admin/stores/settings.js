@@ -45,7 +45,9 @@ export const useSettingsStore = defineStore('admin-settings', {
       try {
         const response = await settings.groups();
         if (response.data.success) {
-          this.groups = Array.isArray(response.data.data) ? response.data.data : [];
+          // API returns { data: { groups: [...] } }
+          const groupsData = response.data.data?.groups;
+          this.groups = Array.isArray(groupsData) ? groupsData : [];
         }
       } catch (error) {
         console.error('Failed to fetch groups:', error);
@@ -60,7 +62,11 @@ export const useSettingsStore = defineStore('admin-settings', {
       try {
         const response = await settings.byGroup(group);
         if (response.data.success) {
-          this.groupSettings = response.data.data;
+          // API returns { data: { group: 'general', settings: [...] } }
+          const settingsData = response.data.data?.settings;
+          this.groupSettings = Array.isArray(settingsData) ? settingsData : [];
+          // Also update items for getSettingValue getter
+          this.items = [...this.groupSettings];
         }
       } catch (error) {
         this.error = error.response?.data?.message || 'Failed to fetch group settings';

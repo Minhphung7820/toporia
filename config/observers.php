@@ -31,5 +31,10 @@ return [
     \App\Infrastructure\Persistence\Models\PostModel::class => [
         \App\Application\Observers\PostObserver::class,
     ],
+
+    // Site Setting Observer - Clear cache on settings change
+    \App\Infrastructure\Persistence\Models\SiteSettingModel::class => [
+        \App\Application\Observers\SiteSettingObserver::class,
+    ],
 ];
 

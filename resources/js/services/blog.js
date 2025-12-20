@@ -260,6 +260,26 @@ export const comments = {
 };
 
 /**
+ * Site Settings API endpoints
+ */
+export const settings = {
+  /**
+   * Get all public settings
+   */
+  getAll() {
+    return http.get('/blog/settings');
+  },
+
+  /**
+   * Get a single setting by key
+   * @param {string} key - Setting key
+   */
+  get(key) {
+    return http.get(`/blog/settings/${key}`);
+  },
+};
+
+/**
  * Feedback API endpoints
  */
 export const feedback = {
@@ -294,5 +314,6 @@ export default {
   categories,
   tags,
   comments,
+  settings,
   feedback,
 };

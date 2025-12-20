@@ -33,13 +33,22 @@
       </div>
     </div>
 
-    <!-- Comment Form -->
+    <!-- Comment Form (only show if comments enabled) -->
     <CommentForm
-      v-if="!replyingTo"
+      v-if="commentsEnabled && !replyingTo"
       :post-id="postId"
       @submitted="handleCommentSubmitted"
       class="comment-form-section"
     />
+
+    <!-- Comments Disabled Message -->
+    <div v-else-if="!commentsEnabled" class="comments-disabled">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M4.93 4.93l14.14 14.14"/>
+      </svg>
+      <span>Comments are disabled for this post</span>
+    </div>
 
     <!-- Loading State -->
     <div v-if="loading.fetch" class="loading-comments">
@@ -113,6 +122,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useCommentsStore } from '../../stores/comments';
+import { useSettingsStore } from '../../stores/settings';
 import CommentItem from './CommentItem.vue';
 import CommentForm from './CommentForm.vue';
 import CommentSkeleton from './CommentSkeleton.vue';
@@ -125,6 +135,10 @@ const props = defineProps({
 });
 
 const commentsStore = useCommentsStore();
+const settingsStore = useSettingsStore();
+
+// Check if comments are enabled
+const commentsEnabled = computed(() => settingsStore.commentsEnabled);
 
 // Local state
 const showToast = ref(false);
@@ -258,6 +272,25 @@ onUnmounted(() => {
   margin-bottom: 32px;
   padding-bottom: 32px;
   border-bottom: 1px solid #e5e5e5;
+}
+
+/* Comments Disabled Message */
+.comments-disabled {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: #f9f9f9;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.comments-disabled svg {
+  flex-shrink: 0;
+  color: #999;
 }
 
 .comments-title {

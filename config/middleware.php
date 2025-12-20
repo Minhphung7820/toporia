@@ -12,6 +12,7 @@ use App\Presentation\Http\Middleware\AddSecurityHeaders;
 use App\Presentation\Http\Middleware\AdminMiddleware;
 use App\Presentation\Http\Middleware\AdminOnlyMiddleware;
 use App\Presentation\Http\Middleware\Authenticate;
+use App\Presentation\Http\Middleware\CommentsEnabledMiddleware;
 use App\Presentation\Http\Middleware\LogRequest;
 use App\Presentation\Http\Middleware\ValidateJsonRequest;
 use Toporia\Framework\Http\Middleware\CsrfProtection;
@@ -88,6 +89,9 @@ return [
         'replay' => ReplayAttackProtection::class,
         'cors' => HandleCors::class,  // Auto-wires: config
         'throttle' => ThrottleRequests::class,  // Supports: throttle:api-per-user or throttle:60,1
+
+        // Feature toggles (based on site settings)
+        'comments.enabled' => CommentsEnabledMiddleware::class,
 
         // Add more aliases here as needed
         // 'guest' => GuestMiddleware::class,

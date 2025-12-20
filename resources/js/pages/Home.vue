@@ -342,10 +342,12 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useBlogStore } from '../stores/blog';
+import { useSettingsStore } from '../stores/settings';
 import http from '../services/http';
 
 const router = useRouter();
 const blogStore = useBlogStore();
+const settingsStore = useSettingsStore();
 
 // Local state
 const searchQuery = ref('');
@@ -481,11 +483,20 @@ const fetchStats = async () => {
 
 // Lifecycle
 onMounted(async () => {
+  // Wait for settings to be loaded first
+  if (!settingsStore.initialized) {
+    await settingsStore.initialize();
+  }
+
+  // Use settings for counts
+  const featuredCount = settingsStore.featuredPostsCount;
+  const popularCount = settingsStore.popularPostsCount;
+
   // Fetch all data in parallel
   await Promise.all([
-    blogStore.fetchFeaturedPosts(4),
+    blogStore.fetchFeaturedPosts(featuredCount),
     blogStore.fetchLatestPosts(8),
-    blogStore.fetchPopularPosts(5),
+    blogStore.fetchPopularPosts(popularCount),
     blogStore.fetchCategoriesTreeWithCounts(),
     blogStore.fetchPopularTags(15),
     fetchStats(),

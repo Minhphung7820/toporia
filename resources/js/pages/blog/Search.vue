@@ -133,12 +133,14 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useBlogStore } from '../../stores/blog';
+import { useSettingsStore } from '../../stores/settings';
 import PostCard from '../../components/blog/PostCard.vue';
 import PostCardSkeleton from '../../components/blog/PostCardSkeleton.vue';
 
 const route = useRoute();
 const router = useRouter();
 const blogStore = useBlogStore();
+const settingsStore = useSettingsStore();
 
 // Local state
 const searchQuery = ref('');
@@ -173,7 +175,7 @@ const handleSearch = () => {
 
   hasSearched.value = true;
   updateUrl(searchQuery.value);
-  blogStore.searchPosts(searchQuery.value, 10, null, 'next');
+  blogStore.searchPosts(searchQuery.value, settingsStore.postsPerPage, null, 'next');
 };
 
 const clearSearch = () => {
@@ -186,7 +188,7 @@ const clearSearch = () => {
 const handleNextPage = async () => {
   if (searchPagination.value.nextCursor) {
     updateUrl(currentQuery.value, searchPagination.value.nextCursor, 'next');
-    await blogStore.searchPosts(currentQuery.value, 10, searchPagination.value.nextCursor, 'next');
+    await blogStore.searchPosts(currentQuery.value, settingsStore.postsPerPage, searchPagination.value.nextCursor, 'next');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 };
@@ -194,7 +196,7 @@ const handleNextPage = async () => {
 const handlePrevPage = async () => {
   if (searchPagination.value.prevCursor) {
     updateUrl(currentQuery.value, searchPagination.value.prevCursor, 'prev');
-    await blogStore.searchPosts(currentQuery.value, 10, searchPagination.value.prevCursor, 'prev');
+    await blogStore.searchPosts(currentQuery.value, settingsStore.postsPerPage, searchPagination.value.prevCursor, 'prev');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 };
@@ -203,7 +205,7 @@ const performSearch = (query, cursor = null, direction = 'next') => {
   if (query && query.trim().length >= 2) {
     searchQuery.value = query;
     hasSearched.value = true;
-    blogStore.searchPosts(query, 10, cursor, direction);
+    blogStore.searchPosts(query, settingsStore.postsPerPage, cursor, direction);
   }
 };
 
@@ -223,7 +225,7 @@ watch(() => route.query, (newQuery) => {
     if (query && query !== currentQuery.value) {
       performSearch(query, cursor, direction);
     } else if (query && cursor) {
-      blogStore.searchPosts(query, 10, cursor, direction);
+      blogStore.searchPosts(query, settingsStore.postsPerPage, cursor, direction);
     }
   }
 });

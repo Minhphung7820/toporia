@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Services\Blog;
 
+use App\Application\Services\SiteSettingsService;
 use App\Domain\Contracts\Repository\CommentRepository;
 use App\Domain\Contracts\Repository\PostRepository;
 use App\Domain\Entities\Comment;
@@ -70,6 +71,13 @@ final class CommentService
      */
     public function createComment(array $data, ?int $userId = null, ?string $ipAddress = null): array
     {
+        $settings = SiteSettingsService::getInstance();
+
+        // Check if comments are enabled (also checked by middleware, but double-check here)
+        if (!$settings->commentsEnabled()) {
+            return ['success' => false, 'message' => 'Comments are disabled'];
+        }
+
         // Validate required fields
         if (empty($data['post_id'])) {
             return ['success' => false, 'message' => 'Post ID is required'];
@@ -95,8 +103,8 @@ final class CommentService
             }
         }
 
-        // Check if comments require approval
-        $requiresApproval = config('blog.comments_require_approval', true);
+        // Check if comments require approval (from cached settings)
+        $requiresApproval = $settings->commentsRequireApproval();
 
         $comment = new Comment(
             id: null,
@@ -140,6 +148,13 @@ final class CommentService
      */
     public function createReply(int $parentId, array $data, ?int $userId = null, ?string $ipAddress = null): array
     {
+        $settings = SiteSettingsService::getInstance();
+
+        // Check if comments are enabled (also checked by middleware, but double-check here)
+        if (!$settings->commentsEnabled()) {
+            return ['success' => false, 'message' => 'Comments are disabled'];
+        }
+
         // Get parent comment
         $parent = $this->commentRepository->findById($parentId);
 
@@ -147,8 +162,9 @@ final class CommentService
             return ['success' => false, 'message' => 'Parent comment not found'];
         }
 
-        // Check depth limit
-        if (!$parent->canHaveReplies()) {
+        // Check depth limit using cached setting
+        $maxDepth = $settings->commentsMaxDepth();
+        if ($parent->depth >= $maxDepth - 1) {
             return ['success' => false, 'message' => 'Maximum reply depth reached'];
         }
 
@@ -166,7 +182,8 @@ final class CommentService
             }
         }
 
-        $requiresApproval = config('blog.comments_require_approval', true);
+        // Check if comments require approval (from cached settings)
+        $requiresApproval = $settings->commentsRequireApproval();
 
         $reply = new Comment(
             id: null,

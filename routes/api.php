@@ -22,6 +22,7 @@ use App\Presentation\Http\Controllers\Api\Blog\CommentController as BlogCommentC
 use App\Presentation\Http\Controllers\Api\Blog\CategoryController as BlogCategoryController;
 use App\Presentation\Http\Controllers\Api\Blog\TagController as BlogTagController;
 use App\Presentation\Http\Controllers\Api\Blog\FeedbackController;
+use App\Presentation\Http\Controllers\Api\Blog\SettingsController as BlogSettingsController;
 
 // CSRF Cookie endpoint for SPA authentication (must be called before login/register)
 Route::get('/csrf-cookie', CsrfCookieController::class);
@@ -54,11 +55,11 @@ Route::get('/blog/posts/{slug}', [BlogPostController::class, 'show']);
 Route::get('/blog/posts/{id}/related', [BlogPostController::class, 'related']);
 Route::post('/blog/posts/{id}/views', [BlogPostController::class, 'incrementViews']);
 
-// Comments
+// Comments (store/reply/like require comments to be enabled)
 Route::get('/blog/posts/{postId}/comments', [BlogCommentController::class, 'index']);
-Route::post('/blog/posts/{postId}/comments', [BlogCommentController::class, 'store']);
-Route::post('/blog/comments/{commentId}/reply', [BlogCommentController::class, 'reply']);
-Route::post('/blog/comments/{commentId}/like', [BlogCommentController::class, 'like']);
+Route::post('/blog/posts/{postId}/comments', [BlogCommentController::class, 'store'])->middleware(['comments.enabled']);
+Route::post('/blog/comments/{commentId}/reply', [BlogCommentController::class, 'reply'])->middleware(['comments.enabled']);
+Route::post('/blog/comments/{commentId}/like', [BlogCommentController::class, 'like'])->middleware(['comments.enabled']);
 
 // Categories
 Route::get('/blog/categories', [BlogCategoryController::class, 'index']);
@@ -76,6 +77,10 @@ Route::get('/blog/tags/cloud', [BlogTagController::class, 'cloud']);
 Route::get('/blog/tags/search', [BlogTagController::class, 'search']);
 Route::get('/blog/tags/{slug}', [BlogTagController::class, 'show']);
 Route::get('/blog/tags/{slug}/posts', [BlogPostController::class, 'byTag']);
+
+// Site Settings (Public)
+Route::get('/blog/settings', [BlogSettingsController::class, 'index']);
+Route::get('/blog/settings/{key}', [BlogSettingsController::class, 'show']);
 
 // Feedback (Public)
 Route::post('/feedback', [FeedbackController::class, 'store']);

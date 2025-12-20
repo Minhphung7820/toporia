@@ -125,12 +125,14 @@
 import { computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useBlogStore } from '../../stores/blog';
+import { useSettingsStore } from '../../stores/settings';
 import PostCard from '../../components/blog/PostCard.vue';
 import PostCardSkeleton from '../../components/blog/PostCardSkeleton.vue';
 
 const route = useRoute();
 const router = useRouter();
 const blogStore = useBlogStore();
+const settingsStore = useSettingsStore();
 
 // Computed
 const posts = computed(() => blogStore.posts);
@@ -161,7 +163,7 @@ const handleNextPage = async () => {
       route.params.slug,
       pagination.value.nextCursor,
       'next',
-      10
+      settingsStore.postsPerPage
     );
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -174,14 +176,14 @@ const handlePrevPage = async () => {
       route.params.slug,
       pagination.value.prevCursor,
       'prev',
-      10
+      settingsStore.postsPerPage
     );
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 };
 
 const fetchData = async (slug, cursor = null, direction = 'next') => {
-  await blogStore.fetchPostsByTag(slug, cursor, direction, 10);
+  await blogStore.fetchPostsByTag(slug, cursor, direction, settingsStore.postsPerPage);
 };
 
 // Watch route changes (including slug and query params)

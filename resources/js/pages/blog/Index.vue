@@ -124,6 +124,7 @@
 import { onMounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useBlogStore } from '../../stores/blog';
+import { useSettingsStore } from '../../stores/settings';
 import PostCard from '../../components/blog/PostCard.vue';
 import PostCardSkeleton from '../../components/blog/PostCardSkeleton.vue';
 import SearchBox from '../../components/blog/SearchBox.vue';
@@ -133,6 +134,7 @@ import TagCloud from '../../components/blog/TagCloud.vue';
 const router = useRouter();
 const route = useRoute();
 const blogStore = useBlogStore();
+const settingsStore = useSettingsStore();
 
 // Computed properties
 const posts = computed(() => blogStore.posts);
@@ -160,7 +162,7 @@ const updateUrl = (cursor, direction) => {
 const handleNextPage = async () => {
   if (pagination.value.nextCursor) {
     updateUrl(pagination.value.nextCursor, 'next');
-    await blogStore.fetchPosts(pagination.value.nextCursor, 'next');
+    await blogStore.fetchPosts(pagination.value.nextCursor, 'next', settingsStore.postsPerPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 };
@@ -168,7 +170,7 @@ const handleNextPage = async () => {
 const handlePrevPage = async () => {
   if (pagination.value.prevCursor) {
     updateUrl(pagination.value.prevCursor, 'prev');
-    await blogStore.fetchPosts(pagination.value.prevCursor, 'prev');
+    await blogStore.fetchPosts(pagination.value.prevCursor, 'prev', settingsStore.postsPerPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 };
@@ -189,13 +191,23 @@ const formatViews = (views) => {
 
 // Fetch data on mount - use cursor from URL if present
 onMounted(async () => {
+  // Wait for settings to be loaded first
+  if (!settingsStore.initialized) {
+    await settingsStore.initialize();
+  }
+
   const cursor = getCursorFromUrl();
   const direction = getDirectionFromUrl();
 
+  // Use settings for counts
+  const perPage = settingsStore.postsPerPage;
+  const featuredCount = settingsStore.featuredPostsCount;
+  const popularCount = settingsStore.popularPostsCount;
+
   await Promise.all([
-    blogStore.fetchPosts(cursor, direction, 10),
-    blogStore.fetchFeaturedPosts(4),
-    blogStore.fetchPopularPosts(5),
+    blogStore.fetchPosts(cursor, direction, perPage),
+    blogStore.fetchFeaturedPosts(featuredCount),
+    blogStore.fetchPopularPosts(popularCount),
     blogStore.fetchCategoriesTreeWithCounts(), // Hierarchical tree with post counts
     blogStore.fetchTagCloud(30),
   ]);
@@ -206,7 +218,7 @@ watch(() => route.query, async (newQuery) => {
   if (route.name === 'blog') {
     const cursor = newQuery.cursor || null;
     const direction = newQuery.direction || 'next';
-    await blogStore.fetchPosts(cursor, direction, 10);
+    await blogStore.fetchPosts(cursor, direction, settingsStore.postsPerPage);
   }
 });
 </script>

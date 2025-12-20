@@ -75,7 +75,7 @@ final class OAuthController
      * Find or create user from OAuth data
      *
      * @param array $socialiteUser OAuth user data
-     * @param string $provider OAuth provider (google, facebook, etc.)
+     * @param string $provider OAuth provider (google, facebook, github, etc.)
      * @return UserModel
      */
     private function findOrCreateUser(array $socialiteUser, string $provider): UserModel
@@ -86,28 +86,72 @@ final class OAuthController
             throw new \RuntimeException('Email not provided by OAuth provider');
         }
 
+        // Check if OAuth provider verified this email
+        $providerVerifiedEmail = $this->isEmailVerifiedByProvider($socialiteUser, $provider);
+
         // Try to find existing user by email using ORM
         $user = UserModel::where('email', $email)->first();
 
         if ($user) {
+            $needsSave = false;
+
             // Update avatar if provided by OAuth
             if (isset($socialiteUser['avatar']) && $socialiteUser['avatar']) {
                 $user->avatar = $socialiteUser['avatar'];
+                $needsSave = true;
+            }
+
+            // Auto-verify email if:
+            // 1. User hasn't verified yet
+            // 2. OAuth provider confirms email is verified
+            if (!$user->email_verified_at && $providerVerifiedEmail) {
+                $user->email_verified_at = now()->toDateTimeString();
+                $needsSave = true;
+            }
+
+            if ($needsSave) {
                 $user->save();
             }
+
             return $user;
         }
 
         // Create new user using ORM
+        // Only auto-verify if OAuth provider confirms email is verified
         return UserModel::create([
             'name' => $socialiteUser['name'] ?? $socialiteUser['email'],
             'email' => $email,
             'password' => password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT), // Random password
-            'email_verified_at' => date('Y-m-d H:i:s'), // Auto-verify OAuth users
+            'email_verified_at' => $providerVerifiedEmail ? now()->toDateTimeString() : null,
             'avatar' => $socialiteUser['avatar'] ?? null,
             'role' => 'user',
             'is_active' => true,
         ]);
+    }
+
+    /**
+     * Check if email is verified by OAuth provider.
+     *
+     * Different providers return email_verified in different ways:
+     * - Google: 'email_verified' => true/false (boolean)
+     * - GitHub: If email is returned, it's verified (GitHub only returns verified emails)
+     * - Facebook: 'email' is only returned if verified
+     *
+     * @param array $socialiteUser OAuth user data
+     * @param string $provider OAuth provider name
+     * @return bool
+     */
+    private function isEmailVerifiedByProvider(array $socialiteUser, string $provider): bool
+    {
+        return match ($provider) {
+            'google' => ($socialiteUser['email_verified'] ?? false) === true,
+            // GitHub only returns email if it's verified and primary
+            'github' => isset($socialiteUser['email']) && !empty($socialiteUser['email']),
+            // Facebook only returns email if verified
+            'facebook' => isset($socialiteUser['email']) && !empty($socialiteUser['email']),
+            // Default: check for explicit email_verified field, otherwise false
+            default => ($socialiteUser['email_verified'] ?? false) === true,
+        };
     }
 
     /**
