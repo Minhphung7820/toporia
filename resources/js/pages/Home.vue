@@ -383,12 +383,22 @@ const handleSearch = () => {
 };
 
 const formatNumber = (num) => {
-  if (!num) return '0';
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M';
+  if (!num || num <= 0) return '0';
+
+  // Billion (tỷ)
+  if (num >= 1000000000) {
+    const value = num / 1000000000;
+    return (value >= 100 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')) + 'B';
   }
+  // Million (triệu)
+  if (num >= 1000000) {
+    const value = num / 1000000;
+    return (value >= 100 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')) + 'M';
+  }
+  // Thousand (nghìn)
   if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K';
+    const value = num / 1000;
+    return (value >= 100 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')) + 'K';
   }
   return num.toLocaleString();
 };
@@ -427,14 +437,29 @@ const getInitials = (name) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-// Format number for display (with suffix)
+// Format number for display (with suffix: K, M, B, T)
 const formatStatNumber = (num) => {
-  if (!num) return '0';
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M';
+  if (!num || num <= 0) return '0';
+
+  // Trillion (nghìn tỷ)
+  if (num >= 1000000000000) {
+    const value = num / 1000000000000;
+    return (value >= 100 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')) + 'T';
   }
+  // Billion (tỷ)
+  if (num >= 1000000000) {
+    const value = num / 1000000000;
+    return (value >= 100 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')) + 'B';
+  }
+  // Million (triệu)
+  if (num >= 1000000) {
+    const value = num / 1000000;
+    return (value >= 100 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')) + 'M';
+  }
+  // Thousand (nghìn)
   if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K';
+    const value = num / 1000;
+    return (value >= 100 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')) + 'K';
   }
   return num.toLocaleString();
 };
