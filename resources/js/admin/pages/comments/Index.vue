@@ -236,13 +236,45 @@
                   </td>
                   <td class="col-comment">
                     <div class="comment-content">
-                      <p>{{ truncate(comment.content, 120) }}</p>
+                      <!-- Text preview (non-code part) -->
+                      <p v-if="getTextPreview(comment.content)">{{ getTextPreview(comment.content) }}</p>
+                      <!-- Code preview snippet -->
+                      <div v-if="hasCodeBlock(comment.content)" class="code-preview">
+                        <code>{{ getCodePreview(comment.content) }}</code>
+                      </div>
+                      <!-- Attachment Thumbnails -->
+                      <div v-if="comment.attachments && comment.attachments.length > 0" class="comment-attachments-preview">
+                        <div
+                          v-for="(att, idx) in comment.attachments.slice(0, 3)"
+                          :key="att.id"
+                          class="attachment-thumb"
+                          @click.stop="openLightbox(comment, idx)"
+                        >
+                          <img v-if="att.type === 'image'" :src="att.url" :alt="att.filename" />
+                          <div v-else class="file-thumb">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                          </div>
+                          <!-- Eye icon overlay -->
+                          <div class="thumb-overlay">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </div>
+                        </div>
+                        <div v-if="comment.attachments.length > 3" class="attachment-more" @click.stop="showCommentDetail(comment)">
+                          +{{ comment.attachments.length - 3 }}
+                        </div>
+                      </div>
                       <button
-                        v-if="comment.content && comment.content.length > 120"
+                        v-if="(comment.content && comment.content.length > 120) || (comment.attachments && comment.attachments.length > 0)"
                         @click="showCommentDetail(comment)"
                         class="view-more"
                       >
-                        View full comment
+                        {{ comment.attachments?.length > 0 ? `View ${comment.attachments.length} attachment(s)` : 'View full comment' }}
                       </button>
                     </div>
                   </td>
@@ -410,30 +442,62 @@
               </button>
               <div v-if="selectedComment" class="comment-detail">
                 <div class="detail-header">
-                  <img
-                    v-if="selectedComment.user?.avatar"
-                    :src="selectedComment.user.avatar"
-                    :alt="selectedComment.user.name"
-                    class="author-avatar-img lg"
-                  />
-                  <div
-                    v-else
-                    class="author-avatar lg"
-                    :style="{ background: getAvatarColor(selectedComment.author_name || selectedComment.user?.name || 'A') }"
-                  >
-                    {{ getInitials(selectedComment.author_name || selectedComment.user?.name || 'A') }}
-                  </div>
-                  <div class="detail-author-info">
-                    <h4>{{ selectedComment.author_name || selectedComment.user?.name || 'Anonymous' }}</h4>
-                    <span>{{ selectedComment.author_email || selectedComment.user?.email || '-' }}</span>
+                  <div class="detail-header-left">
+                    <img
+                      v-if="selectedComment.user?.avatar"
+                      :src="selectedComment.user.avatar"
+                      :alt="selectedComment.user.name"
+                      class="author-avatar-img lg"
+                    />
+                    <div
+                      v-else
+                      class="author-avatar lg"
+                      :style="{ background: getAvatarColor(selectedComment.author_name || selectedComment.user?.name || 'A') }"
+                    >
+                      {{ getInitials(selectedComment.author_name || selectedComment.user?.name || 'A') }}
+                    </div>
+                    <div class="detail-author-info">
+                      <h4>{{ selectedComment.author_name || selectedComment.user?.name || 'Anonymous' }}</h4>
+                      <span>{{ selectedComment.author_email || selectedComment.user?.email || '-' }}</span>
+                    </div>
                   </div>
                   <span class="status-badge" :class="getStatusClass(selectedComment.status)">
                     <span class="status-dot"></span>
                     {{ selectedComment.status }}
                   </span>
                 </div>
-                <div class="detail-content">
-                  <p>{{ selectedComment.content }}</p>
+                <div class="detail-content" ref="detailContentRef">
+                  <p v-html="formatCommentContent(selectedComment.content)"></p>
+                </div>
+                <!-- Attachments Gallery -->
+                <div v-if="selectedComment.attachments && selectedComment.attachments.length > 0" class="detail-attachments">
+                  <h5>Attachments ({{ selectedComment.attachments.length }})</h5>
+                  <div class="attachments-grid">
+                    <div
+                      v-for="(att, idx) in selectedComment.attachments"
+                      :key="att.id"
+                      :class="['attachment-card', att.type]"
+                      @click="openLightbox(selectedComment, idx)"
+                    >
+                      <div v-if="att.type === 'image'" class="attachment-image">
+                        <img :src="att.url" :alt="att.filename" />
+                        <div class="attachment-hover">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div v-else class="attachment-file">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        <span class="file-name">{{ att.filename }}</span>
+                        <span class="file-size">{{ formatFileSize(att.size) }}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div class="detail-meta">
                   <div v-if="selectedComment.post" class="meta-item">
@@ -489,6 +553,64 @@
         </Transition>
       </Teleport>
 
+      <!-- Image Lightbox -->
+      <Teleport to="body">
+        <Transition name="lightbox">
+          <div v-if="lightboxOpen" class="lightbox-overlay" @click.self="closeLightbox">
+            <button class="lightbox-close" @click="closeLightbox">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <button
+              v-if="lightboxIndex > 0"
+              class="lightbox-nav lightbox-prev"
+              @click="prevLightboxImage"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <div class="lightbox-content">
+              <img
+                v-if="currentLightboxImage?.type === 'image'"
+                :src="currentLightboxImage?.url"
+                :alt="currentLightboxImage?.filename"
+                class="lightbox-image"
+              />
+              <div v-else class="lightbox-file">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <span class="lightbox-filename">{{ currentLightboxImage?.filename }}</span>
+                <a :href="currentLightboxImage?.url" target="_blank" class="lightbox-download">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download
+                </a>
+              </div>
+            </div>
+            <button
+              v-if="lightboxAttachments.length > 0 && lightboxIndex < lightboxAttachments.length - 1"
+              class="lightbox-nav lightbox-next"
+              @click="nextLightboxImage"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+            <div v-if="lightboxAttachments.length > 1" class="lightbox-counter">
+              {{ lightboxIndex + 1 }} / {{ lightboxAttachments.length }}
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+
       <!-- Toast Notifications -->
       <Teleport to="body">
         <TransitionGroup name="toast" tag="div" class="toast-container">
@@ -529,7 +651,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
 import Pagination from '../../components/shared/Pagination.vue';
@@ -560,6 +682,19 @@ const bulkLoading = ref(false);
 const highlightedId = ref(null);
 const toasts = ref([]);
 let toastId = 0;
+
+// Lightbox state
+const lightboxOpen = ref(false);
+const lightboxIndex = ref(0);
+const lightboxAttachments = ref([]);
+
+// Ref for detail modal content (for copy button setup)
+const detailContentRef = ref(null);
+
+const currentLightboxImage = computed(() => {
+  if (lightboxAttachments.value.length === 0) return null;
+  return lightboxAttachments.value[lightboxIndex.value] || null;
+});
 
 // Computed from store
 const comments = computed(() => store.items || []);
@@ -677,8 +812,192 @@ const getAvatarColor = (name) => {
 
 const truncate = (text, length) => {
   if (!text) return '';
-  if (text.length <= length) return text;
-  return text.slice(0, length) + '...';
+  // Decode HTML entities first
+  const decoded = decodeHtmlEntities(text);
+  // Strip HTML tags for plain text preview
+  const stripped = decoded.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (stripped.length <= length) return stripped;
+  return stripped.slice(0, length) + '...';
+};
+
+// Check if comment has code block
+const hasCodeBlock = (content) => {
+  if (!content) return false;
+  return content.includes('<pre') || content.includes('&lt;pre');
+};
+
+// Get text preview (non-code part only)
+const getTextPreview = (content) => {
+  if (!content) return '';
+  const decoded = decodeHtmlEntities(content);
+
+  // First, extract any text that's inside <pre> but outside <code> (malformed)
+  let extractedText = '';
+  decoded.replace(/<pre[^>]*>([^<]*)<code>/gi, (match, textBefore) => {
+    const trimmed = textBefore.trim();
+    if (trimmed) extractedText += trimmed + ' ';
+    return match;
+  });
+  decoded.replace(/<\/code>([^<]*)<\/pre>/gi, (match, textAfter) => {
+    const trimmed = textAfter.trim();
+    if (trimmed) extractedText += trimmed + ' ';
+    return match;
+  });
+
+  // Remove code blocks to get normal text
+  const withoutCode = decoded.replace(/<pre[^>]*>[\s\S]*?<\/pre>/gi, '');
+  // Strip remaining HTML tags
+  const normalText = withoutCode.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Combine extracted text and normal text
+  const combined = (extractedText + normalText).replace(/\s+/g, ' ').trim();
+  if (!combined) return '';
+  return combined.length > 80 ? combined.slice(0, 80) + '...' : combined;
+};
+
+// Get code preview (first few lines of code)
+const getCodePreview = (content) => {
+  if (!content) return '';
+  const decoded = decodeHtmlEntities(content);
+
+  // Try to extract code content - support multiple formats:
+  // 1. <pre><code>...</code></pre>
+  // 2. <pre class="code-block"><code>...</code></pre>
+  // 3. <pre>...</pre> (without code tag)
+  let code = '';
+
+  // First try <pre><code>...</code></pre>
+  const codeTagMatch = decoded.match(/<pre[^>]*>\s*<code[^>]*>([\s\S]*?)<\/code>\s*<\/pre>/i);
+  if (codeTagMatch && codeTagMatch[1]) {
+    code = codeTagMatch[1];
+  } else {
+    // Try <pre>...</pre> without code tag
+    const preOnlyMatch = decoded.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+    if (preOnlyMatch && preOnlyMatch[1]) {
+      // Remove any inner code tags if present but not properly closed
+      code = preOnlyMatch[1].replace(/<\/?code[^>]*>/gi, '');
+    }
+  }
+
+  if (!code) return '';
+
+  // Clean up the code
+  code = code.trim();
+
+  // Get first 2 lines or 100 chars
+  const lines = code.split('\n').slice(0, 2);
+  let preview = lines.join('\n');
+  if (preview.length > 100) {
+    preview = preview.slice(0, 100);
+  }
+  return preview + (code.length > preview.length ? '...' : '');
+};
+
+// Decode HTML entities for display
+const decodeHtmlEntities = (text) => {
+  if (!text) return '';
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+};
+
+// Format comment content with code blocks for admin preview
+const formatCommentContent = (content) => {
+  if (!content) return '';
+
+  // First decode HTML entities
+  let decoded = decodeHtmlEntities(content);
+
+  // Sanitize - only allow safe tags (including div for structure)
+  const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'br', 'pre', 'code', 'div'];
+  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
+  decoded = decoded.replace(tagRegex, (match, tag) => {
+    const lowerTag = tag.toLowerCase();
+    if (allowedTags.includes(lowerTag)) {
+      // Always add code-block class to pre tags for styling
+      if (lowerTag === 'pre') {
+        return '<pre class="code-block">';
+      }
+      return match;
+    }
+    return '';
+  });
+
+  // Fix malformed code blocks where text is inside <pre> but outside <code>
+  // Pattern: <pre...>TEXT_OUTSIDE<code>CODE_INSIDE</code></pre>
+  // Should be: TEXT_OUTSIDE<pre...><code>CODE_INSIDE</code></pre>
+  decoded = decoded.replace(/<pre([^>]*)>([^<]+)(<code>)/gi, (match, preAttrs, textBefore, codeTag) => {
+    // If there's text between <pre> and <code>, move it before <pre>
+    const trimmedText = textBefore.trim();
+    if (trimmedText && !trimmedText.startsWith('<')) {
+      return `<div class="text-before-code">${trimmedText}</div><pre${preAttrs}>${codeTag}`;
+    }
+    return match;
+  });
+
+  // Also handle case where text appears after </code> but before </pre>
+  decoded = decoded.replace(/(<\/code>)([^<]+)<\/pre>/gi, (match, closeCode, textAfter) => {
+    const trimmedText = textAfter.trim();
+    if (trimmedText) {
+      return `${closeCode}</pre><div class="text-after-code">${trimmedText}</div>`;
+    }
+    return match;
+  });
+
+  return decoded;
+};
+
+// Setup copy buttons for code blocks in modal
+const setupCodeBlockCopyButtons = () => {
+  if (!detailContentRef.value) return;
+
+  const codeBlocks = detailContentRef.value.querySelectorAll('.code-block');
+  codeBlocks.forEach((block) => {
+    // Check if copy button already exists
+    if (block.querySelector('.code-copy-btn')) return;
+
+    // Create copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'code-copy-btn';
+    copyBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+      </svg>
+      <span>Copy</span>
+    `;
+
+    copyBtn.addEventListener('click', async () => {
+      const code = block.querySelector('code');
+      if (code) {
+        try {
+          await navigator.clipboard.writeText(code.textContent || '');
+          copyBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Copied!</span>
+          `;
+          copyBtn.classList.add('copied');
+          setTimeout(() => {
+            copyBtn.innerHTML = `
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            `;
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        } catch (err) {
+          console.error('Failed to copy:', err);
+        }
+      }
+    });
+
+    // Insert copy button into the code block header area
+    block.insertBefore(copyBtn, block.firstChild);
+  });
 };
 
 const getStatusClass = (status) => {
@@ -714,6 +1033,51 @@ const formatRelativeDate = (date) => {
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  let size = bytes;
+  while (size >= 1024 && i < units.length - 1) {
+    size /= 1024;
+    i++;
+  }
+  return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+};
+
+// Lightbox methods
+const openLightbox = (comment, index = 0) => {
+  if (!comment.attachments || comment.attachments.length === 0) return;
+  lightboxAttachments.value = comment.attachments;
+  lightboxIndex.value = index;
+  lightboxOpen.value = true;
+  document.body.style.overflow = 'hidden';
+};
+
+const closeLightbox = () => {
+  lightboxOpen.value = false;
+  document.body.style.overflow = '';
+};
+
+const prevLightboxImage = () => {
+  if (lightboxIndex.value > 0) {
+    lightboxIndex.value--;
+  }
+};
+
+const nextLightboxImage = () => {
+  if (lightboxIndex.value < lightboxAttachments.value.length - 1) {
+    lightboxIndex.value++;
+  }
+};
+
+const handleLightboxKeydown = (e) => {
+  if (!lightboxOpen.value) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') prevLightboxImage();
+  if (e.key === 'ArrowRight') nextLightboxImage();
 };
 
 // Actions
@@ -806,6 +1170,10 @@ const bulkDelete = async () => {
 const showCommentDetail = (comment) => {
   selectedComment.value = comment;
   showDetailModal.value = true;
+  // Setup copy buttons after modal renders
+  nextTick(() => {
+    setupCodeBlockCopyButtons();
+  });
 };
 
 const approveAndClose = async (id) => {
@@ -857,6 +1225,9 @@ onMounted(() => {
   subscribe('admin.comments');
   on('comment.created', handleNewComment, 'admin.comments');
   on('comment.updated', handleCommentUpdated, 'admin.comments');
+
+  // Keyboard navigation for lightbox
+  document.addEventListener('keydown', handleLightboxKeydown);
 });
 
 onUnmounted(() => {
@@ -864,6 +1235,9 @@ onUnmounted(() => {
   off('comment.updated', handleCommentUpdated, 'admin.comments');
   unsubscribe('admin.comments');
   disconnect();
+
+  // Remove keyboard listener
+  document.removeEventListener('keydown', handleLightboxKeydown);
 });
 </script>
 
@@ -1455,6 +1829,28 @@ onUnmounted(() => {
   overflow-wrap: break-word;
 }
 
+/* Code preview in table */
+.code-preview {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: #1e1e1e;
+  border-radius: 6px;
+  border-left: 3px solid #6ee7b7;
+  max-height: 48px;
+  overflow: hidden;
+}
+
+.code-preview code {
+  display: block;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .view-more {
   margin-top: 6px;
   padding: 0;
@@ -1699,7 +2095,11 @@ onUnmounted(() => {
 
 .modal-content.modal-lg {
   max-width: 600px;
+  max-height: calc(100vh - 80px);
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-close {
@@ -1762,17 +2162,34 @@ onUnmounted(() => {
 /* Comment Detail Modal */
 .comment-detail {
   padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .detail-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+  flex-shrink: 0;
+  padding-right: 40px;
+}
+
+.detail-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .detail-author-info {
   flex: 1;
+  min-width: 0;
 }
 
 .detail-author-info h4 {
@@ -1791,6 +2208,29 @@ onUnmounted(() => {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  max-height: 400px;
+}
+
+/* Custom scrollbar for detail content */
+.detail-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.detail-content::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 3px;
+}
+
+.detail-content::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 3px;
+}
+
+.detail-content::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 .detail-content p {
@@ -1801,11 +2241,132 @@ onUnmounted(() => {
   white-space: pre-wrap;
 }
 
+/* Text extracted from malformed code blocks */
+.detail-content :deep(.text-before-code),
+.detail-content :deep(.text-after-code) {
+  display: block;
+  margin: 8px 0;
+  padding: 0;
+  color: #374151;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* Code blocks in detail content */
+.detail-content :deep(.code-block),
+.detail-content :deep(pre) {
+  display: block;
+  margin: 12px 0;
+  padding: 0;
+  background: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid #333;
+  overflow: hidden;
+}
+
+.detail-content :deep(.code-block)::before,
+.detail-content :deep(pre)::before {
+  content: 'Code';
+  display: block;
+  padding: 10px 14px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #333;
+  color: #888;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.detail-content :deep(.code-block code),
+.detail-content :deep(pre code) {
+  display: block;
+  padding: 14px 16px;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+/* Custom scrollbar for code blocks */
+.detail-content :deep(.code-block code)::-webkit-scrollbar,
+.detail-content :deep(pre code)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.detail-content :deep(.code-block code)::-webkit-scrollbar-track,
+.detail-content :deep(pre code)::-webkit-scrollbar-track {
+  background: #2d2d2d;
+  border-radius: 4px;
+}
+
+.detail-content :deep(.code-block code)::-webkit-scrollbar-thumb,
+.detail-content :deep(pre code)::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+.detail-content :deep(.code-block code)::-webkit-scrollbar-thumb:hover,
+.detail-content :deep(pre code)::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+.detail-content :deep(.code-block code)::-webkit-scrollbar-corner,
+.detail-content :deep(pre code)::-webkit-scrollbar-corner {
+  background: #2d2d2d;
+}
+
+/* Copy button for code blocks */
+.detail-content :deep(.code-copy-btn) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #2d2d2d;
+  border: none;
+  border-bottom: 1px solid #333;
+  color: #888;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.detail-content :deep(.code-copy-btn):hover {
+  background: #3d3d3d;
+  color: #d4d4d4;
+}
+
+.detail-content :deep(.code-copy-btn.copied) {
+  color: #6ee7b7;
+}
+
+.detail-content :deep(.code-copy-btn svg) {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Hide ::before when copy button exists */
+.detail-content :deep(.code-block:has(.code-copy-btn))::before,
+.detail-content :deep(pre:has(.code-copy-btn))::before {
+  display: none;
+}
+
 .detail-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
 .meta-item {
@@ -1834,6 +2395,7 @@ onUnmounted(() => {
   gap: 12px;
   padding-top: 16px;
   border-top: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
 /* Toast Notifications */
@@ -1958,6 +2520,318 @@ onUnmounted(() => {
 .toast-leave-to {
   opacity: 0;
   transform: translateX(100%);
+}
+
+/* Attachment Thumbnails in Table */
+.comment-attachments-preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.attachment-thumb {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.attachment-thumb:hover {
+  border-color: #667eea;
+  transform: scale(1.05);
+}
+
+.attachment-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-thumb .file-thumb {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.thumb-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.attachment-thumb:hover .thumb-overlay {
+  opacity: 1;
+}
+
+.attachment-more {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.attachment-more:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+/* Detail Modal Attachments */
+.detail-attachments {
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.detail-attachments h5 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.attachments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.attachment-card {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid #e5e7eb;
+}
+
+.attachment-card:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.attachment-image {
+  position: relative;
+  aspect-ratio: 1;
+}
+
+.attachment-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-hover {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.attachment-card:hover .attachment-hover {
+  opacity: 1;
+}
+
+.attachment-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 10px;
+  background: #f9fafb;
+  text-align: center;
+  min-height: 100px;
+}
+
+.attachment-file svg {
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.file-name {
+  font-size: 11px;
+  color: #374151;
+  word-break: break-all;
+  line-height: 1.3;
+  max-height: 2.6em;
+  overflow: hidden;
+}
+
+.file-size {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+/* Lightbox */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 60px 80px;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightbox-prev {
+  left: 20px;
+}
+
+.lightbox-next {
+  right: 20px;
+}
+
+.lightbox-content {
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-image {
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  color: white;
+  text-align: center;
+}
+
+.lightbox-file svg {
+  opacity: 0.8;
+  margin-bottom: 16px;
+}
+
+.lightbox-filename {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 20px;
+  max-width: 300px;
+  word-break: break-all;
+}
+
+.lightbox-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #667eea;
+  color: white;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.lightbox-download:hover {
+  background: #5b6fd6;
+  transform: translateY(-1px);
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Lightbox Transition */
+.lightbox-enter-active,
+.lightbox-leave-active {
+  transition: all 0.3s ease;
+}
+
+.lightbox-enter-from,
+.lightbox-leave-to {
+  opacity: 0;
+}
+
+.lightbox-enter-from .lightbox-image,
+.lightbox-leave-to .lightbox-image {
+  transform: scale(0.9);
 }
 
 /* Responsive */
@@ -2131,6 +3005,39 @@ onUnmounted(() => {
 
   .modal-actions .btn {
     max-width: none;
+  }
+
+  /* Lightbox responsive */
+  .lightbox-overlay {
+    padding: 20px;
+  }
+
+  .lightbox-nav {
+    padding: 12px;
+  }
+
+  .lightbox-prev {
+    left: 10px;
+  }
+
+  .lightbox-next {
+    right: 10px;
+  }
+
+  .lightbox-close {
+    top: 10px;
+    right: 10px;
+    padding: 10px;
+  }
+
+  .lightbox-counter {
+    bottom: 10px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .attachments-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 

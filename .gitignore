@@ -20,6 +20,7 @@ composer.lock
 /storage/app/*
 !/storage/app/.gitkeep
 !/storage/app/public/
+/storage/app/public/*
 !/storage/app/public/.gitkeep
 
 /storage/cache/*

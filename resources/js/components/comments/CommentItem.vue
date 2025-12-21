@@ -28,6 +28,9 @@
           <div class="comment-header">
             <div class="author-info">
               <span class="author-name">{{ comment.author_name || 'Anonymous' }}</span>
+              <span v-if="comment.is_post_author" class="author-badge" title="Post Author">
+                Author
+              </span>
               <span v-if="comment.is_verified" class="verified-badge" title="Verified">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -37,8 +40,85 @@
             </div>
           </div>
 
-          <!-- Content Text -->
-          <div class="comment-content">{{ comment.content }}</div>
+          <!-- Content Text (rendered HTML with mentions) -->
+          <div class="comment-content" ref="commentContentRef" v-html="formattedContent"></div>
+
+          <!-- Attachments -->
+          <div v-if="comment.attachments && comment.attachments.length > 0" class="comment-attachments">
+            <!-- Image Gallery -->
+            <div v-if="imageAttachments.length > 0" :class="['image-gallery', `count-${Math.min(imageAttachments.length, 4)}`]">
+              <div
+                v-for="(img, index) in imageAttachments.slice(0, 4)"
+                :key="img.id"
+                class="gallery-item"
+                @click="openLightbox(index)"
+              >
+                <img :src="img.url" :alt="img.filename" loading="lazy" />
+                <span v-if="index === 3 && imageAttachments.length > 4" class="more-overlay">
+                  +{{ imageAttachments.length - 4 }}
+                </span>
+              </div>
+            </div>
+            <!-- File Attachments -->
+            <div v-if="fileAttachments.length > 0" class="file-attachments">
+              <a
+                v-for="file in fileAttachments"
+                :key="file.id"
+                :href="file.url"
+                target="_blank"
+                class="file-item"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <span class="file-info">
+                  <span class="file-name">{{ file.filename }}</span>
+                  <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                </span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Lightbox Modal -->
+          <Teleport to="body">
+            <Transition name="lightbox">
+              <div v-if="lightboxOpen" class="lightbox-overlay" @click.self="closeLightbox">
+                <button class="lightbox-close" @click="closeLightbox">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+                <button
+                  v-if="lightboxIndex > 0"
+                  class="lightbox-nav lightbox-prev"
+                  @click="prevImage"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+                <img
+                  :src="imageAttachments[lightboxIndex]?.url"
+                  :alt="imageAttachments[lightboxIndex]?.filename"
+                  class="lightbox-image"
+                />
+                <button
+                  v-if="lightboxIndex < imageAttachments.length - 1"
+                  class="lightbox-nav lightbox-next"
+                  @click="nextImage"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+                <div class="lightbox-counter">
+                  {{ lightboxIndex + 1 }} / {{ imageAttachments.length }}
+                </div>
+              </div>
+            </Transition>
+          </Teleport>
 
           <!-- Actions -->
           <div class="comment-actions">
@@ -122,7 +202,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useCommentsStore } from '../../stores/comments';
 import { useSettingsStore } from '../../stores/settings';
 
@@ -150,6 +230,9 @@ defineEmits(['reply']);
 const commentsStore = useCommentsStore();
 const settingsStore = useSettingsStore();
 
+// Refs
+const commentContentRef = ref(null);
+
 // Local state
 const showMenu = ref(false);
 
@@ -162,6 +245,75 @@ const canReply = computed(() => {
   return settingsStore.commentsEnabled && props.depth < maxDepth.value - 1;
 });
 const loading = computed(() => commentsStore.loading);
+
+// Computed for attachments
+const imageAttachments = computed(() => {
+  if (!props.comment.attachments) return [];
+  return props.comment.attachments.filter(att => att.type === 'image');
+});
+
+const fileAttachments = computed(() => {
+  if (!props.comment.attachments) return [];
+  return props.comment.attachments.filter(att => att.type === 'file');
+});
+
+// Format content with mentions and code blocks styled
+const formattedContent = computed(() => {
+  let content = props.comment.content || '';
+
+  // Sanitize HTML to prevent XSS (allow only safe tags)
+  const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'br', 'span', 'pre', 'code'];
+  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
+  content = content.replace(tagRegex, (match, tag) => {
+    const lowerTag = tag.toLowerCase();
+    if (allowedTags.includes(lowerTag)) {
+      // Allow span with specific classes only
+      if (lowerTag === 'span') {
+        if (match.includes('class="mention"') || match.includes('class="mention-tag"')) {
+          return match;
+        }
+        return '';
+      }
+      // Allow pre tag and ensure it has code-block class
+      if (lowerTag === 'pre') {
+        // Always add code-block class for styling
+        return '<pre class="code-block">';
+      }
+      // Allow code tag inside pre
+      if (lowerTag === 'code') {
+        // Clean up contenteditable and placeholder attributes for display
+        return match
+          .replace(/\s*contenteditable="[^"]*"/gi, '')
+          .replace(/\s*data-placeholder="[^"]*"/gi, '');
+      }
+      return match;
+    }
+    return '';
+  });
+
+  // Style mention spans if they exist
+  content = content.replace(
+    /<span class="mention"[^>]*>@([^<]+)<\/span>/g,
+    '<span class="mention-tag">@$1</span>'
+  );
+
+  // Also handle plain @mentions from backend if not already wrapped
+  if (props.comment.mentions && props.comment.mentions.length > 0) {
+    props.comment.mentions.forEach(mention => {
+      const name = mention.name || mention.username;
+      if (name) {
+        const regex = new RegExp(`@${name}(?![^<]*>)`, 'g');
+        content = content.replace(regex, `<span class="mention-tag">@${name}</span>`);
+      }
+    });
+  }
+
+  return content;
+});
+
+// Lightbox state
+const lightboxOpen = ref(false);
+const lightboxIndex = ref(0);
 
 // Methods
 const getInitials = (name) => {
@@ -240,6 +392,46 @@ const handleReport = () => {
   alert('Report functionality coming soon');
 };
 
+// Lightbox methods
+const openLightbox = (index) => {
+  lightboxIndex.value = index;
+  lightboxOpen.value = true;
+  document.body.style.overflow = 'hidden';
+};
+
+const closeLightbox = () => {
+  lightboxOpen.value = false;
+  document.body.style.overflow = '';
+};
+
+const nextImage = () => {
+  if (lightboxIndex.value < imageAttachments.value.length - 1) {
+    lightboxIndex.value++;
+  }
+};
+
+const prevImage = () => {
+  if (lightboxIndex.value > 0) {
+    lightboxIndex.value--;
+  }
+};
+
+const handleLightboxKeydown = (e) => {
+  if (!lightboxOpen.value) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowRight') nextImage();
+  if (e.key === 'ArrowLeft') prevImage();
+};
+
+// Format file size
+const formatFileSize = (bytes) => {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 // Close menu when clicking outside
 const handleClickOutside = (e) => {
   if (!e.target.closest('.more-menu')) {
@@ -247,12 +439,73 @@ const handleClickOutside = (e) => {
   }
 };
 
+// Setup copy buttons for code blocks
+const setupCodeBlockCopyButtons = () => {
+  if (!commentContentRef.value) return;
+
+  const codeBlocks = commentContentRef.value.querySelectorAll('.code-block');
+  codeBlocks.forEach((block) => {
+    // Check if copy button already exists
+    if (block.querySelector('.code-copy-btn')) return;
+
+    // Create copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'code-copy-btn';
+    copyBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+      </svg>
+      <span>Copy</span>
+    `;
+
+    copyBtn.addEventListener('click', async () => {
+      const code = block.querySelector('code');
+      if (code) {
+        try {
+          await navigator.clipboard.writeText(code.textContent || '');
+          copyBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Copied!</span>
+          `;
+          copyBtn.classList.add('copied');
+          setTimeout(() => {
+            copyBtn.innerHTML = `
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            `;
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        } catch (err) {
+          console.error('Failed to copy:', err);
+        }
+      }
+    });
+
+    // Insert copy button into the code block header area
+    block.insertBefore(copyBtn, block.firstChild);
+  });
+};
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
+  document.addEventListener('keydown', handleLightboxKeydown);
+  // Setup copy buttons after content is rendered
+  nextTick(() => {
+    setupCodeBlockCopyButtons();
+  });
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener('keydown', handleLightboxKeydown);
+  // Ensure body scroll is restored
+  document.body.style.overflow = '';
 });
 </script>
 
@@ -322,6 +575,19 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 600;
   color: #1a1a1a;
+}
+
+.author-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .verified-badge {
@@ -540,6 +806,420 @@ onUnmounted(() => {
     left: -24px;
     top: 18px;
     bottom: -12px;
+  }
+}
+
+/* Comment Attachments */
+.comment-attachments {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+/* Image Gallery */
+.image-gallery {
+  display: grid;
+  gap: 4px;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  max-width: 400px;
+}
+
+.image-gallery.count-1 {
+  grid-template-columns: 1fr;
+  max-width: 280px;
+}
+
+.image-gallery.count-2 {
+  grid-template-columns: 1fr 1fr;
+  max-width: 320px;
+}
+
+.image-gallery.count-3 {
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 360px;
+}
+
+.image-gallery.count-4 {
+  grid-template-columns: repeat(4, 1fr);
+  max-width: 400px;
+}
+
+.gallery-item {
+  position: relative;
+  aspect-ratio: 1;
+  cursor: pointer;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
+.image-gallery.count-1 .gallery-item {
+  aspect-ratio: 4/3;
+  max-height: 180px;
+}
+
+.image-gallery.count-2 .gallery-item {
+  max-height: 140px;
+}
+
+.image-gallery.count-3 .gallery-item,
+.image-gallery.count-4 .gallery-item {
+  max-height: 90px;
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s;
+}
+
+.gallery-item:hover img {
+  transform: scale(1.05);
+}
+
+.more-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* File Attachments */
+.file-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  color: #333;
+  text-decoration: none;
+  font-size: 13px;
+  transition: background 0.15s;
+  max-width: fit-content;
+}
+
+.file-item:hover {
+  background: #eee;
+}
+
+.file-item svg {
+  flex-shrink: 0;
+  color: #666;
+}
+
+.file-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.file-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.file-size {
+  font-size: 11px;
+  color: #888;
+}
+
+/* Mention Tags in Content */
+.comment-content :deep(.mention-tag) {
+  display: inline;
+  padding: 2px 6px;
+  background: #e8f4fc;
+  color: #1d72b8;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* Code Block in Comment Content */
+.comment-content :deep(.code-block) {
+  position: relative;
+  display: block;
+  margin: 12px 0;
+  padding: 0;
+  background: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid #333;
+  overflow: hidden;
+}
+
+.comment-content :deep(.code-block)::before {
+  content: 'Code';
+  display: block;
+  padding: 10px 14px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #333;
+  color: #888;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Copy Button */
+.comment-content :deep(.code-copy-btn) {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  background: #3d3d3d;
+  border: 1px solid #4d4d4d;
+  border-radius: 5px;
+  color: #aaa;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 2;
+}
+
+.comment-content :deep(.code-copy-btn:hover) {
+  background: #4d4d4d;
+  color: #fff;
+  border-color: #5d5d5d;
+}
+
+.comment-content :deep(.code-copy-btn.copied) {
+  background: #22c55e;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.comment-content :deep(.code-copy-btn svg) {
+  flex-shrink: 0;
+}
+
+.comment-content :deep(.code-block code) {
+  display: block;
+  padding: 14px 16px;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  tab-size: 2;
+}
+
+/* Syntax Highlighting Classes */
+.comment-content :deep(.code-block code .keyword) {
+  color: #c586c0;
+}
+
+.comment-content :deep(.code-block code .string) {
+  color: #ce9178;
+}
+
+.comment-content :deep(.code-block code .comment) {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.comment-content :deep(.code-block code .function) {
+  color: #dcdcaa;
+}
+
+.comment-content :deep(.code-block code .variable) {
+  color: #9cdcfe;
+}
+
+.comment-content :deep(.code-block code .number) {
+  color: #b5cea8;
+}
+
+.comment-content :deep(.code-block code br) {
+  display: block;
+  content: '';
+  margin: 0;
+}
+
+/* Lightbox Overlay */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+  z-index: 10;
+}
+
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s;
+  z-index: 10;
+}
+
+.lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.lightbox-prev {
+  left: 16px;
+}
+
+.lightbox-next {
+  right: 16px;
+}
+
+.lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.lightbox-counter {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 16px;
+  color: #fff;
+  font-size: 13px;
+}
+
+/* Lightbox Transition */
+.lightbox-enter-active,
+.lightbox-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.lightbox-enter-from,
+.lightbox-leave-to {
+  opacity: 0;
+}
+
+/* Responsive for attachments */
+@media (max-width: 640px) {
+  .image-gallery {
+    max-width: 280px;
+  }
+
+  .image-gallery.count-1 {
+    max-width: 220px;
+  }
+
+  .image-gallery.count-1 .gallery-item {
+    max-height: 140px;
+  }
+
+  .image-gallery.count-2 {
+    max-width: 240px;
+  }
+
+  .image-gallery.count-2 .gallery-item {
+    max-height: 100px;
+  }
+
+  .image-gallery.count-3,
+  .image-gallery.count-4 {
+    max-width: 280px;
+  }
+
+  .image-gallery.count-3 .gallery-item,
+  .image-gallery.count-4 .gallery-item {
+    max-height: 70px;
+  }
+
+  .more-overlay {
+    font-size: 14px;
+  }
+
+  .file-name {
+    max-width: 150px;
+  }
+
+  /* Code block mobile */
+  .comment-content :deep(.code-block) {
+    margin: 10px 0;
+    border-radius: 6px;
+  }
+
+  .comment-content :deep(.code-block)::before {
+    font-size: 10px;
+    padding: 8px 12px;
+  }
+
+  .comment-content :deep(.code-copy-btn) {
+    padding: 4px 8px;
+    font-size: 10px;
+    top: 5px;
+    right: 6px;
+  }
+
+  .comment-content :deep(.code-copy-btn span) {
+    display: none;
+  }
+
+  .comment-content :deep(.code-block code) {
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .lightbox-nav {
+    padding: 8px;
+  }
+
+  .lightbox-prev {
+    left: 8px;
+  }
+
+  .lightbox-next {
+    right: 8px;
   }
 }
 </style>

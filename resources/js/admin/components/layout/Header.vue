@@ -108,12 +108,36 @@
                         <span class="item-author">{{ comment.author_name || 'Anonymous' }}</span>
                         <span class="item-time">{{ formatTimeAgo(comment.created_at) }}</span>
                       </div>
-                      <p class="item-text">{{ truncate(comment.content, 60) }}</p>
-                      <div v-if="comment.post" class="item-meta">
+                      <!-- Text preview (non-code part) -->
+                      <p v-if="getTextPreview(comment.content)" class="item-text">{{ getTextPreview(comment.content) }}</p>
+                      <!-- Code preview snippet -->
+                      <div v-if="hasCodeBlock(comment.content)" class="item-code-preview">
+                        <code>{{ getCodePreview(comment.content) }}</code>
+                      </div>
+                      <!-- Attachment thumbnails -->
+                      <div v-if="comment.attachments && comment.attachments.length > 0" class="item-attachments">
+                        <div
+                          v-for="att in comment.attachments.slice(0, 1)"
+                          :key="att.id"
+                          class="attachment-thumb"
+                        >
+                          <img v-if="att.type === 'image'" :src="att.url" :alt="att.filename" />
+                          <div v-else class="file-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                          </div>
+                        </div>
+                        <span v-if="comment.attachments.length > 1" class="attachment-count">
+                          +{{ comment.attachments.length - 1 }}
+                        </span>
+                      </div>
+                      <div v-if="comment.commentable || comment.post" class="item-meta">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                         </svg>
-                        <span>{{ truncate(comment.post.title, 25) }}</span>
+                        <span>{{ truncate((comment.commentable || comment.post)?.title, 25) }}</span>
                       </div>
                     </div>
                     <div class="item-actions">
@@ -354,9 +378,64 @@ const formatTimeAgo = (date) => {
   return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
+// Decode HTML entities for display
+const decodeHtmlEntities = (text) => {
+  if (!text) return '';
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+};
+
 const truncate = (text, length) => {
   if (!text) return '';
-  return text.length > length ? text.substring(0, length) + '...' : text;
+  // Decode HTML entities first, then strip HTML tags for plain text display
+  const decoded = decodeHtmlEntities(text);
+  const stripped = decoded.replace(/<[^>]*>/g, '');
+  return stripped.length > length ? stripped.substring(0, length) + '...' : stripped;
+};
+
+// Check if comment has code block
+const hasCodeBlock = (content) => {
+  if (!content) return false;
+  return content.includes('<pre') || content.includes('&lt;pre');
+};
+
+// Get text preview (non-code part only) for notifications
+const getTextPreview = (content, length = 60) => {
+  if (!content) return '';
+  const decoded = decodeHtmlEntities(content);
+  // Remove code blocks first
+  const withoutCode = decoded.replace(/<pre[^>]*>[\s\S]*?<\/pre>/gi, '');
+  // Strip remaining HTML tags
+  const stripped = withoutCode.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!stripped) return '';
+  return stripped.length > length ? stripped.slice(0, length) + '...' : stripped;
+};
+
+// Get code preview (first line of code) for notifications
+const getCodePreview = (content) => {
+  if (!content) return '';
+  const decoded = decodeHtmlEntities(content);
+
+  let code = '';
+  // First try <pre><code>...</code></pre>
+  const codeTagMatch = decoded.match(/<pre[^>]*>\s*<code[^>]*>([\s\S]*?)<\/code>\s*<\/pre>/i);
+  if (codeTagMatch && codeTagMatch[1]) {
+    code = codeTagMatch[1];
+  } else {
+    // Try <pre>...</pre> without code tag
+    const preOnlyMatch = decoded.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+    if (preOnlyMatch && preOnlyMatch[1]) {
+      code = preOnlyMatch[1].replace(/<\/?code[^>]*>/gi, '');
+    }
+  }
+
+  if (!code) return '';
+
+  code = code.trim();
+  // Get first line only, max 50 chars for notification
+  const firstLine = code.split('\n')[0];
+  return firstLine.length > 50 ? firstLine.slice(0, 50) + '...' : firstLine + (code.includes('\n') ? '...' : '');
 };
 
 const isNewComment = (id) => {
@@ -819,9 +898,8 @@ onUnmounted(() => {
 .notification-item.new::before {
   content: '';
   position: absolute;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 8px;
+  top: 16px;
   width: 6px;
   height: 6px;
   background: #4f46e5;
@@ -875,12 +953,76 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+/* Code preview in notification */
+.item-code-preview {
+  margin: 4px 0 6px 0;
+  padding: 6px 8px;
+  background: #1e1e1e;
+  border-radius: 6px;
+  border-left: 2px solid #6ee7b7;
+  max-height: 28px;
+  overflow: hidden;
+}
+
+.item-code-preview code {
+  display: block;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .item-meta {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 11px;
   color: #94a3b8;
+}
+
+/* Attachment thumbnails in notification */
+.item-attachments {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.attachment-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.attachment-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-thumb .file-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.attachment-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 /* Quick Actions */

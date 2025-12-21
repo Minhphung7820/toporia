@@ -92,6 +92,14 @@ class CommentModel extends Model
     }
 
     /**
+     * Comment has many attachments.
+     */
+    public function attachments()
+    {
+        return $this->hasMany(CommentAttachmentModel::class, 'comment_id');
+    }
+
+    /**
      * Get approved replies.
      */
     public function approvedReplies()

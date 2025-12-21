@@ -264,6 +264,58 @@ export const comments = {
   like(commentId) {
     return http.post(`/blog/comments/${commentId}/like`);
   },
+
+  /**
+   * Upload files for comment attachment
+   * @param {File[]} files - Files to upload
+   * @param {Function} _onProgress - Progress callback (not supported with fetch)
+   */
+  async uploadFiles(files, _onProgress = null) {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('files[]', file);
+    });
+
+    // Use native fetch for FormData upload to avoid Axios JSON serialization issues
+    // Fetch automatically sets correct Content-Type with boundary for FormData
+    const response = await fetch('/api/blog/comments/upload', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        'X-XSRF-TOKEN': document.cookie
+          .split('; ')
+          .find((row) => row.startsWith('XSRF-TOKEN='))
+          ?.split('=')[1]
+          ? decodeURIComponent(
+              document.cookie
+                .split('; ')
+                .find((row) => row.startsWith('XSRF-TOKEN='))
+                .split('=')[1]
+            )
+          : '',
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const error = new Error(data.message || 'Upload failed');
+      error.response = { data, status: response.status };
+      throw error;
+    }
+
+    return { data };
+  },
+
+  /**
+   * Delete uploaded file
+   * @param {string} path - File path
+   */
+  deleteFile(path) {
+    return http.delete('/blog/comments/upload', { data: { path } });
+  },
 };
 
 /**
@@ -316,6 +368,20 @@ export const feedback = {
   },
 };
 
+/**
+ * User API endpoints (for mentions)
+ */
+export const users = {
+  /**
+   * Search users for @mention autocomplete
+   * @param {string} query - Search query (min 2 chars)
+   * @param {number} limit - Max results
+   */
+  search(query, limit = 10) {
+    return http.get('/blog/users/search', { params: { q: query, limit } });
+  },
+};
+
 export default {
   posts,
   categories,
@@ -323,4 +389,5 @@ export default {
   comments,
   settings,
   feedback,
+  users,
 };

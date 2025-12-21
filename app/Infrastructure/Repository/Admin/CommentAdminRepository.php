@@ -25,7 +25,7 @@ final class CommentAdminRepository extends BaseRepository
     public function getPaginated(array $filters = [], int $perPage = 20, int $page = 1): Paginator
     {
         return $this
-            ->with(['user', 'commentable'])
+            ->with(['user', 'commentable', 'attachments'])
             ->applyFilters($filters)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage, $page);
@@ -41,7 +41,7 @@ final class CommentAdminRepository extends BaseRepository
     public function getPending(int $perPage = 20, int $page = 1, ?int $postAuthorId = null): Paginator
     {
         $repo = $this
-            ->with(['user', 'commentable'])
+            ->with(['user', 'commentable', 'attachments'])
             ->scope(fn($q) => $q->where('status', CommentModel::STATUS_PENDING));
 
         // Filter by post author if specified (for editors)
@@ -153,14 +153,14 @@ final class CommentAdminRepository extends BaseRepository
     }
 
     /**
-     * Find comment with user and commentable relations for notifications.
+     * Find comment with user, commentable and attachments relations.
      *
      * @param int $id
      * @return mixed
      */
     public function findWithRelations(int $id): mixed
     {
-        return $this->with(['user', 'commentable'])->find($id);
+        return $this->with(['user', 'commentable', 'attachments'])->find($id);
     }
 
     public function approve(int $id): bool

@@ -61,6 +61,13 @@ Route::post('/blog/posts/{postId}/comments', [BlogCommentController::class, 'sto
 Route::post('/blog/comments/{commentId}/reply', [BlogCommentController::class, 'reply'])->middleware(['comments.enabled']);
 Route::post('/blog/comments/{commentId}/like', [BlogCommentController::class, 'like'])->middleware(['comments.enabled']);
 
+// Comment file uploads (for attachments before submitting comment)
+Route::post('/blog/comments/upload', [\App\Presentation\Http\Controllers\Api\Blog\CommentUploadController::class, 'upload']);
+Route::delete('/blog/comments/upload', [\App\Presentation\Http\Controllers\Api\Blog\CommentUploadController::class, 'delete']);
+
+// User search for @mentions
+Route::get('/blog/users/search', [\App\Presentation\Http\Controllers\Api\Blog\UserSearchController::class, 'search']);
+
 // Categories
 Route::get('/blog/categories', [BlogCategoryController::class, 'index']);
 Route::get('/blog/categories/tree', [BlogCategoryController::class, 'tree']);

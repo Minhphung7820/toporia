@@ -200,7 +200,38 @@
           <!-- Comment Content -->
           <div class="card-content">
             <div class="comment-text">
-              <p>{{ comment.content }}</p>
+              <p v-html="formatCommentContent(comment.content)"></p>
+            </div>
+
+            <!-- Attachments -->
+            <div v-if="comment.attachments && comment.attachments.length > 0" class="comment-attachments">
+              <div class="attachments-grid">
+                <div
+                  v-for="(att, attIdx) in comment.attachments.slice(0, 4)"
+                  :key="att.id"
+                  class="attachment-item"
+                  :class="{ 'has-more': attIdx === 3 && comment.attachments.length > 4 }"
+                  @click="openAttachmentPreview(comment, attIdx)"
+                >
+                  <img v-if="att.type === 'image'" :src="att.url" :alt="att.filename" loading="lazy" />
+                  <div v-else class="file-preview">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    <span class="file-name">{{ truncateFilename(att.filename, 12) }}</span>
+                  </div>
+                  <div v-if="attIdx === 3 && comment.attachments.length > 4" class="more-overlay">
+                    <span>+{{ comment.attachments.length - 4 }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="attachments-meta">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                </svg>
+                <span>{{ comment.attachments.length }} {{ comment.attachments.length === 1 ? 'file' : 'files' }} attached</span>
+              </div>
             </div>
 
             <!-- Reply Preview if exists -->
@@ -352,8 +383,34 @@
 
                 <div class="detail-content">
                   <div class="section-label">Comment</div>
-                  <div class="content-box">
-                    <p>{{ selectedComment.content }}</p>
+                  <div class="content-box" ref="contentBoxRef">
+                    <p v-html="formatCommentContent(selectedComment.content)"></p>
+                  </div>
+                </div>
+
+                <!-- Attachments in Detail Modal -->
+                <div v-if="selectedComment.attachments && selectedComment.attachments.length > 0" class="detail-attachments">
+                  <div class="section-label">Attachments ({{ selectedComment.attachments.length }})</div>
+                  <div class="detail-attachments-grid">
+                    <a
+                      v-for="att in selectedComment.attachments"
+                      :key="att.id"
+                      :href="att.url"
+                      target="_blank"
+                      class="detail-attachment-item"
+                    >
+                      <img v-if="att.type === 'image'" :src="att.url" :alt="att.filename" loading="lazy" />
+                      <div v-else class="detail-file-preview">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </div>
+                      <div class="attachment-info">
+                        <span class="attachment-name">{{ truncateFilename(att.filename, 20) }}</span>
+                        <span class="attachment-size">{{ formatFileSize(att.size) }}</span>
+                      </div>
+                    </a>
                   </div>
                 </div>
               </div>
@@ -457,7 +514,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
 import Pagination from '../../../components/shared/Pagination.vue';
 import { useCommentsStore } from '../../stores/comments';
@@ -477,6 +534,9 @@ const selectedComment = ref(null);
 const processing = ref(false);
 const processingIds = ref([]);
 const toasts = ref([]);
+
+// Ref for content box (for copy button setup)
+const contentBoxRef = ref(null);
 
 // Computed
 const comments = computed(() => store.pendingItems);
@@ -567,6 +627,129 @@ const truncate = (text, length) => {
   return text.length > length ? text.substring(0, length) + '...' : text;
 };
 
+// Decode HTML entities and format comment content for admin display
+const decodeHtmlEntities = (text) => {
+  if (!text) return '';
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+};
+
+// Format comment content with code blocks for admin preview
+const formatCommentContent = (content) => {
+  if (!content) return '';
+
+  // First decode HTML entities
+  let decoded = decodeHtmlEntities(content);
+
+  // Sanitize - only allow safe tags (including div for structure)
+  const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'br', 'pre', 'code', 'div'];
+  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
+  decoded = decoded.replace(tagRegex, (match, tag) => {
+    const lowerTag = tag.toLowerCase();
+    if (allowedTags.includes(lowerTag)) {
+      // Always add code-block class to pre tags for styling
+      if (lowerTag === 'pre') {
+        return '<pre class="code-block">';
+      }
+      return match;
+    }
+    return '';
+  });
+
+  // Fix malformed code blocks where text is inside <pre> but outside <code>
+  // Pattern: <pre...>TEXT_OUTSIDE<code>CODE_INSIDE</code></pre>
+  // Should be: TEXT_OUTSIDE<pre...><code>CODE_INSIDE</code></pre>
+  decoded = decoded.replace(/<pre([^>]*)>([^<]+)(<code>)/gi, (match, preAttrs, textBefore, codeTag) => {
+    // If there's text between <pre> and <code>, move it before <pre>
+    const trimmedText = textBefore.trim();
+    if (trimmedText && !trimmedText.startsWith('<')) {
+      return `<div class="text-before-code">${trimmedText}</div><pre${preAttrs}>${codeTag}`;
+    }
+    return match;
+  });
+
+  // Also handle case where text appears after </code> but before </pre>
+  decoded = decoded.replace(/(<\/code>)([^<]+)<\/pre>/gi, (match, closeCode, textAfter) => {
+    const trimmedText = textAfter.trim();
+    if (trimmedText) {
+      return `${closeCode}</pre><div class="text-after-code">${trimmedText}</div>`;
+    }
+    return match;
+  });
+
+  return decoded;
+};
+
+// Setup copy buttons for code blocks in a container
+const setupCodeBlockCopyButtonsInContainer = (container) => {
+  if (!container) return;
+
+  const codeBlocks = container.querySelectorAll('.code-block');
+  codeBlocks.forEach((block) => {
+    // Check if copy button already exists
+    if (block.querySelector('.code-copy-btn')) return;
+
+    // Create copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'code-copy-btn';
+    copyBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+      </svg>
+      <span>Copy</span>
+    `;
+
+    copyBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const code = block.querySelector('code');
+      if (code) {
+        try {
+          await navigator.clipboard.writeText(code.textContent || '');
+          copyBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Copied!</span>
+          `;
+          copyBtn.classList.add('copied');
+          setTimeout(() => {
+            copyBtn.innerHTML = `
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            `;
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        } catch (err) {
+          console.error('Failed to copy:', err);
+        }
+      }
+    });
+
+    // Insert copy button into the code block header area
+    block.insertBefore(copyBtn, block.firstChild);
+  });
+};
+
+// Setup copy buttons for code blocks in modal
+const setupCodeBlockCopyButtons = () => {
+  if (!contentBoxRef.value) return;
+  setupCodeBlockCopyButtonsInContainer(contentBoxRef.value);
+};
+
+// Setup copy buttons for all code blocks in the page
+const setupAllCodeBlockCopyButtons = () => {
+  // Setup for comment cards in the list
+  const commentCards = document.querySelectorAll('.comment-text');
+  commentCards.forEach((card) => {
+    setupCodeBlockCopyButtonsInContainer(card);
+  });
+};
+
 const isUrgent = (date) => {
   if (!date) return false;
   const now = new Date();
@@ -584,6 +767,30 @@ const getTimeBadgeClass = (date) => {
   if (diffHours > 48) return 'urgent';
   if (diffHours > 24) return 'warning';
   return 'normal';
+};
+
+// Attachment helpers
+const truncateFilename = (filename, maxLength) => {
+  if (!filename) return '';
+  if (filename.length <= maxLength) return filename;
+  const ext = filename.split('.').pop();
+  const nameWithoutExt = filename.slice(0, filename.lastIndexOf('.'));
+  const truncatedName = nameWithoutExt.slice(0, maxLength - ext.length - 4);
+  return `${truncatedName}...${ext}`;
+};
+
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+};
+
+const openAttachmentPreview = (comment, index) => {
+  const attachment = comment.attachments[index];
+  if (attachment && attachment.url) {
+    window.open(attachment.url, '_blank');
+  }
 };
 
 // Toast System
@@ -701,6 +908,10 @@ const handleDelete = async () => {
 const openDetailModal = (comment) => {
   selectedComment.value = comment;
   showDetailModal.value = true;
+  // Setup copy buttons after modal renders
+  nextTick(() => {
+    setupCodeBlockCopyButtons();
+  });
 };
 
 const closeDetailModal = () => {
@@ -737,6 +948,22 @@ onUnmounted(() => {
   off('comment.created', handleNewComment, 'admin.comments');
   off('comment.updated', handleCommentUpdated, 'admin.comments');
   unsubscribe('admin.comments');
+});
+
+// Watch for comments changes to setup copy buttons
+watch(comments, () => {
+  nextTick(() => {
+    setupAllCodeBlockCopyButtons();
+  });
+}, { immediate: false });
+
+// Also setup on initial load
+watch(loading, (newLoading, oldLoading) => {
+  if (oldLoading && !newLoading) {
+    nextTick(() => {
+      setupAllCodeBlockCopyButtons();
+    });
+  }
 });
 </script>
 
@@ -1274,6 +1501,396 @@ onUnmounted(() => {
   color: #374151;
   line-height: 1.7;
   white-space: pre-wrap;
+}
+
+/* Text extracted from malformed code blocks */
+.comment-text :deep(.text-before-code),
+.comment-text :deep(.text-after-code) {
+  display: block;
+  margin: 8px 0;
+  padding: 0;
+  color: #374151;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* Code blocks in admin comment preview */
+.comment-text :deep(.code-block),
+.comment-text :deep(pre) {
+  display: block;
+  margin: 12px 0;
+  padding: 0;
+  background: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid #333;
+  overflow: hidden;
+}
+
+.comment-text :deep(.code-block)::before,
+.comment-text :deep(pre)::before {
+  content: 'Code';
+  display: block;
+  padding: 8px 12px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #333;
+  color: #888;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.comment-text :deep(.code-block code),
+.comment-text :deep(pre code) {
+  display: block;
+  padding: 12px;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+/* Custom scrollbar for code blocks */
+.comment-text :deep(.code-block code)::-webkit-scrollbar,
+.comment-text :deep(pre code)::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.comment-text :deep(.code-block code)::-webkit-scrollbar-track,
+.comment-text :deep(pre code)::-webkit-scrollbar-track {
+  background: #2d2d2d;
+  border-radius: 3px;
+}
+
+.comment-text :deep(.code-block code)::-webkit-scrollbar-thumb,
+.comment-text :deep(pre code)::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+.comment-text :deep(.code-block code)::-webkit-scrollbar-thumb:hover,
+.comment-text :deep(pre code)::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+.comment-text :deep(.code-block code)::-webkit-scrollbar-corner,
+.comment-text :deep(pre code)::-webkit-scrollbar-corner {
+  background: #2d2d2d;
+}
+
+/* Copy button for code blocks in comment list */
+.comment-text :deep(.code-copy-btn) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #2d2d2d;
+  border: none;
+  border-bottom: 1px solid #333;
+  color: #888;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.comment-text :deep(.code-copy-btn):hover {
+  background: #3d3d3d;
+  color: #d4d4d4;
+}
+
+.comment-text :deep(.code-copy-btn.copied) {
+  color: #6ee7b7;
+}
+
+.comment-text :deep(.code-copy-btn svg) {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Hide ::before when copy button exists */
+.comment-text :deep(.code-block:has(.code-copy-btn))::before,
+.comment-text :deep(pre:has(.code-copy-btn))::before {
+  display: none;
+}
+
+/* Text extracted from malformed code blocks in detail modal */
+.content-box :deep(.text-before-code),
+.content-box :deep(.text-after-code) {
+  display: block;
+  margin: 8px 0;
+  padding: 0;
+  color: #374151;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* Content box code blocks in detail modal */
+.content-box :deep(.code-block),
+.content-box :deep(pre) {
+  display: block;
+  margin: 12px 0;
+  padding: 0;
+  background: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid #333;
+  overflow: hidden;
+}
+
+.content-box :deep(.code-block)::before,
+.content-box :deep(pre)::before {
+  content: 'Code';
+  display: block;
+  padding: 10px 14px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #333;
+  color: #888;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.content-box :deep(.code-block code),
+.content-box :deep(pre code) {
+  display: block;
+  padding: 14px 16px;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+/* Custom scrollbar for content-box code blocks */
+.content-box :deep(.code-block code)::-webkit-scrollbar,
+.content-box :deep(pre code)::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.content-box :deep(.code-block code)::-webkit-scrollbar-track,
+.content-box :deep(pre code)::-webkit-scrollbar-track {
+  background: #2d2d2d;
+  border-radius: 3px;
+}
+
+.content-box :deep(.code-block code)::-webkit-scrollbar-thumb,
+.content-box :deep(pre code)::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+.content-box :deep(.code-block code)::-webkit-scrollbar-thumb:hover,
+.content-box :deep(pre code)::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+.content-box :deep(.code-block code)::-webkit-scrollbar-corner,
+.content-box :deep(pre code)::-webkit-scrollbar-corner {
+  background: #2d2d2d;
+}
+
+/* Copy button for code blocks */
+.content-box :deep(.code-copy-btn) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #2d2d2d;
+  border: none;
+  border-bottom: 1px solid #333;
+  color: #888;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.content-box :deep(.code-copy-btn):hover {
+  background: #3d3d3d;
+  color: #d4d4d4;
+}
+
+.content-box :deep(.code-copy-btn.copied) {
+  color: #6ee7b7;
+}
+
+.content-box :deep(.code-copy-btn svg) {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Hide ::before when copy button exists */
+.content-box :deep(.code-block:has(.code-copy-btn))::before,
+.content-box :deep(pre:has(.code-copy-btn))::before {
+  display: none;
+}
+
+/* Comment Attachments */
+.comment-attachments {
+  margin-top: 12px;
+}
+
+.attachments-grid {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  max-width: 320px;
+}
+
+.attachment-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f3f4f6;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.attachment-item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.attachment-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-item .file-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 4px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.attachment-item .file-preview svg {
+  width: 20px;
+  height: 20px;
+}
+
+.attachment-item .file-name {
+  font-size: 8px;
+  margin-top: 2px;
+  word-break: break-all;
+  line-height: 1.1;
+  max-height: 2.2em;
+  overflow: hidden;
+}
+
+.attachment-item .more-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attachment-item .more-overlay span {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.attachments-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.attachments-meta svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Detail Modal Attachments */
+.detail-attachments {
+  margin-top: 20px;
+}
+
+.detail-attachments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.detail-attachment-item {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.detail-attachment-item:hover {
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+}
+
+.detail-attachment-item img {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+}
+
+.detail-file-preview {
+  width: 100%;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.attachment-info {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.attachment-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  line-height: 1.3;
+}
+
+.attachment-size {
+  font-size: 11px;
+  color: #9ca3af;
 }
 
 /* Reply Context */
@@ -1848,6 +2465,19 @@ onUnmounted(() => {
     padding: 16px;
   }
 
+  .attachments-grid {
+    max-width: 280px;
+  }
+
+  .attachment-item {
+    width: 56px;
+    height: 56px;
+  }
+
+  .detail-attachments-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
   .card-actions {
     flex-wrap: wrap;
     padding: 12px 16px;
@@ -1935,6 +2565,52 @@ onUnmounted(() => {
 
   .comment-text p {
     font-size: 14px;
+  }
+
+  .attachments-grid {
+    max-width: 220px;
+    gap: 4px;
+  }
+
+  .attachment-item {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+  }
+
+  .attachment-item .file-preview svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .attachment-item .file-name {
+    display: none;
+  }
+
+  .attachment-item .more-overlay span {
+    font-size: 12px;
+  }
+
+  .attachments-meta {
+    font-size: 10px;
+  }
+
+  .detail-attachments-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .detail-attachment-item img,
+  .detail-file-preview {
+    height: 80px;
+  }
+
+  .attachment-info {
+    padding: 8px;
+  }
+
+  .attachment-name {
+    font-size: 11px;
   }
 
   .action-btn {

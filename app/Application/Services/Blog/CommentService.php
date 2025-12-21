@@ -8,6 +8,8 @@ use App\Application\Services\SiteSettingsService;
 use App\Domain\Contracts\Repository\CommentRepository;
 use App\Domain\Contracts\Repository\PostRepository;
 use App\Domain\Entities\Comment;
+use App\Infrastructure\Persistence\Models\CommentAttachmentModel;
+use App\Infrastructure\Persistence\Models\CommentMentionModel;
 use App\Infrastructure\Persistence\Models\UserModel;
 use Toporia\Framework\Realtime\Broadcast;
 
@@ -122,7 +124,7 @@ final class CommentService
 
         $comment = new Comment(
             id: null,
-            content: strip_tags($data['content']),
+            content: $this->sanitizeContent($data['content']),
             commentableType: 'Post',
             commentableId: (int) $data['post_id'],
             userId: $userId,
@@ -138,6 +140,16 @@ final class CommentService
         );
 
         $savedComment = $this->commentRepository->save($comment);
+
+        // Save attachments if provided
+        if (!empty($data['attachments'])) {
+            $this->saveAttachments($savedComment->id, $data['attachments']);
+        }
+
+        // Save mentions if provided
+        if (!empty($data['mentions'])) {
+            $this->saveMentions($savedComment->id, $data['mentions'], $userId);
+        }
 
         // Broadcast realtime event to admin notifications channel
         $this->broadcastCommentCreated($savedComment, $requiresApproval);
@@ -204,7 +216,7 @@ final class CommentService
 
         $reply = new Comment(
             id: null,
-            content: strip_tags($data['content']),
+            content: $this->sanitizeContent($data['content']),
             commentableType: $parent->commentableType,
             commentableId: $parent->commentableId,
             userId: $userId,
@@ -220,6 +232,16 @@ final class CommentService
         );
 
         $savedReply = $this->commentRepository->save($reply);
+
+        // Save attachments if provided
+        if (!empty($data['attachments'])) {
+            $this->saveAttachments($savedReply->id, $data['attachments']);
+        }
+
+        // Save mentions if provided
+        if (!empty($data['mentions'])) {
+            $this->saveMentions($savedReply->id, $data['mentions'], $userId);
+        }
 
         // Broadcast realtime event to admin notifications channel
         $this->broadcastCommentCreated($savedReply, $requiresApproval);
@@ -279,7 +301,7 @@ final class CommentService
     }
 
     /**
-     * Enrich comment data with user information (name, avatar).
+     * Enrich comment data with user information (name, avatar) and attachments.
      *
      * @param Comment $comment
      * @return array
@@ -297,7 +319,85 @@ final class CommentService
             }
         }
 
+        // Check if commenter is the post author
+        $data['is_post_author'] = false;
+        if ($comment->commentableType === 'Post' && $comment->userId !== null) {
+            $post = $this->postRepository->findById($comment->commentableId);
+            if ($post && $post->authorId === $comment->userId) {
+                $data['is_post_author'] = true;
+            }
+        }
+
+        // Load attachments
+        $attachments = CommentAttachmentModel::where('comment_id', $comment->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        $data['attachments'] = $attachments->map(fn($att) => [
+            'id' => $att->id,
+            'filename' => $att->filename,
+            'path' => $att->path,
+            'url' => url('/storage/' . $att->path),
+            'mime_type' => $att->mime_type,
+            'size' => $att->size,
+            'type' => $att->type,
+            'width' => $att->width,
+            'height' => $att->height,
+        ])->all();
+
+        // Load mentions
+        $mentions = CommentMentionModel::where('comment_id', $comment->id)
+            ->with('mentionedUser')
+            ->get();
+
+        $data['mentions'] = $mentions->map(fn($m) => [
+            'user_id' => $m->mentioned_user_id,
+            'name' => $m->mentionedUser?->name,
+            'username' => $m->mentionedUser?->username,
+        ])->all();
+
         return $data;
+    }
+
+    /**
+     * Save attachments for a comment.
+     *
+     * @param int $commentId
+     * @param array $attachments
+     */
+    private function saveAttachments(int $commentId, array $attachments): void
+    {
+        foreach ($attachments as $index => $attachment) {
+            CommentAttachmentModel::create([
+                'comment_id' => $commentId,
+                'filename' => $attachment['filename'] ?? '',
+                'path' => $attachment['path'] ?? '',
+                'mime_type' => $attachment['mime_type'] ?? '',
+                'size' => $attachment['size'] ?? 0,
+                'type' => $attachment['type'] ?? 'file',
+                'width' => $attachment['width'] ?? null,
+                'height' => $attachment['height'] ?? null,
+                'sort_order' => $index,
+            ]);
+        }
+    }
+
+    /**
+     * Save mentions for a comment.
+     *
+     * @param int $commentId
+     * @param array $mentionedUserIds
+     * @param int|null $mentionedByUserId
+     */
+    private function saveMentions(int $commentId, array $mentionedUserIds, ?int $mentionedByUserId): void
+    {
+        foreach ($mentionedUserIds as $userId) {
+            CommentMentionModel::create([
+                'comment_id' => $commentId,
+                'mentioned_user_id' => (int) $userId,
+                'mentioned_by_user_id' => $mentionedByUserId,
+            ]);
+        }
     }
 
     /**
@@ -316,18 +416,56 @@ final class CommentService
             // Get post info for the notification
             $post = $this->postRepository->findById($comment->commentableId);
 
+            // Load attachments for the comment
+            $attachments = CommentAttachmentModel::where('comment_id', $comment->id)
+                ->orderBy('sort_order')
+                ->get();
+
+            $attachmentsData = $attachments->map(fn($att) => [
+                'id' => $att->id,
+                'filename' => $att->filename,
+                'path' => $att->path,
+                'url' => $att->url, // Uses accessor from model
+                'mime_type' => $att->mime_type,
+                'size' => $att->size,
+                'type' => $att->type,
+                'width' => $att->width,
+                'height' => $att->height,
+            ])->all();
+
+            // Load user info if comment is from registered user
+            $authorAvatar = null;
+            $authorDisplayName = $comment->authorName ?? 'Anonymous';
+            if ($comment->userId !== null) {
+                $user = UserModel::find($comment->userId);
+                if ($user) {
+                    $authorDisplayName = $user->name;
+                    $authorAvatar = $user->avatar;
+                }
+            }
+
             $payload = [
                 'id' => $comment->id,
                 'content' => $comment->content,
-                'author_name' => $comment->authorName ?? 'Anonymous',
+                'author_name' => $authorDisplayName,
                 'author_email' => $comment->authorEmail,
+                'author_avatar' => $authorAvatar,
+                'user_id' => $comment->userId,
                 'status' => $requiresApproval ? 'pending' : 'approved',
+                'is_approved' => !$requiresApproval,
                 'is_reply' => $comment->parentId !== null,
-                'post' => $post ? [
+                'parent_id' => $comment->parentId,
+                'depth' => $comment->depth,
+                'likes_count' => $comment->likesCount,
+                'commentable_type' => $comment->commentableType,
+                'commentable_id' => $comment->commentableId,
+                'commentable' => $post ? [
                     'id' => $post->id,
                     'title' => $post->title,
                 ] : null,
+                'attachments' => $attachmentsData,
                 'created_at' => $comment->createdAt->format('Y-m-d H:i:s'),
+                'updated_at' => $comment->updatedAt->format('Y-m-d H:i:s'),
             ];
 
             // Broadcast to admin notifications channel (for Header)
@@ -345,5 +483,40 @@ final class CommentService
             // Log error but don't fail the comment creation
             error_log("Failed to broadcast comment.created event: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Sanitize HTML content, allowing only safe tags for comments.
+     * Allows: b, strong, i, em, u, br, pre, code (for code blocks)
+     *
+     * @param string $content
+     * @return string
+     */
+    private function sanitizeContent(string $content): string
+    {
+        // Allow only safe formatting tags and code blocks
+        $allowedTags = '<b><strong><i><em><u><br><pre><code>';
+
+        // Strip all tags except allowed ones
+        $sanitized = strip_tags($content, $allowedTags);
+
+        // Clean up pre tags - only allow class="code-block"
+        $sanitized = preg_replace_callback(
+            '/<pre([^>]*)>/i',
+            function ($matches) {
+                $attrs = $matches[1];
+                // Only keep class="code-block" if present
+                if (preg_match('/class\s*=\s*["\']code-block["\']/i', $attrs)) {
+                    return '<pre class="code-block">';
+                }
+                return '<pre>';
+            },
+            $sanitized
+        );
+
+        // Remove any other attributes from allowed tags for security
+        $sanitized = preg_replace('/<(b|strong|i|em|u|br|code)(\s+[^>]*)>/i', '<$1>', $sanitized);
+
+        return $sanitized;
     }
 }
