@@ -10,6 +10,7 @@ use App\Infrastructure\Persistence\Models\ImportExportJobModel;
 use App\Infrastructure\Persistence\Models\PostModel;
 use Toporia\Framework\Bus\Contracts\ShouldQueueInterface;
 use Toporia\Framework\Queue\Job;
+use Toporia\Framework\Realtime\Broadcast;
 use Toporia\Framework\Support\Accessors\Log;
 use Toporia\Tabula\Tabula;
 
@@ -70,6 +71,7 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
 
         $job->markAsProcessing();
         $this->reportProgress(0, 'Starting export...');
+        $this->broadcastProgress(0, 'Starting export...', 'processing');
 
         try {
             // Count total rows to export
@@ -81,15 +83,20 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
             ]);
 
             $this->reportProgress(10, "Found {$totalRows} posts to export");
+            $this->broadcastProgress(10, "Found {$totalRows} posts to export", 'processing', [
+                'total_rows' => $totalRows,
+            ]);
 
             if ($totalRows === 0) {
                 $job->markAsCompleted();
                 $this->reportProgress(100, 'No posts to export');
+                $this->broadcastProgress(100, 'No posts to export', 'completed');
                 return;
             }
 
             // Create export instance with filters
             $this->reportProgress(20, 'Preparing export...');
+            $this->broadcastProgress(20, 'Preparing export...', 'processing');
             $export = $this->createExport();
 
             // Set total count for accurate progress tracking
@@ -109,9 +116,10 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
                 mkdir($dir, 0755, true);
             }
 
-            // Configure progress callback
+            // Configure progress callback with WebSocket broadcasting
             $lastProgress = 20;
-            $export->withProgressCallback(function (int $processed, int $total) use (&$lastProgress, $totalRows) {
+            $jobId = $this->jobId;
+            $export->withProgressCallback(function (int $processed, int $total) use (&$lastProgress, $totalRows, $jobId) {
                 // Calculate progress (20-90% for export phase)
                 $progress = 20 + (int) (($processed / max(1, $total)) * 70);
 
@@ -122,12 +130,18 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
 
                     // Update job record directly (avoid stale $job->total_rows issue)
                     $dbProgress = $totalRows > 0 ? (int) (($processed / $totalRows) * 100) : 0;
-                    ImportExportJobModel::where('id', $this->jobId)->update([
+                    ImportExportJobModel::where('id', $jobId)->update([
                         'processed_rows' => $processed,
                         'success_rows' => $processed,
                         'failed_rows' => 0,
                         'progress' => min(100, $dbProgress),
                         'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+
+                    // Broadcast progress via WebSocket
+                    $this->broadcastProgress($dbProgress, "Exporting: " . number_format($processed) . " / " . number_format($totalRows) . " rows", 'processing', [
+                        'processed_rows' => $processed,
+                        'total_rows' => $totalRows,
                     ]);
                 }
             });
@@ -138,6 +152,7 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
             $elapsed = microtime(true) - $startTime;
 
             $this->reportProgress(95, 'Export completed, finalizing...');
+            $this->broadcastProgress(95, 'Export completed, finalizing...', 'processing');
 
             // Update job with results
             $fileSize = filesize($outputPath);
@@ -164,6 +179,13 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
             ]);
 
             $this->reportProgress(100, $message);
+            $this->broadcastProgress(100, $message, 'completed', [
+                'processed_rows' => $totalRows,
+                'total_rows' => $totalRows,
+                'success_rows' => $totalRows,
+                'failed_rows' => 0,
+                'elapsed_seconds' => round($elapsed, 2),
+            ]);
 
             Log::info("ExportPostsJob completed", [
                 'job_id' => $this->jobId,
@@ -180,6 +202,11 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
             ]);
 
             $job->markAsFailed($e->getMessage());
+
+            // Broadcast failure
+            $this->broadcastProgress(0, "Export failed: {$e->getMessage()}", 'failed', [
+                'error' => $e->getMessage(),
+            ]);
 
             throw $e;
         }
@@ -198,6 +225,14 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
         if ($job) {
             $job->markAsFailed($exception->getMessage());
         }
+
+        // Broadcast permanent failure
+        $this->broadcastProgress(
+            0,
+            "Export permanently failed: {$exception->getMessage()}",
+            'failed',
+            ['error' => $exception->getMessage(), 'permanent' => true]
+        );
     }
 
     /**
@@ -220,6 +255,35 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
         }
 
         return $query;
+    }
+
+    /**
+     * Broadcast progress to WebSocket channel.
+     */
+    private function broadcastProgress(
+        int $progress,
+        string $message,
+        string $status = 'processing',
+        array $extra = []
+    ): void {
+        try {
+            $channel = "import.jobs.{$this->jobId}";
+
+            Broadcast::channel($channel)
+                ->event('progress')
+                ->with(array_merge([
+                    'job_id' => $this->jobId,
+                    'progress' => $progress,
+                    'message' => $message,
+                    'status' => $status,
+                ], $extra))
+                ->now();
+        } catch (\Throwable $e) {
+            Log::warning("Failed to broadcast export progress", [
+                'job_id' => $this->jobId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

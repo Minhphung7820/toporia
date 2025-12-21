@@ -89,7 +89,6 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
         }
 
         $job->markAsProcessing();
-        $this->reportProgress(0, 'Starting import...');
 
         // Resolve file path - support both relative and absolute paths
         $filePath = $this->resolveFilePath($this->filePath);
@@ -108,14 +107,18 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
             $totalRows = $this->countRows($filePath);
             ImportExportJobModel::where('id', $this->jobId)->update([
                 'total_rows' => $totalRows,
+                'progress' => 0,
+                'message' => "Found {$totalRows} rows, preparing import...",
             ]);
-
-            $this->reportProgress(5, "Found {$totalRows} rows to import");
 
             // Disable triggers for performance
             $this->dropTriggers();
             $triggersDropped = true;
-            $this->reportProgress(10, 'Triggers disabled, starting import...');
+
+            // Update message but keep progress at 0 until actual import starts
+            ImportExportJobModel::where('id', $this->jobId)->update([
+                'message' => 'Triggers disabled, starting import...',
+            ]);
 
             // Create import instance
             $import = $this->workers > 0
@@ -123,25 +126,59 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
                 : PostsImport::make();
 
             // Configure progress callback with WebSocket broadcasting
-            $lastProgress = 10;
-            $import->withProgressCallback(function (int $processed, int $total) use (&$lastProgress, $job, $totalRows) {
-                // Calculate progress (10-80% for import phase)
-                $progress = 10 + (int) (($processed / max(1, $total)) * 70);
+            // Progress = processed / total * 100 (simple, intuitive)
+            $lastProgress = 0;
+            $lastCancelCheck = 0;
+            $jobId = $this->jobId; // Capture for closure
+            $import->withProgressCallback(function (int $processed, int $total) use (&$lastProgress, &$lastCancelCheck, $jobId, $totalRows) {
+                // Check for cancellation every 10,000 rows to avoid DB overhead
+                if ($processed - $lastCancelCheck >= 10000) {
+                    $lastCancelCheck = $processed;
+                    $currentStatus = ImportExportJobModel::where('id', $jobId)->value('status');
+                    if ($currentStatus === ImportExportJobModel::STATUS_CANCELLED) {
+                        Log::info("ImportPostsJob: Cancellation detected during import", [
+                            'job_id' => $jobId,
+                            'processed' => $processed,
+                        ]);
+                        // Throw exception to stop import
+                        throw new \RuntimeException('Import cancelled by user');
+                    }
+                }
 
-                // Only update if progress changed significantly (>= 2%)
-                if ($progress >= $lastProgress + 2) {
+                // Simple progress: processed / total * 100
+                // Use pre-counted totalRows for accuracy
+                $effectiveTotal = $totalRows > 0 ? $totalRows : max(1, $total);
+                $progress = (int) (($processed / $effectiveTotal) * 100);
+
+                // Only update if progress changed significantly (>= 1%)
+                if ($progress > $lastProgress) {
                     $lastProgress = $progress;
 
-                    // Update job record
-                    $job->updateProcessedRows($processed, $processed, 0);
-
-                    // Broadcast with extra row info
-                    $this->broadcastProgress($progress, "Importing: {$processed}/{$total} rows", 'processing', [
+                    // Update job record directly with calculated progress
+                    ImportExportJobModel::where('id', $jobId)->update([
                         'processed_rows' => $processed,
-                        'total_rows' => $totalRows,
                         'success_rows' => $processed,
                         'failed_rows' => 0,
+                        'progress' => $progress,
+                        'message' => "Importing: " . number_format($processed) . " / " . number_format($totalRows) . " rows",
+                        'updated_at' => date('Y-m-d H:i:s'),
                     ]);
+
+                    // Broadcast with extra row info
+                    Broadcast::channel("import.jobs.{$jobId}")
+                        ->event('progress')
+                        ->with([
+                            'job_id' => $jobId,
+                            'progress' => $progress,
+                            'message' => "Importing: " . number_format($processed) . " / " . number_format($totalRows) . " rows",
+                            'status' => 'processing',
+                            'processed_rows' => $processed,
+                            'total_rows' => $totalRows,
+                            'success_rows' => $processed,
+                            'failed_rows' => 0,
+                            'timestamp' => date('c'),
+                        ])
+                        ->now();
                 }
             });
 
@@ -166,7 +203,7 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
 
             // Dispatch post-import processing job (ES indexing, stats recalculation)
             $this->reportProgress(90, 'Dispatching post-import tasks...');
-            dispatch(new PostImportPostProcessingJob($maxIdBeforeImport, 1000));
+            dispatch(new PostImportPostProcessingJob($maxIdBeforeImport, 500));
             Log::info('PostImportPostProcessingJob dispatched', [
                 'job_id' => $this->jobId,
                 'max_id_before_import' => $maxIdBeforeImport,
@@ -202,6 +239,25 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
                 'elapsed' => $elapsed,
             ]);
         } catch (\Throwable $e) {
+            // Check if this was a user cancellation
+            if ($e->getMessage() === 'Import cancelled by user') {
+                Log::info("ImportPostsJob cancelled by user", [
+                    'job_id' => $this->jobId,
+                    'processed_rows' => $lastProgress ?? 0,
+                ]);
+
+                // Job is already marked as cancelled in DB, just broadcast
+                $this->broadcastProgress(
+                    $lastProgress ?? 0,
+                    'Import cancelled by user',
+                    'cancelled',
+                    ['cancelled' => true]
+                );
+
+                // Don't re-throw - this is expected behavior
+                return;
+            }
+
             Log::error("ImportPostsJob failed", [
                 'job_id' => $this->jobId,
                 'error' => $e->getMessage(),

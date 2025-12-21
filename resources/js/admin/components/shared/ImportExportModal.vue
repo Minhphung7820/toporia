@@ -153,7 +153,7 @@
 
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="handleClose" :disabled="isProcessing">
-            {{ activeJob && !isFinished ? 'Close' : 'Cancel' }}
+            {{ isFinished ? 'Close' : (activeJob ? 'Close' : 'Cancel') }}
           </button>
 
           <!-- Import buttons -->
@@ -177,9 +177,9 @@
             <button
               v-if="isFinished"
               class="btn btn-primary"
-              @click="resetAndClose"
+              @click="startNewImport"
             >
-              Done
+              New Import
             </button>
           </template>
 
@@ -214,11 +214,11 @@
               Download
             </button>
             <button
-              v-if="isFinished && !activeJob?.can_download"
+              v-if="isFinished"
               class="btn btn-primary"
-              @click="resetAndClose"
+              @click="startNewExport"
             >
-              Done
+              New Export
             </button>
           </template>
         </div>
@@ -230,6 +230,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import axios from 'axios';
+import { useJobProgress } from '@/admin/composables/useJobProgress';
 
 const props = defineProps({
   mode: {
@@ -245,6 +246,9 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'completed']);
 
+// Use SSE composable for real-time progress
+const { job: streamedJob, isConnected, connect: connectStream, disconnect: disconnectStream } = useJobProgress();
+
 // State
 const selectedFile = ref(null);
 const isDragging = ref(false);
@@ -253,10 +257,21 @@ const uploading = ref(false);
 const exporting = ref(false);
 const cancelling = ref(false);
 const activeJob = ref(null);
-const pollingInterval = ref(null);
 const exportFilters = ref({
   is_published: '',
   category_id: '',
+});
+
+// Watch streamed job updates and sync to activeJob
+watch(streamedJob, (newJob) => {
+  if (newJob) {
+    activeJob.value = newJob;
+
+    // Emit completed event when job finishes successfully
+    if (newJob.status === 'completed') {
+      emit('completed', newJob);
+    }
+  }
 });
 
 // Computed
@@ -314,7 +329,8 @@ const startImport = async () => {
 
     if (response.data.success) {
       activeJob.value = response.data.data;
-      startPolling();
+      // Connect to SSE stream for real-time updates
+      connectStream(response.data.data.id);
     } else {
       alert(response.data.message || 'Failed to start import');
     }
@@ -340,7 +356,8 @@ const startExport = async () => {
 
     if (response.data.success) {
       activeJob.value = response.data.data;
-      startPolling();
+      // Connect to SSE stream for real-time updates
+      connectStream(response.data.data.id);
     } else {
       alert(response.data.message || 'Failed to start export');
     }
@@ -359,7 +376,7 @@ const cancelJob = async () => {
     const response = await axios.post(`/api/admin/posts/jobs/${activeJob.value.id}/cancel`);
     if (response.data.success) {
       activeJob.value.status = 'cancelled';
-      stopPolling();
+      disconnectStream();
     }
   } catch (error) {
     alert(error.response?.data?.message || 'Failed to cancel job');
@@ -375,38 +392,6 @@ const downloadFile = () => {
   window.location.href = `/api/admin/posts/jobs/${activeJob.value.id}/download`;
 };
 
-const pollJobStatus = async () => {
-  if (!activeJob.value?.id) return;
-
-  try {
-    const response = await axios.get(`/api/admin/posts/jobs/${activeJob.value.id}`);
-    if (response.data.success) {
-      activeJob.value = response.data.data;
-
-      if (isFinished.value) {
-        stopPolling();
-        if (activeJob.value.status === 'completed') {
-          emit('completed', activeJob.value);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Failed to poll job status:', error);
-  }
-};
-
-const startPolling = () => {
-  stopPolling();
-  pollingInterval.value = setInterval(pollJobStatus, 2000);
-};
-
-const stopPolling = () => {
-  if (pollingInterval.value) {
-    clearInterval(pollingInterval.value);
-    pollingInterval.value = null;
-  }
-};
-
 const checkActiveJobs = async () => {
   try {
     const response = await axios.get('/api/admin/posts/jobs/active');
@@ -415,11 +400,11 @@ const checkActiveJobs = async () => {
         ? response.data.data.import
         : response.data.data.export;
 
-      if (job) {
+      // Only load job if it's still in progress (pending/processing)
+      // Don't auto-load completed/failed/cancelled jobs when opening modal
+      if (job && ['pending', 'processing'].includes(job.status)) {
         activeJob.value = job;
-        if (!isFinished.value) {
-          startPolling();
-        }
+        connectStream(job.id);
       }
     }
   } catch (error) {
@@ -433,13 +418,19 @@ const handleClose = () => {
       return;
     }
   }
-  stopPolling();
+  disconnectStream();
   emit('close');
 };
 
-const resetAndClose = () => {
-  stopPolling();
-  emit('close');
+const startNewImport = () => {
+  activeJob.value = null;
+  selectedFile.value = null;
+  disconnectStream();
+};
+
+const startNewExport = () => {
+  activeJob.value = null;
+  disconnectStream();
 };
 
 // Lifecycle
@@ -448,7 +439,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  stopPolling();
+  disconnectStream();
 });
 </script>
 

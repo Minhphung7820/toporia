@@ -19,6 +19,8 @@ services:
       - ./storage/sessions:/var/www/html/storage/sessions
       - ./storage/cache:/var/www/html/storage/cache
       - ./storage/framework:/var/www/html/storage/framework
+      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/99-custom.ini:ro
+      - ./docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
     environment:
       # Host UID/GID for permission sync (fixes file permission issues)
       HOST_UID: ${UID:-1000}

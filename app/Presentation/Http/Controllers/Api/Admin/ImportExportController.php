@@ -36,9 +36,9 @@ final class ImportExportController extends BaseController
     ];
 
     /**
-     * Maximum upload file size (100MB).
+     * Maximum upload file size (2GB).
      */
-    private const MAX_UPLOAD_SIZE = 100 * 1024 * 1024;
+    private const MAX_UPLOAD_SIZE = 2 * 1024 * 1024 * 1024;
 
     public function __construct(
         Request $request,
@@ -280,4 +280,5 @@ final class ImportExportController extends BaseController
             'Cache-Control' => 'no-cache, no-store, must-revalidate',
         ]);
     }
+
 }

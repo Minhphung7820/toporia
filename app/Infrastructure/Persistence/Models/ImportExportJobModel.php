@@ -250,16 +250,32 @@ class ImportExportJobModel extends Model
 
     /**
      * Get user's active jobs (pending or processing) for a specific type.
+     * Also returns recently completed jobs (within 5 minutes) for download.
      *
      * @return static[]
      */
     public static function getActiveJobsForUser(int $userId, string $type): array
     {
-        return static::where('user_id', $userId)
+        // First check for active jobs (pending/processing)
+        $activeJobs = static::where('user_id', $userId)
             ->where('type', $type)
             ->whereIn('status', [self::STATUS_PENDING, self::STATUS_PROCESSING])
             ->get()
             ->all();
+
+        if (!empty($activeJobs)) {
+            return $activeJobs;
+        }
+
+        // If no active jobs, return recently completed job (within 5 minutes) for download
+        $recentCompleted = static::where('user_id', $userId)
+            ->where('type', $type)
+            ->where('status', self::STATUS_COMPLETED)
+            ->where('completed_at', '>=', date('Y-m-d H:i:s', strtotime('-5 minutes')))
+            ->orderBy('completed_at', 'desc')
+            ->first();
+
+        return $recentCompleted ? [$recentCompleted] : [];
     }
 
     /**
