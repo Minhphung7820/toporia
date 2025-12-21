@@ -7,6 +7,12 @@
           <p>Manage your blog posts</p>
         </div>
         <div class="header-actions">
+          <button class="btn btn-secondary btn-icon-only" @click="showHistoryModal = true" title="Import/Export History">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          </button>
           <button class="btn btn-secondary" @click="showImportModal = true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
@@ -208,6 +214,12 @@
         @close="showExportModal = false"
         @completed="onExportCompleted"
       />
+
+      <!-- Job History Modal -->
+      <JobHistoryModal
+        v-if="showHistoryModal"
+        @close="showHistoryModal = false"
+      />
     </div>
   </AdminLayout>
 </template>
@@ -219,6 +231,7 @@ import AdminLayout from '../../components/layout/AdminLayout.vue';
 import Pagination from '../../components/shared/Pagination.vue';
 import ConfirmDialog from '../../components/shared/ConfirmDialog.vue';
 import ImportExportModal from '../../components/shared/ImportExportModal.vue';
+import JobHistoryModal from '../../components/shared/JobHistoryModal.vue';
 import { usePostsStore } from '../../stores/posts';
 import { useCategoriesStore } from '../../stores/categories';
 import { debounce } from 'lodash-es';
@@ -238,6 +251,7 @@ const showDeleteDialog = ref(false);
 const postToDelete = ref(null);
 const showImportModal = ref(false);
 const showExportModal = ref(false);
+const showHistoryModal = ref(false);
 
 const posts = computed(() => store.items || []);
 const categories = computed(() => categoriesStore.selectOptions || []);
@@ -684,6 +698,16 @@ onMounted(async () => {
 .btn-secondary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-icon-only {
+  padding: 10px;
+  min-width: 40px;
+  justify-content: center;
+}
+
+.btn-icon-only span {
+  display: none;
 }
 
 @media (max-width: 768px) {

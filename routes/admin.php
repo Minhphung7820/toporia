@@ -56,6 +56,8 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'admin']], function 
     Route::post('/posts/export', [ImportExportController::class, 'export']);
     Route::get('/posts/jobs', [ImportExportController::class, 'jobs']);
     Route::get('/posts/jobs/active', [ImportExportController::class, 'activeJobs']);
+    Route::get('/posts/jobs/history', [ImportExportController::class, 'history']);
+    Route::get('/posts/jobs/stats', [ImportExportController::class, 'stats']);
     Route::get('/posts/jobs/{id}', [ImportExportController::class, 'status']);
     Route::post('/posts/jobs/{id}/cancel', [ImportExportController::class, 'cancel']);
     Route::get('/posts/jobs/{id}/download', [ImportExportController::class, 'download']);

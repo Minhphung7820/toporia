@@ -398,4 +398,35 @@ final class ImportExportService
             'export' => !empty($exportJobs) ? $exportJobs[0]->toApiArray() : null,
         ];
     }
+
+    /**
+     * Get job history with cursor pagination.
+     *
+     * @param int $userId User ID
+     * @param string|null $type Filter by type
+     * @param string|null $cursor Cursor for pagination
+     * @param int $limit Items per page
+     * @param string|null $status Filter by status
+     * @return array{data: array, next_cursor: ?string, has_more: bool}
+     */
+    public function getJobHistory(
+        int $userId,
+        ?string $type = null,
+        ?string $cursor = null,
+        int $limit = 15,
+        ?string $status = null
+    ): array {
+        return ImportExportJobModel::getJobsWithCursor($userId, $type, $cursor, $limit, $status);
+    }
+
+    /**
+     * Get job statistics for user.
+     *
+     * @param int $userId User ID
+     * @return array
+     */
+    public function getJobStats(int $userId): array
+    {
+        return ImportExportJobModel::getJobStats($userId);
+    }
 }

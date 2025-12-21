@@ -281,4 +281,70 @@ final class ImportExportController extends BaseController
         ]);
     }
 
+    /**
+     * Get job history with cursor pagination.
+     *
+     * GET /api/admin/posts/jobs/history
+     *
+     * Query params:
+     * - type: 'import' | 'export' | null (all)
+     * - status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | null (all)
+     * - cursor: Last job ID for pagination
+     * - limit: Number of items per page (default: 15, max: 50)
+     */
+    public function history(Request $request): JsonResponseInterface
+    {
+        $userId = auth()->id();
+        if (!$userId) {
+            return $this->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $type = $request->input('type');
+        $status = $request->input('status');
+        $cursor = $request->input('cursor');
+        $limit = min(50, max(1, (int) $request->input('limit', 15)));
+
+        // Validate type
+        if ($type !== null && !in_array($type, ['import', 'export'], true)) {
+            return $this->json(['success' => false, 'message' => 'Invalid type'], 400);
+        }
+
+        // Validate status
+        $validStatuses = ['pending', 'processing', 'completed', 'failed', 'cancelled'];
+        if ($status !== null && !in_array($status, $validStatuses, true)) {
+            return $this->json(['success' => false, 'message' => 'Invalid status'], 400);
+        }
+
+        $result = $this->importExportService->getJobHistory($userId, $type, $cursor, $limit, $status);
+
+        return $this->json([
+            'success' => true,
+            'data' => $result['data'],
+            'pagination' => [
+                'next_cursor' => $result['next_cursor'],
+                'has_more' => $result['has_more'],
+                'limit' => $limit,
+            ],
+        ]);
+    }
+
+    /**
+     * Get job statistics.
+     *
+     * GET /api/admin/posts/jobs/stats
+     */
+    public function stats(): JsonResponseInterface
+    {
+        $userId = auth()->id();
+        if (!$userId) {
+            return $this->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $stats = $this->importExportService->getJobStats($userId);
+
+        return $this->json([
+            'success' => true,
+            'data' => $stats,
+        ]);
+    }
 }

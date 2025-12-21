@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Persistence\Models;
 
 use Toporia\Framework\Database\ORM\Model;
+use App\Infrastructure\Persistence\Models\ImportExportJobStatsModel;
 
 /**
  * ImportExportJob ORM Model for tracking import/export operations.
@@ -377,5 +378,133 @@ class ImportExportJobModel extends Model
             'completed_at' => $this->completed_at,
             'created_at' => $this->created_at,
         ];
+    }
+
+    /**
+     * Convert to detailed array for history API response.
+     */
+    public function toHistoryArray(): array
+    {
+        // Calculate file size
+        $fileSize = null;
+        $filePath = $this->type === self::TYPE_EXPORT ? $this->result_file_path : $this->file_path;
+        if ($filePath) {
+            $absolutePath = str_starts_with($filePath, '/') ? $filePath : storage_path($filePath);
+            if (file_exists($absolutePath)) {
+                $fileSize = filesize($absolutePath);
+            }
+        }
+
+        // Calculate duration in seconds
+        $duration = null;
+        if ($this->started_at && $this->completed_at) {
+            $startTime = strtotime($this->started_at);
+            $endTime = strtotime($this->completed_at);
+            $duration = $endTime - $startTime;
+        }
+
+        return [
+            'id' => $this->id,
+            'type' => $this->type,
+            'status' => $this->status,
+            'original_filename' => $this->original_filename,
+            'total_rows' => $this->total_rows,
+            'processed_rows' => $this->processed_rows,
+            'success_rows' => $this->success_rows,
+            'failed_rows' => $this->failed_rows,
+            'progress' => $this->progress,
+            'message' => $this->message,
+            'error_message' => $this->error_message,
+            'file_size' => $fileSize,
+            'duration' => $duration,
+            'can_download' => $this->isCompleted() && $this->result_file_path !== null,
+            'can_cancel' => $this->canBeCancelled(),
+            'queue_name' => $this->queue_name,
+            'priority' => $this->priority,
+            'started_at' => $this->started_at,
+            'completed_at' => $this->completed_at,
+            'created_at' => $this->created_at,
+        ];
+    }
+
+    /**
+     * Get jobs with cursor pagination.
+     *
+     * @param int $userId User ID
+     * @param string|null $type Filter by type ('import' or 'export')
+     * @param string|null $cursor Last job ID for pagination
+     * @param int $limit Number of items per page
+     * @param string|null $status Filter by status
+     * @return array{data: array, next_cursor: ?string, has_more: bool}
+     */
+    public static function getJobsWithCursor(
+        int $userId,
+        ?string $type = null,
+        ?string $cursor = null,
+        int $limit = 15,
+        ?string $status = null
+    ): array {
+        $query = static::where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc');
+
+        // Filter by type
+        if ($type !== null) {
+            $query->where('type', $type);
+        }
+
+        // Filter by status
+        if ($status !== null) {
+            $query->where('status', $status);
+        }
+
+        // Cursor pagination: get items after the cursor
+        if ($cursor !== null) {
+            // Get the cursor job to find its created_at
+            $cursorJob = static::find($cursor);
+            if ($cursorJob) {
+                $query->where(function ($q) use ($cursorJob) {
+                    $q->where('created_at', '<', $cursorJob->created_at)
+                        ->orWhere(function ($q2) use ($cursorJob) {
+                            $q2->where('created_at', '=', $cursorJob->created_at)
+                                ->where('id', '<', $cursorJob->id);
+                        });
+                });
+            }
+        }
+
+        // Fetch one extra to check if there are more
+        $jobs = $query->limit($limit + 1)->get()->all();
+
+        $hasMore = count($jobs) > $limit;
+        if ($hasMore) {
+            array_pop($jobs); // Remove the extra item
+        }
+
+        $nextCursor = null;
+        if ($hasMore && !empty($jobs)) {
+            $lastJob = end($jobs);
+            $nextCursor = $lastJob->id;
+        }
+
+        return [
+            'data' => array_map(fn($job) => $job->toHistoryArray(), $jobs),
+            'next_cursor' => $nextCursor,
+            'has_more' => $hasMore,
+        ];
+    }
+
+    /**
+     * Get job statistics for a user.
+     *
+     * Uses pre-computed statistics from import_export_job_stats table
+     * for O(1) performance instead of O(n) COUNT queries.
+     *
+     * @param int $userId User ID
+     * @return array
+     */
+    public static function getJobStats(int $userId): array
+    {
+        return ImportExportJobStatsModel::getStatsForUser($userId);
     }
 }
