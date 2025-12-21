@@ -1,5 +1,5 @@
 <template>
-  <div class="comments-wrapper">
+  <div ref="commentsWrapper" class="comments-wrapper">
     <!-- Comments Header -->
     <div class="comments-header">
       <h3 class="comments-title">
@@ -65,6 +65,25 @@
         :post-id="postId"
         @reply="handleReply"
       />
+
+      <!-- Load More Button -->
+      <div v-if="hasMore" class="load-more-section">
+        <button
+          @click="loadMore"
+          :disabled="loadingMore"
+          class="load-more-btn"
+        >
+          <svg v-if="loadingMore" class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 11-6.219-8.56" />
+          </svg>
+          <template v-else>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </template>
+          {{ loadingMore ? 'Loading...' : 'Load more comments' }}
+        </button>
+      </div>
     </div>
 
     <!-- Empty State -->
@@ -120,7 +139,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useCommentsStore } from '../../stores/comments';
 import { useSettingsStore } from '../../stores/settings';
 import CommentItem from './CommentItem.vue';
@@ -134,8 +154,13 @@ const props = defineProps({
   },
 });
 
+const route = useRoute();
+const router = useRouter();
 const commentsStore = useCommentsStore();
 const settingsStore = useSettingsStore();
+
+// Template ref
+const commentsWrapper = ref(null);
 
 // Check if comments are enabled
 const commentsEnabled = computed(() => settingsStore.commentsEnabled);
@@ -145,6 +170,7 @@ const showToast = ref(false);
 const toastMessage = ref('');
 const showSort = ref(false);
 const sortBy = ref('newest');
+const currentPage = ref(1); // Track how many pages loaded
 
 const sortOptions = [
   { value: 'newest', label: 'Most recent' },
@@ -156,6 +182,8 @@ const sortOptions = [
 const comments = computed(() => commentsStore.comments);
 const loading = computed(() => commentsStore.loading);
 const replyingTo = computed(() => commentsStore.replyingTo);
+const hasMore = computed(() => commentsStore.hasMore);
+const loadingMore = computed(() => commentsStore.loading.loadMore);
 
 const sortLabel = computed(() => {
   const option = sortOptions.find(o => o.value === sortBy.value);
@@ -235,6 +263,47 @@ const cancelReply = () => {
   commentsStore.cancelReply();
 };
 
+const loadMore = async () => {
+  await commentsStore.loadMoreComments(props.postId);
+  currentPage.value++;
+  updateUrlWithPage(currentPage.value);
+};
+
+// Update URL with comment page parameter
+const updateUrlWithPage = (page) => {
+  const query = { ...route.query };
+  if (page > 1) {
+    query.commentPage = page;
+  } else {
+    delete query.commentPage;
+  }
+  router.replace({ query });
+};
+
+// Scroll to comments section smoothly
+const scrollToComments = () => {
+  if (commentsWrapper.value) {
+    commentsWrapper.value.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
+// Load multiple pages sequentially (for restoring state from URL)
+const loadPagesFromUrl = async () => {
+  const pageFromUrl = parseInt(route.query.commentPage) || 1;
+  if (pageFromUrl > 1) {
+    // Load additional pages
+    for (let i = 1; i < pageFromUrl; i++) {
+      if (commentsStore.hasMore) {
+        await commentsStore.loadMoreComments(props.postId);
+        currentPage.value++;
+      }
+    }
+    // Scroll to comments after loading
+    await nextTick();
+    scrollToComments();
+  }
+};
+
 // Close sort dropdown when clicking outside
 const handleClickOutside = (e) => {
   if (!e.target.closest('.sort-dropdown')) {
@@ -242,8 +311,24 @@ const handleClickOutside = (e) => {
   }
 };
 
+// Watch for initial comments load to restore pagination from URL
+const initialLoadDone = ref(false);
+watch(
+  () => commentsStore.loading.fetch,
+  async (isFetching, wasFetching) => {
+    // When fetch completes (was loading, now not loading)
+    if (wasFetching && !isFetching && !initialLoadDone.value) {
+      initialLoadDone.value = true;
+      await loadPagesFromUrl();
+    }
+  }
+);
+
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
+  // Reset page counter when component mounts
+  currentPage.value = 1;
+  initialLoadDone.value = false;
 });
 
 onUnmounted(() => {
@@ -400,6 +485,54 @@ onUnmounted(() => {
 .comments-list {
   display: flex;
   flex-direction: column;
+}
+
+/* Load More Section */
+.load-more-section {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.load-more-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #f5f5f5;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #444;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background: #eee;
+  border-color: #ddd;
+  color: #1a1a1a;
+}
+
+.load-more-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.load-more-btn .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Empty State */

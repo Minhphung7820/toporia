@@ -27,11 +27,17 @@ final class CommentController extends BaseController
     /**
      * Get comments for a post.
      *
-     * GET /api/blog/posts/{postId}/comments
+     * GET /api/blog/posts/{postId}/comments?limit=5&cursor=123
      */
     public function index(int $postId): JsonResponseInterface
     {
-        $result = $this->commentService->getPostComments($postId);
+        $limit = (int) ($this->request->get('limit') ?? 5);
+        $cursor = $this->request->get('cursor') ? (int) $this->request->get('cursor') : null;
+
+        // Clamp limit between 1 and 20
+        $limit = max(1, min(20, $limit));
+
+        $result = $this->commentService->getPostComments($postId, $limit, $cursor);
 
         if (!$result['success']) {
             return $this->json($result, 404);

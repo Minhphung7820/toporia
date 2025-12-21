@@ -48,6 +48,30 @@ final class PdoCommentRepository implements CommentRepository
     /**
      * {@inheritdoc}
      */
+    public function findByPostPaginated(int $postId, int $limit, ?int $cursor = null, bool $approvedOnly = true): array
+    {
+        $query = CommentModel::query()
+            ->where('commentable_type', 'Post')
+            ->where('commentable_id', $postId)
+            ->whereNull('parent_id');
+
+        if ($approvedOnly) {
+            $query->where('is_approved', true);
+        }
+
+        // Cursor pagination: get comments older than cursor
+        if ($cursor !== null) {
+            $query->where('id', '<', $cursor);
+        }
+
+        $models = $query->orderBy('id', 'desc')->limit($limit)->get();
+
+        return $models->map(fn(CommentModel $model) => $this->toDomain($model))->all();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public function findReplies(int $parentId, bool $approvedOnly = true): array
     {
         $query = CommentModel::query()

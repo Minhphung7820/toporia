@@ -19,6 +19,7 @@ use Toporia\Framework\Database\ORM\Model;
  * @property string|null $author_email
  * @property string|null $author_ip
  * @property bool $is_approved
+ * @property string $status Status: pending, approved, rejected
  * @property int $likes_count
  * @property int $depth
  * @property string $created_at
@@ -27,6 +28,10 @@ use Toporia\Framework\Database\ORM\Model;
 class CommentModel extends Model
 {
     protected static string $table = 'comments';
+
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_REJECTED = 'rejected';
 
     protected static array $fillable = [
         'commentable_type',
@@ -38,6 +43,7 @@ class CommentModel extends Model
         'author_email',
         'author_ip',
         'is_approved',
+        'status',
         'likes_count',
         'depth',
     ];
@@ -103,7 +109,7 @@ class CommentModel extends Model
      */
     public static function approved()
     {
-        return static::query()->where('is_approved', true);
+        return static::query()->where('status', self::STATUS_APPROVED);
     }
 
     /**
@@ -111,7 +117,15 @@ class CommentModel extends Model
      */
     public static function pending()
     {
-        return static::query()->where('is_approved', false);
+        return static::query()->where('status', self::STATUS_PENDING);
+    }
+
+    /**
+     * Get rejected comments.
+     */
+    public static function rejected()
+    {
+        return static::query()->where('status', self::STATUS_REJECTED);
     }
 
     /**

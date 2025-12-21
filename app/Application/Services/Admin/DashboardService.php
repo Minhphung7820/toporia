@@ -68,6 +68,7 @@ final class DashboardService
                         'total' => $allStats['comments']['total'],
                         'pending' => $allStats['comments']['pending'],
                         'approved' => $allStats['comments']['approved'],
+                        'rejected' => $allStats['comments']['rejected'] ?? 0,
                     ],
                     'feedback' => [
                         'total' => $allStats['feedback']['total'],
@@ -98,6 +99,7 @@ final class DashboardService
                     'total' => $commentStats['total'],
                     'pending' => $commentStats['pending'],
                     'approved' => $commentStats['approved'],
+                    'rejected' => $commentStats['rejected'],
                 ],
                 // Moderators don't see feedback stats
                 'feedback' => null,
@@ -247,7 +249,7 @@ final class DashboardService
                     'name' => $model->user->name,
                     'avatar' => $model->user->avatar,
                 ] : null,
-                'status' => $model->is_approved ? 'approved' : 'pending',
+                'status' => $model->status ?? ($model->is_approved ? 'approved' : 'pending'),
                 'created_at' => $model->created_at,
             ];
 
@@ -394,8 +396,9 @@ final class DashboardService
         $result = PostModel::getConnection()->selectOne("
             SELECT
                 COUNT(c.id) as total,
-                SUM(CASE WHEN c.is_approved = 0 THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN c.is_approved = 1 THEN 1 ELSE 0 END) as approved
+                SUM(CASE WHEN c.status = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN c.status = 'approved' THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN c.status = 'rejected' THEN 1 ELSE 0 END) as rejected
             FROM comments c
             INNER JOIN posts p ON c.commentable_id = p.id AND c.commentable_type = 'Post'
             WHERE p.author_id = ?
@@ -405,6 +408,7 @@ final class DashboardService
             'total' => (int) ($result['total'] ?? 0),
             'pending' => (int) ($result['pending'] ?? 0),
             'approved' => (int) ($result['approved'] ?? 0),
+            'rejected' => (int) ($result['rejected'] ?? 0),
         ];
     }
 

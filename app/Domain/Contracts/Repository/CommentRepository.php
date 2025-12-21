@@ -32,6 +32,17 @@ interface CommentRepository
     public function findByPost(int $postId, bool $approvedOnly = true): array;
 
     /**
+     * Find comments for a post with cursor pagination.
+     *
+     * @param int $postId Post ID
+     * @param int $limit Number of comments to return
+     * @param int|null $cursor Last comment ID (load comments before this ID)
+     * @param bool $approvedOnly Only return approved comments
+     * @return Comment[] Array of root comments
+     */
+    public function findByPostPaginated(int $postId, int $limit, ?int $cursor = null, bool $approvedOnly = true): array;
+
+    /**
      * Find replies to a comment.
      *
      * @param int $parentId Parent comment ID

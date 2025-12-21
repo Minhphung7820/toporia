@@ -189,6 +189,7 @@
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
                     </span>
+                    <span v-else-if="comment.status === 'rejected'" class="rc-status rejected">Rejected</span>
                   </div>
 
                   <!-- Comment Content -->
@@ -550,7 +551,7 @@ onMounted(() => {
 }
 
 .stat-value.warning {
-  color: #ea580c;
+  color: #f59e0b;
 }
 
 /* Posts List */
@@ -750,10 +751,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
+}
+
+.rc-status.rejected {
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 .rc-content {

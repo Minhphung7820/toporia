@@ -68,10 +68,16 @@ final class CommentAdminService
 
         $this->commentRepository->approve($commentId);
 
+        // Use truncated content for description
+        $contentPreview = mb_substr($comment->content ?? '', 0, 50);
+        if (strlen($comment->content ?? '') > 50) {
+            $contentPreview .= '...';
+        }
+
         AdminActivityLogModel::log(
             $userId,
             AdminActivityLogModel::ACTION_APPROVE,
-            'Approved comment',
+            "Approved Comment: {$contentPreview}",
             'Comment',
             $commentId
         );
@@ -99,10 +105,16 @@ final class CommentAdminService
 
         $this->commentRepository->reject($commentId);
 
+        // Use truncated content for description
+        $contentPreview = mb_substr($comment->content ?? '', 0, 50);
+        if (strlen($comment->content ?? '') > 50) {
+            $contentPreview .= '...';
+        }
+
         AdminActivityLogModel::log(
             $userId,
             AdminActivityLogModel::ACTION_REJECT,
-            'Rejected comment',
+            "Rejected Comment: {$contentPreview}",
             'Comment',
             $commentId
         );
@@ -136,15 +148,19 @@ final class CommentAdminService
 
         $count = $this->commentRepository->bulkApprove($ids);
 
-        AdminActivityLogModel::log(
-            $userId,
-            AdminActivityLogModel::ACTION_APPROVE,
-            "Bulk approved {$count} comments"
-        );
+        // Only log activity if comments were actually approved
+        if ($count > 0) {
+            AdminActivityLogModel::log(
+                $userId,
+                AdminActivityLogModel::ACTION_APPROVE,
+                "Bulk approved {$count} comments",
+                'Comment'
+            );
 
-        // Send notifications for each approved comment
-        foreach ($comments as $comment) {
-            $this->sendApprovalNotification($comment);
+            // Send notifications for each approved comment
+            foreach ($comments as $comment) {
+                $this->sendApprovalNotification($comment);
+            }
         }
 
         return [
@@ -174,15 +190,19 @@ final class CommentAdminService
 
         $count = $this->commentRepository->bulkReject($ids);
 
-        AdminActivityLogModel::log(
-            $userId,
-            AdminActivityLogModel::ACTION_REJECT,
-            "Bulk rejected {$count} comments"
-        );
+        // Only log activity if comments were actually rejected
+        if ($count > 0) {
+            AdminActivityLogModel::log(
+                $userId,
+                AdminActivityLogModel::ACTION_REJECT,
+                "Bulk rejected {$count} comments",
+                'Comment'
+            );
 
-        // Send notifications for each rejected comment
-        foreach ($comments as $comment) {
-            $this->sendRejectionNotification($comment);
+            // Send notifications for each rejected comment
+            foreach ($comments as $comment) {
+                $this->sendRejectionNotification($comment);
+            }
         }
 
         return [
@@ -230,11 +250,15 @@ final class CommentAdminService
 
         $count = $this->commentRepository->bulkDelete($ids);
 
-        AdminActivityLogModel::log(
-            $userId,
-            AdminActivityLogModel::ACTION_DELETE,
-            "Bulk deleted {$count} comments"
-        );
+        // Only log activity if comments were actually deleted
+        if ($count > 0) {
+            AdminActivityLogModel::log(
+                $userId,
+                AdminActivityLogModel::ACTION_DELETE,
+                "Bulk deleted {$count} comments",
+                'Comment'
+            );
+        }
 
         return [
             'success' => true,

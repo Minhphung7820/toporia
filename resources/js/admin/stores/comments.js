@@ -45,8 +45,9 @@ export const useCommentsStore = defineStore('admin-comments', {
     transformComment(comment) {
       return {
         ...comment,
-        // Convert is_approved (boolean) to status (string)
-        status: comment.is_approved ? 'approved' : 'pending',
+        // Use status field directly from API (pending, approved, rejected)
+        // Fallback to is_approved for backward compatibility
+        status: comment.status || (comment.is_approved ? 'approved' : 'pending'),
         // Map commentable (polymorphic) to post for display
         post: comment.commentable || null,
       };

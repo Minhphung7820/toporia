@@ -140,15 +140,22 @@ const getActionClass = (action) => {
 };
 
 const getTargetName = (item) => {
-  // Extract target name from description
-  // Format: "Action model_type: Target Name" -> extract "Target Name"
+  // Format 1 (single item): "Approved Comment: content preview" -> extract "content preview"
   if (item.description) {
     const match = item.description.match(/:\s*(.+)$/);
     if (match) {
       return match[1];
     }
+
+    // Format 2 (bulk action): "Bulk approved 2 comments" -> extract "2 comments"
+    const bulkMatch = item.description.match(/Bulk \w+ (\d+ \w+)/i);
+    if (bulkMatch) {
+      return bulkMatch[1];
+    }
   }
-  return item.model_type || 'item';
+
+  // Fallback: show model_type (e.g., "Comment", "Post")
+  return item.model_type || '';
 };
 
 const formatTime = (date) => {

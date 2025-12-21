@@ -225,11 +225,18 @@ export const tags = {
  */
 export const comments = {
   /**
-   * Get comments for a post
+   * Get comments for a post with cursor pagination
    * @param {number} postId - Post ID
+   * @param {Object} options - Pagination options
+   * @param {number} options.limit - Number of comments per page
+   * @param {number|null} options.cursor - Cursor for pagination (last comment ID)
    */
-  list(postId) {
-    return http.get(`/blog/posts/${postId}/comments`);
+  list(postId, { limit = 5, cursor = null } = {}) {
+    const params = { limit };
+    if (cursor) {
+      params.cursor = cursor;
+    }
+    return http.get(`/blog/posts/${postId}/comments`, { params });
   },
 
   /**

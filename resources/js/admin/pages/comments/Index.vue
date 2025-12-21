@@ -215,7 +215,17 @@
                   </td>
                   <td class="col-author">
                     <div class="author-cell">
-                      <div class="author-avatar" :style="{ background: getAvatarColor(comment.author_name || comment.user?.name || 'A') }">
+                      <img
+                        v-if="comment.user?.avatar"
+                        :src="comment.user.avatar"
+                        :alt="comment.user.name"
+                        class="author-avatar-img"
+                      />
+                      <div
+                        v-else
+                        class="author-avatar"
+                        :style="{ background: getAvatarColor(comment.author_name || comment.user?.name || 'A') }"
+                      >
                         {{ getInitials(comment.author_name || comment.user?.name || 'A') }}
                       </div>
                       <div class="author-info">
@@ -400,7 +410,17 @@
               </button>
               <div v-if="selectedComment" class="comment-detail">
                 <div class="detail-header">
-                  <div class="author-avatar lg" :style="{ background: getAvatarColor(selectedComment.author_name || selectedComment.user?.name || 'A') }">
+                  <img
+                    v-if="selectedComment.user?.avatar"
+                    :src="selectedComment.user.avatar"
+                    :alt="selectedComment.user.name"
+                    class="author-avatar-img lg"
+                  />
+                  <div
+                    v-else
+                    class="author-avatar lg"
+                    :style="{ background: getAvatarColor(selectedComment.author_name || selectedComment.user?.name || 'A') }"
+                  >
                     {{ getInitials(selectedComment.author_name || selectedComment.user?.name || 'A') }}
                   </div>
                   <div class="detail-author-info">
@@ -1375,6 +1395,20 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 600;
   flex-shrink: 0;
+}
+
+.author-avatar-img {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.author-avatar-img.lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
 }
 
 .author-avatar.lg {

@@ -8,6 +8,7 @@ use App\Application\Services\SiteSettingsService;
 use App\Domain\Contracts\Repository\CommentRepository;
 use App\Domain\Contracts\Repository\PostRepository;
 use App\Domain\Entities\Comment;
+use App\Infrastructure\Persistence\Models\UserModel;
 use Toporia\Framework\Realtime\Broadcast;
 
 /**
@@ -23,12 +24,14 @@ final class CommentService
     ) {}
 
     /**
-     * Get comments for a post with nested replies.
+     * Get comments for a post with nested replies and cursor pagination.
      *
      * @param int $postId Post ID
+     * @param int $limit Number of root comments per page
+     * @param int|null $cursor Last comment ID for pagination (load comments before this ID)
      * @return array{success: bool, data?: array, message: string}
      */
-    public function getPostComments(int $postId): array
+    public function getPostComments(int $postId, int $limit = 5, ?int $cursor = null): array
     {
         $post = $this->postRepository->findById($postId);
 
@@ -39,17 +42,25 @@ final class CommentService
             ];
         }
 
-        // Get root comments
-        $rootComments = $this->commentRepository->findByPost($postId, true);
+        // Get root comments with cursor pagination
+        $rootComments = $this->commentRepository->findByPostPaginated($postId, $limit + 1, $cursor, true);
 
-        // Build nested structure
+        // Check if there are more comments
+        $hasMore = count($rootComments) > $limit;
+        if ($hasMore) {
+            $rootComments = array_slice($rootComments, 0, $limit);
+        }
+
+        // Build nested structure with user info
         $commentsWithReplies = [];
+        $nextCursor = null;
         foreach ($rootComments as $comment) {
             $replies = $this->commentRepository->findReplies($comment->id, true);
             $commentsWithReplies[] = [
-                'comment' => $comment->toArray(),
+                'comment' => $this->enrichCommentWithUser($comment),
                 'replies' => array_map(fn($reply) => $this->buildReplyTree($reply), $replies),
             ];
+            $nextCursor = $comment->id;
         }
 
         return [
@@ -57,6 +68,8 @@ final class CommentService
             'data' => [
                 'comments' => $commentsWithReplies,
                 'count' => $this->commentRepository->countByPost($postId, true),
+                'has_more' => $hasMore,
+                'next_cursor' => $hasMore ? $nextCursor : null,
             ],
             'message' => 'Comments retrieved successfully',
         ];
@@ -260,9 +273,31 @@ final class CommentService
         }
 
         return [
-            'comment' => $comment->toArray(),
+            'comment' => $this->enrichCommentWithUser($comment),
             'replies' => $replies,
         ];
+    }
+
+    /**
+     * Enrich comment data with user information (name, avatar).
+     *
+     * @param Comment $comment
+     * @return array
+     */
+    private function enrichCommentWithUser(Comment $comment): array
+    {
+        $data = $comment->toArray();
+
+        // If comment is from a registered user, get their info
+        if ($comment->userId !== null) {
+            $user = UserModel::find($comment->userId);
+            if ($user) {
+                $data['author_name'] = $user->name;
+                $data['author_avatar'] = $user->avatar;
+            }
+        }
+
+        return $data;
     }
 
     /**

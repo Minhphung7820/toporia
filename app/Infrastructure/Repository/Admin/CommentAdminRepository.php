@@ -42,7 +42,7 @@ final class CommentAdminRepository extends BaseRepository
     {
         $repo = $this
             ->with(['user', 'commentable'])
-            ->scope(fn($q) => $q->where('is_approved', false));
+            ->scope(fn($q) => $q->where('status', CommentModel::STATUS_PENDING));
 
         // Filter by post author if specified (for editors)
         if ($postAuthorId !== null) {
@@ -81,13 +81,9 @@ final class CommentAdminRepository extends BaseRepository
                     $query->where('commentable_id', (int) $filters['post_id']);
                 }
 
-                // Map status filter to is_approved boolean
+                // Filter by status
                 if (!empty($filters['status'])) {
-                    if ($filters['status'] === 'approved') {
-                        $query->where('is_approved', true);
-                    } elseif ($filters['status'] === 'pending' || $filters['status'] === 'rejected') {
-                        $query->where('is_approved', false);
-                    }
+                    $query->where('status', $filters['status']);
                 }
 
                 // Filter by post author (for editors - only see comments on their posts)
@@ -116,8 +112,9 @@ final class CommentAdminRepository extends BaseRepository
         if ($postAuthorId === null) {
             return [
                 'total' => $this->count(),
-                'approved' => $this->countWhere(['is_approved' => true]),
-                'pending' => $this->countWhere(['is_approved' => false]),
+                'approved' => $this->countWhere(['status' => CommentModel::STATUS_APPROVED]),
+                'pending' => $this->countWhere(['status' => CommentModel::STATUS_PENDING]),
+                'rejected' => $this->countWhere(['status' => CommentModel::STATUS_REJECTED]),
             ];
         }
 
@@ -125,7 +122,7 @@ final class CommentAdminRepository extends BaseRepository
         $postIds = PostModel::where('author_id', $postAuthorId)->pluck('id')->toArray();
 
         if (empty($postIds)) {
-            return ['total' => 0, 'approved' => 0, 'pending' => 0];
+            return ['total' => 0, 'approved' => 0, 'pending' => 0, 'rejected' => 0];
         }
 
         $total = CommentModel::where('commentable_type', 'Post')
@@ -134,18 +131,24 @@ final class CommentAdminRepository extends BaseRepository
 
         $approved = CommentModel::where('commentable_type', 'Post')
             ->whereIn('commentable_id', $postIds)
-            ->where('is_approved', true)
+            ->where('status', CommentModel::STATUS_APPROVED)
             ->count();
 
         $pending = CommentModel::where('commentable_type', 'Post')
             ->whereIn('commentable_id', $postIds)
-            ->where('is_approved', false)
+            ->where('status', CommentModel::STATUS_PENDING)
+            ->count();
+
+        $rejected = CommentModel::where('commentable_type', 'Post')
+            ->whereIn('commentable_id', $postIds)
+            ->where('status', CommentModel::STATUS_REJECTED)
             ->count();
 
         return [
             'total' => $total,
             'approved' => $approved,
             'pending' => $pending,
+            'rejected' => $rejected,
         ];
     }
 
@@ -164,7 +167,10 @@ final class CommentAdminRepository extends BaseRepository
     {
         $comment = $this->find($id);
         if ($comment) {
-            $this->update($id, ['is_approved' => true]);
+            $this->update($id, [
+                'is_approved' => true,
+                'status' => CommentModel::STATUS_APPROVED,
+            ]);
             return true;
         }
         return false;
@@ -174,7 +180,10 @@ final class CommentAdminRepository extends BaseRepository
     {
         $comment = $this->find($id);
         if ($comment) {
-            $this->update($id, ['is_approved' => false]);
+            $this->update($id, [
+                'is_approved' => false,
+                'status' => CommentModel::STATUS_REJECTED,
+            ]);
             return true;
         }
         return false;
@@ -182,12 +191,18 @@ final class CommentAdminRepository extends BaseRepository
 
     public function bulkApprove(array $ids): int
     {
-        return $this->updateWhere(['id' => $ids], ['is_approved' => true]);
+        return $this->updateWhere(['id' => $ids], [
+            'is_approved' => true,
+            'status' => CommentModel::STATUS_APPROVED,
+        ]);
     }
 
     public function bulkReject(array $ids): int
     {
-        return $this->updateWhere(['id' => $ids], ['is_approved' => false]);
+        return $this->updateWhere(['id' => $ids], [
+            'is_approved' => false,
+            'status' => CommentModel::STATUS_REJECTED,
+        ]);
     }
 
     public function bulkDelete(array $ids): int

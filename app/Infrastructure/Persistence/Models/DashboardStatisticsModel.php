@@ -88,7 +88,7 @@ class DashboardStatisticsModel extends Model
     /**
      * Get all comment statistics.
      *
-     * @return array{total: int, pending: int, approved: int}
+     * @return array{total: int, pending: int, approved: int, rejected: int}
      */
     public static function getCommentStats(): array
     {
@@ -96,12 +96,14 @@ class DashboardStatisticsModel extends Model
             'comments_total',
             'comments_pending',
             'comments_approved',
+            'comments_rejected',
         ]);
 
         return [
             'total' => $stats['comments_total'],
             'pending' => $stats['comments_pending'],
             'approved' => $stats['comments_approved'],
+            'rejected' => $stats['comments_rejected'],
         ];
     }
 
@@ -139,6 +141,7 @@ class DashboardStatisticsModel extends Model
             'comments_total',
             'comments_pending',
             'comments_approved',
+            'comments_rejected',
             'feedback_total',
             'feedback_pending',
         ]);
@@ -155,6 +158,7 @@ class DashboardStatisticsModel extends Model
                 'total' => $allStats['comments_total'],
                 'pending' => $allStats['comments_pending'],
                 'approved' => $allStats['comments_approved'],
+                'rejected' => $allStats['comments_rejected'],
             ],
             'feedback' => [
                 'total' => $allStats['feedback_total'],
@@ -193,12 +197,13 @@ class DashboardStatisticsModel extends Model
             static::updateStat('posts_total_views', (int) $postStats['total_views'], $now);
         }
 
-        // Recalculate comment stats
+        // Recalculate comment stats using status field
         $commentStats = $connection->selectOne("
             SELECT
                 COUNT(*) as total,
-                SUM(CASE WHEN is_approved = 0 THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN is_approved = 1 THEN 1 ELSE 0 END) as approved
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved,
+                SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected
             FROM comments
         ");
 
@@ -206,6 +211,7 @@ class DashboardStatisticsModel extends Model
             static::updateStat('comments_total', (int) $commentStats['total'], $now);
             static::updateStat('comments_pending', (int) $commentStats['pending'], $now);
             static::updateStat('comments_approved', (int) $commentStats['approved'], $now);
+            static::updateStat('comments_rejected', (int) $commentStats['rejected'], $now);
         }
 
         // Recalculate feedback stats

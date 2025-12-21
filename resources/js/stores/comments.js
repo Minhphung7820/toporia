@@ -13,9 +13,14 @@ export const useCommentsStore = defineStore('comments', {
     comments: [],
     commentsCount: 0,
 
+    // Pagination state
+    hasMore: false,
+    nextCursor: null,
+
     // Loading states
     loading: {
       fetch: false,
+      loadMore: false,
       create: false,
       reply: false,
       like: false,
@@ -51,25 +56,55 @@ export const useCommentsStore = defineStore('comments', {
 
   actions: {
     /**
-     * Fetch comments for a post
+     * Fetch comments for a post (initial load)
      */
-    async fetchComments(postId) {
+    async fetchComments(postId, limit = 5) {
       this.loading.fetch = true;
       this.error = null;
 
       try {
-        const response = await comments.list(postId);
+        const response = await comments.list(postId, { limit });
         const data = response.data;
 
         if (data.success) {
           this.comments = data.data.comments;
           this.commentsCount = data.data.count;
+          this.hasMore = data.data.has_more || false;
+          this.nextCursor = data.data.next_cursor || null;
         }
       } catch (error) {
         this.error = error.response?.data?.message || 'Failed to fetch comments';
         console.error('Failed to fetch comments:', error);
       } finally {
         this.loading.fetch = false;
+      }
+    },
+
+    /**
+     * Load more comments (pagination)
+     */
+    async loadMoreComments(postId, limit = 5) {
+      if (!this.hasMore || !this.nextCursor || this.loading.loadMore) {
+        return;
+      }
+
+      this.loading.loadMore = true;
+
+      try {
+        const response = await comments.list(postId, { limit, cursor: this.nextCursor });
+        const data = response.data;
+
+        if (data.success) {
+          // Append new comments to existing list
+          this.comments = [...this.comments, ...data.data.comments];
+          this.hasMore = data.data.has_more || false;
+          this.nextCursor = data.data.next_cursor || null;
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to load more comments';
+        console.error('Failed to load more comments:', error);
+      } finally {
+        this.loading.loadMore = false;
       }
     },
 
