@@ -267,15 +267,14 @@ class ImportExportJobModel extends Model
             return $activeJobs;
         }
 
-        // If no active jobs, return recently completed job (within 5 minutes) for download
-        $recentCompleted = static::where('user_id', $userId)
+        // If no active jobs, return the most recent job (completed/failed/cancelled)
+        // This allows users to see their last export and download it
+        $recentJob = static::where('user_id', $userId)
             ->where('type', $type)
-            ->where('status', self::STATUS_COMPLETED)
-            ->where('completed_at', '>=', date('Y-m-d H:i:s', strtotime('-5 minutes')))
-            ->orderBy('completed_at', 'desc')
+            ->orderBy('created_at', 'desc')
             ->first();
 
-        return $recentCompleted ? [$recentCompleted] : [];
+        return $recentJob ? [$recentJob] : [];
     }
 
     /**

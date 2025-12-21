@@ -97,6 +97,11 @@
                   {{ activeJob.failed_rows.toLocaleString() }} failed
                 </div>
               </div>
+
+              <!-- Show completed time for finished jobs -->
+              <div v-if="activeJob.completed_at" class="job-completed-time">
+                Completed at: {{ formatDateTime(activeJob.completed_at) }}
+              </div>
             </div>
           </template>
 
@@ -129,7 +134,7 @@
             <!-- Active job: Show progress -->
             <div v-else class="progress-section">
               <div class="job-info">
-                <span class="job-title">Exporting posts...</span>
+                <span class="job-title">{{ activeJob.status === 'completed' ? 'Export completed' : 'Exporting posts...' }}</span>
                 <span class="job-status" :class="`status-${activeJob.status}`">
                   {{ getStatusLabel(activeJob.status) }}
                 </span>
@@ -147,6 +152,11 @@
 
               <p v-if="activeJob.message" class="job-message">{{ activeJob.message }}</p>
               <p v-if="activeJob.error_message" class="job-error">{{ activeJob.error_message }}</p>
+
+              <!-- Show completed time for finished jobs -->
+              <div v-if="activeJob.completed_at" class="job-completed-time">
+                Completed at: {{ formatDateTime(activeJob.completed_at) }}
+              </div>
             </div>
           </template>
         </div>
@@ -316,6 +326,19 @@ const getStatusLabel = (status) => {
   return labels[status] || status;
 };
 
+const formatDateTime = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleString('vi-VN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+};
+
 const startImport = async () => {
   if (!selectedFile.value) return;
 
@@ -400,11 +423,12 @@ const checkActiveJobs = async () => {
         ? response.data.data.import
         : response.data.data.export;
 
-      // Only load job if it's still in progress (pending/processing)
-      // Don't auto-load completed/failed/cancelled jobs when opening modal
-      if (job && ['pending', 'processing'].includes(job.status)) {
+      if (job) {
         activeJob.value = job;
-        connectStream(job.id);
+        // Only connect stream if job is still in progress
+        if (['pending', 'processing'].includes(job.status)) {
+          connectStream(job.id);
+        }
       }
     }
   } catch (error) {
@@ -708,6 +732,18 @@ onUnmounted(() => {
 
 .result-item.failed {
   color: #dc2626;
+}
+
+.job-completed-time {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f0fdf4;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Export Options */
