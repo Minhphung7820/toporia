@@ -85,6 +85,8 @@ onUnmounted(() => {
   display: flex;
   min-height: 100vh;
   background-color: #f8fafc;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 .admin-main {
@@ -94,6 +96,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 .admin-main.sidebar-collapsed {
@@ -105,6 +109,8 @@ onUnmounted(() => {
   padding: 28px 32px;
   margin-top: 72px;
   max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 @media (max-width: 1024px) {

@@ -207,11 +207,13 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
             $this->reportProgress(85, 'Triggers restored');
 
             // Dispatch post-import processing job (ES indexing, stats recalculation)
+            // Use same queue as parent job for consistent queue routing
             $this->reportProgress(90, 'Dispatching post-import tasks...');
-            dispatch(new PostImportPostProcessingJob($maxIdBeforeImport, 500));
+            dispatch(new PostImportPostProcessingJob($maxIdBeforeImport, 500, $this->getQueue()));
             Log::info('PostImportPostProcessingJob dispatched', [
                 'job_id' => $this->jobId,
                 'max_id_before_import' => $maxIdBeforeImport,
+                'queue' => $this->getQueue(),
             ]);
 
             // Mark as completed

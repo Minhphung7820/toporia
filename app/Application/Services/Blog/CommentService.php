@@ -8,6 +8,7 @@ use App\Application\Services\SiteSettingsService;
 use App\Domain\Contracts\Repository\CommentRepository;
 use App\Domain\Contracts\Repository\PostRepository;
 use App\Domain\Entities\Comment;
+use Toporia\Framework\Realtime\Broadcast;
 
 /**
  * Comment Service - Handles comment operations for the public site.
@@ -125,6 +126,9 @@ final class CommentService
 
         $savedComment = $this->commentRepository->save($comment);
 
+        // Broadcast realtime event to admin notifications channel
+        $this->broadcastCommentCreated($savedComment, $requiresApproval);
+
         return [
             'success' => true,
             'data' => [
@@ -204,6 +208,9 @@ final class CommentService
 
         $savedReply = $this->commentRepository->save($reply);
 
+        // Broadcast realtime event to admin notifications channel
+        $this->broadcastCommentCreated($savedReply, $requiresApproval);
+
         return [
             'success' => true,
             'data' => [
@@ -256,5 +263,52 @@ final class CommentService
             'comment' => $comment->toArray(),
             'replies' => $replies,
         ];
+    }
+
+    /**
+     * Broadcast comment created event to admin channels.
+     *
+     * Broadcasts to both:
+     * - admin.notifications (for Header notification bell)
+     * - admin.comments (for Comments management page)
+     *
+     * @param Comment $comment The created comment
+     * @param bool $requiresApproval Whether comment requires approval
+     */
+    private function broadcastCommentCreated(Comment $comment, bool $requiresApproval): void
+    {
+        try {
+            // Get post info for the notification
+            $post = $this->postRepository->findById($comment->commentableId);
+
+            $payload = [
+                'id' => $comment->id,
+                'content' => $comment->content,
+                'author_name' => $comment->authorName ?? 'Anonymous',
+                'author_email' => $comment->authorEmail,
+                'status' => $requiresApproval ? 'pending' : 'approved',
+                'is_reply' => $comment->parentId !== null,
+                'post' => $post ? [
+                    'id' => $post->id,
+                    'title' => $post->title,
+                ] : null,
+                'created_at' => $comment->createdAt->format('Y-m-d H:i:s'),
+            ];
+
+            // Broadcast to admin notifications channel (for Header)
+            Broadcast::channel('admin.notifications')
+                ->event('comment.created')
+                ->with($payload)
+                ->now();
+
+            // Broadcast to admin comments channel (for Comments page)
+            Broadcast::channel('admin.comments')
+                ->event('comment.created')
+                ->with($payload)
+                ->now();
+        } catch (\Throwable $e) {
+            // Log error but don't fail the comment creation
+            error_log("Failed to broadcast comment.created event: {$e->getMessage()}");
+        }
     }
 }

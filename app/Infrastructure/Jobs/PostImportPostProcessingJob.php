@@ -7,6 +7,7 @@ namespace App\Infrastructure\Jobs;
 use Toporia\Framework\Bus\Contracts\ShouldQueueInterface;
 use Toporia\Framework\Queue\Backoff\ExponentialBackoff;
 use Toporia\Framework\Queue\Job;
+use Toporia\Framework\Support\Accessors\DB;
 use Toporia\Framework\Support\Accessors\Log;
 use Toporia\Framework\Support\Facades\Console;
 
@@ -25,16 +26,28 @@ final class PostImportPostProcessingJob extends Job implements ShouldQueueInterf
 
     public function __construct(
         private readonly int $maxIdBeforeImport,
-        private readonly int $chunkSize = 1000
+        private readonly int $chunkSize = 1000,
+        ?string $queueName = null
     ) {
         parent::__construct();
 
         $this->tries(3);
         $this->backoff(new ExponentialBackoff(base: 30, max: 120));
+
+        // Use provided queue name or default to 'import-export-high'
+        if ($queueName !== null) {
+            $this->onQueue($queueName);
+        } else {
+            $this->onQueue('import-export-high');
+        }
     }
 
     public function handle(): void
     {
+        // Reconnect database to avoid "MySQL server has gone away" error
+        // This is critical for long-running jobs where connection may timeout
+        DB::reconnect();
+
         Log::info('PostImportPostProcessingJob started', [
             'max_id_before_import' => $this->maxIdBeforeImport,
             'chunk_size' => $this->chunkSize,

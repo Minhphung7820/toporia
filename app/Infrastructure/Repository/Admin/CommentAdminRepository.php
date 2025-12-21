@@ -149,6 +149,17 @@ final class CommentAdminRepository extends BaseRepository
         ];
     }
 
+    /**
+     * Find comment with user and commentable relations for notifications.
+     *
+     * @param int $id
+     * @return mixed
+     */
+    public function findWithRelations(int $id): mixed
+    {
+        return $this->with(['user', 'commentable'])->find($id);
+    }
+
     public function approve(int $id): bool
     {
         $comment = $this->find($id);

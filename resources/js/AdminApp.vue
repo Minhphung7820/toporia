@@ -70,6 +70,9 @@ onUnmounted(() => {
 <style>
 #admin-wrapper {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 /* Auth loading state - clean minimal spinner */
