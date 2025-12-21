@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Jobs;
 
 use App\Infrastructure\Exports\PostsExport;
-use App\Infrastructure\Jobs\Middleware\LazyWithoutOverlapping;
+use Toporia\Framework\Queue\Middleware\LazyWithoutOverlapping;
 use App\Infrastructure\Persistence\Models\ImportExportJobModel;
 use App\Infrastructure\Persistence\Models\PostModel;
 use Toporia\Framework\Bus\Contracts\ShouldQueueInterface;
@@ -79,9 +79,10 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
         $this->broadcastProgress(0, 'Starting export...', 'processing');
 
         try {
-            // Count total rows to export
-            $query = $this->buildQuery();
-            $totalRows = $query->count();
+            // Get estimate count from MySQL stats (instant) instead of COUNT(*) (slow)
+            // For 8M+ records, COUNT(*) can take 10+ seconds
+            // Estimate from information_schema is ~95% accurate and instant
+            $totalRows = $this->getEstimateCount();
 
             ImportExportJobModel::where('id', $this->jobId)->update([
                 'total_rows' => $totalRows,
@@ -292,25 +293,52 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
     }
 
     /**
-     * Build query based on filters.
+     * Get estimate row count from MySQL information_schema.
+     *
+     * Uses TABLE_ROWS from information_schema.tables which is:
+     * - Instant (no table scan required)
+     * - ~95% accurate for InnoDB tables
+     * - Perfect for progress tracking where exact count isn't critical
+     *
+     * For filtered exports, we use estimate as upper bound.
+     * Actual exported rows may be less due to WHERE conditions.
+     *
+     * @return int Estimated row count
      */
-    private function buildQuery(): mixed
+    private function getEstimateCount(): int
     {
-        $query = PostModel::query();
+        // If filters applied, use COUNT(*) on filtered query (smaller dataset)
+        // For full table export, use information_schema estimate
+        $hasFilters = isset($this->filters['is_published'])
+            || !empty($this->filters['category_id'])
+            || !empty($this->filters['author_id']);
 
-        if (isset($this->filters['is_published'])) {
-            $query = $query->where('is_published', $this->filters['is_published'] ? 1 : 0);
+        if ($hasFilters) {
+            // Filtered query - COUNT is acceptable (smaller result set)
+            $query = PostModel::query();
+
+            if (isset($this->filters['is_published'])) {
+                $query = $query->where('is_published', $this->filters['is_published'] ? 1 : 0);
+            }
+            if (!empty($this->filters['category_id'])) {
+                $query = $query->where('category_id', $this->filters['category_id']);
+            }
+            if (!empty($this->filters['author_id'])) {
+                $query = $query->where('author_id', $this->filters['author_id']);
+            }
+
+            return $query->count();
         }
 
-        if (!empty($this->filters['category_id'])) {
-            $query = $query->where('category_id', $this->filters['category_id']);
-        }
+        // Full table - use information_schema for instant estimate
+        $tableName = (new PostModel())->getTable();
+        $result = DB::select(
+            "SELECT TABLE_ROWS FROM information_schema.tables WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+            [$tableName]
+        );
 
-        if (!empty($this->filters['author_id'])) {
-            $query = $query->where('author_id', $this->filters['author_id']);
-        }
-
-        return $query;
+        $row = $result->first();
+        return (int) ($row['TABLE_ROWS'] ?? 0);
     }
 
     /**

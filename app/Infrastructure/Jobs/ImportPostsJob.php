@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Jobs;
 
 use App\Infrastructure\Imports\PostsImport;
-use App\Infrastructure\Jobs\Middleware\LazyWithoutOverlapping;
+use Toporia\Framework\Queue\Middleware\LazyWithoutOverlapping;
 use App\Infrastructure\Jobs\PostImportPostProcessingJob;
 use App\Infrastructure\Persistence\Models\ImportExportJobModel;
 use App\Infrastructure\Persistence\Models\PostModel;
