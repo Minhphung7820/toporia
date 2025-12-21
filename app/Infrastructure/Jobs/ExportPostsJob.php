@@ -122,9 +122,28 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
             }
 
             // Configure progress callback with WebSocket broadcasting
+            // NOTE: Export uses cursor() with unbuffered queries - progress updates use separate PDO
             $lastProgress = 20;
             $jobId = $this->jobId;
-            $export->withProgressCallback(function (int $processed, int $total) use (&$lastProgress, $totalRows, $jobId) {
+            $progressPdo = null; // Lazy-initialized separate connection for progress updates
+            $lastCancelCheck = 0; // Track when we last checked cancel status
+            $export->withProgressCallback(function (int $processed, int $total) use (&$lastProgress, $totalRows, $jobId, &$progressPdo, &$lastCancelCheck) {
+                // Check for cancellation every 10,000 rows to avoid too many DB queries
+                if ($processed - $lastCancelCheck >= 10000) {
+                    $lastCancelCheck = $processed;
+
+                    // Check if job was cancelled using separate PDO connection
+                    $progressPdo = $progressPdo ?? $this->createSeparatePdo();
+                    $stmt = $progressPdo->prepare('SELECT status FROM import_export_jobs WHERE id = ?');
+                    $stmt->execute([$jobId]);
+                    $status = $stmt->fetchColumn();
+
+                    if ($status === 'cancelled') {
+                        // Throw exception to stop cursor iteration and release job
+                        throw new \RuntimeException('Export cancelled by user');
+                    }
+                }
+
                 // Calculate progress (20-90% for export phase)
                 $progress = 20 + (int) (($processed / max(1, $total)) * 70);
 
@@ -133,15 +152,15 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
                     $lastProgress = $progress;
                     $this->reportProgress($progress, "Exporting: {$processed}/{$total} rows");
 
-                    // Update job record directly (avoid stale $job->total_rows issue)
+                    // Use separate PDO connection for progress updates
+                    // This avoids conflict with cursor's unbuffered query on main connection
                     $dbProgress = $totalRows > 0 ? (int) (($processed / $totalRows) * 100) : 0;
-                    ImportExportJobModel::where('id', $jobId)->update([
-                        'processed_rows' => $processed,
-                        'success_rows' => $processed,
-                        'failed_rows' => 0,
-                        'progress' => min(100, $dbProgress),
-                        'updated_at' => date('Y-m-d H:i:s'),
-                    ]);
+                    $progressPdo = $this->updateProgressWithSeparatePdo(
+                        $progressPdo,
+                        $jobId,
+                        $processed,
+                        $dbProgress
+                    );
 
                     // Broadcast progress via WebSocket
                     $this->broadcastProgress($dbProgress, "Exporting: " . number_format($processed) . " / " . number_format($totalRows) . " rows", 'processing', [
@@ -155,6 +174,10 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
             $startTime = microtime(true);
             Tabula::export($export, $outputPath);
             $elapsed = microtime(true) - $startTime;
+
+            // Reconnect database after cursor streaming completes
+            // The cursor uses unbuffered queries which may have affected connection state
+            DB::reconnect();
 
             $this->reportProgress(95, 'Export completed, finalizing...');
             $this->broadcastProgress(95, 'Export completed, finalizing...', 'processing');
@@ -199,6 +222,34 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
                 'elapsed' => $elapsed,
             ]);
         } catch (\Throwable $e) {
+            // Reconnect in case cursor left connection in bad state
+            DB::reconnect();
+
+            // Check if this was a cancellation (not a real error)
+            $isCancelled = str_contains($e->getMessage(), 'cancelled by user');
+
+            if ($isCancelled) {
+                // Job was cancelled - this is expected, just log and clean up
+                Log::info("ExportPostsJob cancelled", [
+                    'job_id' => $this->jobId,
+                    'processed_rows' => $job->processed_rows ?? 0,
+                ]);
+
+                // Clean up partial export file if exists
+                if (isset($outputPath) && file_exists($outputPath)) {
+                    unlink($outputPath);
+                }
+
+                // Broadcast cancellation
+                $this->broadcastProgress(0, 'Export cancelled by user', 'cancelled', [
+                    'cancelled' => true,
+                ]);
+
+                // Don't throw - job completed (cancelled) normally
+                return;
+            }
+
+            // Real error - log and fail
             Log::error("ExportPostsJob failed", [
                 'job_id' => $this->jobId,
                 'error' => $e->getMessage(),
@@ -260,6 +311,78 @@ final class ExportPostsJob extends Job implements ShouldQueueInterface
         }
 
         return $query;
+    }
+
+    /**
+     * Create a separate PDO connection for operations during cursor streaming.
+     *
+     * @return \PDO
+     */
+    private function createSeparatePdo(): \PDO
+    {
+        $config = config('database.connections.' . config('database.default'));
+        $dsn = sprintf(
+            '%s:host=%s;port=%d;dbname=%s;charset=%s',
+            $config['driver'] ?? 'mysql',
+            $config['host'] ?? '127.0.0.1',
+            $config['port'] ?? 3306,
+            $config['database'] ?? '',
+            $config['charset'] ?? 'utf8mb4'
+        );
+        return new \PDO(
+            $dsn,
+            $config['username'] ?? 'root',
+            $config['password'] ?? '',
+            [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            ]
+        );
+    }
+
+    /**
+     * Update progress using a separate PDO connection.
+     *
+     * When export uses cursor() with unbuffered queries, the main DB connection
+     * cannot execute other queries. This method uses a dedicated PDO connection
+     * for progress updates to avoid conflicts.
+     *
+     * @param \PDO|null $pdo Existing PDO connection or null to create new
+     * @param string $jobId Job ID to update
+     * @param int $processed Number of rows processed
+     * @param int $progress Progress percentage (0-100)
+     * @return \PDO The PDO connection (for reuse in next call)
+     */
+    private function updateProgressWithSeparatePdo(
+        ?\PDO $pdo,
+        string $jobId,
+        int $processed,
+        int $progress
+    ): \PDO {
+        // Lazy-initialize separate PDO connection
+        if ($pdo === null) {
+            $pdo = $this->createSeparatePdo();
+        }
+
+        // Update progress using prepared statement
+        $stmt = $pdo->prepare('
+            UPDATE import_export_jobs
+            SET processed_rows = ?,
+                success_rows = ?,
+                failed_rows = 0,
+                progress = ?,
+                updated_at = ?
+            WHERE id = ?
+        ');
+        $stmt->execute([
+            $processed,
+            $processed,
+            min(100, $progress),
+            date('Y-m-d H:i:s'),
+            $jobId,
+        ]);
+
+        return $pdo;
     }
 
     /**
