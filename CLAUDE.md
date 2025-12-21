@@ -374,7 +374,7 @@ Terminal::command('deploy:prepare', function () {
 - If unsure between Laravel and Toporia behavior, ALWAYS choose Toporia
 - If a method does not exist, do NOT create a Laravel-like one - use or propose the equivalent Toporia-style method
 
-**Toporia ORM supported methods** (similar method names but Toporia's own implementation - NOT Laravel/Eloquent):
+**Toporia ORM** has its OWN implementation of relationship methods (similar names, different codebase):
 - `with()` - Eager loading relationships
 - `hasOne()`, `hasMany()`, `belongsTo()`, `belongsToMany()` - Basic relationship definitions
 - `hasOneThrough()`, `hasManyThrough()` - Through relationships
@@ -383,7 +383,7 @@ Terminal::command('deploy:prepare', function () {
 - `withCount()`, `withSum()`, `withAvg()`, `withMin()`, `withMax()` - Relationship aggregates
 - `belongsToMany()->withPivot()` - Include pivot columns in results
 
-**Toporia framework classes** (in `packages/framework/src/`):
+**Toporia framework namespaces** (in `packages/framework/src/`):
 - `Toporia\Framework\Container\Container` - DI Container
 - `Toporia\Framework\Routing\Router` - Router
 - `Toporia\Framework\Database\ORM\Model` - ORM Model
