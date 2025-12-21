@@ -12,6 +12,7 @@ use App\Infrastructure\Persistence\Models\PostModel;
 use Toporia\Framework\Bus\Contracts\ShouldQueueInterface;
 use Toporia\Framework\Queue\Job;
 use Toporia\Framework\Realtime\Broadcast;
+use Toporia\Framework\Support\Accessors\DB;
 use Toporia\Framework\Support\Accessors\Log;
 use Toporia\Tabula\Tabula;
 
@@ -75,6 +76,10 @@ final class ImportPostsJob extends Job implements ShouldQueueInterface
 
     public function handle(): void
     {
+        // Reconnect database to avoid "MySQL server has gone away" error
+        // This is critical for long-running jobs where connection may timeout
+        DB::reconnect();
+
         $job = ImportExportJobModel::find($this->jobId);
 
         if (!$job) {
