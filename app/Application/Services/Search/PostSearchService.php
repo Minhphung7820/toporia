@@ -312,6 +312,7 @@ final class PostSearchService
             'views' => (int) ($post->views ?? 0),
             'reading_time' => (int) ($post->reading_time ?? 0),
             'published_at' => $post->published_at,
+            'scheduled_at' => $post->scheduled_at,
             'created_at' => $post->created_at,
             'updated_at' => $post->updated_at,
         ];
@@ -487,11 +488,18 @@ final class PostSearchService
             ];
         }
 
-        // Status filter
+        // Status filter - must match MySQL logic exactly
         if (isset($filters['status'])) {
             match ($filters['status']) {
                 'published' => $filterClauses[] = ['term' => ['is_published' => true]],
-                'draft' => $filterClauses[] = ['term' => ['is_published' => false]],
+                'draft' => array_push($filterClauses,
+                    ['term' => ['is_published' => false]],
+                    ['bool' => ['must_not' => [['exists' => ['field' => 'scheduled_at']]]]]
+                ),
+                'scheduled' => array_push($filterClauses,
+                    ['term' => ['is_published' => false]],
+                    ['exists' => ['field' => 'scheduled_at']]
+                ),
                 default => null,
             };
         }
@@ -589,11 +597,18 @@ final class PostSearchService
             ];
         }
 
-        // Status filter
+        // Status filter - must match MySQL logic exactly
         if (isset($filters['status'])) {
             match ($filters['status']) {
                 'published' => $filter[] = ['term' => ['is_published' => true]],
-                'draft' => $filter[] = ['term' => ['is_published' => false]],
+                'draft' => array_push($filter,
+                    ['term' => ['is_published' => false]],
+                    ['bool' => ['must_not' => [['exists' => ['field' => 'scheduled_at']]]]]
+                ),
+                'scheduled' => array_push($filter,
+                    ['term' => ['is_published' => false]],
+                    ['exists' => ['field' => 'scheduled_at']]
+                ),
                 default => null,
             };
         }

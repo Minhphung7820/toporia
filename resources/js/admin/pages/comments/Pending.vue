@@ -200,7 +200,7 @@
           <!-- Comment Content -->
           <div class="card-content">
             <div class="comment-text">
-              <p v-html="formatCommentContent(comment.content)"></p>
+              <p v-html="formatAdminContent(comment.content)"></p>
             </div>
 
             <!-- Attachments -->
@@ -384,7 +384,7 @@
                 <div class="detail-content">
                   <div class="section-label">Comment</div>
                   <div class="content-box" ref="contentBoxRef">
-                    <p v-html="formatCommentContent(selectedComment.content)"></p>
+                    <p v-html="formatAdminContent(selectedComment.content)"></p>
                   </div>
                 </div>
 
@@ -519,6 +519,7 @@ import AdminLayout from '../../components/layout/AdminLayout.vue';
 import Pagination from '../../../components/shared/Pagination.vue';
 import { useCommentsStore } from '../../stores/comments';
 import { useWebSocket } from '../../composables/useWebSocket';
+import { formatCommentContent } from '../../../utils/formatContent';
 
 // Store
 const store = useCommentsStore();
@@ -622,94 +623,15 @@ const formatDate = (date) => {
   });
 };
 
+// Truncate text for preview
 const truncate = (text, length) => {
   if (!text) return '';
   return text.length > length ? text.substring(0, length) + '...' : text;
 };
 
-// Decode HTML entities and format comment content for admin display
-const decodeHtmlEntities = (text) => {
-  if (!text) return '';
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = text;
-  return textarea.value;
-};
-
-// Format comment content with code blocks for admin preview
-// Preserves original order and shows full content
-const formatCommentContent = (content) => {
-  if (!content) return '';
-
-  // First decode HTML entities
-  let decoded = decodeHtmlEntities(content);
-
-  // Process the content to preserve order and structure
-  // Split into parts: code blocks and text segments
-  const result = [];
-  // Match entire <pre> blocks including any nested content
-  const preRegex = /<pre[^>]*>([\s\S]*?)<\/pre>/gi;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = preRegex.exec(decoded)) !== null) {
-    // Get text before this code block
-    const textBefore = decoded.slice(lastIndex, match.index);
-    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-    const cleanText = textBefore.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-    if (cleanText) {
-      result.push(`<div class="text-segment">${cleanText}</div>`);
-    }
-
-    // Get the full content inside <pre> tag
-    const preContent = match[1];
-
-    // Extract code - check for <code> tag first
-    // Use a more robust approach: find opening and closing code tags positions
-    const codeOpenMatch = preContent.match(/<code[^>]*>/i);
-    const codeCloseIdx = preContent.lastIndexOf('</code>');
-
-    let codeContent = '';
-    if (codeOpenMatch && codeCloseIdx !== -1) {
-      // Extract content between <code> and </code>
-      const codeStartIdx = codeOpenMatch.index + codeOpenMatch[0].length;
-      codeContent = preContent.slice(codeStartIdx, codeCloseIdx);
-    } else {
-      // No <code> tag, use pre content directly
-      codeContent = preContent;
-    }
-
-    // Only add if there's actual code content
-    if (codeContent.trim()) {
-      // Escape any HTML that might interfere with display
-      const escapedCode = codeContent
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-      result.push(`<pre class="code-block"><code>${escapedCode}</code></pre>`);
-    }
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Get any remaining text after the last code block
-  const remainingText = decoded.slice(lastIndex);
-  // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-  const cleanRemaining = remainingText.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-  if (cleanRemaining) {
-    result.push(`<div class="text-segment">${cleanRemaining}</div>`);
-  }
-
-  // If no structured parts, try plain text
-  if (result.length === 0) {
-    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-    const plainText = decoded.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-    if (plainText) {
-      return `<div class="text-segment">${plainText}</div>`;
-    }
-    return '';
-  }
-
-  return result.join('');
+// Wrapper for formatCommentContent - admin uses decode + escape
+const formatAdminContent = (content) => {
+  return formatCommentContent(content, { decode: true, escapeCode: true });
 };
 
 // Setup copy buttons for code blocks in a container

@@ -225,6 +225,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useCommentsStore } from '../../stores/comments';
 import { useSettingsStore } from '../../stores/settings';
+import { formatCommentContent, formatMentions } from '../../utils/formatContent';
 
 const props = defineProps({
   comment: {
@@ -286,87 +287,16 @@ const fileAttachments = computed(() => {
 });
 
 // Format content with mentions and code blocks styled
-// Preserves original order of text and code blocks
+// Uses shared utility for consistent formatting
 const formattedContent = computed(() => {
-  let content = props.comment.content || '';
+  const content = props.comment.content || '';
+  if (!content) return '';
 
-  // Process the content to preserve order and structure
-  // Split into parts: code blocks and text segments
-  const result = [];
-  // Match <pre> blocks with any attributes, containing optional <code> tags
-  const preRegex = /<pre[^>]*>([\s\S]*?)<\/pre>/gi;
-  let lastIndex = 0;
-  let match;
+  // Public site: content is already HTML-safe, no decode/escape needed
+  const formatted = formatCommentContent(content, { decode: false, escapeCode: false });
 
-  while ((match = preRegex.exec(content)) !== null) {
-    // Get text before this code block
-    const textBefore = content.slice(lastIndex, match.index);
-    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-    const cleanText = textBefore.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-    if (cleanText) {
-      result.push(`<div class="text-segment">${cleanText}</div>`);
-    }
-
-    // Extract code content from the <pre> block
-    const preContent = match[1];
-    let codeContent = '';
-
-    // Check if there's a <code> tag inside
-    const codeMatch = preContent.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
-    if (codeMatch && codeMatch[1]) {
-      codeContent = codeMatch[1];
-    } else {
-      // No <code> tag, use pre content directly (strip only HTML tags, not PHP/XML tags)
-      // Only strip tags that start with < followed by a letter or /
-      codeContent = preContent.replace(/<\/?[a-zA-Z][^>]*>/g, '');
-    }
-
-    // Only add if there's actual code content
-    if (codeContent.trim()) {
-      result.push(`<pre class="code-block"><code>${codeContent}</code></pre>`);
-    }
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Get any remaining text after the last code block
-  const remainingText = content.slice(lastIndex);
-  // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-  const cleanRemaining = remainingText.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-  if (cleanRemaining) {
-    result.push(`<div class="text-segment">${cleanRemaining}</div>`);
-  }
-
-  // If no structured parts were found, try plain text
-  let processedContent = '';
-  if (result.length > 0) {
-    processedContent = result.join('');
-  } else {
-    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-    const plainText = content.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-    if (plainText) {
-      processedContent = `<div class="text-segment">${plainText}</div>`;
-    }
-  }
-
-  // Style mention spans if they exist
-  processedContent = processedContent.replace(
-    /<span class="mention"[^>]*>@([^<]+)<\/span>/g,
-    '<span class="mention-tag">@$1</span>'
-  );
-
-  // Also handle plain @mentions from backend if not already wrapped
-  if (props.comment.mentions && props.comment.mentions.length > 0) {
-    props.comment.mentions.forEach(mention => {
-      const name = mention.name || mention.username;
-      if (name) {
-        const regex = new RegExp(`@${name}(?![^<]*>)`, 'g');
-        processedContent = processedContent.replace(regex, `<span class="mention-tag">@${name}</span>`);
-      }
-    });
-  }
-
-  return processedContent;
+  // Apply mention styling
+  return formatMentions(formatted, props.comment.mentions);
 });
 
 // Lightbox state

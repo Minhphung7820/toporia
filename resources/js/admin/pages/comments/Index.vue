@@ -468,7 +468,7 @@
                   </span>
                 </div>
                 <div class="detail-content" ref="detailContentRef">
-                  <p v-html="formatCommentContent(selectedComment.content)"></p>
+                  <p v-html="formatAdminContent(selectedComment.content)"></p>
                 </div>
                 <!-- Attachments Gallery -->
                 <div v-if="selectedComment.attachments && selectedComment.attachments.length > 0" class="detail-attachments">
@@ -659,6 +659,11 @@ import Pagination from '../../components/shared/Pagination.vue';
 import { useCommentsStore } from '../../stores/comments';
 import { useWebSocket } from '../../composables/useWebSocket';
 import { debounce } from 'lodash-es';
+import {
+  formatCommentContent,
+  getContentParts,
+  decodeHtmlEntities
+} from '../../../utils/formatContent';
 
 const route = useRoute();
 const router = useRouter();
@@ -811,218 +816,18 @@ const getAvatarColor = (name) => {
   return colors[index];
 };
 
+// Truncate text for preview
 const truncate = (text, length) => {
   if (!text) return '';
-  // Decode HTML entities first
   const decoded = decodeHtmlEntities(text);
-  // Strip HTML tags for plain text preview
-  const stripped = decoded.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const stripped = decoded.replace(/<\/?[a-zA-Z][^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   if (stripped.length <= length) return stripped;
   return stripped.slice(0, length) + '...';
 };
 
-// Check if comment has code block
-const hasCodeBlock = (content) => {
-  if (!content) return false;
-  return content.includes('<pre') || content.includes('&lt;pre');
-};
-
-// Get content parts in original order (text and code blocks)
-// Returns array of { type: 'text' | 'code', content: string }
-const getContentParts = (content) => {
-  if (!content) return [];
-  const decoded = decodeHtmlEntities(content);
-  const parts = [];
-
-  // Regex to match <pre> blocks (with or without <code>)
-  const preRegex = /<pre[^>]*>[\s\S]*?<\/pre>/gi;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = preRegex.exec(decoded)) !== null) {
-    // Get text before this code block
-    const textBefore = decoded.slice(lastIndex, match.index);
-    const cleanText = textBefore.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    if (cleanText) {
-      const truncated = cleanText.length > 80 ? cleanText.slice(0, 80) + '...' : cleanText;
-      parts.push({ type: 'text', content: truncated });
-    }
-
-    // Extract code content from the <pre> block
-    const preContent = match[0];
-    let code = '';
-
-    // Try <pre><code>...</code></pre>
-    const codeMatch = preContent.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
-    if (codeMatch && codeMatch[1]) {
-      code = codeMatch[1].trim();
-    } else {
-      // Direct content in <pre> without <code>
-      code = preContent.replace(/<\/?pre[^>]*>/gi, '').replace(/<\/?code[^>]*>/gi, '').trim();
-    }
-
-    if (code) {
-      // Get first 2 lines or 100 chars for preview
-      const lines = code.split('\n').slice(0, 2);
-      let preview = lines.join('\n');
-      if (preview.length > 100) {
-        preview = preview.slice(0, 100);
-      }
-      parts.push({ type: 'code', content: preview + (code.length > preview.length ? '...' : '') });
-    }
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Get any remaining text after the last code block
-  const remainingText = decoded.slice(lastIndex);
-  const cleanRemaining = remainingText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  if (cleanRemaining) {
-    const truncated = cleanRemaining.length > 80 ? cleanRemaining.slice(0, 80) + '...' : cleanRemaining;
-    parts.push({ type: 'text', content: truncated });
-  }
-
-  // If no parts found, try to get plain text
-  if (parts.length === 0) {
-    const plainText = decoded.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    if (plainText) {
-      const truncated = plainText.length > 80 ? plainText.slice(0, 80) + '...' : plainText;
-      parts.push({ type: 'text', content: truncated });
-    }
-  }
-
-  return parts;
-};
-
-// Get text preview (non-code part only) - kept for backward compatibility
-const getTextPreview = (content) => {
-  if (!content) return '';
-  const decoded = decodeHtmlEntities(content);
-
-  // Remove code blocks to get normal text
-  const withoutCode = decoded.replace(/<pre[^>]*>[\s\S]*?<\/pre>/gi, '');
-  // Strip remaining HTML tags
-  const normalText = withoutCode.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-
-  if (!normalText) return '';
-  return normalText.length > 80 ? normalText.slice(0, 80) + '...' : normalText;
-};
-
-// Get code preview (first few lines of code) - kept for backward compatibility
-const getCodePreview = (content) => {
-  if (!content) return '';
-  const decoded = decodeHtmlEntities(content);
-
-  // Try to extract code content
-  let code = '';
-
-  // First try <pre><code>...</code></pre>
-  const codeTagMatch = decoded.match(/<pre[^>]*>\s*<code[^>]*>([\s\S]*?)<\/code>\s*<\/pre>/i);
-  if (codeTagMatch && codeTagMatch[1]) {
-    code = codeTagMatch[1];
-  } else {
-    // Try <pre>...</pre> without code tag
-    const preOnlyMatch = decoded.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
-    if (preOnlyMatch && preOnlyMatch[1]) {
-      code = preOnlyMatch[1].replace(/<\/?code[^>]*>/gi, '');
-    }
-  }
-
-  if (!code) return '';
-  code = code.trim();
-
-  // Get first 2 lines or 100 chars
-  const lines = code.split('\n').slice(0, 2);
-  let preview = lines.join('\n');
-  if (preview.length > 100) {
-    preview = preview.slice(0, 100);
-  }
-  return preview + (code.length > preview.length ? '...' : '');
-};
-
-// Decode HTML entities for display
-const decodeHtmlEntities = (text) => {
-  if (!text) return '';
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = text;
-  return textarea.value;
-};
-
-// Format comment content with code blocks for admin detail view
-// Preserves original order and shows full content
-const formatCommentContent = (content) => {
-  if (!content) return '';
-
-  // First decode HTML entities
-  let decoded = decodeHtmlEntities(content);
-
-  // Process the content to preserve order and structure
-  // Split into parts: code blocks and text segments
-  const result = [];
-  // Match entire <pre> blocks including any nested content
-  const preRegex = /<pre[^>]*>([\s\S]*?)<\/pre>/gi;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = preRegex.exec(decoded)) !== null) {
-    // Get text before this code block
-    const textBefore = decoded.slice(lastIndex, match.index);
-    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-    const cleanText = textBefore.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-    if (cleanText) {
-      result.push(`<div class="text-segment">${cleanText}</div>`);
-    }
-
-    // Get the full content inside <pre> tag
-    const preContent = match[1];
-
-    // Extract code - check for <code> tag first
-    // Use a more robust approach: find opening and closing code tags positions
-    const codeOpenMatch = preContent.match(/<code[^>]*>/i);
-    const codeCloseIdx = preContent.lastIndexOf('</code>');
-
-    let codeContent = '';
-    if (codeOpenMatch && codeCloseIdx !== -1) {
-      // Extract content between <code> and </code>
-      const codeStartIdx = codeOpenMatch.index + codeOpenMatch[0].length;
-      codeContent = preContent.slice(codeStartIdx, codeCloseIdx);
-    } else {
-      // No <code> tag, use pre content directly
-      codeContent = preContent;
-    }
-
-    // Only add if there's actual code content
-    if (codeContent.trim()) {
-      // Escape any HTML that might interfere with display
-      const escapedCode = codeContent
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-      result.push(`<pre class="code-block"><code>${escapedCode}</code></pre>`);
-    }
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Get any remaining text after the last code block
-  const remainingText = decoded.slice(lastIndex);
-  // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-  const cleanRemaining = remainingText.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-  if (cleanRemaining) {
-    result.push(`<div class="text-segment">${cleanRemaining}</div>`);
-  }
-
-  // If no structured parts, try plain text
-  if (result.length === 0) {
-    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
-    const plainText = decoded.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
-    if (plainText) {
-      return `<div class="text-segment">${plainText}</div>`;
-    }
-    return '';
-  }
-
-  return result.join('');
+// Wrapper for formatCommentContent - admin uses decode + escape
+const formatAdminContent = (content) => {
+  return formatCommentContent(content, { decode: true, escapeCode: true });
 };
 
 // Setup copy buttons for code blocks in modal
@@ -1487,12 +1292,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 0 14px;
+  height: 44px;
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   min-width: 280px;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 .search-wrapper:focus-within {
@@ -1530,7 +1337,8 @@ onUnmounted(() => {
 }
 
 .filter-select {
-  padding: 10px 32px 10px 14px;
+  padding: 0 32px 0 14px;
+  height: 44px;
   background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 12px center;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
@@ -1539,6 +1347,7 @@ onUnmounted(() => {
   cursor: pointer;
   appearance: none;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 .filter-select:focus {
@@ -3030,11 +2839,17 @@ onUnmounted(() => {
   }
 
   .search-wrapper {
-    min-width: 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .filter-group {
+    width: 100%;
   }
 
   .filter-select {
     width: 100%;
+    height: 44px;
   }
 
   .table-card {
@@ -3172,16 +2987,129 @@ onUnmounted(() => {
     font-size: 12px;
   }
 
-  .data-table {
-    min-width: 500px;
+  /* Mobile: Toolbar inputs same width */
+  .toolbar-left {
+    gap: 8px;
   }
 
-  .author-info {
+  .search-wrapper,
+  .filter-group {
+    width: 100%;
+  }
+
+  .filter-select {
+    width: 100%;
+    height: 42px;
+  }
+
+  /* Mobile: Table adjustments */
+  .table-wrapper {
+    overflow-x: visible;
+  }
+
+  .data-table {
+    table-layout: auto;
+    min-width: 0;
+  }
+
+  /* Mobile: Hide checkbox column to save space */
+  .col-checkbox {
     display: none;
   }
 
+  /* Mobile: Compact author column */
+  .col-author {
+    width: auto;
+    min-width: 100px;
+  }
+
+  .author-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .author-avatar,
+  .author-avatar-img {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .author-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .author-name {
+    font-size: 11px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .author-email {
+    display: none;
+  }
+
+  /* Mobile: Show comment column */
+  .col-comment {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .comment-content {
+    max-width: 150px;
+  }
+
+  .comment-content p {
+    font-size: 11px;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .code-preview {
+    display: none;
+  }
+
+  .view-more {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  /* Mobile: Compact actions */
+  .col-actions {
+    width: auto;
+    min-width: 60px;
+  }
+
+  .actions-cell {
+    gap: 2px;
+  }
+
   .action-btn {
-    padding: 6px;
+    padding: 5px;
+  }
+
+  .action-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Hide attachments preview on mobile */
+  .comment-attachments-preview {
+    display: none;
+  }
+
+  /* Table cell padding */
+  .data-table th,
+  .data-table td {
+    padding: 8px 6px;
   }
 }
 </style>
