@@ -22,17 +22,16 @@ use Toporia\Framework\Console\Command;
  */
 final class IndexPostsCommand extends Command
 {
-    protected string $signature = 'search:index-posts {--fresh : Delete and recreate the index} {--chunk=500 : Number of posts per batch} {--from-id=0 : Start from specific post ID}';
+    protected string $signature = 'search:index-posts {--fresh : Delete and recreate the index} {--chunk=500 : Number of posts per batch} {--from-id=0 : Start from specific post ID} {--sleep=10 : Milliseconds to sleep between batches}';
 
     protected string $description = 'Index all posts to Elasticsearch';
 
-    public function __construct(
-        private readonly PostSearchService $postSearchService
-    ) {}
-
     public function handle(): int
     {
-        if (!$this->postSearchService->isAvailable()) {
+        /** @var PostSearchService $postSearchService */
+        $postSearchService = app(PostSearchService::class);
+
+        if (!$postSearchService->isAvailable()) {
             $this->error('Elasticsearch is not available. Check your configuration and connection.');
             return 1;
         }
@@ -40,14 +39,15 @@ final class IndexPostsCommand extends Command
         $fresh = $this->option('fresh');
         $chunkSize = (int) $this->option('chunk');
         $fromId = (int) $this->option('from-id');
+        $sleepMs = (int) $this->option('sleep');
 
         if ($fresh) {
             $this->info('Recreating index...');
-            $this->postSearchService->recreateIndex();
+            $postSearchService->recreateIndex();
             $this->writeln('  Index recreated');
         } else {
             $this->info('Ensuring index exists...');
-            $this->postSearchService->ensureIndex();
+            $postSearchService->ensureIndex();
             $this->writeln('  Index ready');
         }
 
@@ -90,7 +90,7 @@ final class IndexPostsCommand extends Command
             }
 
             try {
-                $count = $this->postSearchService->bulkIndex($posts);
+                $count = $postSearchService->bulkIndex($posts);
                 $indexed += $count;
             } catch (\Throwable $e) {
                 $failed += $batchCount;
@@ -102,6 +102,11 @@ final class IndexPostsCommand extends Command
             // Progress output
             $progress = round(($indexed + $failed) / $postsToProcess * 100, 1);
             $this->write("\r  Progress: {$progress}% ({$indexed} indexed, {$failed} failed)");
+
+            // Sleep between batches to prevent overload
+            if ($sleepMs > 0) {
+                usleep($sleepMs * 1000);
+            }
         }
 
         $this->newLine();
@@ -123,7 +128,7 @@ final class IndexPostsCommand extends Command
         // Show index stats
         $this->newLine();
         $this->info('Index statistics:');
-        $stats = $this->postSearchService->getIndexStats();
+        $stats = $postSearchService->getIndexStats();
         if (isset($stats['error'])) {
             $this->warn("  Could not get stats: {$stats['error']}");
         } else {
