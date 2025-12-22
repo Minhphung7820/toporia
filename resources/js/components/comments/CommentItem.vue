@@ -41,7 +41,27 @@
           </div>
 
           <!-- Content Text (rendered HTML with mentions) -->
-          <div class="comment-content" ref="commentContentRef" v-html="formattedContent"></div>
+          <div
+            :class="['comment-content', { 'is-collapsed': !isExpanded && shouldCollapse }]"
+            ref="commentContentRef"
+            v-html="formattedContent"
+          ></div>
+
+          <!-- Expand/Collapse Toggle -->
+          <button
+            v-if="shouldCollapse"
+            @click="toggleExpand"
+            :class="['expand-toggle', { 'is-expanded': isExpanded }]"
+          >
+            <span class="expand-toggle-content">
+              <span class="expand-toggle-text">{{ isExpanded ? 'Thu gọn' : 'Xem thêm' }}</span>
+              <span class="expand-toggle-icon">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </span>
+            </span>
+          </button>
 
           <!-- Attachments -->
           <div v-if="comment.attachments && comment.attachments.length > 0" class="comment-attachments">
@@ -235,6 +255,11 @@ const commentContentRef = ref(null);
 
 // Local state
 const showMenu = ref(false);
+const isExpanded = ref(false);
+const contentHeight = ref(0);
+
+// Content collapse threshold (in pixels)
+const COLLAPSE_THRESHOLD = 200;
 
 // Max reply depth (from settings)
 const maxDepth = computed(() => settingsStore.commentsMaxDepth);
@@ -245,6 +270,9 @@ const canReply = computed(() => {
   return settingsStore.commentsEnabled && props.depth < maxDepth.value - 1;
 });
 const loading = computed(() => commentsStore.loading);
+
+// Check if content should be collapsible
+const shouldCollapse = computed(() => contentHeight.value > COLLAPSE_THRESHOLD);
 
 // Computed for attachments
 const imageAttachments = computed(() => {
@@ -258,41 +286,71 @@ const fileAttachments = computed(() => {
 });
 
 // Format content with mentions and code blocks styled
+// Preserves original order of text and code blocks
 const formattedContent = computed(() => {
   let content = props.comment.content || '';
 
-  // Sanitize HTML to prevent XSS (allow only safe tags)
-  const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'br', 'span', 'pre', 'code'];
-  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
-  content = content.replace(tagRegex, (match, tag) => {
-    const lowerTag = tag.toLowerCase();
-    if (allowedTags.includes(lowerTag)) {
-      // Allow span with specific classes only
-      if (lowerTag === 'span') {
-        if (match.includes('class="mention"') || match.includes('class="mention-tag"')) {
-          return match;
-        }
-        return '';
-      }
-      // Allow pre tag and ensure it has code-block class
-      if (lowerTag === 'pre') {
-        // Always add code-block class for styling
-        return '<pre class="code-block">';
-      }
-      // Allow code tag inside pre
-      if (lowerTag === 'code') {
-        // Clean up contenteditable and placeholder attributes for display
-        return match
-          .replace(/\s*contenteditable="[^"]*"/gi, '')
-          .replace(/\s*data-placeholder="[^"]*"/gi, '');
-      }
-      return match;
+  // Process the content to preserve order and structure
+  // Split into parts: code blocks and text segments
+  const result = [];
+  // Match <pre> blocks with any attributes, containing optional <code> tags
+  const preRegex = /<pre[^>]*>([\s\S]*?)<\/pre>/gi;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = preRegex.exec(content)) !== null) {
+    // Get text before this code block
+    const textBefore = content.slice(lastIndex, match.index);
+    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
+    const cleanText = textBefore.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
+    if (cleanText) {
+      result.push(`<div class="text-segment">${cleanText}</div>`);
     }
-    return '';
-  });
+
+    // Extract code content from the <pre> block
+    const preContent = match[1];
+    let codeContent = '';
+
+    // Check if there's a <code> tag inside
+    const codeMatch = preContent.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
+    if (codeMatch && codeMatch[1]) {
+      codeContent = codeMatch[1];
+    } else {
+      // No <code> tag, use pre content directly (strip only HTML tags, not PHP/XML tags)
+      // Only strip tags that start with < followed by a letter or /
+      codeContent = preContent.replace(/<\/?[a-zA-Z][^>]*>/g, '');
+    }
+
+    // Only add if there's actual code content
+    if (codeContent.trim()) {
+      result.push(`<pre class="code-block"><code>${codeContent}</code></pre>`);
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Get any remaining text after the last code block
+  const remainingText = content.slice(lastIndex);
+  // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
+  const cleanRemaining = remainingText.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
+  if (cleanRemaining) {
+    result.push(`<div class="text-segment">${cleanRemaining}</div>`);
+  }
+
+  // If no structured parts were found, try plain text
+  let processedContent = '';
+  if (result.length > 0) {
+    processedContent = result.join('');
+  } else {
+    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
+    const plainText = content.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
+    if (plainText) {
+      processedContent = `<div class="text-segment">${plainText}</div>`;
+    }
+  }
 
   // Style mention spans if they exist
-  content = content.replace(
+  processedContent = processedContent.replace(
     /<span class="mention"[^>]*>@([^<]+)<\/span>/g,
     '<span class="mention-tag">@$1</span>'
   );
@@ -303,12 +361,12 @@ const formattedContent = computed(() => {
       const name = mention.name || mention.username;
       if (name) {
         const regex = new RegExp(`@${name}(?![^<]*>)`, 'g');
-        content = content.replace(regex, `<span class="mention-tag">@${name}</span>`);
+        processedContent = processedContent.replace(regex, `<span class="mention-tag">@${name}</span>`);
       }
     });
   }
 
-  return content;
+  return processedContent;
 });
 
 // Lightbox state
@@ -386,6 +444,26 @@ const toggleMenu = () => {
   showMenu.value = !showMenu.value;
 };
 
+// Toggle expand/collapse
+const toggleExpand = () => {
+  isExpanded.value = !isExpanded.value;
+};
+
+// Measure content height
+const measureContentHeight = () => {
+  if (commentContentRef.value) {
+    // Temporarily remove max-height to measure full height
+    const el = commentContentRef.value;
+    const originalMaxHeight = el.style.maxHeight;
+    const originalOverflow = el.style.overflow;
+    el.style.maxHeight = 'none';
+    el.style.overflow = 'visible';
+    contentHeight.value = el.scrollHeight;
+    el.style.maxHeight = originalMaxHeight;
+    el.style.overflow = originalOverflow;
+  }
+};
+
 const handleReport = () => {
   showMenu.value = false;
   // Implement report functionality
@@ -448,6 +526,14 @@ const setupCodeBlockCopyButtons = () => {
     // Check if copy button already exists
     if (block.querySelector('.code-copy-btn')) return;
 
+    // Skip empty code blocks (no code element or empty code)
+    const codeEl = block.querySelector('code');
+    if (!codeEl || !codeEl.textContent?.trim()) {
+      // Hide empty code blocks
+      block.style.display = 'none';
+      return;
+    }
+
     // Create copy button
     const copyBtn = document.createElement('button');
     copyBtn.className = 'code-copy-btn';
@@ -495,9 +581,10 @@ const setupCodeBlockCopyButtons = () => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
   document.addEventListener('keydown', handleLightboxKeydown);
-  // Setup copy buttons after content is rendered
+  // Setup copy buttons and measure content height after content is rendered
   nextTick(() => {
     setupCodeBlockCopyButtons();
+    measureContentHeight();
   });
 });
 
@@ -607,6 +694,88 @@ onUnmounted(() => {
   line-height: 1.6;
   white-space: pre-line;
   margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+/* Collapsed state */
+.comment-content.is-collapsed {
+  max-height: 200px;
+}
+
+/* Gradient fade overlay for collapsed content */
+.comment-content.is-collapsed::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.95) 70%,
+    rgba(255, 255, 255, 1) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Expand/Collapse toggle button */
+.expand-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin-bottom: 12px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.expand-toggle:hover {
+  color: #1a1a1a;
+}
+
+.expand-toggle-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expand-toggle-text {
+  position: relative;
+}
+
+.expand-toggle-text::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.expand-toggle:hover .expand-toggle-text::after {
+  opacity: 0.4;
+}
+
+.expand-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.expand-toggle.is-expanded .expand-toggle-icon {
+  transform: rotate(180deg);
 }
 
 /* Actions */
@@ -786,6 +955,20 @@ onUnmounted(() => {
     font-size: 13px;
   }
 
+  /* Collapsed state - smaller on mobile */
+  .comment-content.is-collapsed {
+    max-height: 150px;
+  }
+
+  .comment-content.is-collapsed::after {
+    height: 50px;
+  }
+
+  /* Expand toggle - mobile optimized */
+  .expand-toggle {
+    font-size: 12px;
+  }
+
   .action-btn {
     padding: 5px 8px;
     font-size: 12px;
@@ -940,6 +1123,21 @@ onUnmounted(() => {
   color: #888;
 }
 
+/* Text Segment in Content */
+.comment-content :deep(.text-segment) {
+  display: block;
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.comment-content :deep(.text-segment):first-child {
+  margin-top: 0;
+}
+
+.comment-content :deep(.text-segment):last-child {
+  margin-bottom: 0;
+}
+
 /* Mention Tags in Content */
 .comment-content :deep(.mention-tag) {
   display: inline;
@@ -1016,13 +1214,60 @@ onUnmounted(() => {
 .comment-content :deep(.code-block code) {
   display: block;
   padding: 14px 16px;
+  margin: 0;
   color: #d4d4d4;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
   font-size: 13px;
   line-height: 1.5;
   white-space: pre;
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 400px;
   tab-size: 2;
+}
+
+/* Custom scrollbar for code blocks */
+.comment-content :deep(.code-block code)::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.comment-content :deep(.code-block code)::-webkit-scrollbar-track {
+  background: #2d2d2d;
+  border-radius: 3px;
+}
+
+.comment-content :deep(.code-block code)::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+.comment-content :deep(.code-block code)::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+.comment-content :deep(.code-block code)::-webkit-scrollbar-corner {
+  background: #2d2d2d;
+}
+
+/* Hide ::before when copy button exists (copy button replaces header) */
+.comment-content :deep(.code-block:has(.code-copy-btn))::before {
+  display: none;
+}
+
+/* Hide empty code blocks (no code content) */
+.comment-content :deep(.code-block:not(:has(code))),
+.comment-content :deep(.code-block:has(code:empty)) {
+  display: none;
+}
+
+/* Ensure no extra margin at bottom */
+.comment-content :deep(.code-block) {
+  margin-bottom: 0;
+}
+
+.comment-content :deep(.code-block):first-child {
+  margin-top: 0;
 }
 
 /* Syntax Highlighting Classes */

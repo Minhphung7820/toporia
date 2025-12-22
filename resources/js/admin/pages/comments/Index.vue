@@ -236,12 +236,13 @@
                   </td>
                   <td class="col-comment">
                     <div class="comment-content">
-                      <!-- Text preview (non-code part) -->
-                      <p v-if="getTextPreview(comment.content)">{{ getTextPreview(comment.content) }}</p>
-                      <!-- Code preview snippet -->
-                      <div v-if="hasCodeBlock(comment.content)" class="code-preview">
-                        <code>{{ getCodePreview(comment.content) }}</code>
-                      </div>
+                      <!-- Content preview - preserves original order -->
+                      <template v-for="(part, idx) in getContentParts(comment.content)" :key="idx">
+                        <p v-if="part.type === 'text'">{{ part.content }}</p>
+                        <div v-else-if="part.type === 'code'" class="code-preview">
+                          <code>{{ part.content }}</code>
+                        </div>
+                      </template>
                       <!-- Attachment Thumbnails -->
                       <div v-if="comment.attachments && comment.attachments.length > 0" class="comment-attachments-preview">
                         <div
@@ -826,44 +827,93 @@ const hasCodeBlock = (content) => {
   return content.includes('<pre') || content.includes('&lt;pre');
 };
 
-// Get text preview (non-code part only)
+// Get content parts in original order (text and code blocks)
+// Returns array of { type: 'text' | 'code', content: string }
+const getContentParts = (content) => {
+  if (!content) return [];
+  const decoded = decodeHtmlEntities(content);
+  const parts = [];
+
+  // Regex to match <pre> blocks (with or without <code>)
+  const preRegex = /<pre[^>]*>[\s\S]*?<\/pre>/gi;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = preRegex.exec(decoded)) !== null) {
+    // Get text before this code block
+    const textBefore = decoded.slice(lastIndex, match.index);
+    const cleanText = textBefore.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (cleanText) {
+      const truncated = cleanText.length > 80 ? cleanText.slice(0, 80) + '...' : cleanText;
+      parts.push({ type: 'text', content: truncated });
+    }
+
+    // Extract code content from the <pre> block
+    const preContent = match[0];
+    let code = '';
+
+    // Try <pre><code>...</code></pre>
+    const codeMatch = preContent.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
+    if (codeMatch && codeMatch[1]) {
+      code = codeMatch[1].trim();
+    } else {
+      // Direct content in <pre> without <code>
+      code = preContent.replace(/<\/?pre[^>]*>/gi, '').replace(/<\/?code[^>]*>/gi, '').trim();
+    }
+
+    if (code) {
+      // Get first 2 lines or 100 chars for preview
+      const lines = code.split('\n').slice(0, 2);
+      let preview = lines.join('\n');
+      if (preview.length > 100) {
+        preview = preview.slice(0, 100);
+      }
+      parts.push({ type: 'code', content: preview + (code.length > preview.length ? '...' : '') });
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Get any remaining text after the last code block
+  const remainingText = decoded.slice(lastIndex);
+  const cleanRemaining = remainingText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (cleanRemaining) {
+    const truncated = cleanRemaining.length > 80 ? cleanRemaining.slice(0, 80) + '...' : cleanRemaining;
+    parts.push({ type: 'text', content: truncated });
+  }
+
+  // If no parts found, try to get plain text
+  if (parts.length === 0) {
+    const plainText = decoded.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (plainText) {
+      const truncated = plainText.length > 80 ? plainText.slice(0, 80) + '...' : plainText;
+      parts.push({ type: 'text', content: truncated });
+    }
+  }
+
+  return parts;
+};
+
+// Get text preview (non-code part only) - kept for backward compatibility
 const getTextPreview = (content) => {
   if (!content) return '';
   const decoded = decodeHtmlEntities(content);
-
-  // First, extract any text that's inside <pre> but outside <code> (malformed)
-  let extractedText = '';
-  decoded.replace(/<pre[^>]*>([^<]*)<code>/gi, (match, textBefore) => {
-    const trimmed = textBefore.trim();
-    if (trimmed) extractedText += trimmed + ' ';
-    return match;
-  });
-  decoded.replace(/<\/code>([^<]*)<\/pre>/gi, (match, textAfter) => {
-    const trimmed = textAfter.trim();
-    if (trimmed) extractedText += trimmed + ' ';
-    return match;
-  });
 
   // Remove code blocks to get normal text
   const withoutCode = decoded.replace(/<pre[^>]*>[\s\S]*?<\/pre>/gi, '');
   // Strip remaining HTML tags
   const normalText = withoutCode.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
-  // Combine extracted text and normal text
-  const combined = (extractedText + normalText).replace(/\s+/g, ' ').trim();
-  if (!combined) return '';
-  return combined.length > 80 ? combined.slice(0, 80) + '...' : combined;
+  if (!normalText) return '';
+  return normalText.length > 80 ? normalText.slice(0, 80) + '...' : normalText;
 };
 
-// Get code preview (first few lines of code)
+// Get code preview (first few lines of code) - kept for backward compatibility
 const getCodePreview = (content) => {
   if (!content) return '';
   const decoded = decodeHtmlEntities(content);
 
-  // Try to extract code content - support multiple formats:
-  // 1. <pre><code>...</code></pre>
-  // 2. <pre class="code-block"><code>...</code></pre>
-  // 3. <pre>...</pre> (without code tag)
+  // Try to extract code content
   let code = '';
 
   // First try <pre><code>...</code></pre>
@@ -874,14 +924,11 @@ const getCodePreview = (content) => {
     // Try <pre>...</pre> without code tag
     const preOnlyMatch = decoded.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
     if (preOnlyMatch && preOnlyMatch[1]) {
-      // Remove any inner code tags if present but not properly closed
       code = preOnlyMatch[1].replace(/<\/?code[^>]*>/gi, '');
     }
   }
 
   if (!code) return '';
-
-  // Clean up the code
   code = code.trim();
 
   // Get first 2 lines or 100 chars
@@ -901,50 +948,81 @@ const decodeHtmlEntities = (text) => {
   return textarea.value;
 };
 
-// Format comment content with code blocks for admin preview
+// Format comment content with code blocks for admin detail view
+// Preserves original order and shows full content
 const formatCommentContent = (content) => {
   if (!content) return '';
 
   // First decode HTML entities
   let decoded = decodeHtmlEntities(content);
 
-  // Sanitize - only allow safe tags (including div for structure)
-  const allowedTags = ['b', 'strong', 'i', 'em', 'u', 'br', 'pre', 'code', 'div'];
-  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
-  decoded = decoded.replace(tagRegex, (match, tag) => {
-    const lowerTag = tag.toLowerCase();
-    if (allowedTags.includes(lowerTag)) {
-      // Always add code-block class to pre tags for styling
-      if (lowerTag === 'pre') {
-        return '<pre class="code-block">';
-      }
-      return match;
+  // Process the content to preserve order and structure
+  // Split into parts: code blocks and text segments
+  const result = [];
+  // Match entire <pre> blocks including any nested content
+  const preRegex = /<pre[^>]*>([\s\S]*?)<\/pre>/gi;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = preRegex.exec(decoded)) !== null) {
+    // Get text before this code block
+    const textBefore = decoded.slice(lastIndex, match.index);
+    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
+    const cleanText = textBefore.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
+    if (cleanText) {
+      result.push(`<div class="text-segment">${cleanText}</div>`);
+    }
+
+    // Get the full content inside <pre> tag
+    const preContent = match[1];
+
+    // Extract code - check for <code> tag first
+    // Use a more robust approach: find opening and closing code tags positions
+    const codeOpenMatch = preContent.match(/<code[^>]*>/i);
+    const codeCloseIdx = preContent.lastIndexOf('</code>');
+
+    let codeContent = '';
+    if (codeOpenMatch && codeCloseIdx !== -1) {
+      // Extract content between <code> and </code>
+      const codeStartIdx = codeOpenMatch.index + codeOpenMatch[0].length;
+      codeContent = preContent.slice(codeStartIdx, codeCloseIdx);
+    } else {
+      // No <code> tag, use pre content directly
+      codeContent = preContent;
+    }
+
+    // Only add if there's actual code content
+    if (codeContent.trim()) {
+      // Escape any HTML that might interfere with display
+      const escapedCode = codeContent
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      result.push(`<pre class="code-block"><code>${escapedCode}</code></pre>`);
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Get any remaining text after the last code block
+  const remainingText = decoded.slice(lastIndex);
+  // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
+  const cleanRemaining = remainingText.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
+  if (cleanRemaining) {
+    result.push(`<div class="text-segment">${cleanRemaining}</div>`);
+  }
+
+  // If no structured parts, try plain text
+  if (result.length === 0) {
+    // Strip only HTML tags (starting with letter or /), not PHP tags like <?php
+    const plainText = decoded.replace(/<\/?[a-zA-Z][^>]*>/g, '').trim();
+    if (plainText) {
+      return `<div class="text-segment">${plainText}</div>`;
     }
     return '';
-  });
+  }
 
-  // Fix malformed code blocks where text is inside <pre> but outside <code>
-  // Pattern: <pre...>TEXT_OUTSIDE<code>CODE_INSIDE</code></pre>
-  // Should be: TEXT_OUTSIDE<pre...><code>CODE_INSIDE</code></pre>
-  decoded = decoded.replace(/<pre([^>]*)>([^<]+)(<code>)/gi, (match, preAttrs, textBefore, codeTag) => {
-    // If there's text between <pre> and <code>, move it before <pre>
-    const trimmedText = textBefore.trim();
-    if (trimmedText && !trimmedText.startsWith('<')) {
-      return `<div class="text-before-code">${trimmedText}</div><pre${preAttrs}>${codeTag}`;
-    }
-    return match;
-  });
-
-  // Also handle case where text appears after </code> but before </pre>
-  decoded = decoded.replace(/(<\/code>)([^<]+)<\/pre>/gi, (match, closeCode, textAfter) => {
-    const trimmedText = textAfter.trim();
-    if (trimmedText) {
-      return `${closeCode}</pre><div class="text-after-code">${trimmedText}</div>`;
-    }
-    return match;
-  });
-
-  return decoded;
+  return result.join('');
 };
 
 // Setup copy buttons for code blocks in modal
@@ -2241,7 +2319,8 @@ onUnmounted(() => {
   white-space: pre-wrap;
 }
 
-/* Text extracted from malformed code blocks */
+/* Text segments in content */
+.detail-content :deep(.text-segment),
 .detail-content :deep(.text-before-code),
 .detail-content :deep(.text-after-code) {
   display: block;
@@ -2256,7 +2335,7 @@ onUnmounted(() => {
 .detail-content :deep(.code-block),
 .detail-content :deep(pre) {
   display: block;
-  margin: 12px 0;
+  margin: 12px 0 0 0;
   padding: 0;
   background: #1e1e1e;
   border-radius: 8px;
@@ -2283,6 +2362,7 @@ onUnmounted(() => {
 .detail-content :deep(pre code) {
   display: block;
   padding: 14px 16px;
+  margin: 0;
   color: #d4d4d4;
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Consolas', monospace;
   font-size: 13px;
@@ -2291,6 +2371,12 @@ onUnmounted(() => {
   overflow-x: auto;
   overflow-y: auto;
   max-height: 300px;
+}
+
+/* Ensure first code block has no extra space at top */
+.detail-content :deep(.code-block):first-child,
+.detail-content :deep(pre):first-child {
+  margin-top: 0;
 }
 
 /* Custom scrollbar for code blocks */
