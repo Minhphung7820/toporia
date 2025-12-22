@@ -35,7 +35,7 @@
             </svg>
           </div>
           <div class="stat-info">
-            <span class="stat-value">{{ pagination.total }}</span>
+            <span class="stat-value">{{ statistics?.total || 0 }}</span>
             <span class="stat-label">Total Comments</span>
           </div>
         </div>
@@ -357,21 +357,19 @@
         </Transition>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="pagination.lastPage > 1" class="pagination-wrapper">
-        <div class="pagination-info">
-          Showing {{ pagination.from }} to {{ pagination.to }} of {{ pagination.total }} comments
+      <!-- Cursor Pagination -->
+      <div class="cursor-pagination">
+        <div class="cursor-info">
+          Showing {{ comments.length }} comments
         </div>
-        <Pagination
-          :current-page="pagination.currentPage"
-          :last-page="pagination.lastPage"
-          :per-page="pagination.perPage"
-          :total="pagination.total"
-          :from="pagination.from"
-          :to="pagination.to"
-          @page-change="goToPage"
-          @per-page-change="onPerPageChange"
-        />
+        <button
+          v-if="cursor.hasMore"
+          @click="loadMore"
+          :disabled="loadingMore"
+          class="btn btn-secondary load-more-btn"
+        >
+          {{ loadingMore ? 'Loading...' : 'Load More' }}
+        </button>
       </div>
 
       <!-- Delete Confirmation Modal -->
@@ -652,10 +650,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
-import Pagination from '../../components/shared/Pagination.vue';
 import { useCommentsStore } from '../../stores/comments';
 import { useWebSocket } from '../../composables/useWebSocket';
 import { debounce } from 'lodash-es';
@@ -705,11 +702,16 @@ const currentLightboxImage = computed(() => {
 // Computed from store
 const comments = computed(() => store.items || []);
 const pagination = computed(() => store.pagination);
+const cursor = computed(() => store.cursor);
 const loading = computed(() => store.loading);
+const loadingMore = computed(() => store.loadingMore);
 const selectedIds = computed(() => store.selectedIds || []);
 const selectedCount = computed(() => store.selectedCount);
 const pendingCount = computed(() => store.pendingCount);
 const statistics = computed(() => store.statistics);
+
+// Track how many pages have been loaded (for URL restore)
+const loadedPages = ref(1);
 
 const isAllSelected = computed(() => {
   const items = comments.value;
@@ -755,8 +757,10 @@ const debouncedSearch = debounce(() => {
 
 const applyFilters = () => {
   store.setFilters(filters.value);
-  updateUrl({ ...filters.value, page: 1 });
-  store.fetchComments(1);
+  loadedPages.value = 1;
+  // Clear cursor, count, scroll when filters change
+  updateUrl({ ...filters.value, cursor: undefined, count: undefined, scroll: undefined });
+  store.fetchCommentsCursor(null, true); // Reset and fetch with cursor pagination
 };
 
 const clearSearch = () => {
@@ -764,15 +768,27 @@ const clearSearch = () => {
   applyFilters();
 };
 
-const goToPage = (page) => {
-  updateUrl({ page });
-  store.fetchComments(page);
+// Load more comments (cursor pagination)
+const loadMore = async () => {
+  await store.loadMore();
+  loadedPages.value++;
+  // Save state to URL for F5 restore (all params in one call)
+  const scrollY = Math.round(window.scrollY);
+  updateUrl({
+    cursor: store.cursor.next || undefined,
+    count: loadedPages.value,
+    scroll: scrollY > 0 ? scrollY : undefined
+  });
 };
 
-const onPerPageChange = (perPage) => {
-  store.setPerPage(perPage);
-  updateUrl({ per_page: perPage, page: 1 });
-  store.fetchComments(1);
+// Restore scroll position after data load
+const restoreScrollPosition = () => {
+  const savedScroll = route.query.scroll;
+  if (savedScroll) {
+    setTimeout(() => {
+      window.scrollTo({ top: parseInt(savedScroll), behavior: 'instant' });
+    }, 100);
+  }
 };
 
 // Selection
@@ -1078,7 +1094,8 @@ const deleteAndClose = (comment) => {
 const handleNewComment = (data) => {
   addToast('New comment received', 'info');
   highlightedId.value = data.id;
-  store.fetchComments(pagination.value.currentPage);
+  // Refresh with cursor pagination (reset to get newest comments)
+  store.fetchCommentsCursor(null, true);
   store.fetchStatistics();
   setTimeout(() => {
     highlightedId.value = null;
@@ -1086,22 +1103,38 @@ const handleNewComment = (data) => {
 };
 
 const handleCommentUpdated = (data) => {
-  store.fetchComments(pagination.value.currentPage);
+  // Refresh with cursor pagination (reset to get updated data)
+  store.fetchCommentsCursor(null, true);
   store.fetchStatistics();
 };
 
 // Initialize
-onMounted(() => {
-  const page = parseInt(route.query.page) || 1;
-  const perPage = parseInt(route.query.per_page) || 20;
+onMounted(async () => {
+  const limit = parseInt(route.query.limit) || 20;
   const search = route.query.search || '';
   const status = route.query.status || '';
+  const loadCount = parseInt(route.query.count) || 1; // Number of pages to load
 
   filters.value = { search, status };
   store.setFilters(filters.value);
-  store.setPerPage(perPage);
-  store.fetchComments(page);
+  store.setLimit(limit);
   store.fetchStatistics();
+
+  // If count > 1, load multiple pages to restore state after F5
+  if (loadCount > 1) {
+    // Load pages sequentially until we reach the saved position
+    for (let i = 0; i < loadCount; i++) {
+      if (i === 0) {
+        await store.fetchCommentsCursor(null, true);
+      } else if (store.cursor.hasMore) {
+        await store.fetchCommentsCursor(store.cursor.next, false);
+      }
+    }
+    loadedPages.value = loadCount;
+    restoreScrollPosition();
+  } else {
+    await store.fetchCommentsCursor(null, true);
+  }
 
   // Connect to WebSocket for realtime updates
   connect();
@@ -1944,18 +1977,38 @@ onUnmounted(() => {
   z-index: 10;
 }
 
-/* Pagination */
-.pagination-wrapper {
+/* Cursor Pagination */
+.cursor-pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+  padding: 16px 0;
 }
 
-.pagination-info {
-  font-size: 14px;
+.cursor-info {
   color: #6b7280;
+  font-size: 14px;
+}
+
+.load-more-btn {
+  padding: 10px 24px;
+  font-size: 14px;
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Modal */

@@ -6,6 +6,13 @@ export const useCommentsStore = defineStore('admin-comments', {
     items: [],
     pendingItems: [],
     statistics: null,
+    // Cursor pagination state
+    cursor: {
+      next: null,
+      hasMore: false,
+    },
+    loadingMore: false,
+    // Offset pagination state (kept for pending page)
     pagination: {
       currentPage: 1,
       lastPage: 1,
@@ -27,6 +34,7 @@ export const useCommentsStore = defineStore('admin-comments', {
       status: '',
       post_id: '',
     },
+    limit: 20,
     loading: false,
     loadingPending: false,
     error: null,
@@ -53,6 +61,63 @@ export const useCommentsStore = defineStore('admin-comments', {
       };
     },
 
+    /**
+     * Fetch comments with cursor pagination.
+     * @param {number|null} cursor - Comment ID to start from (null for first page)
+     * @param {boolean} reset - Reset items array (true for new search/filter)
+     */
+    async fetchCommentsCursor(cursor = null, reset = false) {
+      if (reset) {
+        this.loading = true;
+        this.items = [];
+      } else {
+        this.loadingMore = true;
+      }
+      this.error = null;
+
+      try {
+        const params = {
+          limit: this.limit,
+          ...Object.fromEntries(
+            Object.entries(this.filters).filter(([, v]) => v !== '')
+          ),
+        };
+        if (cursor) {
+          params.cursor = cursor;
+        }
+
+        const response = await comments.listCursor(params);
+        if (response.data.success) {
+          const newItems = (response.data.data || []).map((c) => this.transformComment(c));
+
+          if (reset) {
+            this.items = newItems;
+          } else {
+            this.items = [...this.items, ...newItems];
+          }
+
+          this.cursor = {
+            next: response.data.next_cursor,
+            hasMore: response.data.has_more,
+          };
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || 'Failed to fetch comments';
+      } finally {
+        this.loading = false;
+        this.loadingMore = false;
+      }
+    },
+
+    /**
+     * Load more comments (next page with cursor)
+     */
+    async loadMore() {
+      if (!this.cursor.hasMore || this.loadingMore) return;
+      await this.fetchCommentsCursor(this.cursor.next, false);
+    },
+
+    // Keep offset pagination for backwards compatibility
     async fetchComments(page = 1) {
       this.loading = true;
       this.error = null;
@@ -88,6 +153,10 @@ export const useCommentsStore = defineStore('admin-comments', {
 
     setPerPage(perPage) {
       this.pagination.perPage = perPage;
+    },
+
+    setLimit(limit) {
+      this.limit = limit;
     },
 
     async fetchPending(page = 1) {

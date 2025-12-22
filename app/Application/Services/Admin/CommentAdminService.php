@@ -37,6 +37,28 @@ final class CommentAdminService
     }
 
     /**
+     * Get comments with cursor-based pagination.
+     * Optimized for large tables to avoid disk I/O issues with OFFSET.
+     *
+     * @param array $filters Filter criteria
+     * @param int $limit Number of records per page
+     * @param int|null $cursor Last comment ID for pagination
+     * @return array
+     */
+    public function getCursorPaginated(array $filters = [], int $limit = 20, ?int $cursor = null): array
+    {
+        $result = $this->commentRepository->getCursorPaginated($filters, $limit, $cursor);
+
+        return [
+            'success' => true,
+            'data' => $result['data'],
+            'next_cursor' => $result['next_cursor'],
+            'has_more' => $result['has_more'],
+            'message' => 'Comments retrieved successfully',
+        ];
+    }
+
+    /**
      * Get pending comments.
      *
      * @param int $page

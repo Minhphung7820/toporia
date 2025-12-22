@@ -70,6 +70,9 @@ export const comments = {
   list(params = {}) {
     return http.get('/admin/comments', { params });
   },
+  listCursor(params = {}) {
+    return http.get('/admin/comments', { params: { ...params, pagination: 'cursor' } });
+  },
   pending(params = {}) {
     return http.get('/admin/comments/pending', { params });
   },

@@ -32,6 +32,82 @@ final class CommentAdminRepository extends BaseRepository
     }
 
     /**
+     * Get comments with cursor-based pagination.
+     * Optimized for large tables - uses indexed id column instead of OFFSET.
+     *
+     * @param array $filters Filter criteria
+     * @param int $limit Number of records per page
+     * @param int|null $cursor Last comment ID (load comments before this ID)
+     * @return array{data: array, next_cursor: int|null, has_more: bool}
+     */
+    public function getCursorPaginated(array $filters = [], int $limit = 20, ?int $cursor = null): array
+    {
+        $query = CommentModel::query()
+            ->with(['user', 'commentable', 'attachments'])
+            ->orderBy('id', 'desc');
+
+        // Apply filters
+        $this->applyCursorFilters($query, $filters);
+
+        // Cursor-based pagination: get records with id < cursor
+        if ($cursor !== null) {
+            $query->where('id', '<', $cursor);
+        }
+
+        // Get one more than limit to check if there are more
+        $comments = $query->limit($limit + 1)->get();
+
+        $hasMore = $comments->count() > $limit;
+        if ($hasMore) {
+            $comments = $comments->slice(0, $limit);
+        }
+
+        $nextCursor = $hasMore && $comments->count() > 0
+            ? $comments->last()->id
+            : null;
+
+        return [
+            'data' => $comments->toArray(),
+            'next_cursor' => $nextCursor,
+            'has_more' => $hasMore,
+        ];
+    }
+
+    /**
+     * Apply filters to cursor query.
+     */
+    private function applyCursorFilters($query, array $filters): void
+    {
+        if (isset($filters['is_approved']) && $filters['is_approved'] !== '') {
+            $query->where('is_approved', (bool) $filters['is_approved']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where('content', 'LIKE', "%{$search}%");
+        }
+
+        if (!empty($filters['post_id'])) {
+            $query->where('commentable_id', (int) $filters['post_id']);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['post_author_id'])) {
+            $authorId = (int) $filters['post_author_id'];
+            $query->where('commentable_type', 'Post');
+            $postIds = PostModel::where('author_id', $authorId)->pluck('id')->toArray();
+            if (!empty($postIds)) {
+                $query->whereIn('commentable_id', $postIds);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+    }
+
+    /**
      * Get pending comments (not approved).
      *
      * @param int $perPage

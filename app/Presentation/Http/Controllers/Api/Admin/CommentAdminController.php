@@ -34,8 +34,10 @@ final class CommentAdminController extends BaseController
     /**
      * Get all comments with filters.
      * Admin sees all comments, Moderator sees comments on their posts only.
+     * Supports both offset and cursor-based pagination.
      *
      * GET /api/admin/comments
+     * GET /api/admin/comments?pagination=cursor&limit=20&cursor=123
      */
     public function index(Request $request): JsonResponseInterface
     {
@@ -54,6 +56,16 @@ final class CommentAdminController extends BaseController
 
         $filters = array_filter($filters, fn($v) => $v !== null && $v !== '');
 
+        // Check if cursor pagination is requested
+        $cursor = $request->query('cursor');
+        if ($cursor !== null || $request->query('pagination') === 'cursor') {
+            $limit = min((int) $request->query('limit', 20), 100);
+            $cursorValue = $cursor ? (int) $cursor : null;
+            $result = $this->commentAdminService->getCursorPaginated($filters, $limit, $cursorValue);
+            return $this->json($result);
+        }
+
+        // Default offset pagination
         $page = (int) $request->query('page', 1);
         $perPage = min((int) $request->query('per_page', 20), 100);
 

@@ -303,11 +303,12 @@ const loadedPages = ref(1);
 const loadMore = async () => {
   await store.loadMore();
   loadedPages.value++;
-  // Save state to URL for F5 restore
-  saveScrollPosition();
+  // Save state to URL for F5 restore (all params in one call)
+  const scrollY = Math.round(window.scrollY);
   updateUrl({
     cursor: store.cursor.next || undefined,
-    count: loadedPages.value
+    count: loadedPages.value,
+    scroll: scrollY > 0 ? scrollY : undefined
   });
 };
 
@@ -406,7 +407,6 @@ onMounted(async () => {
   const search = route.query.search || '';
   const status = route.query.status || '';
   const isFeatured = route.query.is_featured || '';
-  const savedCursor = route.query.cursor || null;
   const loadCount = parseInt(route.query.count) || 1; // Number of pages to load
 
   filters.value = { search, status, is_featured: isFeatured };
@@ -416,16 +416,17 @@ onMounted(async () => {
   // Fetch categories for export modal
   categoriesStore.fetchSelectOptions();
 
-  // If we have a saved cursor, load multiple pages to restore state
-  if (savedCursor && loadCount > 1) {
+  // If count > 1, load multiple pages to restore state after F5
+  if (loadCount > 1) {
     // Load pages sequentially until we reach the saved position
     for (let i = 0; i < loadCount; i++) {
       if (i === 0) {
         await store.fetchPostsCursor(null, true);
-      } else if (store.cursor.next) {
+      } else if (store.cursor.hasMore) {
         await store.fetchPostsCursor(store.cursor.next, false);
       }
     }
+    loadedPages.value = loadCount;
     restoreScrollPosition();
   } else {
     await store.fetchPostsCursor(null, true);
