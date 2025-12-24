@@ -80,35 +80,10 @@
 
       <!-- Filters & Actions Bar -->
       <div class="toolbar">
-        <div class="toolbar-left">
-          <div class="search-wrapper">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              type="text"
-              v-model="filters.search"
-              placeholder="Search comments..."
-              @input="debouncedSearch"
-            />
-            <button v-if="filters.search" @click="clearSearch" class="clear-btn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-
-          <div class="filter-group">
-            <select v-model="filters.status" @change="applyFilters" class="filter-select">
-              <option value="">All Status</option>
-              <option value="approved">Approved</option>
-              <option value="pending">Pending</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-        </div>
+        <CommentFilterPanel
+          v-model="filters"
+          @apply="applyFilters"
+        />
 
         <div class="toolbar-right">
           <Transition name="slide-fade">
@@ -653,6 +628,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../../components/layout/AdminLayout.vue';
+import CommentFilterPanel from '../../components/comments/CommentFilterPanel.vue';
 import { useCommentsStore } from '../../stores/comments';
 import { useWebSocket } from '../../composables/useWebSocket';
 import { debounce } from 'lodash-es';
@@ -673,6 +649,9 @@ const { isConnected, connect, disconnect, subscribe, unsubscribe, on, off } = us
 const filters = ref({
   search: '',
   status: '',
+  post_id: null,
+  author_id: null,
+  time_range: '1h', // Default to last 1 hour
 });
 const showDeleteDialog = ref(false);
 const showBulkDeleteDialog = ref(false);
@@ -1307,7 +1286,7 @@ onUnmounted(() => {
 /* Toolbar */
 .toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
@@ -1315,10 +1294,13 @@ onUnmounted(() => {
 }
 
 .toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbar-right {
+  flex-shrink: 0;
+  padding-top: 20px;
 }
 
 .search-wrapper {

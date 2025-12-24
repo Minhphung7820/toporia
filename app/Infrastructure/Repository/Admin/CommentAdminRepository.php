@@ -95,6 +95,14 @@ final class CommentAdminRepository extends BaseRepository
             $query->where('status', $filters['status']);
         }
 
+        if (!empty($filters['author_id'])) {
+            $query->where('user_id', (int) $filters['author_id']);
+        }
+
+        if (!empty($filters['time_range'])) {
+            $this->applyTimeRangeFilter($query, $filters['time_range']);
+        }
+
         if (!empty($filters['post_author_id'])) {
             $authorId = (int) $filters['post_author_id'];
             $query->where('commentable_type', 'Post');
@@ -104,6 +112,47 @@ final class CommentAdminRepository extends BaseRepository
             } else {
                 $query->whereRaw('1 = 0');
             }
+        }
+    }
+
+    /**
+     * Apply time range filter to query.
+     *
+     * @param mixed $query Query builder instance
+     * @param string $timeRange Time range preset or custom range
+     */
+    private function applyTimeRangeFilter($query, string $timeRange): void
+    {
+        // Check if it's a custom range (format: YYYY-MM-DD_YYYY-MM-DD)
+        if (str_contains($timeRange, '_')) {
+            [$from, $to] = explode('_', $timeRange, 2);
+            $query->whereBetween('created_at', [
+                $from . ' 00:00:00',
+                $to . ' 23:59:59',
+            ]);
+            return;
+        }
+
+        // Preset time ranges
+        $now = new \DateTime();
+        $startTime = clone $now;
+
+        match ($timeRange) {
+            '1h' => $startTime->modify('-1 hour'),
+            '5h' => $startTime->modify('-5 hours'),
+            '24h' => $startTime->modify('-24 hours'),
+            '72h' => $startTime->modify('-72 hours'),
+            '7d' => $startTime->modify('-7 days'),
+            'older' => $startTime->modify('-30 days'),
+            default => null,
+        };
+
+        if ($timeRange === 'older') {
+            // Older than 7 days
+            $query->where('created_at', '<', (clone $now)->modify('-7 days')->format('Y-m-d H:i:s'));
+        } else {
+            // Between start time and now
+            $query->where('created_at', '>=', $startTime->format('Y-m-d H:i:s'));
         }
     }
 

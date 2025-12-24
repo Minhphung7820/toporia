@@ -33,6 +33,8 @@ export const useCommentsStore = defineStore('admin-comments', {
       search: '',
       status: '',
       post_id: '',
+      author_id: '',
+      time_range: '1h', // Default to last 1 hour
     },
     limit: 20,
     loading: false,
@@ -330,6 +332,8 @@ export const useCommentsStore = defineStore('admin-comments', {
         search: '',
         status: '',
         post_id: '',
+        author_id: '',
+        time_range: '1h',
       };
     },
   },

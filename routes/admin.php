@@ -29,6 +29,8 @@ use App\Presentation\Http\Controllers\Api\Admin\SettingsAdminController;
 use App\Presentation\Http\Controllers\Api\Admin\FeedbackAdminController;
 use App\Presentation\Http\Controllers\Api\Admin\UploadController;
 use App\Presentation\Http\Controllers\Api\Admin\ImportExportController;
+use App\Presentation\Http\Controllers\Api\Admin\PostSearchController;
+use App\Presentation\Http\Controllers\Api\Admin\UserSearchController;
 use Toporia\Framework\Support\Accessors\Terminal;
 use Toporia\Framework\Support\Facades\Console;
 
@@ -92,6 +94,10 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'admin']], function 
 
     // File Upload - Both admin and editor can upload
     Route::post('/upload', [UploadController::class, 'upload']);
+
+    // Search endpoints for filters/dropdowns
+    Route::get('/posts/search', [PostSearchController::class, 'search']);
+    Route::get('/users/search', [UserSearchController::class, 'search']);
 
     // =========================================================================
     // ADMIN-ONLY ROUTES

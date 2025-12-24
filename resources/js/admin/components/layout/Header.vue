@@ -100,12 +100,13 @@
                     :class="{ new: isNewComment(comment.id) }"
                     @click="goToComment(comment)"
                   >
-                    <div class="item-avatar" :style="{ background: getAvatarGradient(comment.author_name) }">
-                      {{ getInitials(comment.author_name || 'A') }}
+                    <div class="item-avatar" :style="{ background: getAvatarGradient(comment.author_name || comment.user?.name) }">
+                      <img v-if="comment.user?.avatar" :src="comment.user.avatar" :alt="comment.user.name" />
+                      <span v-else>{{ getInitials(comment.author_name || comment.user?.name || 'A') }}</span>
                     </div>
                     <div class="item-content">
                       <div class="item-header">
-                        <span class="item-author">{{ comment.author_name || 'Anonymous' }}</span>
+                        <span class="item-author">{{ comment.author_name || comment.user?.name || 'Anonymous' }}</span>
                         <span class="item-time">{{ formatTimeAgo(comment.created_at) }}</span>
                       </div>
                       <!-- Text preview (non-code part) -->
@@ -917,6 +918,22 @@ onUnmounted(() => {
   font-weight: 600;
   color: white;
   flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.item-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.item-avatar span {
+  position: relative;
+  z-index: 1;
 }
 
 .item-content {

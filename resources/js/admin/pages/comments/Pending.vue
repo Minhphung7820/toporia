@@ -172,7 +172,8 @@
                 <span class="checkmark"></span>
               </label>
               <div class="author-avatar" :style="{ background: getAvatarGradient(comment.author_name || comment.user?.name) }">
-                {{ getInitials(comment.author_name || comment.user?.name || 'A') }}
+                <img v-if="comment.user?.avatar" :src="comment.user.avatar" :alt="comment.user.name" />
+                <span v-else>{{ getInitials(comment.author_name || comment.user?.name || 'A') }}</span>
               </div>
               <div class="author-details">
                 <div class="author-name">{{ comment.author_name || comment.user?.name || 'Anonymous' }}</div>
@@ -199,9 +200,29 @@
 
           <!-- Comment Content -->
           <div class="card-content">
-            <div class="comment-text">
+            <div
+              class="comment-text"
+              :class="{ 'is-collapsed': !isExpanded(comment.id) && shouldCollapse(comment.id) }"
+              :ref="el => { if (el) commentContentRefs[comment.id] = el }"
+            >
               <p v-html="formatAdminContent(comment.content)"></p>
             </div>
+
+            <!-- Expand/Collapse Toggle -->
+            <button
+              v-if="shouldCollapse(comment.id)"
+              @click="toggleExpand(comment.id)"
+              :class="['expand-toggle', { 'is-expanded': isExpanded(comment.id) }]"
+            >
+              <span class="expand-toggle-content">
+                <span class="expand-toggle-text">{{ isExpanded(comment.id) ? 'Thu gọn' : 'Xem thêm' }}</span>
+                <span class="expand-toggle-icon">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </span>
+              </span>
+            </button>
 
             <!-- Attachments -->
             <div v-if="comment.attachments && comment.attachments.length > 0" class="comment-attachments">
@@ -539,6 +560,14 @@ const toasts = ref([]);
 // Ref for content box (for copy button setup)
 const contentBoxRef = ref(null);
 
+// Content collapse/expand state
+const commentContentRefs = ref({});
+const expandedComments = ref(new Set());
+const contentHeights = ref({});
+
+// Content collapse threshold (in pixels)
+const COLLAPSE_THRESHOLD = 200;
+
 // Computed
 const comments = computed(() => store.pendingItems);
 const pagination = computed(() => store.pendingPagination);
@@ -701,6 +730,49 @@ const setupAllCodeBlockCopyButtons = () => {
   commentCards.forEach((card) => {
     setupCodeBlockCopyButtonsInContainer(card);
   });
+};
+
+// Measure content height for a specific comment
+const measureCommentHeight = (commentId) => {
+  const el = commentContentRefs.value[commentId];
+  if (el) {
+    // Temporarily remove max-height to measure full height
+    const originalMaxHeight = el.style.maxHeight;
+    const originalOverflow = el.style.overflow;
+    el.style.maxHeight = 'none';
+    el.style.overflow = 'visible';
+    contentHeights.value[commentId] = el.scrollHeight;
+    el.style.maxHeight = originalMaxHeight;
+    el.style.overflow = originalOverflow;
+  }
+};
+
+// Measure all comment heights
+const measureAllCommentHeights = () => {
+  comments.value.forEach((comment) => {
+    measureCommentHeight(comment.id);
+  });
+};
+
+// Check if a comment should be collapsible
+const shouldCollapse = (commentId) => {
+  return (contentHeights.value[commentId] || 0) > COLLAPSE_THRESHOLD;
+};
+
+// Check if a comment is expanded
+const isExpanded = (commentId) => {
+  return expandedComments.value.has(commentId);
+};
+
+// Toggle expand/collapse for a specific comment
+const toggleExpand = (commentId) => {
+  if (expandedComments.value.has(commentId)) {
+    expandedComments.value.delete(commentId);
+  } else {
+    expandedComments.value.add(commentId);
+  }
+  // Force reactivity
+  expandedComments.value = new Set(expandedComments.value);
 };
 
 const isUrgent = (date) => {
@@ -903,10 +975,11 @@ onUnmounted(() => {
   unsubscribe('admin.comments');
 });
 
-// Watch for comments changes to setup copy buttons
+// Watch for comments changes to setup copy buttons and measure heights
 watch(comments, () => {
   nextTick(() => {
     setupAllCodeBlockCopyButtons();
+    measureAllCommentHeights();
   });
 }, { immediate: false });
 
@@ -915,6 +988,7 @@ watch(loading, (newLoading, oldLoading) => {
   if (oldLoading && !newLoading) {
     nextTick(() => {
       setupAllCodeBlockCopyButtons();
+      measureAllCommentHeights();
     });
   }
 });
@@ -1361,6 +1435,22 @@ watch(loading, (newLoading, oldLoading) => {
   font-weight: 600;
   color: white;
   flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.author-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.author-avatar span {
+  position: relative;
+  z-index: 1;
 }
 
 .author-avatar.large {
@@ -1454,6 +1544,65 @@ watch(loading, (newLoading, oldLoading) => {
   color: #374151;
   line-height: 1.7;
   white-space: pre-wrap;
+}
+
+/* Collapsed state for long content */
+.comment-text.is-collapsed {
+  position: relative;
+  max-height: 200px;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+/* Gradient fade overlay for collapsed content */
+.comment-text.is-collapsed::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70px;
+  background: linear-gradient(to bottom, rgba(249,250,251,0) 0%, rgba(249,250,251,1) 100%);
+  pointer-events: none;
+}
+
+/* Expand/Collapse Toggle Button */
+.expand-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.expand-toggle:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.expand-toggle-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expand-toggle-icon {
+  display: flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.expand-toggle.is-expanded .expand-toggle-icon {
+  transform: rotate(180deg);
 }
 
 /* Text segments in comment cards */
